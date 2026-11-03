@@ -157,7 +157,8 @@ Set these in front of the command, for example `AGENT_MODEL=sonnet PORT=9000 ./r
 | Home     | `/`         | What Agents Atelier is, its features, the team, your recent projects          |
 | Projects | `/projects` | All projects: stats, search, filters, sort, grid or list view, pagination     |
 | Studio   | `/p/<id>`   | One project: chat, live preview, code editor, team (opened from a project)    |
-| Agents   | `/agents`   | View, edit, add, delete and reorder agents, plus the shared rules             |
+| Agents   | `/agents`   | List and reorder agents; `/agents/<id>` to view one, `/agents/new` to create, `/agents/<id>/edit`, `/agents/rules` |
+| Teams    | `/teams`    | List teams; `/teams/<id>` to view one, `/teams/new` to create, `/teams/<id>/edit` |
 | Guide    | `/guide`    | A full tour, tips for prompts, shortcuts and an FAQ                           |
 
 ### Inside the studio
@@ -206,16 +207,20 @@ Set these in front of the command, for example `AGENT_MODEL=sonnet PORT=9000 ./r
 "default" means your Claude Code model (or `AGENT_MODEL`). The mechanical agents use the faster `sonnet`, while the
 planning and judging agents use the stronger default.
 
-### Presets
+### Teams
 
-| Preset  | Agents                             | Use it for                              |
+A **team** is a set of agents that run together, always in the agents' order. Pick one in a project's Team panel, or
+manage them on the **Teams** page: create your own, view a team's agents with estimated time and cost, edit, duplicate
+or delete it. The four built-in teams can be viewed and duplicated, but not changed.
+
+| Team    | Agents                             | Use it for                              |
 |---------|------------------------------------|-----------------------------------------|
 | Default | the 10 agents marked "on"          | A new page                              |
 | Quick   | HTML, CSS                          | Small changes, fastest and cheapest     |
 | Polish  | Accessibility, Performance, Critic | Improving a page that already exists    |
 | Full    | all 15                             | The most thorough result                |
 
-Choose a preset from the Team panel, or save your current selection as your own preset.
+In the studio, choose a team from the Team panel, or save your current selection as a new team.
 
 ## Customising the agents
 
@@ -235,8 +240,13 @@ You are the Dark mode agent. Add a dark theme using prefers-color-scheme,
 reusing the CSS variables in :root. Don't change the light theme.
 ```
 
-- **Edit it on the Agents page** (`/agents`), with an icon picker, colours and model, or in any text editor.
-  Changes apply to the next run, with no restart needed.
+- **Create, view and edit agents** on the Agents pages (`/agents`, `/agents/new`, `/agents/<id>`), or in any text
+  editor. Changes apply to the next run, with no restart needed.
+- **Models come from a list, not free text.** The list holds the aliases your Claude CLI advertises
+  (`fable`, `opus`, `sonnet`, read from `claude --help`), the current full model names (`claude-opus-5-5`,
+  `claude-sonnet-5-5`, `claude-haiku-5-5`, `claude-fable-5-1`), and any model you add with **Another model… → Check
+  with Claude CLI**. That check makes one tiny call, and only models the CLI accepts are saved. An agent whose
+  file names an unknown model gets a warning on its page and in the studio, and fails at once with a clear message.
 - **The number in the file name sets the order.** Drag agents on the Agents page to reorder them.
 - **`agents/_common.md`** holds the shared rules every agent follows. Edit it to change what all agents know.
 - Full details are in [doc.md](doc.md#3-agents).
@@ -251,9 +261,20 @@ reusing the CSS variables in :root. Don't change the light theme.
   code first. Stopped runs can be continued, even after a server restart.
 - **Your files are yours.** They live in `work/<project-id>/`, so you can open and edit them in any editor. The next
   prompt's agents read the current files first.
-- **Safety:**
-  - Agents only touch files inside their project folder.
-  - The server only listens on your machine and has no login, so don't expose it to a network.
+- **Safety and prompt injection.** Agents read text you didn't write yourself: earlier agents' notes, `plan.md`,
+  the page, text inside images. So they're treated as untrusted:
+  - **Locked to the project folder.** Each agent runs Claude Code in `--restricted` mode with only five file tools
+    (read, write, edit, search). It has no shell, no web, no MCP servers, and none of your personal Claude settings.
+    Reads and writes outside the project folder are blocked by the CLI itself.
+  - **Data is marked as data.** Project details, notes and image paths are passed in labelled blocks and cleaned so
+    they can't fake their way out. Every agent also gets security rules that the server adds last and that can't be
+    edited away.
+  - **You're told when something's off.** A blocked attempt (for example reading `/etc/passwd`), or a page that
+    starts loading scripts, iframes or data from another site, shows a **Security check** card in the chat.
+  - **Generated pages are sandboxed.** In the preview, in thumbnails or in their own tab, they run in an isolated
+    origin, so their JavaScript can't use the app's API.
+  - **Only your own browser tabs can make changes.** The server only answers on `localhost`, refuses changes coming
+    from other websites, and has no login, so don't expose it to a network.
 - **Limits:**
   - requests up to 8 MB
   - reference images up to 5 MB each (PNG, JPG, WebP, GIF), up to 6 per prompt
@@ -287,6 +308,25 @@ Yes, in the Code tab or in any editor. The agents read the current files on the 
 **Does it work offline?**
 The app does, but the agents need Claude Code to reach Claude.
 
+## Tests
+
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+The suite (`tests/test_server.py`, about 40 tests in roughly 15 seconds) starts its own server on a free port, with a
+temporary copy of `agents/` and an empty `work/` folder, so your data is never touched. It uses a **fake Claude CLI**
+(`tests/fake-claude`), so no model is called and nothing is spent. It covers:
+- every page and API error path
+- request guards (foreign Host, cross-site writes, body size)
+- files, uploads and versions
+- agents, models and teams
+- WebSocket messages
+- full runs: stop / continue / start again / retry, timeouts, CLI errors
+- the prompt-injection defences: tool isolation, data blocks, blocked actions and the page scan
+
+Set `KEEP_TEST_FILES=1` to keep the temporary folder for inspection.
+
 ## Troubleshooting
 
 | You see                                | What to do                                                                     |
@@ -297,6 +337,8 @@ The app does, but the agents need Claude Code to reach Claude.
 | "Can't reach the server"               | Start it with `./run.sh`, or check the port                                    |
 | A banner saying the connection dropped | The studio reconnects by itself; agents keep working on the server            |
 | An agent "ran for more than N minutes" | Press **Continue**, or raise `AGENT_TIMEOUT`                                   |
+| A **Security check** card in the chat  | Read what was blocked or found, check the files, restore a version if needed   |
+| "Unknown host" or "other websites"     | Open the app at `http://localhost:<port>` (set `ATELIER_HOSTS` to allow another name) |
 | An error with a **ref** code           | Search the server's terminal output for that ref to see the full details       |
 
 ## Project layout
@@ -308,5 +350,6 @@ The app does, but the agents need Claude Code to reach Claude.
 ├── run.sh           start the server
 ├── agents/          the agent team: one Markdown file per agent, shared rules, saved presets
 ├── server/          the Python server (FastAPI) and the web pages
+├── tests/           automated tests and a fake Claude CLI
 └── work/            your projects, chat history and versions (created at first run, not in git)
 ```

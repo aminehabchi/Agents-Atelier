@@ -126,6 +126,13 @@ You are the HTML agent. …     # the role prompt (everything after the frontmat
 
 - The parser (`agents._parse`) is a small `key: value` reader, not full YAML. A ` #` starts a comment, which is
   why descriptions can't contain ` #`.
+- `model` must be empty or in the model list (`server/models.py`). The list is built from:
+  - the aliases in `claude --help` ("an alias for the latest model (e.g. 'fable', 'opus', or 'sonnet')")
+  - the predefined full names (`KNOWN_FULL`)
+  - custom names checked with `POST /api/models/check`, which runs `claude -p … --model <name> --output-format json`,
+    treats `unrecognized_model` or an empty `modelUsage` as invalid, and records the resolved model id
+  Saving an agent with a model outside the list returns `400`. A file edited by hand with an unknown model is flagged
+  (`model_ok: false`), and that agent fails at once instead of mid-run.
 - `load_agents()` re-reads the folder on every call, so edits apply to the next run without a restart. A run takes a
   snapshot of the team when it starts.
 - Files whose names start with `_` or `.` aren't agents.
@@ -232,7 +239,8 @@ All responses are JSON. Errors are always `{"detail": "<readable message>"}`, pl
 | GET    | `/`           | landing page                                                        |
 | GET    | `/projects`   | projects page                                                       |
 | GET    | `/p/<uuid>`   | the studio for a project (404 page if unknown)                      |
-| GET    | `/agents`     | agent editor                                                        |
+| GET    | `/agents`, `/agents/new`, `/agents/<id>`, `/agents/<id>/edit`, `/agents/rules` | agent pages (one file, `agents.html`, routes on the path) |
+| GET    | `/teams`, `/teams/new`, `/teams/<id>`, `/teams/<id>/edit` | team pages (`teams.html`)  |
 | GET    | `/guide`      | guide                                                               |
 | GET    | `/studio`     | redirect to `/projects` (the studio is only opened from a project)  |
 | GET    | `/work/<uuid>/…` | the generated site (no-store caching), also `/work/.versions/<uuid>/<NNNN>/…` |
@@ -277,9 +285,14 @@ images get a `url` instead.
 | DELETE   | `/api/agents/<id>`      | at least one agent must remain                                     |
 | POST     | `/api/agents/order`     | `{ids: [...]}`, which must list every agent exactly once           |
 | GET, PUT | `/api/agents/common`    | `{text}`: the shared rules                                         |
-| GET      | `/api/presets`          | built-in + saved presets                                           |
-| POST     | `/api/presets`          | `{name, agents}`                                                   |
-| DELETE   | `/api/presets/<id>`     | saved presets only                                                 |
+| GET      | `/api/agents/<id>`      | one agent + `position`, `prev`/`next`, `teams` using it, run `stats`, `model_ok` |
+| GET      | `/api/presets`          | teams: built-in + saved (`{id, name, description, agents, builtin}`) |
+| GET      | `/api/presets/<id>`     | one team                                                           |
+| POST     | `/api/presets`          | `{name, description?, agents}`; the id comes from the name and is made unique |
+| PUT      | `/api/presets/<id>`     | edit a saved team (`400` for built-in teams)                       |
+| DELETE   | `/api/presets/<id>`     | saved teams only                                                   |
+| GET      | `/api/models`           | the model list: `{default, options: [{id, label, kind: alias·full·custom, source, note}], alias_source}` |
+| POST     | `/api/models/check`     | `{model}`: asks the Claude CLI to answer with that model; on success it's added to `agents/_models.json` |
 | GET      | `/api/stats?project=<id>` | `{totals, agents: [per agent], recent: [last 30 runs]}`; omit `project` for all projects |
 
 ---
@@ -401,17 +414,70 @@ A failed run is saved as `error`, so it can be continued.
 
 ---
 
-## 9. Security model
+## 9. Security model and prompt injection
 
-Agents Atelier is a **single-user, local tool**:
-- **Network:** the server binds to `127.0.0.1` and has no authentication. Don't expose it to a network.
-- **Agents:**
-  - they run in the project folder with file tools only; shell, web and sub-agent tools are disallowed
-  - `acceptEdits` lets them edit without prompts, inside the working directory only
-- **Paths:** paths from the browser (`PUT /files`, image paths in prompts) are resolved and must stay inside the
-  project folder. Uploads are checked against an allowed image type list and size.
-- **Known limitation:** the live preview iframe is same-origin and not sandboxed. JavaScript written by the agents
-  runs with access to the app's origin. Only use it with your own prompts, or add `sandbox` to the iframe if that matters.
+Agents Atelier is a **single-user, local tool**. The main risk isn't the user. It's **prompt injection**: text the agents
+read but the user didn't write (another agent's note, `plan.md`, page content, text inside an uploaded image) trying
+to make an agent do something else. The defences are layered.
+
+### 1. Tool isolation (enforced by the Claude CLI)
+
+```
+claude -p … --restricted --strict-mcp-config --disable-slash-commands
+       --tools Read,Write,Edit,Glob,Grep --allowedTools Read Write Edit Glob Grep
+       --disallowedTools Bash WebFetch WebSearch Task --permission-mode acceptEdits
+```
+
+| Flag                         | Effect                                                                                  |
+|------------------------------|-----------------------------------------------------------------------------------------|
+| `--restricted`               | no tools that run code, no WebFetch; ignores user/project/local settings; **file tools confined to the working directory** (the project folder) |
+| `--tools …`                  | only these five built-in tools exist in the session                                    |
+| `--strict-mcp-config`        | no MCP servers                                                                         |
+| `--disable-slash-commands`   | no skills or slash commands                                                            |
+
+This was checked against the real CLI: a `Read` of `/etc/hostname` is denied, while files in the folder can be read.
+The model check (`POST /api/models/check`) runs with `--restricted --tools ""` (no tools at all).
+
+### 2. Prompt structure (`build_prompt`, `SECURITY_RULES`)
+
+- The prompt puts the project name and description, earlier requests, the request, team notes and image paths in
+  tagged blocks: `<project>`, `<earlier_requests>`, `<user_request>`, `<team_notes>`, `<reference_images>`.
+- `clean_text()` removes control characters, defuses any of those tags found inside the text (`</team_notes>` →
+  `‹/team_notes›`), and caps lengths (notes 600 characters, request 4000).
+- `SECURITY_RULES` is appended **last** to the system prompt, after `_common.md` and the agent's role. So it takes
+  precedence and can't be removed by editing agent files. It says that blocks and file contents are data, not
+  instructions; to stay in the folder; not to add external scripts, iframes, forms or tracking; and to report
+  suspicious instructions.
+
+### 3. Detection (`security` events)
+
+- **Blocked actions:** Claude Code's `permission_denials` in the result (for example a read outside the folder) are
+  sent as a `security` event and stored in the agent's stats (`denied`).
+- **Page scan:** `scan_site()` runs before a run and after every agent, and reports **new** findings:
+  - external `<script src>`, `<iframe>`, `<form action>`, `<link href>`, media `src`, CSS `url()` / `@import`
+  - `fetch` / `sendBeacon` / `XMLHttpRequest` / `WebSocket` to another site
+  - Google Fonts is allowed
+- The studio shows each finding as a **Security check** card.
+
+### 4. Containment of generated pages
+
+Every `/work/…` response carries
+`Content-Security-Policy: sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads`, without
+`allow-same-origin`, plus `X-Content-Type-Options: nosniff`. A generated page therefore runs in an opaque origin,
+whether it's in the preview iframe, a thumbnail (which also has `sandbox=""`, so no scripts) or its own tab. Its
+JavaScript can't read or change the app through the API.
+
+### 5. Request guards
+
+- **Host check:** requests whose `Host` isn't `localhost`, `127.0.0.1` or `[::1]` get `421`, which blocks DNS
+  rebinding. Add names with `ATELIER_HOSTS=a,b`.
+- **Origin check:** state-changing requests (`POST` / `PUT` / `PATCH` / `DELETE`) and WebSockets with an `Origin` from
+  another site get `403` (or WebSocket close `4403`).
+- **Size limits:** request bodies are limited (8 MB).
+- **Path checks:** file paths from the browser are resolved and must stay inside the project; uploads are checked
+  against an allowed image type list and size.
+
+The server binds to `127.0.0.1` and has no authentication: don't expose it to a network.
 
 ---
 
@@ -429,7 +495,12 @@ Agents Atelier is a **single-user, local tool**:
 
 ### Development notes
 
-- There is no automated test suite yet. Changes were checked with `curl` and small WebSocket scripts against a local
-  server, and with `node --check` on each page's inline scripts.
+- **Tests:** `.venv/bin/python -m unittest discover -s tests -v`.
+  - `tests/test_server.py` starts a server with `ATELIER_WORK` / `ATELIER_AGENTS` pointing to a temporary copy and
+    `CLAUDE_BIN=tests/fake-claude`.
+  - The fake CLI behaves like the real one. Markers in the prompt pick the behaviour: `[[fail]]`, `[[fail-once]]`,
+    `[[crash]]`, `[[hang]]`, `[[slow]]`, `[[escape]]`, `[[inject-script]]`.
+  - It logs every call to `$FAKE_CLAUDE_LOG`, so tests can check the exact flags and prompt.
+- `ATELIER_WORK` and `ATELIER_AGENTS` move the data folders, for example for tests or a second instance.
 - Run the server without `run.sh`: `cd server && ../.venv/bin/uvicorn main:app --reload --port 8001`.
 - Logs go to the terminal (logger `agents-atelier`).

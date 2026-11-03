@@ -13,39 +13,78 @@
 <script src="/static/icons.js"></script>
 <script src="/static/ui.js"></script>
 <style>
-  .layout { display: grid; grid-template-columns: 340px 1fr; gap: 24px; margin-top: 0; align-items: start; }
-  .side { position: sticky; top: 88px; background: var(--paper); border-radius: 24px; box-shadow: var(--ring); padding: 10px; max-height: calc(100vh - 110px); display: flex; flex-direction: column; }
-  .side .head { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 8px; font-size: 13px; color: var(--stone); }
-  .alist { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 2px; }
-  .aitem { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 6px; border-radius: 14px; cursor: pointer; border: 1px solid transparent; background: none; text-align: left; width: 100%; }
-  .aitem:hover { background: var(--linen); }
-  .aitem.on { background: var(--bone); }
-  .aitem.dragging { opacity: .4; }
-  .aitem.drop-before { box-shadow: 0 -2px 0 var(--ink); }
-  .aitem.drop-after { box-shadow: 0 2px 0 var(--ink); }
-  .grip { color: var(--line-strong); cursor: grab; display: grid; place-items: center; width: 14px; }
-  .aitem:hover .grip { color: var(--stone); }
-  .num { font: 11px ui-monospace, monospace; color: var(--stone); width: 18px; text-align: right; }
-  .tile { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
-  .aitem .nm { flex: 1; min-width: 0; font-size: 14px; line-height: 1.3; }
-  .aitem .nm b { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .aitem .nm small { display: block; font-size: 12px; color: var(--stone); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
-  .aitem .badge { font-size: 11px; padding: 2px 8px; }
-  .aitem .dirty { width: 6px; height: 6px; border-radius: 50%; background: var(--ink); }
-  .sep { height: 1px; background: var(--line); margin: 6px 8px; }
+  .bar-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+  .bar-top h1 { margin: 0 auto 0 0; font-weight: 400; font-size: 40px; letter-spacing: -.05em; line-height: 1.1; }
+  .crumb { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--graphite); text-decoration: none; margin-bottom: 18px; }
+  .crumb:hover { color: var(--ink); }
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+  .controls .search { flex: 1 1 240px; max-width: 360px; }
+  .fchip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); font-size: 13px; color: var(--graphite); line-height: 1; }
+  .fchip:hover { border-color: var(--graphite); color: var(--ink); }
+  .fchip.on { background: var(--espresso); border-color: var(--espresso); color: #fff; }
+  .hint { font-size: 13px; color: var(--stone); margin: 0 0 12px; display: flex; gap: 6px; align-items: center; }
+  .tile { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
+  .badge.mono { font-family: ui-monospace, monospace; }
 
-  .editor { background: var(--paper); border-radius: 24px; box-shadow: var(--ring); padding: 32px; min-height: 400px; }
-  .ehead { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
-  .ehead .tile { width: 56px; height: 56px; border-radius: 18px; }
-  .ehead h2 { margin: 0; font-weight: 400; font-size: 32px; letter-spacing: -.03em; line-height: 1.1; }
-  .ehead .file { font: 12px ui-monospace, monospace; color: var(--stone); margin-top: 4px; }
+  /* ---------- list ---------- */
+  .alist { background: var(--paper); border-radius: 24px; box-shadow: var(--ring); overflow: hidden; }
+  .arow { position: relative; display: grid; grid-template-columns: 18px 26px 36px minmax(0, 1fr) auto auto 18px; gap: 14px; align-items: center;
+    padding: 14px 18px 14px 12px; border-bottom: 1px solid var(--line); text-decoration: none; transition: background .15s; }
+  .arow:last-child { border-bottom: 0; }
+  .arow:hover { background: var(--linen); }
+  .arow.dragging { opacity: .4; } .arow.drop-before { box-shadow: inset 0 2px 0 var(--ink); } .arow.drop-after { box-shadow: inset 0 -2px 0 var(--ink); }
+  .arow .grip { color: var(--line-strong); cursor: grab; display: grid; place-items: center; }
+  .arow:hover .grip { color: var(--stone); }
+  .arow .num { font: 12px ui-monospace, monospace; color: var(--stone); text-align: right; }
+  .arow .nm { min-width: 0; }
+  .arow .nm b { display: block; font-weight: 500; font-size: 15px; }
+  .arow .nm small { display: block; font-size: 13px; color: var(--graphite); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .arow .meta { display: flex; gap: 6px; align-items: center; }
+  .arow .teams { font-size: 12px; color: var(--stone); white-space: nowrap; }
+  .arow .go { color: var(--stone); }
+  .rules-row { display: flex; align-items: center; gap: 14px; background: var(--paper); border-radius: 18px; box-shadow: var(--ring); padding: 14px 18px; text-decoration: none; margin-bottom: 12px; }
+  .rules-row:hover { background: var(--linen); }
+  .rules-row b { font-weight: 500; } .rules-row small { display: block; color: var(--stone); font-size: 13px; }
+  .rules-row .go { margin-left: auto; color: var(--stone); }
+
+  /* ---------- view ---------- */
+  .card { background: var(--paper); border-radius: 24px; box-shadow: var(--ring); padding: 28px; }
+  .vhead { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+  .vhead .tile { width: 64px; height: 64px; border-radius: 20px; }
+  .vhead h1 { margin: 0; font-weight: 400; font-size: 40px; letter-spacing: -.05em; line-height: 1.05; }
+  .vhead .sub { font: 12px ui-monospace, monospace; color: var(--stone); margin-top: 6px; }
+  .vhead .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .vhead .acts { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .vdesc { font-size: 18px; line-height: 1.5; color: var(--graphite); margin: 22px 0 0; max-width: 760px; }
+  .grid2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 16px; align-items: start; }
+  .card h2 { margin: 0 0 14px; font-weight: 500; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .card h2 .spacer { flex: 1; }
+  pre.role { margin: 0; white-space: pre-wrap; font: 13.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--charcoal); background: var(--linen); border-radius: 14px; padding: 18px; }
+  .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kv div { background: var(--linen); border-radius: 14px; padding: 14px; }
+  .kv b { display: block; font-weight: 400; font-size: 24px; letter-spacing: -.03em; font-feature-settings: "tnum"; }
+  .kv span { font-size: 12px; color: var(--stone); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 999px; background: var(--linen); text-decoration: none; font-size: 13px; }
+  .chip:hover { background: var(--bone); }
+  .empty-note { font-size: 14px; color: var(--stone); margin: 0; }
+  .pager-nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; }
+
+  /* ---------- form ---------- */
   .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   .field { display: flex; flex-direction: column; gap: 8px; }
   .field.full { grid-column: 1 / -1; }
-  .field > span { font-size: 13px; font-weight: 500; color: var(--charcoal); display: flex; justify-content: space-between; }
-  .field > span small { font-weight: 400; color: var(--stone); }
+  .field > span { font-size: 13px; font-weight: 500; color: var(--charcoal); display: flex; justify-content: space-between; gap: 12px; }
+  .field > span small { font-weight: 400; color: var(--stone); text-align: right; }
   .field .input:disabled { color: var(--stone); background: var(--linen); }
-  textarea.role { min-height: 260px; resize: vertical; font: 13.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .field .help { font-size: 12px; color: var(--stone); line-height: 1.5; }
+  textarea.role-input { min-height: 300px; resize: vertical; font: 13.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  select.input { appearance: none; padding-right: 36px; background: var(--mist) no-repeat right 12px center / 14px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23898683' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
+  .other-model { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .other-model .input { flex: 1 1 220px; }
+  .check-result { font-size: 13px; display: flex; gap: 6px; align-items: center; }
+  .check-result.ok { color: #1f7a3f; } .check-result.err { color: var(--danger); }
   .icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
   .icons button { aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--line); background: var(--paper); display: grid; place-items: center; color: var(--graphite); }
   .icons button:hover { border-color: var(--graphite); color: var(--ink); }
@@ -59,15 +98,16 @@
   .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; }
   .switch input:checked { background: var(--espresso); }
   .switch input:checked::after { transform: translateX(16px); }
-  .actions { display: flex; gap: 8px; align-items: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
-  .actions .status { font-size: 13px; color: var(--stone); margin-right: auto; display: inline-flex; gap: 6px; align-items: center; }
-  .note { font-size: 13px; color: var(--stone); margin: 0 0 20px; display: flex; gap: 8px; }
+  .form-actions { display: flex; gap: 8px; align-items: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .form-actions .status { font-size: 13px; color: var(--stone); margin-right: auto; display: inline-flex; gap: 6px; align-items: center; }
+  .note { font-size: 13px; color: var(--stone); margin: 0 0 20px; display: flex; gap: 8px; line-height: 1.5; }
 
   @media (max-width: 900px) {
-    .layout { grid-template-columns: 1fr; }
-    .side { position: static; max-height: none; }
-    .fields { grid-template-columns: 1fr; }
-    .editor { padding: 20px; }
+    .grid2, .fields { grid-template-columns: 1fr; }
+    .arow { grid-template-columns: 18px 36px minmax(0, 1fr) 18px; }
+    .arow .num, .arow .meta, .arow .teams { display: none; }
+    .card { padding: 20px; }
+    .vhead .acts { margin-left: 0; }
   }
 </style>
 </head>
@@ -79,269 +119,345 @@
     <nav class="links">
       <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
       <a href="/agents" class="on"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
       <a href="/guide"><i data-icon="book" data-size="16"></i>Guide</a>
     </nav>
     <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
   </div>
 </header>
 
-<main class="wrap page">
-  <h1 class="sr-only">Agents</h1>
-
-  <div class="layout">
-    <aside class="side">
-      <div class="head"><span id="count"></span>
-        <button class="btn btn-dark btn-sm" id="add"><i data-icon="plus" data-size="16"></i>New agent</button></div>
-      <div class="alist" id="list"></div>
-    </aside>
-    <section class="editor" id="editor"></section>
-  </div>
-</main>
+<main class="wrap page" id="app"></main>
 
 <script>
 const $ = (id) => document.getElementById(id);
+const app = $("app");
 const AGENT_ICONS = ["clipboard","compass","palette","type","code","image","brush","devices","zap","sparkles","accessibility","search",
   "gauge","bug","award","bot","eye","layers","message","pencil","file","folder","users","monitor","phone","clock","alert","check"];
 const COLORS = ["#8b5cf6","#6366f1","#0ea5e9","#06b6d4","#14b8a6","#10b981","#84cc16","#eab308","#f59e0b","#f97316","#ef4444","#ec4899","#d946ef","#766a7c"];
+const slug = (s) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
+const go = (path) => { dirty = false; location.href = path; };
+let dirty = false;
+window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("scroll", () => document.querySelector("header.top").classList.toggle("scrolled", scrollY > 4));
+document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
 
-let agents = [], current = null, draft = null, isNew = false, common = "";
-
-// ================================================================ load
-async function load(selectId) {
-  try {
-    [agents, { text: common }] = await Promise.all([api("/api/agents?full=1"), api("/api/agents/common")]);
-  } catch (err) {
-    $("list").innerHTML = "";
-    $("count").textContent = "";
-    return showError($("editor"), err, () => load(selectId), "Couldn't load the agents");
-  }
-  renderList();
-  select(selectId ?? current ?? agents[0]?.id);
+// ================================================================ router
+const parts = location.pathname.replace(/\/+$/, "").split("/").slice(2).map(decodeURIComponent);   // after /agents
+function route() {
+  if (!parts.length) return listView();
+  if (parts[0] === "new") return formView(null);
+  if (parts[0] === "rules") return rulesView();
+  if (parts[1] === "edit") return formView(parts[0]);
+  return detailView(parts[0]);
 }
+function setTitle(t) { document.title = `${t} · Agents Atelier`; }
 
-function renderList() {
-  $("count").textContent = `${agents.length} agents · ${agents.filter(a => a.default).length} on by default`;
-  $("list").innerHTML = `
-    <button class="aitem ${current === "_common" ? "on" : ""}" data-id="_common">
-      <span class="grip"></span><span class="num"></span>
-      <span class="tile" style="--c:#766a7c">${icon("layers", { size: 16 })}</span>
-      <span class="nm"><b>Shared rules</b><small>Given to every agent first</small></span><span class="badge">all</span></button>
-    <div class="sep"></div>` +
-    agents.map((a, i) => `
-    <div class="aitem ${a.id === current ? "on" : ""}" data-id="${esc(a.id)}" draggable="true" role="button" tabindex="0">
-      <span class="grip" title="Drag to reorder">${icon("menu", { size: 12 })}</span>
-      <span class="num">${i + 1}</span>
-      <span class="tile" style="--c:${a.color}">${icon(a.icon, { size: 16 })}</span>
-      <span class="nm"><b>${esc(a.name)}</b><small>${esc(a.description || "No description")}</small></span>
-      ${a.id === current && isDirty() ? `<span class="dirty" title="Unsaved changes"></span>` : ""}
-      ${a.model ? `<span class="badge mono" title="Model">${esc(a.model)}</span>` : ""}${a.default ? "" : `<span class="badge">off</span>`}
-    </div>`).join("") +
-    (isNew ? `<div class="aitem on"><span class="grip"></span><span class="num">${agents.length + 1}</span>
-      <span class="tile" style="--c:${draft.color}">${icon(draft.icon, { size: 16 })}</span><span class="nm"><b>${esc(draft.name || "New agent")}</b><small>${esc(draft.description || "Not saved yet")}</small></span>
-      <span class="dirty"></span></div>` : "");
-}
-
-// ================================================================ select & edit
-async function select(id) {
-  if (id !== current && isDirty() &&
-      !await confirmDialog({ title: "Discard changes?", text: "You have unsaved changes to this agent.", ok: "Discard", danger: true })) return;
-  isNew = false;
-  current = id;
-  if (id === "_common") draft = { text: common };
-  else { const a = agents.find(a => a.id === id); draft = a ? { ...a } : null; }
-  renderList(); renderEditor();
-  if (draft) dirtyChanged();
-}
-
-function original() {
-  if (isNew) return { id: "", name: "", icon: "bot", color: "#766a7c", default: true, description: "", model: "", role: "" };
-  if (current === "_common") return { text: common };
-  return agents.find(a => a.id === current);
-}
-function isDirty() {
-  if (!draft) return false;
-  if (isNew) return true;
-  const o = original(); if (!o) return false;
-  return Object.keys(draft).some(k => draft[k] !== o[k]);
-}
-
-function renderEditor() {
-  const ed = $("editor");
-  if (!draft) { ed.innerHTML = `<p class="note">Pick an agent on the left.</p>`; return; }
-
-  if (current === "_common" && !isNew) {
-    ed.innerHTML = `
-      <div class="ehead"><span class="tile" style="--c:#766a7c">${icon("layers", { size: 26 })}</span>
-        <div><h2>Shared rules</h2><div class="file">agents/_common.md</div></div></div>
-      <p class="note">${icon("alert", { size: 16 })}Given to every agent before its own role. Keep the file list and “plain HTML/CSS/JS” rules unless you change how projects work.</p>
-      <label class="field full"><span>Instructions</span><textarea class="input role" id="f-text" spellcheck="false">${esc(draft.text)}</textarea></label>
-      ${actionsBar(false)}`;
-    $("f-text").addEventListener("input", (e) => { draft.text = e.target.value; dirtyChanged(); });
-    return;
-  }
-
-  ed.innerHTML = `
-    <div class="ehead"><span class="tile" id="preview-tile" style="--c:${draft.color}">${icon(draft.icon, { size: 26 })}</span>
-      <div><h2 id="preview-name">${esc(draft.name || "New agent")}</h2>
-      <div class="file">${isNew ? "will be saved as agents/" + String(agents.length + 1).padStart(2, "0") + "-&lt;id&gt;.md" : "agents/" + esc(draft.file)}</div></div></div>
-    <div class="fields">
-      <label class="field"><span>Name</span><input class="input" id="f-name" maxlength="40" value="${esc(draft.name)}" placeholder="e.g. Dark mode"></label>
-      <label class="field"><span>Id <small>${isNew ? "lowercase, numbers, dashes" : "can’t be changed"}</small></span>
-        <input class="input mono" id="f-id" value="${esc(draft.id)}" ${isNew ? "" : "disabled"} placeholder="dark-mode"></label>
-      <div class="field"><span>Icon</span><div class="icons" id="f-icons">${AGENT_ICONS.map(n =>
-        `<button type="button" data-icon-name="${n}" class="${n === draft.icon ? "on" : ""}" title="${n}">${icon(n, { size: 18 })}</button>`).join("")}</div></div>
-      <div class="field"><span>Color <small>used as a small accent</small></span>
-        <div class="colors" id="f-colors">${COLORS.map(c => `<button type="button" data-color="${c}" style="--c:${c}" class="${c === draft.color ? "on" : ""}" title="${c}"></button>`).join("")}
-          <input type="color" id="f-color" value="${esc(draft.color)}" title="Custom color"></div>
-        <label class="switch" style="margin-top:16px"><input type="checkbox" id="f-default" ${draft.default ? "checked" : ""}>
-          <span>On by default for new projects</span></label></div>
-      <label class="field full"><span>Model <small>which Claude model runs this agent — empty uses the server default (your Claude Code model, or AGENT_MODEL)</small></span>
-        <input class="input mono" id="f-model" list="model-options" maxlength="64" value="${esc(draft.model || "")}" placeholder="default">
-        <datalist id="model-options"><option value="sonnet">fast, cheaper — good for mechanical work</option><option value="opus">strongest — planning, review</option><option value="haiku">fastest, cheapest — tiny tasks</option></datalist></label>
-      <label class="field full"><span>Description <small id="desc-count">${(draft.description || "").length}/160 · one line shown in the studio and guide</small></span>
-        <input class="input" id="f-desc" maxlength="160" value="${esc(draft.description || "")}" placeholder="What this agent does, in one sentence"></label>
-      <label class="field full"><span>Role prompt <small>the full instructions — the agent only sees the project files, the shared rules and this</small></span>
-        <textarea class="input role" id="f-role" spellcheck="false" placeholder="You are the … agent. …">${esc(draft.role)}</textarea></label>
+// ================================================================ list: /agents
+let agents = [], filter = "all", query = "";
+async function listView() {
+  setTitle("Agents");
+  app.innerHTML = `<p class="note">Loading…</p>`;
+  let teams;
+  try { [agents, teams] = await Promise.all([api("/api/agents?full=1"), api("/api/presets")]); }
+  catch (err) { return showError(app, err, listView, "Couldn't load the agents"); }
+  const usage = Object.fromEntries(agents.map(a => [a.id, teams.filter(t => t.agents.includes(a.id)).length]));
+  app.innerHTML = `
+    <div class="bar-top"><h1>Agents</h1>
+      <a class="btn btn-ghost" href="/teams">${icon("layers", { size: 16 })}Teams</a>
+      <a class="btn btn-dark" href="/agents/new">${icon("plus", { size: 16 })}New agent</a></div>
+    <a class="rules-row" href="/agents/rules"><span class="tile" style="--c:#766a7c">${icon("layers", { size: 17 })}</span>
+      <span><b>Shared rules</b><small>Instructions every agent receives before its own role</small></span><span class="go">${icon("arrow-right", { size: 16 })}</span></a>
+    <div class="controls">
+      <label class="search"><i data-icon="search" data-size="16"></i><input class="input" id="q" placeholder="Search agents" autocomplete="off" value="${esc(query)}"></label>
+      <button class="fchip ${filter === "all" ? "on" : ""}" data-filter="all">All <span>${agents.length}</span></button>
+      <button class="fchip ${filter === "on" ? "on" : ""}" data-filter="on">On by default <span>${agents.filter(a => a.default).length}</span></button>
+      <button class="fchip ${filter === "off" ? "on" : ""}" data-filter="off">Optional <span>${agents.filter(a => !a.default).length}</span></button>
     </div>
-    ${actionsBar(!isNew)}`;
+    <p class="hint">${icon("menu", { size: 13 })}Agents run top to bottom. Drag the handle — or press Alt+↑/↓ — to change the order.</p>
+    <div class="alist" id="list"></div>`;
+  const draw = () => {
+    const q = query.toLowerCase();
+    const shown = agents.filter(a => (filter === "all" || (filter === "on") === a.default) &&
+      (!q || a.name.toLowerCase().includes(q) || a.id.includes(q) || (a.description || "").toLowerCase().includes(q)));
+    $("list").innerHTML = shown.map(a => `
+      <a class="arow" href="/agents/${encodeURIComponent(a.id)}" data-id="${esc(a.id)}" draggable="${!q && filter === "all"}">
+        <span class="grip" title="Drag to reorder">${q || filter !== "all" ? "" : icon("menu", { size: 13 })}</span>
+        <span class="num">${String(agents.indexOf(a) + 1).padStart(2, "0")}</span>
+        <span class="tile" style="--c:${a.color}">${icon(a.icon, { size: 17 })}</span>
+        <span class="nm"><b>${esc(a.name)}</b><small>${esc(a.description || "No description")}</small></span>
+        <span class="meta">${!a.model_ok ? `<span class="badge mono" style="background:color-mix(in srgb,var(--danger) 12%,var(--paper));color:var(--danger)" title="Not a known model — this agent will fail until you pick a valid one">${icon("alert", { size: 11 })}${esc(a.model)}</span>`
+          : a.model ? `<span class="badge mono" title="Model">${esc(a.model)}</span>` : `<span class="badge" title="Server default model">default model</span>`}
+          ${a.default ? `<span class="badge">on</span>` : `<span class="badge">optional</span>`}</span>
+        <span class="teams">${usage[a.id]} team${usage[a.id] === 1 ? "" : "s"}</span>
+        <span class="go">${icon("arrow-right", { size: 15 })}</span>
+      </a>`).join("") || `<p class="note" style="padding:20px">No agent matches.</p>`;
+  };
+  draw();
+  $("q").addEventListener("input", (e) => { query = e.target.value.trim(); draw(); });
+  app.querySelectorAll("[data-filter]").forEach(b => b.onclick = () => { filter = b.dataset.filter; listView(); });
+  enableReorder(draw);
+}
 
-  $("f-name").addEventListener("input", (e) => {
-    draft.name = e.target.value;
-    $("preview-name").textContent = draft.name || "New agent";
-    if (isNew && !draft._idTouched) $("f-id").value = draft.id = slug(draft.name);
-    dirtyChanged();
+function enableReorder(draw) {
+  const list = $("list");
+  let dragId = null;
+  list.addEventListener("dragstart", (e) => { const r = e.target.closest(".arow[draggable=true]"); if (!r) return; dragId = r.dataset.id; r.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; });
+  list.addEventListener("dragover", (e) => {
+    const r = e.target.closest(".arow"); if (!r || !dragId) return;
+    e.preventDefault();
+    list.querySelectorAll(".drop-before,.drop-after").forEach(x => x.classList.remove("drop-before", "drop-after"));
+    const b = r.getBoundingClientRect(); r.classList.add(e.clientY < b.top + b.height / 2 ? "drop-before" : "drop-after");
   });
-  $("f-id")?.addEventListener("input", (e) => { draft.id = e.target.value; draft._idTouched = true; dirtyChanged(); });
-  $("f-role").addEventListener("input", (e) => { draft.role = e.target.value; dirtyChanged(); });
-  $("f-model").addEventListener("input", (e) => { draft.model = e.target.value.trim(); dirtyChanged(); });
-  $("f-desc").addEventListener("input", (e) => {
-    draft.description = e.target.value; $("desc-count").textContent = `${draft.description.length}/160 · one line shown in the studio and guide`; dirtyChanged();
+  list.addEventListener("dragend", () => { dragId = null; list.querySelectorAll(".dragging,.drop-before,.drop-after").forEach(x => x.classList.remove("dragging", "drop-before", "drop-after")); });
+  list.addEventListener("drop", async (e) => {
+    const r = e.target.closest(".arow"); if (!r || !dragId || r.dataset.id === dragId) return;
+    e.preventDefault();
+    const ids = agents.map(a => a.id).filter(id => id !== dragId);
+    ids.splice(ids.indexOf(r.dataset.id) + (r.classList.contains("drop-after") ? 1 : 0), 0, dragId);
+    await saveOrder(ids, draw);
   });
-  $("f-default").addEventListener("change", (e) => { draft.default = e.target.checked; dirtyChanged(); });
-  $("f-icons").addEventListener("click", (e) => {
+  list.addEventListener("keydown", async (e) => {
+    const r = e.target.closest(".arow"); if (!r || !e.altKey || !["ArrowUp", "ArrowDown"].includes(e.key)) return;
+    e.preventDefault();
+    const ids = agents.map(a => a.id), i = ids.indexOf(r.dataset.id), j = i + (e.key === "ArrowUp" ? -1 : 1);
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    await saveOrder(ids, draw);
+    list.querySelector(`.arow[data-id="${CSS.escape(r.dataset.id)}"]`)?.focus();
+  });
+}
+async function saveOrder(ids, draw) {
+  try { agents = await api("/api/agents/order", { method: "POST", body: JSON.stringify({ ids }) }); draw(); toast("Order saved"); }
+  catch (err) { toast(err.message, "err"); }
+}
+
+// ================================================================ view: /agents/<id>
+async function detailView(id) {
+  app.innerHTML = `<p class="note">Loading…</p>`;
+  let a;
+  try { a = await api(`/api/agents/${encodeURIComponent(id)}`); }
+  catch (err) { return showError(app, err, err.status === 404 ? null : () => detailView(id), err.status === 404 ? "Agent not found" : "Couldn't load this agent"); }
+  setTitle(a.name);
+  const st = a.stats;
+  app.innerHTML = `
+    <a class="crumb" href="/agents">${icon("arrow-right", { size: 14, cls: "flip" })}All agents</a>
+    <section class="card">
+      <div class="vhead">
+        <span class="tile" style="--c:${a.color}">${icon(a.icon, { size: 30 })}</span>
+        <div><h1>${esc(a.name)}</h1>
+          <div class="sub">Agent ${a.position} of ${a.total} · agents/${esc(a.file)} · id ${esc(a.id)}</div>
+          <div class="badges">
+            <span class="badge ${a.model ? "mono" : ""}">${icon("cpu", { size: 12 })}${esc(a.model || "default model")}</span>
+            <span class="badge">${a.default ? "On by default" : "Optional"}</span>
+            <span class="badge">${a.teams.length} team${a.teams.length === 1 ? "" : "s"}</span>
+          </div></div>
+        <div class="acts">
+          <a class="btn btn-ghost btn-sm" href="/agents/new?from=${encodeURIComponent(a.id)}">${icon("copy", { size: 14 })}Duplicate</a>
+          <button class="btn btn-ghost btn-sm" id="del">${icon("trash", { size: 14 })}Delete</button>
+          <a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">${icon("pencil", { size: 14 })}Edit</a>
+        </div>
+      </div>
+      <p class="vdesc">${esc(a.description || "No description yet.")}</p>
+      ${a.model_ok ? "" : `<div class="err-state" role="alert" style="max-width:none;margin:20px 0 0;padding:16px 18px;text-align:left;display:flex;gap:12px;align-items:center">
+        <span class="tile" style="margin:0;width:36px;height:36px">${icon("alert", { size: 18 })}</span>
+        <span style="flex:1"><b style="display:inline">“${esc(a.model)}” isn't a known model.</b> This agent will fail until you pick a valid one.</span>
+        <a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">Fix the model</a></div>`}
+    </section>
+    <div class="grid2">
+      <section class="card">
+        <h2>${icon("file", { size: 16 })}Instructions<span class="spacer"></span>
+          <button class="btn btn-ghost btn-sm" id="copyRole">${icon("copy", { size: 14 })}Copy</button></h2>
+        <pre class="role">${esc(a.role)}</pre>
+      </section>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <section class="card">
+          <h2>${icon("chart", { size: 16 })}Across all projects</h2>
+          ${st ? `<div class="kv">
+            <div><b>${st.runs}</b><span>runs${st.done < st.runs ? ` · ${st.runs - st.done} not finished` : ""}</span></div>
+            <div><b>${duration(st.avg_seconds)}</b><span>average time</span></div>
+            <div><b>${money(st.avg_cost)}</b><span>average cost</span></div>
+            <div><b>${money(st.cost)}</b><span>total cost</span></div></div>
+            ${st.models.length ? `<p class="empty-note" style="margin-top:12px">Models used: <span class="mono">${esc(st.models.join(", "))}</span></p>` : ""}`
+          : `<p class="empty-note">This agent hasn't run yet.</p>`}
+        </section>
+        <section class="card">
+          <h2>${icon("layers", { size: 16 })}Teams using it</h2>
+          ${a.teams.length ? `<div class="chips">${a.teams.map(t => `<a class="chip" href="/teams/${encodeURIComponent(t.id)}">${icon(t.builtin ? "users" : "sliders", { size: 13 })}${esc(t.name)}</a>`).join("")}</div>`
+            : `<p class="empty-note">Not part of any team yet.</p>`}
+        </section>
+      </div>
+    </div>
+    <nav class="pager-nav">
+      ${a.prev ? `<a class="btn btn-ghost btn-sm" href="/agents/${encodeURIComponent(a.prev)}">${icon("arrow-right", { size: 14, cls: "flip" })}Previous agent</a>` : "<span></span>"}
+      ${a.next ? `<a class="btn btn-ghost btn-sm" href="/agents/${encodeURIComponent(a.next)}">Next agent${icon("arrow-right", { size: 14 })}</a>` : ""}
+    </nav>`;
+  $("copyRole").onclick = async () => { try { await navigator.clipboard.writeText(a.role); toast("Instructions copied"); } catch { toast("Copy failed", "err"); } };
+  $("del").onclick = async () => {
+    if (!await confirmDialog({ title: `Delete “${a.name}”?`, ok: "Delete", danger: true,
+      text: `This removes agents/${a.file}. Projects and teams that use it will simply skip it.` })) return;
+    try { await api(`/api/agents/${encodeURIComponent(a.id)}`, { method: "DELETE" }); toast("Agent deleted"); go("/agents"); }
+    catch (err) { toast(err.message, "err"); }
+  };
+}
+
+// ================================================================ form: /agents/new, /agents/<id>/edit
+async function formView(id) {
+  const from = new URLSearchParams(location.search).get("from");
+  app.innerHTML = `<p class="note">Loading…</p>`;
+  let source = null, catalog, all;
+  try {
+    [catalog, all, source] = await Promise.all([api("/api/models"), api("/api/agents"),
+      id || from ? api(`/api/agents/${encodeURIComponent(id || from)}`) : null]);
+  } catch (err) { return showError(app, err, () => formView(id), "Couldn't open the form"); }
+  const isNew = !id;
+  const draft = source
+    ? { id: isNew ? "" : source.id, name: isNew ? `${source.name} copy` : source.name, icon: source.icon, color: source.color, default: isNew ? false : source.default,
+        description: source.description || "", model: source.model || "", role: source.role }
+    : { id: "", name: "", icon: "bot", color: "#766a7c", default: false, description: "", model: "",
+        role: "You are the … agent. <your mission in one sentence>\n\nRead: <which files and plan.md sections>.\n\nDo:\n- …\n- …\n\nDon't: <what to leave to other agents>." };
+  if (isNew && source) draft.id = slug(draft.name);
+  const initial = JSON.stringify(draft);
+  setTitle(isNew ? "New agent" : `Edit ${source.name}`);
+  const known = new Set(catalog.options.map(o => o.id));
+  const group = (kind, label) => {
+    const opts = catalog.options.filter(o => o.kind === kind);
+    return opts.length ? `<optgroup label="${esc(label)}">${opts.map(o => `<option value="${esc(o.id)}">${esc(o.label)} — ${esc(o.note)}</option>`).join("")}</optgroup>` : "";
+  };
+  app.innerHTML = `
+    <a class="crumb" href="${isNew ? "/agents" : `/agents/${encodeURIComponent(id)}`}">${icon("arrow-right", { size: 14, cls: "flip" })}${isNew ? "All agents" : esc(source.name)}</a>
+    <section class="card">
+      <div class="vhead" style="margin-bottom:26px">
+        <span class="tile" id="pv-tile" style="--c:${draft.color}">${icon(draft.icon, { size: 30 })}</span>
+        <div><h1 id="pv-name">${esc(draft.name || "New agent")}</h1>
+          <div class="sub">${isNew ? `Will be added as agent ${all.length + 1} (move it in the list afterwards)` : `agents/${esc(source.file)}`}</div></div>
+      </div>
+      <div class="fields">
+        <label class="field"><span>Name</span><input class="input" id="f-name" maxlength="40" value="${esc(draft.name)}" placeholder="e.g. Dark mode"></label>
+        <label class="field"><span>Id <small>${isNew ? "lowercase letters, numbers, dashes" : "can't be changed"}</small></span>
+          <input class="input mono" id="f-id" value="${esc(draft.id)}" ${isNew ? "" : "disabled"} placeholder="dark-mode"></label>
+        <label class="field full"><span>Description <small id="desc-count"></small></span>
+          <input class="input" id="f-desc" maxlength="160" value="${esc(draft.description)}" placeholder="What this agent does, in one sentence"></label>
+        <div class="field full"><span>Model <small>Aliases come from your Claude CLI (${esc(catalog.alias_source)})</small></span>
+          <select class="input" id="f-model">
+            <option value="">${esc(catalog.default.label)} — ${esc(catalog.default.note)}</option>
+            ${group("alias", "Aliases from the Claude CLI — always the latest model")}
+            ${group("full", "Specific model versions")}
+            ${group("custom", "Checked by you")}
+            ${draft.model && !known.has(draft.model) ? `<option value="${esc(draft.model)}">${esc(draft.model)} — not in the list, check it below</option>` : ""}
+            <option value="__other">Another model…</option>
+          </select>
+          <div class="other-model" id="otherModel" hidden>
+            <input class="input mono" id="f-model-other" maxlength="64" placeholder="e.g. claude-opus-5-5">
+            <button class="btn btn-ghost btn-sm" type="button" id="checkModel">${icon("check", { size: 14 })}Check with Claude CLI</button>
+          </div>
+          <span class="check-result" id="checkResult"></span>
+          <span class="help">Only models from this list can be saved. To use another one, choose “Another model…” and check it: the Claude CLI answers with one word (a tiny call), and the model is added to the list.</span>
+        </div>
+        <div class="field"><span>Icon</span><div class="icons" id="f-icons">${AGENT_ICONS.map(n =>
+          `<button type="button" data-icon-name="${n}" class="${n === draft.icon ? "on" : ""}" title="${n}">${icon(n, { size: 18 })}</button>`).join("")}</div></div>
+        <div class="field"><span>Colour <small>a small accent in the studio</small></span>
+          <div class="colors" id="f-colors">${COLORS.map(c => `<button type="button" data-color="${c}" style="--c:${c}" class="${c === draft.color ? "on" : ""}" title="${c}"></button>`).join("")}
+            <input type="color" id="f-color" value="${esc(draft.color)}" title="Custom colour"></div>
+          <label class="switch" style="margin-top:18px"><input type="checkbox" id="f-default" ${draft.default ? "checked" : ""}><span>On by default for new projects</span></label></div>
+        <label class="field full"><span>Instructions <small>the agent sees the shared rules, then this, then the project files</small></span>
+          <textarea class="input role-input" id="f-role" spellcheck="false">${esc(draft.role)}</textarea></label>
+      </div>
+      <div class="form-actions">
+        <span class="status" id="status"></span>
+        <a class="btn btn-ghost" href="${isNew ? "/agents" : `/agents/${encodeURIComponent(id)}`}">Cancel</a>
+        <button class="btn btn-dark" id="save">${icon("check", { size: 16 })}${isNew ? "Create agent" : "Save changes"}</button>
+      </div>
+    </section>`;
+
+  $("f-model").value = draft.model;
+  const changed = () => {
+    dirty = JSON.stringify(draft) !== initial;
+    $("status").innerHTML = dirty ? `${icon("pencil", { size: 14 })}Unsaved changes` : "";
+    $("desc-count").textContent = `${draft.description.length}/160 · shown in the studio and the guide`;
+  };
+  changed();
+  $("f-name").oninput = (e) => { draft.name = e.target.value; $("pv-name").textContent = draft.name || "New agent"; if (isNew && !draft._idTouched) $("f-id").value = draft.id = slug(draft.name); changed(); };
+  $("f-id").oninput = (e) => { draft.id = e.target.value.trim(); draft._idTouched = true; changed(); };
+  $("f-desc").oninput = (e) => { draft.description = e.target.value; changed(); };
+  $("f-role").oninput = (e) => { draft.role = e.target.value; changed(); };
+  $("f-default").onchange = (e) => { draft.default = e.target.checked; changed(); };
+  $("f-model").onchange = (e) => {
+    const other = e.target.value === "__other";
+    $("otherModel").hidden = !other; $("checkResult").textContent = "";
+    if (other) { $("f-model-other").focus(); return; }
+    draft.model = e.target.value; changed();
+  };
+  $("checkModel").onclick = async () => {
+    const name = $("f-model-other").value.trim();
+    if (!name) return $("f-model-other").focus();
+    const res = $("checkResult"), btn = $("checkModel");
+    btn.disabled = true; res.className = "check-result"; res.textContent = "Asking the Claude CLI…";
+    try {
+      const r = await api("/api/models/check", { method: "POST", body: JSON.stringify({ model: name }), timeout: 120000 });
+      res.className = "check-result ok";
+      res.innerHTML = `${icon("check", { size: 14 })}“${esc(name)}” works — it runs ${esc(r.resolved)}.`;
+      if (![...$("f-model").options].some(o => o.value === name)) {
+        $("f-model").querySelector('option[value="__other"]').insertAdjacentHTML("beforebegin", `<option value="${esc(name)}">${esc(name)} — checked just now</option>`);
+      }
+      $("f-model").value = name; $("otherModel").hidden = true;
+      draft.model = name; changed();
+    } catch (err) { res.className = "check-result err"; res.innerHTML = `${icon("alert", { size: 14 })}${esc(err.message)}`; }
+    finally { btn.disabled = false; }
+  };
+  $("f-model-other").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); $("checkModel").click(); } };
+  $("f-icons").onclick = (e) => {
     const b = e.target.closest("[data-icon-name]"); if (!b) return;
     draft.icon = b.dataset.iconName;
     [...$("f-icons").children].forEach(x => x.classList.toggle("on", x === b));
-    $("preview-tile").innerHTML = icon(draft.icon, { size: 26 });
-    dirtyChanged();
-  });
+    $("pv-tile").innerHTML = icon(draft.icon, { size: 30 }); changed();
+  };
   const setColor = (c) => {
     draft.color = c.toLowerCase();
-    [...$("f-colors").querySelectorAll("button")].forEach(x => x.classList.toggle("on", x.dataset.color === draft.color));
-    $("preview-tile").style.setProperty("--c", draft.color);
-    dirtyChanged();
+    $("f-colors").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.color === draft.color));
+    $("pv-tile").style.setProperty("--c", draft.color); changed();
   };
-  $("f-colors").addEventListener("click", (e) => { const b = e.target.closest("[data-color]"); if (b) { setColor(b.dataset.color); $("f-color").value = b.dataset.color; } });
-  $("f-color").addEventListener("input", (e) => setColor(e.target.value));
+  $("f-colors").onclick = (e) => { const b = e.target.closest("[data-color]"); if (b) { setColor(b.dataset.color); $("f-color").value = b.dataset.color; } };
+  $("f-color").oninput = (e) => setColor(e.target.value);
+  $("save").onclick = async () => {
+    if ($("f-model").value === "__other") return toast("Check the model with the Claude CLI first, or pick one from the list", "err");
+    const body = { ...draft }; delete body._idTouched;
+    $("save").disabled = true;
+    try {
+      const saved = isNew
+        ? await api("/api/agents", { method: "POST", body: JSON.stringify(body) })
+        : await api(`/api/agents/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) });
+      toast(isNew ? `${saved.name} joined the agents` : "Agent saved");
+      go(`/agents/${encodeURIComponent(saved.id)}`);
+    } catch (err) { toast(err.message, "err"); $("save").disabled = false; }
+  };
 }
 
-function actionsBar(canDelete) {
-  return `<div class="actions">
-    <span class="status" id="status"></span>
-    ${canDelete ? `<button class="btn btn-ghost" id="del">${icon("trash", { size: 16 })}Delete</button>` : ""}
-    <button class="btn btn-ghost" id="revert">${isNew ? "Cancel" : "Revert"}</button>
-    <button class="btn btn-dark" id="save">${icon("check", { size: 16 })}${isNew ? "Create agent" : "Save"}</button>
-  </div>`;
-}
-function dirtyChanged() {
-  const d = isDirty();
-  $("status").innerHTML = d ? `${icon("pencil", { size: 14 })}Unsaved changes` : `${icon("check", { size: 14 })}Saved`;
-  $("save").disabled = !d; $("revert").disabled = !d && !isNew;
-  renderList();
-}
-const slug = (s) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
-
-$("editor").addEventListener("click", async (e) => {
-  if (e.target.closest("#save")) return save();
-  if (e.target.closest("#revert")) {
-    if (isNew) { isNew = false; draft = null; return select(agents[0]?.id); }
-    draft = { ...original() }; return renderEditor(), dirtyChanged();
-  }
-  if (e.target.closest("#del")) {
-    if (!await confirmDialog({ title: `Delete “${draft.name}”?`, text: `This removes agents/${draft.file}. Projects that had this agent switched on will simply skip it.`, ok: "Delete", danger: true })) return;
-    try { await api(`/api/agents/${encodeURIComponent(current)}`, { method: "DELETE" }); toast("Agent deleted"); draft = null; current = null; load(); }
+// ================================================================ shared rules: /agents/rules
+async function rulesView() {
+  setTitle("Shared rules");
+  app.innerHTML = `<p class="note">Loading…</p>`;
+  let rules;
+  try { rules = (await api("/api/agents/common")).text; }
+  catch (err) { return showError(app, err, rulesView, "Couldn't load the shared rules"); }
+  app.innerHTML = `
+    <a class="crumb" href="/agents">${icon("arrow-right", { size: 14, cls: "flip" })}All agents</a>
+    <section class="card">
+      <div class="vhead" style="margin-bottom:18px"><span class="tile" style="--c:#766a7c">${icon("layers", { size: 30 })}</span>
+        <div><h1>Shared rules</h1><div class="sub">agents/_common.md · given to every agent before its own instructions</div></div></div>
+      <p class="note">${icon("alert", { size: 16 })}<span>These rules are the contract between agents: which files make a project, “small edits, keep earlier work”, and the sections of plan.md. Change them carefully.</span></p>
+      <textarea class="input role-input" id="rules" spellcheck="false" style="min-height:420px;width:100%">${esc(rules)}</textarea>
+      <div class="form-actions"><span class="status" id="status"></span>
+        <a class="btn btn-ghost" href="/agents">Cancel</a>
+        <button class="btn btn-dark" id="save">${icon("check", { size: 16 })}Save rules</button></div>
+    </section>`;
+  $("rules").oninput = () => { dirty = $("rules").value !== rules; $("status").innerHTML = dirty ? `${icon("pencil", { size: 14 })}Unsaved changes` : ""; };
+  $("save").onclick = async () => {
+    try { rules = (await api("/api/agents/common", { method: "PUT", body: JSON.stringify({ text: $("rules").value }) })).text; dirty = false; $("status").innerHTML = `${icon("check", { size: 14 })}Saved`; toast("Shared rules saved"); }
     catch (err) { toast(err.message, "err"); }
-  }
-});
-
-async function save() {
-  try {
-    if (current === "_common" && !isNew) {
-      common = (await api("/api/agents/common", { method: "PUT", body: JSON.stringify({ text: draft.text }) })).text;
-      draft = { text: common }; toast("Shared rules saved");
-    } else if (isNew) {
-      const a = await api("/api/agents", { method: "POST", body: JSON.stringify(draft) });
-      isNew = false; draft = null; toast(`${a.name} joined the team`); return load(a.id);
-    } else {
-      await api(`/api/agents/${encodeURIComponent(current)}`, { method: "PUT", body: JSON.stringify(draft) });
-      toast("Agent saved"); draft = null; return load(current).then(() => select(current));
-    }
-    renderEditor(); dirtyChanged();
-  } catch (err) { toast(err.message, "err"); }
+  };
 }
 
-$("add").onclick = async () => {
-  if (isDirty() && !isNew && !await confirmDialog({ title: "Discard changes?", text: "You have unsaved changes to this agent.", ok: "Discard", danger: true })) return;
-  isNew = true; current = null;
-  draft = { id: "", name: "", icon: "bot", color: "#766a7c", default: true, description: "", model: "",
-    role: "You are the … agent. <your mission in one sentence>\n\nRead: <which files and plan.md sections>.\n\nDo:\n- …\n- …\n\nDon't: <what to leave to other agents>." };
-  renderList(); renderEditor(); dirtyChanged(); $("f-name").focus();
-};
-
-// ================================================================ list: click + drag to reorder
-$("list").addEventListener("click", (e) => { const it = e.target.closest(".aitem[data-id]"); if (it) select(it.dataset.id); });
-$("list").addEventListener("keydown", (e) => {
-  const it = e.target.closest(".aitem[data-id]"); if (!it) return;
-  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(it.dataset.id); }
-  if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); move(it.dataset.id, e.key === "ArrowUp" ? -1 : 1); }
-});
-
-let dragId = null;
-$("list").addEventListener("dragstart", (e) => {
-  const it = e.target.closest(".aitem[draggable]"); if (!it) return;
-  dragId = it.dataset.id; it.classList.add("dragging"); e.dataTransfer.effectAllowed = "move";
-});
-$("list").addEventListener("dragover", (e) => {
-  const it = e.target.closest(".aitem[draggable]"); if (!it || !dragId) return;
-  e.preventDefault();
-  document.querySelectorAll(".drop-before,.drop-after").forEach(x => x.classList.remove("drop-before", "drop-after"));
-  const r = it.getBoundingClientRect();
-  it.classList.add(e.clientY < r.top + r.height / 2 ? "drop-before" : "drop-after");
-});
-$("list").addEventListener("dragend", () => { dragId = null; document.querySelectorAll(".dragging,.drop-before,.drop-after").forEach(x => x.classList.remove("dragging", "drop-before", "drop-after")); });
-$("list").addEventListener("drop", async (e) => {
-  const it = e.target.closest(".aitem[draggable]"); if (!it || !dragId) return;
-  e.preventDefault();
-  const ids = agents.map(a => a.id).filter(id => id !== dragId);
-  let at = ids.indexOf(it.dataset.id);
-  if (it.classList.contains("drop-after")) at++;
-  if (it.dataset.id === dragId) return;
-  ids.splice(at, 0, dragId);
-  await saveOrder(ids);
-});
-async function move(id, dir) {
-  const ids = agents.map(a => a.id), i = ids.indexOf(id), j = i + dir;
-  if (j < 0 || j >= ids.length) return;
-  [ids[i], ids[j]] = [ids[j], ids[i]];
-  await saveOrder(ids);
-  document.querySelector(`.aitem[data-id="${CSS.escape(id)}"]`)?.focus();
-}
-async function saveOrder(ids) {
-  try {
-    const fresh = await api("/api/agents/order", { method: "POST", body: JSON.stringify({ ids }) });
-    agents = fresh;
-    if (draft && !isNew && current !== "_common") draft.file = agents.find(a => a.id === current)?.file;
-    renderList(); if (!isDirty()) renderEditor(), dirtyChanged();
-    toast("Order saved");
-  } catch (err) { toast(err.message, "err"); }
-}
-
-window.addEventListener("beforeunload", (e) => { if (isDirty()) { e.preventDefault(); e.returnValue = ""; } });
-window.addEventListener("scroll", () => document.querySelector("header.top").classList.toggle("scrolled", scrollY > 4));
-
-document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
-const want = new URLSearchParams(location.search).get("agent");
-load(want || undefined);
+route();
 </script>
 </body>
 </html>

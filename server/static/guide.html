@@ -99,6 +99,7 @@
     <nav class="links">
       <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
       <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
       <a href="/guide" class="on"><i data-icon="book" data-size="16"></i>Guide</a>
     </nav>
     <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
@@ -278,7 +279,7 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
 <script>
 api("/api/agents?full=1").then(agents => {
   document.getElementById("teamList").innerHTML = agents.map((a, i) => `
-    <a class="tm" href="/agents?agent=${encodeURIComponent(a.id)}" style="--c:${a.color};${a.default ? "" : "opacity:.55"}" title="Edit ${esc(a.name)}">
+    <a class="tm" href="/agents/${encodeURIComponent(a.id)}" style="--c:${a.color};${a.default ? "" : "opacity:.55"}" title="Edit ${esc(a.name)}">
       <span class="tile">${icon(a.icon, { size: 17 })}</span>
       <span class="nm">${esc(a.name)}<small>${String(i + 1).padStart(2, "0")} · ${a.default ? "on by default" : "optional"}</small>
         ${a.description ? `<p>${esc(a.description)}</p>` : ""}</span>

@@ -196,7 +196,7 @@
   .menu { position: absolute; bottom: calc(100% + 8px); right: 0; z-index: 30; width: 300px; background: var(--paper); border-radius: 18px; padding: 6px;
     box-shadow: var(--ring), 0 18px 40px rgba(27, 6, 36, .12); display: none; }
   .menu.open { display: block; }
-  .menu .mi { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; background: none; border: 0; padding: 10px 12px; border-radius: 12px; font-size: 14px; }
+  .menu .mi { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; background: none; border: 0; padding: 10px 12px; border-radius: 12px; font-size: 14px; text-decoration: none; color: inherit; }
   .menu .mi:hover { background: var(--linen); }
   .menu .mi .ic { margin-top: 1px; color: var(--stone); }
   .menu .mi b { font-weight: 500; display: flex; align-items: center; gap: 6px; }
@@ -249,6 +249,14 @@
   .status-dot.stopped { background: var(--stone); } .status-dot.error { background: var(--danger); }
   h4.sec { margin: 8px 0 10px; font-weight: 500; font-size: 14px; color: var(--charcoal); }
   @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+
+  /* security warnings */
+  .msg.security { align-self: stretch; background: var(--paper); border-radius: 18px; padding: 14px 16px;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 40%, transparent); }
+  .msg.security .head { display: flex; gap: 10px; align-items: flex-start; color: var(--danger); font-size: 14px; line-height: 1.45; }
+  .msg.security .head b { font-weight: 500; }
+  .msg.security ul { margin: 8px 0 0 28px; padding: 0; font: 12px/1.6 ui-monospace, monospace; color: var(--graphite); }
+  .msg.security p { margin: 8px 0 0 28px; font-size: 13px; color: var(--stone); }
 
   /* resume card (after a stop / error) */
   .msg.resume-card { align-self: stretch; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line-strong); border-radius: 18px; padding: 14px 16px;
@@ -390,7 +398,7 @@
       <b>Nothing to preview yet</b>
       The page appears here as soon as the HTML agent writes <span class="mono">index.html</span>.
     </div></div>
-    <div class="frame-wrap" id="frameWrap"><iframe id="frame" title="Live preview"></iframe></div>
+    <div class="frame-wrap" id="frameWrap"><iframe id="frame" title="Live preview" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe></div>
     <div class="flash" id="flash"></div>
     <div class="code" id="code">
       <nav class="files" id="files"></nav>
@@ -509,6 +517,7 @@ function connect() {
   ws.onclose = (e) => {
     $("conn").classList.remove("on"); $("conn").title = "Reconnecting…";
     if (e.code === 4404) { toast("This project was deleted", "err"); return setTimeout(() => location.replace("/projects"), 900); }
+    if (e.code === 4403) { $("conn").title = "Refused"; return fatal(new Error("The server refused this connection. Open the studio from http://localhost (not another address)."), "Connection refused"); }
     wsFails++;
     if (!$("connBanner")) { clearTimeout(bannerTimer); bannerTimer = setTimeout(showConnBanner, 2000); }
     reconnectTimer = setTimeout(connect, Math.min(1500 * wsFails, 10000));
@@ -633,6 +642,12 @@ function handle(ev) {
       paused = ev.run?.resumable ? ev.run : paused;
       if (ev.run?.resumable) addResumeCard(ev.run);
       renderTeam();
+      break;
+    case "security":
+      addMsg(`<div class="msg security" role="alert"><div class="head">${icon("alert", { size: 18 })}<span><b>Security check</b> — ${esc(ev.text)}</span></div>
+        ${(ev.items || []).length ? `<ul>${ev.items.map(i => `<li>${esc(i)}</li>`).join("")}</ul>` : ""}
+        <p>Blocked actions never ran. Review the files (Code tab), or restore an earlier version if something looks wrong.</p></div>`);
+      if (!replaying) toast("Security check: see the warning in the chat", "err");
       break;
     case "versions": if ($("historyPanel")?.open) loadVersions(); break;
     case "restored":
@@ -903,7 +918,8 @@ function tileHTML(a, i) {
       role="button" aria-label="${esc(a.name)} agent, ${state}${a.description ? ": " + esc(a.description) : ""}"
       title="${esc(a.description ? a.description + "\n\n" : "")}${cards[a.id] ? "Click to show in chat" : on ? "Click to switch off" : "Click to switch on"}">
     <div class="t-top"><span class="tile">${icon(a.icon, { size: 17 })}</span><span class="t-num">${String(i + 1).padStart(2, "0")}</span>
-      ${a.model ? `<span class="model-badge" title="Runs on ${esc(a.model)}">${esc(a.model)}</span>` : ""}
+      ${a.model_ok === false ? `<a class="model-badge" style="color:var(--danger)" href="/agents/${encodeURIComponent(a.id)}/edit" title="Not a known model — click to fix">${icon("alert", { size: 10 })}${esc(a.model)}</a>`
+        : a.model ? `<span class="model-badge" title="Runs on ${esc(a.model)}">${esc(a.model)}</span>` : ""}
       <button class="sw ${on ? "on" : ""}" data-toggle role="switch" aria-checked="${on}" aria-label="Use ${esc(a.name)}" ${busy ? "disabled" : ""}></button></div>
     <div class="t-name">${esc(a.name)}</div>
     <div class="t-status">${line}</div>
@@ -951,7 +967,7 @@ function renderTeamHead() {
       <span class="count">${team.length} of ${AGENTS.length} on</span>
       <span class="spacer"></span>
       <span class="menu-wrap">
-        <button class="btn btn-ghost btn-sm" id="presetsBtn" aria-haspopup="true">${icon("sliders", { size: 14 })}${esc(matchingPreset()?.name || "Presets")}${icon("chevron-up", { size: 13 })}</button>
+        <button class="btn btn-ghost btn-sm" id="presetsBtn" aria-haspopup="true">${icon("sliders", { size: 14 })}${esc(matchingPreset()?.name || "Teams")}${icon("chevron-up", { size: 13 })}</button>
         <div class="menu" id="presetsMenu" role="menu"></div>
       </span>
       <a class="lnk" href="/agents">${icon("pencil", { size: 13 })}Edit agents</a>${chevron}`;
@@ -1351,9 +1367,10 @@ function renderPresetsMenu() {
       ${icon(cur?.id === p.id ? "check" : p.builtin ? "users" : "sliders", { size: 15 })}
       <span><b>${esc(p.name)} <span class="badge">${p.agents.length}</span></b>
       <small>${esc(p.description || p.agents.map(id => BY_ID[id]?.name || id).join(", "))}</small></span>
-      ${p.builtin ? "" : `<span class="del" data-preset-del="${esc(p.id)}" title="Delete preset">${icon("trash", { size: 14 })}</span>`}
+      ${p.builtin ? "" : `<span class="del" data-preset-del="${esc(p.id)}" title="Delete team">${icon("trash", { size: 14 })}</span>`}
     </button>`).join("") +
-    `<hr><button class="mi" data-preset-save role="menuitem">${icon("plus", { size: 15 })}<span><b>Save current team as a preset…</b><small>${selected.size} agent${selected.size === 1 ? "" : "s"} on</small></span></button>`;
+    `<hr><button class="mi" data-preset-save role="menuitem">${icon("plus", { size: 15 })}<span><b>Save current agents as a team…</b><small>${selected.size} agent${selected.size === 1 ? "" : "s"} on</small></span></button>
+     <a class="mi" href="/teams" role="menuitem">${icon("layers", { size: 15 })}<span><b>Manage teams</b><small>Create, view and edit teams</small></span></a>`;
 }
 document.addEventListener("click", async (e) => {
   const menu = $("presetsMenu");
@@ -1363,19 +1380,19 @@ document.addEventListener("click", async (e) => {
     e.stopPropagation();
     const p = presets.find(x => x.id === del.dataset.presetDel);
     togglePresets(false);
-    if (!await confirmDialog({ title: `Delete “${p.name}”?`, text: "The preset is removed. Your agents are not changed.", ok: "Delete", danger: true })) return;
-    try { await api(`/api/presets/${encodeURIComponent(p.id)}`, { method: "DELETE" }); await loadPresets(); renderTeamHead(); toast("Preset deleted"); }
+    if (!await confirmDialog({ title: `Delete “${p.name}”?`, text: "The team is removed. Your agents are not changed.", ok: "Delete", danger: true })) return;
+    try { await api(`/api/presets/${encodeURIComponent(p.id)}`, { method: "DELETE" }); await loadPresets(); renderTeamHead(); toast("Team deleted"); }
     catch (err) { toast(err.message, "err"); }
   } else if (pick) {
     const p = presets.find(x => x.id === pick.dataset.preset);
     togglePresets(false);
-    if (p && !busy) { selected = new Set(p.agents); saveSelection(); toast(`Team set to “${p.name}”`); }
+    if (p && !busy) { selected = new Set(p.agents); saveSelection(); toast(`Using the “${p.name}” team`); }
   } else if (save) {
     togglePresets(false);
-    const name = await promptDialog({ title: "Save team as a preset", label: "Preset name", placeholder: "e.g. Landing page sprint", ok: "Save preset", max: 40,
+    const name = await promptDialog({ title: "Save as a team", label: "Team name", placeholder: "e.g. Landing page sprint", ok: "Save team", max: 40,
       text: `${selected.size} agents: ${AGENTS.filter(a => selected.has(a.id)).map(a => a.name).join(", ")}.` });
     if (!name) return;
-    try { await api("/api/presets", { method: "POST", body: JSON.stringify({ name, agents: [...selected] }) }); await loadPresets(); renderTeamHead(); toast(`Preset “${name}” saved`); }
+    try { await api("/api/presets", { method: "POST", body: JSON.stringify({ name, agents: [...selected] }) }); await loadPresets(); renderTeamHead(); toast(`Team “${name}” saved`); }
     catch (err) { toast(err.message, "err"); }
   } else if (!e.target.closest("#presetsMenu, #presetsBtn")) togglePresets(false);
 });

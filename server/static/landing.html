@@ -119,6 +119,7 @@
       <a href="#features"><i data-icon="sparkles" data-size="16"></i>Features</a>
       <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
       <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
       <a href="/guide"><i data-icon="book" data-size="16"></i>Guide</a>
     </nav>
     <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
@@ -315,7 +316,7 @@ window.addEventListener("scroll", () => document.querySelector("header.top").cla
 api("/api/agents").then(agents => {
   document.getElementById("statAgents").textContent = agents.length;
   document.getElementById("flow").innerHTML = agents.map((a, i) =>
-    `${i ? icon("arrow-right", { size: 14, cls: "arrow" }) : ""}<a class="step ${a.default ? "" : "off"}" href="/agents?agent=${encodeURIComponent(a.id)}"
+    `${i ? icon("arrow-right", { size: 14, cls: "arrow" }) : ""}<a class="step ${a.default ? "" : "off"}" href="/agents/${encodeURIComponent(a.id)}"
       title="${esc(a.description || "Edit " + a.name)}"><span class="si">${icon(a.icon, { size: 15 })}</span>${esc(a.name)}${a.model ? `<span class="mb">${esc(a.model)}</span>` : ""}</a>`).join("");
 }).catch((err) => { document.getElementById("flow").innerHTML = `<span class="legend">Couldn't load the team: ${esc(err.message)}</span>`; });
 

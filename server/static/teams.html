@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f7f7f5">
+<title>Teams · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/site.css">
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  .bar-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+  .bar-top h1 { margin: 0 auto 0 0; font-weight: 400; font-size: 40px; letter-spacing: -.05em; line-height: 1.1; }
+  .crumb { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--graphite); text-decoration: none; margin-bottom: 18px; }
+  .crumb:hover { color: var(--ink); }
+  .note { font-size: 13px; color: var(--stone); margin: 0 0 16px; display: flex; gap: 8px; line-height: 1.5; }
+  .tile { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
+  .card { background: var(--paper); border-radius: 24px; box-shadow: var(--ring); padding: 28px; }
+  .card h2 { margin: 0 0 14px; font-weight: 500; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+
+  /* ---------- list ---------- */
+  .tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .tcard { background: var(--paper); border-radius: 24px; box-shadow: var(--ring); padding: 22px; display: flex; flex-direction: column; gap: 12px; text-decoration: none;
+    transition: transform .2s, box-shadow .2s; }
+  .tcard:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .tcard .top { display: flex; align-items: center; gap: 8px; }
+  .tcard h3 { margin: 0; font-weight: 500; font-size: 19px; letter-spacing: -.02em; flex: 1; }
+  .tcard p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--graphite); min-height: 42px; }
+  .stack { display: flex; flex-wrap: wrap; gap: 4px; }
+  .stack .tile { width: 30px; height: 30px; border-radius: 9px; }
+  .tmeta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--stone); margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); }
+  .tmeta span { display: inline-flex; gap: 4px; align-items: center; }
+  .newcard { border: 1px dashed var(--line-strong); border-radius: 24px; display: grid; place-items: center; min-height: 220px; color: var(--graphite); text-decoration: none; text-align: center; }
+  .newcard:hover { border-color: var(--graphite); background: var(--paper); color: var(--ink); }
+  .newcard .tile { --c: var(--ink); width: 48px; height: 48px; border-radius: 14px; margin: 0 auto 12px; background: var(--espresso); color: #fff; }
+  .sec-title { font-size: 13px; color: var(--stone); margin: 28px 0 12px; }
+
+  /* ---------- view ---------- */
+  .vhead { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+  .vhead .big { width: 64px; height: 64px; border-radius: 20px; background: var(--espresso); color: #fff; display: grid; place-items: center; flex: none; }
+  .vhead h1 { margin: 0; font-weight: 400; font-size: 40px; letter-spacing: -.05em; line-height: 1.05; }
+  .vhead .sub { font-size: 13px; color: var(--stone); margin-top: 6px; }
+  .vhead .acts { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .vdesc { font-size: 18px; line-height: 1.5; color: var(--graphite); margin: 20px 0 0; max-width: 760px; }
+  .kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 22px; }
+  .kv div { background: var(--linen); border-radius: 14px; padding: 14px 16px; }
+  .kv b { display: block; font-weight: 400; font-size: 26px; letter-spacing: -.03em; font-feature-settings: "tnum"; }
+  .kv span { font-size: 12px; color: var(--stone); }
+  .flow { display: flex; flex-direction: column; gap: 6px; }
+  .fstep { display: grid; grid-template-columns: 28px 36px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 12px 14px; border-radius: 16px; background: var(--linen);
+    text-decoration: none; }
+  .fstep:hover { background: var(--bone); }
+  .fstep .n { font: 12px ui-monospace, monospace; color: var(--stone); text-align: right; }
+  .fstep b { font-weight: 500; display: block; } .fstep small { display: block; font-size: 13px; color: var(--graphite); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fstep .est { font-size: 12px; color: var(--stone); white-space: nowrap; font-feature-settings: "tnum"; }
+
+  /* ---------- form ---------- */
+  .fields { display: grid; grid-template-columns: 1fr; gap: 18px; }
+  .field { display: flex; flex-direction: column; gap: 8px; }
+  .field > span { font-size: 13px; font-weight: 500; color: var(--charcoal); display: flex; justify-content: space-between; gap: 12px; }
+  .field > span small { font-weight: 400; color: var(--stone); }
+  .pick-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pick-head .spacer { flex: 1; }
+  .pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+  .pitem { display: grid; grid-template-columns: 22px 36px minmax(0, 1fr); gap: 12px; align-items: center; padding: 12px; border-radius: 16px; border: 1px solid var(--line);
+    background: var(--paper); cursor: pointer; transition: border-color .15s, background .15s; }
+  .pitem:hover { border-color: var(--graphite); }
+  .pitem.on { background: var(--bone); border-color: var(--ink); }
+  .pitem input { width: 18px; height: 18px; accent-color: var(--espresso); margin: 0; }
+  .pitem b { font-weight: 500; font-size: 14px; display: block; }
+  .pitem small { display: block; font-size: 12px; color: var(--stone); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .summary { font-size: 13px; color: var(--graphite); background: var(--linen); border-radius: 14px; padding: 12px 14px; line-height: 1.5; }
+  .form-actions { display: flex; gap: 8px; align-items: center; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .form-actions .status { font-size: 13px; color: var(--stone); margin-right: auto; display: inline-flex; gap: 6px; align-items: center; }
+
+  @media (max-width: 760px) {
+    .kv { grid-template-columns: 1fr; }
+    .fstep { grid-template-columns: 36px minmax(0, 1fr); }
+    .fstep .n, .fstep .est, .fstep .badge { display: none; }
+    .card { padding: 20px; }
+    .vhead .acts { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <nav class="links">
+      <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/teams" class="on"><i data-icon="layers" data-size="16"></i>Teams</a>
+      <a href="/guide"><i data-icon="book" data-size="16"></i>Guide</a>
+    </nav>
+    <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
+  </div>
+</header>
+
+<main class="wrap page" id="app"></main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const app = $("app");
+const DEFAULT_SECONDS = 40;          // estimate for an agent that has never run
+let dirty = false;
+const go = (path) => { dirty = false; location.href = path; };
+window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("scroll", () => document.querySelector("header.top").classList.toggle("scrolled", scrollY > 4));
+document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
+function setTitle(t) { document.title = `${t} · Agents Atelier`; }
+
+const parts = location.pathname.replace(/\/+$/, "").split("/").slice(2).map(decodeURIComponent);   // after /teams
+function route() {
+  if (!parts.length) return listView();
+  if (parts[0] === "new") return formView(null);
+  if (parts[1] === "edit") return formView(parts[0]);
+  return detailView(parts[0]);
+}
+
+/* Shared data: agents in run order, and per-agent averages from past runs (for estimates). */
+async function loadBase() {
+  const [agents, stats] = await Promise.all([api("/api/agents"), api("/api/stats").catch(() => ({ agents: [] }))]);
+  const avg = Object.fromEntries(stats.agents.map(s => [s.agent, s]));
+  return { agents, byId: Object.fromEntries(agents.map(a => [a.id, a])), avg };
+}
+function estimate(ids, avg) {
+  let seconds = 0, cost = 0, measured = 0;
+  ids.forEach(id => {
+    const s = avg[id];
+    if (s && s.runs) { seconds += s.avg_seconds; cost += s.avg_cost; measured++; }
+    else seconds += DEFAULT_SECONDS;
+  });
+  return { seconds, cost, measured, total: ids.length };
+}
+const stack = (ids, byId, max = 10) => `<div class="stack">${ids.slice(0, max).map(id => {
+  const a = byId[id]; return a ? `<span class="tile" style="--c:${a.color}" title="${esc(a.name)}">${icon(a.icon, { size: 14 })}</span>` : "";
+}).join("")}${ids.length > max ? `<span class="badge" style="align-self:center">+${ids.length - max}</span>` : ""}</div>`;
+
+// ================================================================ list: /teams
+async function listView() {
+  setTitle("Teams");
+  app.innerHTML = `<p class="note">Loading…</p>`;
+  let teams, base;
+  try { [teams, base] = await Promise.all([api("/api/presets"), loadBase()]); }
+  catch (err) { return showError(app, err, listView, "Couldn't load the teams"); }
+  const card = (t) => {
+    const est = estimate(t.agents, base.avg);
+    return `<a class="tcard" href="/teams/${encodeURIComponent(t.id)}">
+      <div class="top"><h3>${esc(t.name)}</h3>${t.builtin ? `<span class="badge">built-in</span>` : ""}</div>
+      <p>${esc(t.description || "No description.")}</p>
+      ${stack(t.agents, base.byId)}
+      <div class="tmeta"><span>${icon("users", { size: 13 })}${t.agents.length} agent${t.agents.length === 1 ? "" : "s"}</span>
+        <span title="${est.measured}/${est.total} agents measured from past runs">${icon("clock", { size: 13 })}~${duration(est.seconds)}</span>
+        ${est.measured ? `<span>${icon("chart", { size: 13 })}~${money(est.cost)}</span>` : ""}</div>
+    </a>`;
+  };
+  const builtin = teams.filter(t => t.builtin), mine = teams.filter(t => !t.builtin);
+  app.innerHTML = `
+    <div class="bar-top"><h1>Teams</h1>
+      <a class="btn btn-ghost" href="/agents">${icon("users", { size: 16 })}Agents</a>
+      <a class="btn btn-dark" href="/teams/new">${icon("plus", { size: 16 })}New team</a></div>
+    <p class="note">${icon("alert", { size: 14 })}<span>A team is a set of agents that run together, always in the agents' order. Pick one in a project's Team panel. Times and costs are estimates from past runs (about ${DEFAULT_SECONDS}s for agents that haven't run yet).</span></p>
+    <p class="sec-title">Your teams</p>
+    <div class="tgrid">${mine.map(card).join("")}
+      <a class="newcard" href="/teams/new"><div><span class="tile">${icon("plus", { size: 20 })}</span><b style="font-weight:500">New team</b>
+        <div style="font-size:13px;color:var(--stone);margin-top:4px">Choose agents for a kind of job</div></div></a></div>
+    <p class="sec-title">Built-in teams</p>
+    <div class="tgrid">${builtin.map(card).join("")}</div>`;
+}
+
+// ================================================================ view: /teams/<id>
+async function detailView(id) {
+  app.innerHTML = `<p class="note">Loading…</p>`;
+  let t, base;
+  try { [t, base] = await Promise.all([api(`/api/presets/${encodeURIComponent(id)}`), loadBase()]); }
+  catch (err) { return showError(app, err, err.status === 404 ? null : () => detailView(id), err.status === 404 ? "Team not found" : "Couldn't load this team"); }
+  setTitle(t.name);
+  const est = estimate(t.agents, base.avg);
+  app.innerHTML = `
+    <a class="crumb" href="/teams">${icon("arrow-right", { size: 14, cls: "flip" })}All teams</a>
+    <section class="card">
+      <div class="vhead">
+        <span class="big">${icon(t.builtin ? "users" : "sliders", { size: 28 })}</span>
+        <div><h1>${esc(t.name)}</h1>
+          <div class="sub">${t.builtin ? "Built-in team — duplicate it to make your own version" : `Your team${t.updated ? ` · updated ${ago(t.updated)}` : ""}`} · id <span class="mono">${esc(t.id)}</span></div></div>
+        <div class="acts">
+          <a class="btn btn-ghost btn-sm" href="/teams/new?from=${encodeURIComponent(t.id)}">${icon("copy", { size: 14 })}Duplicate</a>
+          ${t.builtin ? "" : `<button class="btn btn-ghost btn-sm" id="del">${icon("trash", { size: 14 })}Delete</button>
+          <a class="btn btn-dark btn-sm" href="/teams/${encodeURIComponent(t.id)}/edit">${icon("pencil", { size: 14 })}Edit</a>`}
+        </div>
+      </div>
+      <p class="vdesc">${esc(t.description || "No description yet.")}</p>
+      <div class="kv">
+        <div><b>${t.agents.length}</b><span>agents, run in order</span></div>
+        <div><b>~${duration(est.seconds)}</b><span>estimated run time (${est.measured}/${est.total} measured)</span></div>
+        <div><b>${est.measured ? "~" + money(est.cost) : "—"}</b><span>estimated cost${est.measured < est.total ? " (measured agents only)" : ""}</span></div>
+      </div>
+    </section>
+    <section class="card" style="margin-top:16px">
+      <h2>${icon("layers", { size: 16 })}Agents in this team</h2>
+      <div class="flow">${t.agents.map((aid, i) => {
+        const a = base.byId[aid]; if (!a) return "";
+        const s = base.avg[aid];
+        return `<a class="fstep" href="/agents/${encodeURIComponent(aid)}">
+          <span class="n">${i + 1}</span><span class="tile" style="--c:${a.color}">${icon(a.icon, { size: 16 })}</span>
+          <span style="min-width:0"><b>${esc(a.name)}</b><small>${esc(a.description || "")}</small></span>
+          <span class="badge ${a.model ? "mono" : ""}">${esc(a.model || "default model")}</span>
+          <span class="est">${s && s.runs ? `${duration(s.avg_seconds)} · ${money(s.avg_cost)}` : "not run yet"}</span>
+        </a>`;
+      }).join("") || `<p class="note">This team has no agents left (they may have been deleted).</p>`}</div>
+    </section>`;
+  $("del")?.addEventListener("click", async () => {
+    if (!await confirmDialog({ title: `Delete “${t.name}”?`, text: "The team is removed. Its agents and your projects are not changed.", ok: "Delete", danger: true })) return;
+    try { await api(`/api/presets/${encodeURIComponent(t.id)}`, { method: "DELETE" }); toast("Team deleted"); go("/teams"); }
+    catch (err) { toast(err.message, "err"); }
+  });
+}
+
+// ================================================================ form: /teams/new, /teams/<id>/edit
+async function formView(id) {
+  const from = new URLSearchParams(location.search).get("from");
+  app.innerHTML = `<p class="note">Loading…</p>`;
+  let base, source = null;
+  try { [base, source] = await Promise.all([loadBase(), id || from ? api(`/api/presets/${encodeURIComponent(id || from)}`) : null]); }
+  catch (err) { return showError(app, err, () => formView(id), "Couldn't open the form"); }
+  if (id && source.builtin) return showError(app, new Error("Built-in teams can't be edited. Duplicate it to make your own version."), null, "This team is built in");
+  const isNew = !id;
+  const draft = { name: source ? (isNew ? `${source.name} copy` : source.name) : "", description: source?.description || "",
+                  agents: new Set(source ? source.agents : []) };
+  const snap = () => JSON.stringify([draft.name, draft.description, [...draft.agents].sort()]);
+  const initial = snap();
+  setTitle(isNew ? "New team" : `Edit ${source.name}`);
+  app.innerHTML = `
+    <a class="crumb" href="${isNew ? "/teams" : `/teams/${encodeURIComponent(id)}`}">${icon("arrow-right", { size: 14, cls: "flip" })}${isNew ? "All teams" : esc(source.name)}</a>
+    <section class="card">
+      <div class="vhead" style="margin-bottom:24px"><span class="big">${icon("sliders", { size: 28 })}</span>
+        <div><h1 id="pv-name">${esc(draft.name || "New team")}</h1><div class="sub">${isNew ? "A set of agents you can pick in one click" : "Editing your team"}</div></div></div>
+      <div class="fields">
+        <label class="field"><span>Name</span><input class="input" id="f-name" maxlength="40" value="${esc(draft.name)}" placeholder="e.g. Landing page sprint"></label>
+        <label class="field"><span>Description <small id="dcount"></small></span>
+          <input class="input" id="f-desc" maxlength="200" value="${esc(draft.description)}" placeholder="When to use this team"></label>
+        <div class="field">
+          <div class="pick-head"><span style="font-size:13px;font-weight:500">Agents <small style="font-weight:400;color:var(--stone)">· they always run in the order shown on the Agents page</small></span>
+            <span class="spacer"></span>
+            <button class="btn btn-ghost btn-sm" type="button" id="allA">All</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="defA">Default</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="noneA">None</button></div>
+          <div class="pick" id="pick"></div>
+          <div class="summary" id="summary"></div>
+        </div>
+      </div>
+      <div class="form-actions"><span class="status" id="status"></span>
+        <a class="btn btn-ghost" href="${isNew ? "/teams" : `/teams/${encodeURIComponent(id)}`}">Cancel</a>
+        <button class="btn btn-dark" id="save">${icon("check", { size: 16 })}${isNew ? "Create team" : "Save changes"}</button></div>
+    </section>`;
+  const draw = () => {
+    $("pick").innerHTML = base.agents.map((a, i) => `
+      <label class="pitem ${draft.agents.has(a.id) ? "on" : ""}">
+        <input type="checkbox" data-id="${esc(a.id)}" ${draft.agents.has(a.id) ? "checked" : ""}>
+        <span class="tile" style="--c:${a.color}">${icon(a.icon, { size: 16 })}</span>
+        <span style="min-width:0"><b>${String(i + 1).padStart(2, "0")} · ${esc(a.name)}</b><small>${esc(a.description || "")}</small></span>
+      </label>`).join("");
+    const ids = base.agents.filter(a => draft.agents.has(a.id)).map(a => a.id), est = estimate(ids, base.avg);
+    $("summary").innerHTML = ids.length
+      ? `<b>${ids.length} agent${ids.length === 1 ? "" : "s"}</b>: ${ids.map(i => esc(base.byId[i].name)).join(" → ")} · about ${duration(est.seconds)} per run${est.measured ? `, ~${money(est.cost)}` : ""}`
+      : "Pick at least one agent.";
+    dirty = snap() !== initial;
+    $("status").innerHTML = dirty ? `${icon("pencil", { size: 14 })}Unsaved changes` : "";
+    $("dcount").textContent = `${draft.description.length}/200`;
+  };
+  draw();
+  $("f-name").oninput = (e) => { draft.name = e.target.value; $("pv-name").textContent = draft.name || "New team"; draw(); };
+  $("f-desc").oninput = (e) => { draft.description = e.target.value; draw(); };
+  $("pick").onchange = (e) => { const c = e.target.closest("[data-id]"); if (!c) return; c.checked ? draft.agents.add(c.dataset.id) : draft.agents.delete(c.dataset.id); draw(); };
+  $("allA").onclick = () => { draft.agents = new Set(base.agents.map(a => a.id)); draw(); };
+  $("defA").onclick = () => { draft.agents = new Set(base.agents.filter(a => a.default).map(a => a.id)); draw(); };
+  $("noneA").onclick = () => { draft.agents = new Set(); draw(); };
+  $("save").onclick = async () => {
+    const body = { name: draft.name, description: draft.description, agents: [...draft.agents] };
+    $("save").disabled = true;
+    try {
+      const t = isNew ? await api("/api/presets", { method: "POST", body: JSON.stringify(body) })
+                      : await api(`/api/presets/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) });
+      toast(isNew ? `Team “${t.name}” created` : "Team saved"); go(`/teams/${encodeURIComponent(t.id)}`);
+    } catch (err) { toast(err.message, "err"); $("save").disabled = false; }
+  };
+}
+
+route();
+</script>
+</body>
+</html>

@@ -140,6 +140,7 @@
     <nav class="links">
       <a href="/projects" class="on"><i data-icon="grid" data-size="16"></i>Projects</a>
       <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
       <a href="/guide"><i data-icon="book" data-size="16"></i>Guide</a>
     </nav>
     <button class="btn btn-dark" data-new title="New project (N)"><i data-icon="plus" data-size="16"></i>New project</button>
@@ -291,7 +292,7 @@ function cardHTML(p) {
   <article class="pcard">
     <a class="cover" href="/p/${p.id}" aria-label="Open ${esc(p.name)}"></a>
     <div class="thumb">
-      ${p.has_preview ? `<iframe data-src="/work/${p.id}/index.html" tabindex="-1" title="" aria-hidden="true"></iframe>`
+      ${p.has_preview ? `<iframe data-src="/work/${p.id}/index.html" tabindex="-1" title="" aria-hidden="true" sandbox=""></iframe>`
         : `<div class="none"><div>${icon("file", { size: 24 })}No page yet</div></div>`}
       ${p.busy ? `<span class="badge live">Building</span>` : p.paused ? `<span class="badge" title="Stopped before the team finished — open it to continue">Paused</span>` : ""}
       <div class="hover">

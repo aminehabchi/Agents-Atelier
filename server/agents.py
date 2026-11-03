@@ -23,10 +23,12 @@ Files starting with "_" or "." are not agents.
 """
 
 import json
+import os
 import re
+import time
 from pathlib import Path
 
-AGENTS_DIR = Path(__file__).resolve().parent.parent / "agents"
+AGENTS_DIR = Path(os.environ.get("ATELIER_AGENTS") or Path(__file__).resolve().parent.parent / "agents")
 COMMON_FILE = AGENTS_DIR / "_common.md"
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -117,6 +119,9 @@ def validate(data: dict, *, new: bool) -> dict:
     model = str(data.get("model") or "").strip()
     if not MODEL_RE.match(model):
         raise ValueError("Model must be an alias like sonnet or opus, or a full model id.")
+    import models   # local import: models.py reads the CLI and agents/_models.json
+    if not models.allowed(model):
+        raise ValueError(f"“{model}” isn't in the model list. Pick one, or check it with the Claude CLI first.")
     out.update(name=name, role=role, icon=icon, color=color.lower(), default=bool(data.get("default", True)),
                description=description, model=model)
     return out
@@ -177,50 +182,103 @@ def reorder_agents(ids: list[str]):
     _write_all([agents[i] for i in ids])
 
 
-# ---------------------------------------------------------------- team presets
+# ---------------------------------------------------------------- teams (presets)
+# Built-in teams are computed from the current agents; saved teams live in agents/_presets.json.
 
 def builtin_presets() -> list[dict]:
     ids = [a["id"] for a in load_agents()]
     pick = lambda wanted: [i for i in ids if i in wanted]
     return [
         {"id": "default", "name": "Default", "agents": default_ids(), "builtin": True,
-         "description": "The agents marked “on by default”."},
+         "description": "The agents marked “on by default” — a good team for a new page."},
         {"id": "quick", "name": "Quick", "agents": pick({"html", "css"}), "builtin": True,
-         "description": "Just markup and styles — fastest and cheapest."},
+         "description": "Just markup and styles — fastest and cheapest, for small changes."},
         {"id": "polish", "name": "Polish", "agents": pick({"a11y", "perf", "critic"}), "builtin": True,
-         "description": "Improve an existing page: accessibility, speed, final review."},
+         "description": "Improve an existing page: accessibility, speed and a final review."},
         {"id": "full", "name": "Full", "agents": ids, "builtin": True,
-         "description": "Every agent, in order."},
+         "description": "Every agent, in order — the most thorough result."},
     ]
 
 
+def _read_custom() -> list[dict]:
+    try:
+        return json.loads(PRESETS_FILE.read_text()) if PRESETS_FILE.exists() else []
+    except ValueError:
+        return []
+
+
+def _write_custom(items: list[dict]):
+    tmp = PRESETS_FILE.with_name(PRESETS_FILE.name + ".tmp")
+    tmp.write_text(json.dumps(items, indent=2))
+    tmp.replace(PRESETS_FILE)
+
+
 def load_presets() -> list[dict]:
-    ids = {a["id"] for a in load_agents()}
-    custom = json.loads(PRESETS_FILE.read_text()) if PRESETS_FILE.exists() else []
-    for p in custom:
-        p["agents"] = [i for i in p["agents"] if i in ids]
-        p["builtin"] = False
-    return builtin_presets() + custom
+    order = [a["id"] for a in load_agents()]
+    out = builtin_presets()
+    for p in _read_custom():
+        out.append({"id": p["id"], "name": p["name"], "description": p.get("description", ""),
+                    "agents": [i for i in order if i in p.get("agents", [])],   # always in run order
+                    "builtin": False, "created": p.get("created"), "updated": p.get("updated")})
+    return out
 
 
-def save_preset(name: str, agent_ids: list[str]) -> dict:
-    name = " ".join(str(name).split())[:40]
-    if not name:
-        raise ValueError("Give the preset a name.")
-    ids = [a["id"] for a in load_agents() if a["id"] in agent_ids]
+def get_preset(preset_id: str) -> dict:
+    p = next((p for p in load_presets() if p["id"] == preset_id), None)
+    if not p:
+        raise KeyError(preset_id)
+    return p
+
+
+def _clean_team(data: dict) -> dict:
+    name = " ".join(str(data.get("name") or "").split())
+    if not name or len(name) > 40:
+        raise ValueError("Give the team a name (max 40 characters).")
+    description = " ".join(str(data.get("description") or "").split())
+    if len(description) > 200:
+        raise ValueError("Keep the description under 200 characters.")
+    wanted = list(data.get("agents") or [])
+    ids = [a["id"] for a in load_agents() if a["id"] in wanted]
     if not ids:
-        raise ValueError("A preset needs at least one agent.")
-    custom = json.loads(PRESETS_FILE.read_text()) if PRESETS_FILE.exists() else []
-    pid = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:32] or "preset"
-    if pid in {p["id"] for p in builtin_presets()}:
-        pid += "-custom"
-    custom = [p for p in custom if p["id"] != pid] + [{"id": pid, "name": name, "agents": ids}]
-    PRESETS_FILE.write_text(json.dumps(custom, indent=2))
-    return {"id": pid, "name": name, "agents": ids, "builtin": False}
+        raise ValueError("A team needs at least one agent.")
+    return {"name": name, "description": description, "agents": ids}
+
+
+def save_preset(name: str, agent_ids: list[str], description: str = "") -> dict:
+    """Create a saved team. The id comes from the name and is made unique."""
+    clean = _clean_team({"name": name, "agents": agent_ids, "description": description})
+    custom = _read_custom()
+    taken = {p["id"] for p in custom} | {p["id"] for p in builtin_presets()}
+    base = re.sub(r"[^a-z0-9]+", "-", clean["name"].lower()).strip("-")[:32] or "team"
+    pid, n = base, 2
+    while pid in taken:
+        pid, n = f"{base}-{n}", n + 1
+    now = time.time()
+    custom.append({"id": pid, **clean, "created": now, "updated": now})
+    _write_custom(custom)
+    return get_preset(pid)
+
+
+def update_preset(preset_id: str, data: dict) -> dict:
+    if preset_id in {p["id"] for p in builtin_presets()}:
+        raise ValueError("Built-in teams can't be changed. Duplicate it to make your own version.")
+    custom = _read_custom()
+    p = next((p for p in custom if p["id"] == preset_id), None)
+    if not p:
+        raise KeyError(preset_id)
+    p.update(_clean_team(data), updated=time.time())
+    _write_custom(custom)
+    return get_preset(preset_id)
 
 
 def delete_preset(preset_id: str):
-    custom = json.loads(PRESETS_FILE.read_text()) if PRESETS_FILE.exists() else []
+    if preset_id in {p["id"] for p in builtin_presets()}:
+        raise ValueError("Built-in teams can't be deleted.")
+    custom = _read_custom()
     if not any(p["id"] == preset_id for p in custom):
         raise KeyError(preset_id)
-    PRESETS_FILE.write_text(json.dumps([p for p in custom if p["id"] != preset_id], indent=2))
+    _write_custom([p for p in custom if p["id"] != preset_id])
+
+
+def teams_with(agent_id: str) -> list[dict]:
+    return [{"id": p["id"], "name": p["name"], "builtin": p["builtin"]} for p in load_presets() if agent_id in p["agents"]]
