@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start Agents Atelier on http://localhost:8000
+# Start Agents Atelier on http://localhost:8001 (change with PORT=…)
 # Optional: AGENT_MODEL=sonnet ./run.sh   (faster, cheaper agents)
 set -e
 cd "$(dirname "$0")"
