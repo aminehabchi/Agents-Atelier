@@ -1,0 +1,32 @@
+/* Layout shared by the content pages (landing, projects, agents). */
+body { font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+header.top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--linen) 88%, transparent); backdrop-filter: blur(10px);
+  border-bottom: 1px solid transparent; transition: border-color .2s; }
+header.top.scrolled { border-bottom-color: var(--line); }
+header.top .wrap { height: 68px; display: flex; align-items: center; gap: 24px; }
+header.top.clear { position: absolute; inset: 0 0 auto; background: transparent; backdrop-filter: none; }
+.links { display: flex; gap: 4px; margin: 0 auto; }
+.links a { display: inline-flex; align-items: center; gap: 7px; height: 36px; line-height: 1; text-decoration: none; font-size: 14px; color: var(--charcoal); padding: 0 14px; border-radius: 999px; }
+.links a .ic, .links a i[data-icon] { color: var(--stone); }
+.links a:hover .ic, .links a.on .ic, .links a.on i[data-icon], .links a:hover i[data-icon] { color: var(--ink); }
+.links a:hover { background: rgba(255, 255, 255, .7); }
+.links a.on { background: var(--paper); box-shadow: var(--ring); }
+
+.page { padding-top: 32px; padding-bottom: 120px; }
+.eyebrow { font-size: 14px; color: var(--stone); margin: 0 0 12px; }
+.page-title { font-weight: 400; font-size: clamp(40px, 6vw, 72px); line-height: 1; letter-spacing: -.06em; margin: 0 0 16px; }
+.lead { color: var(--graphite); font-size: 18px; max-width: 640px; margin: 0; }
+
+.seg { display: flex; background: var(--paper); box-shadow: var(--ring); border-radius: 999px; padding: 3px; }
+.seg button { background: transparent; border: 0; padding: 7px 14px; border-radius: 999px; font-size: 13px; color: var(--stone); }
+.seg button:hover { color: var(--ink); }
+.seg button.on { background: var(--espresso); color: #fff; }
+
+@media (max-width: 760px) {
+  .links a { font-size: 0; gap: 0; padding: 0; width: 36px; justify-content: center; }
+  .links a .ic { width: 18px; height: 18px; }
+  header.top .btn { font-size: 0; gap: 0; padding: 0; width: 40px; }
+  header.top .btn > i[data-icon]:first-child { margin: 0; }
+}

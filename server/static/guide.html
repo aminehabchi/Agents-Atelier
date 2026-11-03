@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f7f7f5">
+<title>Guide · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/site.css">
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; margin-top: 0; align-items: start; }
+  .toc { position: sticky; top: 92px; display: flex; flex-direction: column; gap: 2px; }
+  .toc p { font-size: 12px; color: var(--stone); margin: 0 0 8px 12px; text-transform: uppercase; letter-spacing: .08em; }
+  .toc a { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 999px; text-decoration: none; font-size: 14px; color: var(--graphite); line-height: 1; }
+  .toc a i[data-icon] { color: var(--stone); }
+  .toc a:hover { background: var(--paper); color: var(--ink); }
+  .toc a.on { background: var(--paper); box-shadow: var(--ring); color: var(--ink); }
+  .toc a.on i[data-icon] { color: var(--ink); }
+
+  article section { padding-bottom: 72px; scroll-margin-top: 96px; }
+  article h2 { font-weight: 400; font-size: 44px; line-height: 1.1; letter-spacing: -.05em; margin: 0 0 16px; display: flex; align-items: center; gap: 14px; }
+  article h2 .num { font: 13px ui-monospace, monospace; color: var(--stone); letter-spacing: 0; background: var(--paper); box-shadow: var(--ring);
+    width: 36px; height: 36px; border-radius: 999px; display: inline-grid; place-items: center; flex: none; }
+  article h3 { font-weight: 500; font-size: 20px; letter-spacing: -.01em; line-height: 1.3; margin: 0 0 6px; }
+  article > section > p { color: var(--graphite); font-size: 17px; max-width: 680px; margin: 0 0 16px; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+  p code, li code, td code { background: var(--paper); box-shadow: var(--ring); padding: 1px 6px; border-radius: 6px; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 28px; }
+  .stepc { background: var(--paper); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px; }
+  .stepc .top { display: flex; align-items: center; justify-content: space-between; }
+  .ico { width: 44px; height: 44px; border-radius: 14px; background: var(--linen); display: grid; place-items: center; color: var(--charcoal); flex: none; }
+  .stepc .n { font: 12px ui-monospace, monospace; color: var(--stone); }
+  .stepc p { margin: 0; font-size: 15px; color: var(--graphite); line-height: 1.55; }
+
+  .anatomy { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; }
+  .part { background: var(--paper); border-radius: 20px; padding: 24px; display: grid; grid-template-columns: 44px 1fr; column-gap: 16px; row-gap: 4px; align-items: start; }
+  .part .ico { grid-row: span 2; }
+  .part h3 { margin: 0; align-self: center; min-height: 22px; display: flex; align-items: center; }
+  .part ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; font-size: 15px; color: var(--graphite); line-height: 1.5; }
+  .part li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; }
+  .part li > i[data-icon] { color: var(--stone); margin-top: 2px; }
+
+  .tips { display: grid; gap: 10px; margin-top: 24px; }
+  .tip { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tip > div { background: var(--paper); border-radius: 16px; padding: 18px 20px; font-size: 15px; line-height: 1.55; color: var(--graphite); }
+  .tip .lbl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--stone); margin-bottom: 6px; line-height: 1; }
+  .tip .good { box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink); }
+
+  pre.code { background: var(--paper); border-radius: 20px; padding: 24px; margin: 20px 0; overflow-x: auto; font: 13.5px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--charcoal); box-shadow: var(--ring); }
+  pre.code .c { color: var(--stone); }
+
+  table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--paper); border-radius: 20px; overflow: hidden; margin-top: 20px; font-size: 15px; }
+  th, td { text-align: left; padding: 14px 20px; vertical-align: middle; border-bottom: 1px solid var(--line); }
+  th { font-weight: 500; font-size: 13px; color: var(--stone); background: var(--linen); }
+  tr:last-child td { border-bottom: 0; }
+  td:first-child { white-space: nowrap; width: 1%; }
+  kbd { font: 12px ui-monospace, monospace; background: var(--linen); border-radius: 6px; padding: 3px 8px; box-shadow: var(--ring); display: inline-block; line-height: 1.2; }
+
+  .team-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; margin-top: 24px; }
+  .tm { display: flex; align-items: center; gap: 12px; background: var(--paper); border-radius: 16px; padding: 12px 14px; text-decoration: none; transition: background .2s; }
+  .tm:hover { background: var(--bone); }
+  .tm .tile { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); flex: none; }
+  .tm .nm { font-size: 14px; font-weight: 500; flex: 1; line-height: 1.2; }
+  .tm .nm small { display: block; font-weight: 400; color: var(--stone); font-size: 12px; margin-top: 2px; }
+  .tm { align-items: flex-start; }
+  .tm .nm p { margin: 6px 0 0; font-weight: 400; font-size: 13px; line-height: 1.5; color: var(--graphite); }
+
+  details { background: var(--paper); border-radius: 16px; margin-top: 8px; }
+  summary { list-style: none; cursor: pointer; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 16px; font-weight: 500; line-height: 1.3; }
+  summary::-webkit-details-marker { display: none; }
+  summary i[data-icon] { color: var(--stone); transition: transform .2s; }
+  details[open] summary i[data-icon] { transform: rotate(180deg); }
+  details > div { padding: 0 20px 20px; color: var(--graphite); font-size: 15px; line-height: 1.6; max-width: 720px; }
+
+  .cta { background: var(--paper); border-radius: 24px; padding: 40px; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  .cta h2 { margin: 0; }
+
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; gap: 24px; }
+    .toc { position: static; flex-direction: row; flex-wrap: wrap; }
+    .toc p { display: none; }
+    .steps, .anatomy, .tip { grid-template-columns: 1fr; }
+    article h2 { font-size: 34px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <nav class="links">
+      <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/guide" class="on"><i data-icon="book" data-size="16"></i>Guide</a>
+    </nav>
+    <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
+  </div>
+</header>
+
+<main class="wrap page">
+  <h1 class="sr-only">Guide</h1>
+
+  <div class="layout">
+    <nav class="toc" id="toc">
+      <p>On this page</p>
+      <a href="#start"><i data-icon="play" data-size="16"></i>Quick start</a>
+      <a href="#studio"><i data-icon="monitor" data-size="16"></i>The studio</a>
+      <a href="#prompts"><i data-icon="lightbulb" data-size="16"></i>Writing prompts</a>
+      <a href="#team"><i data-icon="users" data-size="16"></i>The agent team</a>
+      <a href="#custom"><i data-icon="pencil" data-size="16"></i>Custom agents</a>
+      <a href="#projects"><i data-icon="folder" data-size="16"></i>Projects &amp; files</a>
+      <a href="#keys"><i data-icon="keyboard" data-size="16"></i>Shortcuts</a>
+      <a href="#faq"><i data-icon="help" data-size="16"></i>FAQ</a>
+    </nav>
+
+    <article>
+      <section id="start">
+        <h2><span class="num">01</span>Quick start</h2>
+        <p>Agents Atelier runs on your machine and uses your own Claude Code login, so there's no API key to set up.</p>
+        <div class="steps">
+          <div class="stepc"><div class="top"><span class="ico"><i data-icon="code" data-size="20"></i></span><span class="n">STEP 1</span></div>
+            <h3>Start the server</h3><p>Run <code>./run.sh</code> in the project folder, then open <code>localhost:8001</code>.</p></div>
+          <div class="stepc"><div class="top"><span class="ico"><i data-icon="message" data-size="20"></i></span><span class="n">STEP 2</span></div>
+            <h3>Create a project</h3><p>Click <b>New project</b>, give it a name and a description, then describe the page you want.</p></div>
+          <div class="stepc"><div class="top"><span class="ico"><i data-icon="eye" data-size="20"></i></span><span class="n">STEP 3</span></div>
+            <h3>Watch &amp; refine</h3><p>Agents build it one after another. Ask for changes anytime, then download the .zip.</p></div>
+        </div>
+      </section>
+
+      <section id="studio">
+        <h2><span class="num">02</span>The studio</h2>
+        <p>Each project opens in the studio: the chat on the left, the live page on the right, and the team at the bottom.</p>
+        <div class="anatomy">
+          <div class="part"><span class="ico"><i data-icon="message" data-size="20"></i></span><h3>Chat</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>Every agent posts a card with each file it reads or edits, a timer and a short summary.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>While agents work, the send button turns into a stop button. After a stop you can <b>Continue</b> or <b>Start again</b>.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Follow-up prompts build on the files that are already there.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="monitor" data-size="20"></i></span><h3>Preview</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>Reloads after every edit and keeps your scroll position.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Switch between desktop, tablet (768px) and phone (375px).</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>The <b>Code</b> tab shows every file, with a dot on the ones that changed.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="users" data-size="20"></i></span><h3>Team panel</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>One tile per agent: ready, waiting, working (with a live timer and current action), done or off.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Use the switch on a tile to turn that agent on or off for this project.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Click a tile that already worked to jump to its card in the chat.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="history" data-size="20"></i></span><h3>Versions</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>A version is saved before every run and after each agent, or whenever you click <b>Save version now</b>.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Open, compare with the current code, download, or restore any version. Restoring saves the current code first.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="chart" data-size="20"></i></span><h3>Cost &amp; time</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>See estimated cost, time and tokens per agent, for this project or all projects.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Each agent card shows how long it took and what it cost.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="code" data-size="20"></i></span><h3>Editing &amp; retries</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>The <b>Code</b> tab is an editor. Turn <b>Auto-save</b> on, or save with the button or Ctrl+S.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>The retry button on an agent's card runs just that agent again, with an optional extra instruction.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Attach, paste or drop reference images on the prompt; agents look at them before they work.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="folder" data-size="20"></i></span><h3>Header</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>Click the title to rename the project, or the <code>#id</code> to copy it.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>The folder button opens every project, with search.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span><b>.zip</b> downloads the code. It's locked while agents are working.</span></li>
+            </ul></div>
+        </div>
+      </section>
+
+      <section id="prompts">
+        <h2><span class="num">03</span>Writing prompts</h2>
+        <p>Agents only know what you tell them and what's already in the files. Specific prompts get specific pages.</p>
+        <div class="tips">
+          <div class="tip">
+            <div><span class="lbl"><i data-icon="x" data-size="14"></i>Vague</span>“a website for my business”</div>
+            <div class="good"><span class="lbl"><i data-icon="check" data-size="14"></i>Better</span>“a one-page site for Lumen, a bike repair shop in Lyon: hero with booking button, services with prices, opening hours, map link”</div>
+          </div>
+          <div class="tip">
+            <div><span class="lbl"><i data-icon="x" data-size="14"></i>Vague</span>“make it look nicer”</div>
+            <div class="good"><span class="lbl"><i data-icon="check" data-size="14"></i>Better</span>“use a calm, editorial look: off-white background, one serif for headings, more white space between sections”</div>
+          </div>
+          <div class="tip">
+            <div><span class="lbl"><i data-icon="x" data-size="14"></i>Too much at once</span>“redo everything and add a blog, a shop and dark mode”</div>
+            <div class="good"><span class="lbl"><i data-icon="check" data-size="14"></i>Better</span>Ask one change per prompt, and switch off agents you don't need for it, so each run is faster.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="team">
+        <h2><span class="num">04</span>The agent team</h2>
+        <p>Agents run in order, and each one does a single job. Faded agents are off by default; switch them on per project in the Team panel.</p>
+        <div class="team-list" id="teamList"></div>
+      </section>
+
+      <section id="custom">
+        <h2><span class="num">05</span>Custom agents</h2>
+        <p>Every agent is a Markdown file in <code>agents/</code>. Edit them on the <a href="/agents">Agents page</a> or in your editor. Changes apply to the next run, with no restart needed.</p>
+<pre class="code"><span class="c"># agents/16-dark-mode.md   ← the number sets the run order</span>
+---
+id: dark-mode
+name: Dark mode
+icon: eye             <span class="c"># any icon from the Agents page picker</span>
+model: sonnet         <span class="c"># optional: which Claude model runs it</span>
+color: "#334455"
+default: false        <span class="c"># off for new projects</span>
+---
+You are the Dark mode agent. Add a dark theme using
+prefers-color-scheme, reusing the CSS variables in :root.</pre>
+        <p><code>agents/_common.md</code> holds the shared rules every agent receives before its own role, such as which files make up a project and “plain HTML/CSS/JS only”.</p>
+      </section>
+
+      <section id="projects">
+        <h2><span class="num">06</span>Projects &amp; files</h2>
+        <p>Each project has its own name, description, UUID, URL, folder and saved chat. The name and description are required, and the agents read them with every prompt, so describe what the page is for and who it's for.</p>
+        <table>
+          <tr><th>Where</th><th>What</th></tr>
+          <tr><td><code>/p/&lt;uuid&gt;</code></td><td>The studio for one project</td></tr>
+          <tr><td><code>/projects</code></td><td>All projects with live thumbnails, search and sort</td></tr>
+          <tr><td><code>work/&lt;uuid&gt;/</code></td><td>The site itself: <code>index.html</code>, <code>style.css</code>, <code>script.js</code>, <code>plan.md</code></td></tr>
+          <tr><td><code>work/.projects/</code></td><td>Project name, chosen agents and the saved chat log</td></tr>
+        </table>
+      </section>
+
+      <section id="keys">
+        <h2><span class="num">07</span>Shortcuts</h2>
+        <table>
+          <tr><th>Keys</th><th>Action</th></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Send the prompt</td></tr>
+          <tr><td><kbd>Shift</kbd> + <kbd>Enter</kbd></td><td>New line in the prompt</td></tr>
+          <tr><td><kbd>Ctrl</kbd> + <kbd>S</kbd></td><td>Save the file in the Code tab</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close the projects menu, or cancel renaming</td></tr>
+          <tr><td><kbd>Alt</kbd> + <kbd>↑</kbd> / <kbd>↓</kbd></td><td>Move the selected agent up or down on the Agents page</td></tr>
+          <tr><td><kbd>/</kbd></td><td>Search projects on the Projects page</td></tr>
+          <tr><td><kbd>N</kbd></td><td>New project from the Projects page</td></tr>
+          <tr><td><kbd>Ctrl</kbd> + <kbd>Enter</kbd></td><td>Save the name and description dialog</td></tr>
+        </table>
+      </section>
+
+      <section id="faq">
+        <h2><span class="num">08</span>FAQ</h2>
+        <details><summary>How long does a run take?<i data-icon="chevron-down" data-size="18"></i></summary>
+          <div>Each agent takes about 20–60 seconds, so the default team of 10 needs roughly 5–8 minutes. Switch off agents you don't need, or start the server with <code>AGENT_MODEL=sonnet ./run.sh</code> for faster runs.</div></details>
+        <details><summary>Does it cost anything?<i data-icon="chevron-down" data-size="18"></i></summary>
+          <div>Agents use your Claude Code plan, and each agent counts as one Claude Code session. A run with 10 agents is about 10 sessions.</div></details>
+        <details><summary>Can agents touch other files on my computer?<i data-icon="chevron-down" data-size="18"></i></summary>
+          <div>Each agent runs inside its project folder with file tools only (read, write, edit, search). Shell commands, web access and sub-agents are blocked.</div></details>
+        <details><summary>What happens when I stop the agents?<i data-icon="chevron-down" data-size="18"></i></summary>
+          <div>Nothing is lost. Agents that finished keep their work, and the run is saved. The chat and the Team panel then offer <b>Continue</b>, which picks up at the agent that was stopped and skips the ones already done, or <b>Start again</b>, which runs the whole team again on the same request. The same choice appears if an agent fails or the server restarts mid-run.</div></details>
+        <details><summary>Why is the download button locked?<i data-icon="chevron-down" data-size="18"></i></summary>
+          <div>While agents are working, files change every few seconds, so a download could catch a half-finished page. The button unlocks as soon as the run finishes or you stop it.</div></details>
+        <details><summary>Can I edit the generated code myself?<i data-icon="chevron-down" data-size="18"></i></summary>
+          <div>Yes. The files live in <code>work/&lt;uuid&gt;/</code>. Edit them in any editor; the next prompt's agents read the current files first.</div></details>
+      </section>
+
+      <div class="cta">
+        <h2>Ready to build something?</h2>
+        <a class="btn btn-dark btn-lg" href="/projects">Go to your projects<i data-icon="arrow-right" data-size="18"></i></a>
+      </div>
+    </article>
+  </div>
+</main>
+
+<script>
+api("/api/agents?full=1").then(agents => {
+  document.getElementById("teamList").innerHTML = agents.map((a, i) => `
+    <a class="tm" href="/agents?agent=${encodeURIComponent(a.id)}" style="--c:${a.color};${a.default ? "" : "opacity:.55"}" title="Edit ${esc(a.name)}">
+      <span class="tile">${icon(a.icon, { size: 17 })}</span>
+      <span class="nm">${esc(a.name)}<small>${String(i + 1).padStart(2, "0")} · ${a.default ? "on by default" : "optional"}</small>
+        ${a.description ? `<p>${esc(a.description)}</p>` : ""}</span>
+    </a>`).join("");
+}).catch((err) => showError(document.getElementById("teamList"), err, () => location.reload(), "Couldn't load the agents"));
+
+document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
+// highlight the section in view
+const links = [...document.querySelectorAll("#toc a")];
+const spy = new IntersectionObserver((entries) => entries.forEach(e => {
+  if (e.isIntersecting) links.forEach(a => a.classList.toggle("on", a.hash === "#" + e.target.id));
+}), { rootMargin: "-30% 0px -60% 0px" });
+document.querySelectorAll("article section[id]").forEach(s => spy.observe(s));
+window.addEventListener("scroll", () => document.querySelector("header.top").classList.toggle("scrolled", scrollY > 4));
+</script>
+</body>
+</html>

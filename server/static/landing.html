@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f7f7f5">
+<title>Agents Atelier</title>
+<meta name="description" content="Describe a web page. A team of specialist AI agents builds it in front of you, one after another.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/site.css">
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  :root {
+    --ink: #1b0624; --espresso: #160f0c; --ash: #766a7c; --graphite: #444444; --stone: #898683; --charcoal: #292421;
+    --paper: #ffffff; --linen: #f7f7f5; --bone: #edece7; --mist: #eeeeee;
+    --ring: rgba(0, 0, 0, .05) 0 0 0 1px inset;
+    --max: 1200px;
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-feature-settings: "cv03", "cv04", "cv09", "cv11";
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--linen); color: var(--ink); font-size: 18px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+
+  body { font-size: 18px; line-height: 1.5; }
+  .hero .btn-ghost { background: rgba(255, 255, 255, .6); }
+  header.top.clear .links a:hover { background: rgba(255, 255, 255, .5); }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; min-height: 100vh; display: grid; place-items: center; text-align: center; overflow: hidden; padding: 120px 24px 200px; }
+  .hero svg.paint { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+  .hero .stack { position: relative; z-index: 1; max-width: 920px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--espresso); color: #fff; border-radius: 999px; padding: 6px 14px; font-size: 13px; text-decoration: none; }
+  .pill span { opacity: .6; }
+  h1 { font-weight: 400; font-size: clamp(48px, 8vw, 80px); line-height: 1; letter-spacing: -.06em; margin: 28px 0 24px; }
+  .sub { font-size: 20px; letter-spacing: -.01em; line-height: 1.4; color: var(--graphite); max-width: 620px; margin: 0 auto 40px; }
+  .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; align-items: center; }
+
+  /* ---------- sections ---------- */
+  section.block { padding: 100px 0; }
+  .eyebrow { font-size: 14px; color: var(--stone); margin: 0 0 16px; }
+  h2 { font-weight: 400; font-size: clamp(32px, 4.4vw, 44px); line-height: 1.1; letter-spacing: -.05em; margin: 0 0 20px; max-width: 760px; }
+  .lead { color: var(--graphite); max-width: 640px; margin: 0; }
+
+  .team { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 28px; padding: 40px 0 0; color: var(--stone); font-size: 15px; }
+  .team span { display: inline-flex; align-items: center; gap: 8px; filter: grayscale(1); opacity: .8; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 64px; }
+  .stat b { display: block; font-weight: 400; font-size: clamp(56px, 7vw, 80px); line-height: 1; letter-spacing: -.06em; font-feature-settings: "tnum", "zero"; }
+  .stat span { display: block; font-size: 14px; color: var(--stone); margin-top: 12px; }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 56px; }
+  .card { background: var(--paper); border-radius: 16px; padding: 32px; }
+  .card svg { width: 28px; height: 28px; stroke: var(--charcoal); fill: none; stroke-width: 1.25; }
+  .card h3 { font-weight: 500; font-size: 24px; letter-spacing: -.02em; line-height: 1.3; margin: 24px 0 8px; }
+  .card p { font-size: 16px; line-height: 1.6; color: var(--graphite); margin: 0; }
+  .card .n { font: 12px ui-monospace, monospace; color: var(--stone); float: right; }
+
+  .pipeline { background: var(--paper); border-radius: 24px; box-shadow: var(--ring); padding: 40px; margin-top: 56px; }
+  .flow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .flow .step { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 6px 14px 6px 6px; font-size: 15px; background: var(--linen); box-shadow: var(--ring); text-decoration: none; transition: background .2s; }
+  .flow .step:hover { background: var(--bone); }
+  .flow .step .si { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; background: var(--paper); color: var(--ink); box-shadow: var(--ring); }
+  .flow .arrow { color: var(--stone); }
+  .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  .flow .step.off { opacity: .45; }
+  .legend { margin: 24px 0 0; font-size: 14px; color: var(--stone); }
+
+  .projects { margin-top: 40px; display: grid; gap: 8px; }
+  .proj { display: flex; align-items: center; gap: 16px; background: var(--paper); border-radius: 16px; padding: 18px 24px; text-decoration: none; transition: background .2s; }
+  .proj:hover { background: var(--bone); }
+  .proj .name { flex: 1; min-width: 0; font-size: 17px; line-height: 1.3; }
+  .proj .name, .proj .name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .proj .name small { display: block; font-size: 14px; color: var(--stone); margin-top: 2px; }
+  .proj .id { font: 13px ui-monospace, monospace; color: var(--stone); }
+  .proj .go { color: var(--stone); }
+  .proj .thumb { width: 40px; height: 40px; border-radius: 12px; background: var(--linen); display: grid; place-items: center; color: var(--stone); flex: none; }
+  .proj .badge { flex: none; }
+  .card .ico { width: 48px; height: 48px; border-radius: 14px; background: var(--linen); display: grid; place-items: center; color: var(--charcoal); }
+
+  .final { text-align: center; padding: 120px 0 140px; }
+  .final h2 { margin: 0 auto 32px; }
+  footer { border-top: 1px solid rgba(27, 6, 36, .08); padding: 32px 0; font-size: 14px; color: var(--stone); }
+  footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 56px; }
+  .feature { background: var(--paper); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 10px; }
+  .feature .ico { width: 44px; height: 44px; border-radius: 14px; background: var(--linen); display: grid; place-items: center; color: var(--charcoal); }
+  .feature h3 { font-weight: 500; font-size: 20px; letter-spacing: -.02em; line-height: 1.3; margin: 8px 0 0; }
+  .feature p { font-size: 15px; line-height: 1.6; color: var(--graphite); margin: 0; }
+  .feature .tag { align-self: flex-start; font-size: 12px; color: var(--stone); background: var(--linen); border-radius: 999px; padding: 3px 10px; margin-top: auto; }
+  .flow .step .mb { font: 10.5px ui-monospace, monospace; color: var(--stone); background: var(--paper); border-radius: 999px; padding: 1px 6px; box-shadow: var(--ring); }
+  .proj .meta { font-size: 13px; color: var(--stone); white-space: nowrap; }
+  .reveal { opacity: 0; transform: translateY(16px); transition: opacity .7s ease, transform .7s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
+
+  @media (max-width: 860px) {
+    nav ul { display: none; }
+    nav .wrap { justify-content: space-between; }
+    .stats, .cards, .features { grid-template-columns: 1fr; }
+    .pipeline { padding: 24px; }
+    section.block { padding: 72px 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top clear">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <nav class="links">
+      <a href="#features"><i data-icon="sparkles" data-size="16"></i>Features</a>
+      <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/guide"><i data-icon="book" data-size="16"></i>Guide</a>
+    </nav>
+    <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
+  </div>
+</header>
+
+<header class="hero">
+  <!-- the one painted moment: a watercolor sunset -->
+  <svg class="paint" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <filter id="wc" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="7" result="n"/>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="38"/>
+        <feGaussianBlur stdDeviation="2.2"/>
+      </filter>
+      <filter id="soft"><feGaussianBlur stdDeviation="40"/></filter>
+      <filter id="grain">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3"/>
+        <feColorMatrix values="0 0 0 0 .2  0 0 0 0 .1  0 0 0 0 .05  0 0 0 .06 0"/>
+      </filter>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f6d9cf"/>
+        <stop offset=".35" stop-color="#f7c6b0"/>
+        <stop offset=".6" stop-color="#f9b98f"/>
+        <stop offset=".78" stop-color="#fbd7a8"/>
+      </linearGradient>
+      <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f4b994"/>
+        <stop offset=".5" stop-color="#d9a9a6"/>
+        <stop offset="1" stop-color="#b9b2b8"/>
+      </linearGradient>
+      <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f7f7f5" stop-opacity="0"/>
+        <stop offset=".55" stop-color="#f7f7f5" stop-opacity=".2"/>
+        <stop offset="1" stop-color="#f7f7f5"/>
+      </linearGradient>
+      <radialGradient id="glow" cx=".5" cy=".5" r=".5">
+        <stop offset="0" stop-color="#fff2d6"/>
+        <stop offset=".4" stop-color="#ffd6a0" stop-opacity=".8"/>
+        <stop offset="1" stop-color="#ffb98a" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="1440" height="900" fill="url(#sky)"/>
+    <ellipse cx="1000" cy="170" rx="420" ry="110" fill="#f3b7c1" opacity=".45" filter="url(#soft)"/>
+    <ellipse cx="300" cy="230" rx="380" ry="90" fill="#efc0d0" opacity=".5" filter="url(#soft)"/>
+    <circle cx="760" cy="500" r="260" fill="url(#glow)"/>
+    <circle cx="760" cy="505" r="62" fill="#fff0cf" opacity=".95" filter="url(#wc)"/>
+    <g filter="url(#wc)">
+      <path d="M-40 560 L120 440 L230 500 L380 380 L520 480 L640 430 L760 510 L900 400 L1040 470 L1180 360 L1320 450 L1480 400 L1480 600 L-40 600Z" fill="#c9a2b4" opacity=".75"/>
+      <path d="M-40 590 L90 500 L220 560 L330 480 L470 545 L600 500 L720 560 L860 490 L1000 555 L1120 470 L1260 540 L1380 490 L1480 530 L1480 620 L-40 620Z" fill="#a9879f" opacity=".8"/>
+      <rect x="-40" y="600" width="1520" height="180" fill="url(#water)"/>
+      <path d="M560 615 Q760 600 960 615 L900 650 Q760 640 620 650Z" fill="#ffe3b8" opacity=".75"/>
+      <path d="M640 670 Q760 662 880 670 L850 690 Q760 684 670 690Z" fill="#ffe3b8" opacity=".55"/>
+      <path d="M-40 740 Q200 690 420 720 Q620 750 820 715 Q1080 670 1480 720 L1480 920 L-40 920Z" fill="#9fb48c"/>
+      <path d="M-40 800 Q260 760 520 790 Q800 820 1080 780 Q1300 755 1480 790 L1480 920 L-40 920Z" fill="#7f9c74"/>
+    </g>
+    <rect width="1440" height="900" filter="url(#grain)"/>
+    <rect y="420" width="1440" height="480" fill="url(#fade)"/>
+  </svg>
+
+  <div class="stack">
+    <a class="pill" href="#features">New <span>·</span> versions, retries, live code editing and cost tracking</a>
+    <h1>Describe a page.<br>Watch a team build it.</h1>
+    <p class="sub">A crew of specialist AI agents — UX, design, copy, HTML, CSS, motion, accessibility — takes your prompt and builds a real web page, one after another, right in front of you. Stop them, steer them, roll back any step.</p>
+    <div class="ctas">
+      <a class="btn btn-dark btn-lg" href="/projects">See your projects<i data-icon="arrow-right" data-size="18"></i></a>
+      <a class="btn btn-ghost" href="/guide"><i data-icon="book" data-size="16"></i>Read the guide</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="block" id="how">
+    <div class="wrap">
+      <p class="eyebrow reveal">How it works</p>
+      <h2 class="reveal">One prompt in. A finished page out — and you see every step.</h2>
+      <p class="lead reveal">Each agent is your local Claude Code with a single job. They share one folder of files and pass the work down the line.</p>
+
+      <div class="stats">
+        <div class="stat reveal"><b id="statAgents">15</b><span>specialist agents, each one a file you can edit</span></div>
+        <div class="stat reveal"><b>1</b><span>prompt to start a whole project</span></div>
+        <div class="stat reveal"><b>0</b><span>build steps — plain HTML, CSS and JS you can download as .zip</span></div>
+      </div>
+
+      <div class="cards">
+        <article class="card reveal">
+          <span class="n">01</span>
+          <span class="ico"><i data-icon="folder" data-size="22"></i></span>
+          <h3>Create a project</h3>
+          <p>Give it a name and a short description. Every agent reads both, so the whole team knows what it's building and for whom.</p>
+        </article>
+        <article class="card reveal">
+          <span class="n">02</span>
+          <span class="ico"><i data-icon="message" data-size="22"></i></span>
+          <h3>Describe the page</h3>
+          <p>Write what you want, and attach a sketch or screenshot if you have one. Pick the full team or a quick preset.</p>
+        </article>
+        <article class="card reveal">
+          <span class="n">03</span>
+          <span class="ico"><i data-icon="eye" data-size="22"></i></span>
+          <h3>Watch, refine, download</h3>
+          <p>The preview reloads after every edit. Ask for changes anytime — the team builds on the files already there — then grab the .zip.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="features" style="padding-top:0">
+    <div class="wrap">
+      <p class="eyebrow reveal">Features</p>
+      <h2 class="reveal">You direct the team. Nothing is ever lost.</h2>
+      <p class="lead reveal">Every step is visible, saved and reversible — and you can step in at any point.</p>
+      <div class="features">
+        <article class="feature reveal">
+          <span class="ico"><i data-icon="pause" data-size="22"></i></span>
+          <h3>Stop, continue or start again</h3>
+          <p>Stop the run whenever you like. Every finished agent's work is kept, so you can continue from where it stopped — even after an error or a server restart.</p>
+          <span class="tag">Saved after every agent</span>
+        </article>
+        <article class="feature reveal">
+          <span class="ico"><i data-icon="refresh" data-size="22"></i></span>
+          <h3>Retry one agent</h3>
+          <p>Not happy with the colours? Ask only the CSS agent to try again, with an extra instruction like “warmer palette, bigger headings”.</p>
+          <span class="tag">One agent, not the whole team</span>
+        </article>
+        <article class="feature reveal">
+          <span class="ico"><i data-icon="history" data-size="22"></i></span>
+          <h3>Versions of every step</h3>
+          <p>The code is saved before each run and after each agent. Open any version, compare it line by line, download it, or restore it in one click.</p>
+          <span class="tag">Up to 150 versions per project</span>
+        </article>
+        <article class="feature reveal">
+          <span class="ico"><i data-icon="code" data-size="22"></i></span>
+          <h3>Edit the code yourself</h3>
+          <p>Small fix? Change it directly in the Code tab, with auto-save on or off. The preview updates as soon as you save.</p>
+          <span class="tag">Ctrl+S to save</span>
+        </article>
+        <article class="feature reveal">
+          <span class="ico"><i data-icon="chart" data-size="22"></i></span>
+          <h3>Cost &amp; time per agent</h3>
+          <p>See how long each agent took, which model it used, how many tokens it spent and its estimated cost — per project or across all of them.</p>
+          <span class="tag">Know where the time goes</span>
+        </article>
+        <article class="feature reveal">
+          <span class="ico"><i data-icon="sliders" data-size="22"></i></span>
+          <h3>Presets &amp; a model per agent</h3>
+          <p>Switch between Quick, Polish or Full teams in one click, save your own, and run simple agents on a faster model while the Critic uses the strongest.</p>
+          <span class="tag">Your team, your way</span>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="team" style="padding-top:0">
+    <div class="wrap">
+      <p class="eyebrow reveal">The team</p>
+      <div class="section-head"><h2 class="reveal">Specialists, in order. Switch any of them on or off.</h2>
+        <a class="btn btn-ghost reveal" href="/agents"><i data-icon="pencil" data-size="16"></i>Edit agents</a></div>
+      <p class="lead reveal">Agents live in <code>agents/</code> as Markdown files. Add a file and a new teammate appears; the number in its name sets its place in line.</p>
+      <div class="pipeline reveal">
+        <div class="flow" id="flow"></div>
+        <p class="legend">Faded agents are off by default. Turn them on per project, pick a preset (Quick · Polish · Full), or click an agent to edit its instructions and model.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="projects" style="padding-top:0">
+    <div class="wrap">
+      <p class="eyebrow reveal">Your projects</p>
+      <div class="section-head"><h2 class="reveal">Pick up where you left off.</h2>
+        <a class="btn btn-ghost reveal" href="/projects"><i data-icon="grid" data-size="16"></i>All projects</a></div>
+      <div class="projects" id="projects-list"></div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <h2 class="reveal">What should the team build first?</h2>
+      <button class="btn btn-dark btn-lg reveal" data-new>Start a new project<i data-icon="arrow-right" data-size="18"></i></button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span style="display:inline-flex;gap:8px;align-items:center"><i data-icon="logo" data-size="14"></i>Agents Atelier · runs on your own Claude Code</span>
+    <span><a href="/guide">Guide</a> · <a href="/agents">Agents</a> · <a href="/projects">Projects</a> · files live in <code>work/&lt;project-id&gt;/</code></span>
+  </div>
+</footer>
+
+<script>
+document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
+window.addEventListener("scroll", () => document.querySelector("header.top").classList.toggle("scrolled", scrollY > 4));
+api("/api/agents").then(agents => {
+  document.getElementById("statAgents").textContent = agents.length;
+  document.getElementById("flow").innerHTML = agents.map((a, i) =>
+    `${i ? icon("arrow-right", { size: 14, cls: "arrow" }) : ""}<a class="step ${a.default ? "" : "off"}" href="/agents?agent=${encodeURIComponent(a.id)}"
+      title="${esc(a.description || "Edit " + a.name)}"><span class="si">${icon(a.icon, { size: 15 })}</span>${esc(a.name)}${a.model ? `<span class="mb">${esc(a.model)}</span>` : ""}</a>`).join("");
+}).catch((err) => { document.getElementById("flow").innerHTML = `<span class="legend">Couldn't load the team: ${esc(err.message)}</span>`; });
+
+api("/api/projects").then(list => {
+  const el = document.getElementById("projects-list");
+  el.innerHTML = list.slice(0, 6).map(p => `
+    <a class="proj" href="/p/${p.id}">
+      <span class="thumb">${icon(p.has_preview ? "monitor" : "file", { size: 18 })}</span>
+      <span class="name">${esc(p.name)}<small>${esc(p.description || "No description yet")}</small></span>
+      ${p.busy ? `<span class="badge live">Working</span>` : p.paused ? `<span class="badge">Paused</span>` : ""}
+      <span class="meta">${p.files ? `${p.files} files · ${fmtSize(p.size || 0)}` : "empty"}</span>
+      <span class="id">#${p.id.slice(0, 8)} · ${ago(p.updated)}</span>
+      <span class="go">${icon("arrow-right", { size: 18 })}</span>
+    </a>`).join("") ||
+    `<a class="proj" href="/projects?new=1"><span class="thumb">${icon("plus", { size: 18 })}</span><span class="name">No projects yet — start your first one</span><span class="go">${icon("arrow-right", { size: 18 })}</span></a>`;
+}).catch((err) => showError(document.getElementById("projects-list"), err, () => location.reload(), "Couldn't load your projects"));
+
+const io = new IntersectionObserver((entries) => entries.forEach(e => {
+  if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+}), { threshold: .15 });
+document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+</script>
+</body>
+</html>

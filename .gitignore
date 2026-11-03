@@ -1,0 +1,27 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Your projects: generated sites, chat logs, versions and uploads (local data, can be large)
+work/
+
+# Temporary files written during atomic saves
+*.tmp
+
+# Logs
+*.log
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local environment overrides
+.env
+.env.*

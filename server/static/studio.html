@@ -1,0 +1,1387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f7f7f5">
+<title>Studio · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  html, body { height: 100%; }
+  body { display: grid; grid-template-columns: minmax(380px, 34%) 1fr; height: 100vh; overflow: hidden; }
+
+  /* ---------- Chat column ---------- */
+  .chat { position: relative; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--paper); min-height: 0; }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 64px; border-bottom: 1px solid var(--line); flex: none; }
+  .title { flex: 1; min-width: 0; }
+  .title .name { font-size: 15px; font-weight: 500; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    outline: none; border-radius: 6px; padding: 1px 4px; margin-left: -4px; cursor: text; }
+  .title .name:hover { background: var(--linen); }
+  .title .name:focus { background: var(--mist); box-shadow: 0 0 0 1px var(--espresso); }
+  .title .sub { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--stone); line-height: 1.3; }
+  .title .desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; background: none; border: 0; padding: 0; color: inherit; font-size: inherit; text-align: left; }
+  .title .desc:hover { color: var(--ink); }
+  .title .desc.missing { color: var(--danger); }
+  .title .pid { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--stone); background: none; border: 0; padding: 0; flex: none; }
+  .title .pid:hover { color: var(--ink); }
+  .pitem .pdesc { font-size: 12px; color: var(--graphite); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .conn { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); flex: none; }
+  .conn.on { background: var(--ink); }
+
+  /* projects drawer */
+  .drawer { position: absolute; inset: 64px 0 0 0; background: var(--paper); z-index: 5; display: flex; flex-direction: column;
+    transform: translateX(-100%); transition: transform .25s ease, visibility .25s; visibility: hidden; }
+  .drawer.open { transform: none; visibility: visible; }
+  .drawer .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 16px 12px; }
+  .drawer h2 { margin: 0; font-size: 24px; font-weight: 400; letter-spacing: -.02em; }
+  .drawer .search { margin: 0 16px 8px; }
+  .plist { flex: 1; overflow-y: auto; padding: 4px 10px 12px; }
+  .pitem { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; text-decoration: none; }
+  .pitem:hover { background: var(--linen); }
+  .pitem.current { background: var(--bone); }
+  .pitem .thumb { width: 36px; height: 36px; border-radius: 10px; background: var(--linen); box-shadow: var(--ring); display: grid; place-items: center; color: var(--stone); flex: none; }
+  .pitem.current .thumb { background: var(--paper); }
+  .pitem .info { flex: 1; min-width: 0; }
+  .pitem .pname { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pitem .meta { font-size: 12px; color: var(--stone); margin-top: 2px; display: flex; gap: 6px; align-items: center; }
+  .pitem .tools { display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+  .pitem:hover .tools, .pitem:focus-within .tools { opacity: 1; }
+  .drawer .foot { border-top: 1px solid var(--line); padding: 12px 16px; }
+  .drawer .foot a { display: flex; align-items: center; justify-content: space-between; text-decoration: none; font-size: 14px; color: var(--graphite); padding: 6px 4px; }
+  .drawer .foot a:hover { color: var(--ink); }
+
+  /* messages */
+  .messages { flex: 1; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 12px; background: var(--linen); }
+  .empty { margin: auto; text-align: center; color: var(--stone); font-size: 15px; line-height: 1.6; max-width: 330px; }
+  .empty .stack { display: flex; justify-content: center; margin-bottom: 20px; }
+  .empty .stack span { width: 34px; height: 34px; border-radius: 999px; background: var(--paper); box-shadow: var(--ring), 0 0 0 3px var(--linen);
+    display: grid; place-items: center; color: var(--charcoal); margin-left: -8px; }
+  .empty h3 { color: var(--ink); font-weight: 400; font-size: 32px; letter-spacing: -.03em; line-height: 1.1; margin: 0 0 10px; }
+  .chips { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
+  .chip { background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 9px 16px; font-size: 14px; color: var(--graphite);
+    display: flex; align-items: center; gap: 8px; text-align: left; transition: border-color .2s, color .2s; }
+  .chip:hover { border-color: var(--graphite); color: var(--ink); }
+  .chip .ic { color: var(--stone); }
+
+  .msg { max-width: 100%; font-size: 14px; line-height: 1.55; animation: pop .25s ease; }
+  .replay .msg { animation: none; }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px); } }
+  .msg.user { align-self: flex-end; background: var(--espresso); color: #fff; padding: 10px 16px; border-radius: 20px 20px 6px 20px; max-width: 85%; white-space: pre-wrap; }
+  .msg.agent { background: var(--paper); box-shadow: var(--ring); border-radius: 18px; padding: 14px 16px; scroll-margin: 16px; transition: box-shadow .3s; }
+  .msg.agent.highlight { box-shadow: inset 0 0 0 2px var(--ink); }
+  .msg.agent.working { box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .who { display: flex; align-items: center; gap: 12px; }
+  .tile { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; flex: none; color: var(--ink);
+    background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
+  .who .nm { font-weight: 500; font-size: 15px; letter-spacing: -.01em; }
+  .who .nm small { display: block; font-weight: 400; font-size: 12px; color: var(--stone); letter-spacing: 0; }
+  .who .state { margin-left: auto; color: var(--stone); font-size: 12px; display: inline-flex; align-items: center; gap: 6px; font-feature-settings: "tnum"; }
+  .typing { display: inline-flex; gap: 3px; }
+  .typing span { width: 4px; height: 4px; border-radius: 50%; background: var(--ink); animation: blink 1s infinite; }
+  .typing span:nth-child(2) { animation-delay: .15s; } .typing span:nth-child(3) { animation-delay: .3s; }
+  .msg.agent .text { white-space: pre-wrap; color: var(--graphite); margin-top: 10px; font-size: 14.5px; line-height: 1.6; }
+  .msg.agent .text:empty { display: none; }
+  .actions { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; padding: 8px 10px; background: var(--linen); border-radius: 12px; }
+  .actions:empty { display: none; }
+  .action { display: flex; align-items: center; gap: 8px; font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--stone); min-width: 0; }
+  .action b { color: var(--charcoal); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .action.hidden { display: none; }
+  .actions.open .action.hidden { display: flex; }
+  .more { align-self: flex-start; background: none; border: 0; padding: 2px 0; font-size: 12px; color: var(--ash); }
+  .more:hover { color: var(--ink); text-decoration: underline; }
+  .msg.system { align-self: center; font-size: 13px; color: var(--stone); text-align: center; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .msg.done-card { align-self: stretch; background: var(--paper); box-shadow: var(--ring); border-radius: 16px; padding: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .msg.done-card .lbl { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 14px; min-width: 160px; }
+  .msg.done-card .lbl .tile { --c: var(--ink); }
+  .msg.error { color: var(--danger); background: var(--paper); box-shadow: inset 0 0 0 1px var(--danger); border-radius: 16px; padding: 10px 14px; font-size: 13px;
+    white-space: pre-wrap; display: flex; gap: 8px; }
+
+  /* composer */
+  .composer { padding: 12px 16px 14px; border-top: 1px solid var(--line); background: var(--paper); flex: none; }
+  .composer .row { display: flex; gap: 8px; align-items: flex-end; }
+  .composer textarea { flex: 1; resize: none; max-height: 180px; min-height: 46px; line-height: 1.45; }
+  .send { height: 46px; width: 46px; border: 0; border-radius: 999px; background: var(--espresso); color: #fff; display: grid; place-items: center; flex: none; transition: background .2s; }
+  .send:hover { background: var(--charcoal); }
+  .send:disabled { opacity: .35; cursor: default; }
+  .send.stop { background: var(--paper); color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
+  .hint { font-size: 11px; color: var(--stone); margin-top: 8px; display: flex; justify-content: space-between; gap: 8px; }
+  kbd { font: 11px ui-monospace, monospace; background: var(--linen); border-radius: 4px; padding: 1px 5px; box-shadow: var(--ring); }
+
+  /* ---------- Stage column ---------- */
+  .stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .toolbar { display: flex; align-items: center; gap: 8px; padding: 0 16px; height: 64px; border-bottom: 1px solid var(--line); background: var(--paper); flex: none; }
+  .seg { display: flex; background: var(--linen); box-shadow: var(--ring); border-radius: 999px; padding: 3px; }
+  .seg button { background: transparent; border: 0; padding: 6px 12px; border-radius: 999px; font-size: 13px; color: var(--stone); display: inline-flex; align-items: center; gap: 6px; }
+  .seg button:hover { color: var(--ink); }
+  .seg button.on { background: var(--paper); color: var(--ink); box-shadow: var(--ring); }
+  .spacer { flex: 1; }
+  .url { font: 12px ui-monospace, monospace; color: var(--stone); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    background: var(--linen); border-radius: 999px; padding: 6px 12px; }
+
+  .view { flex: 1; position: relative; min-height: 0; background: var(--bone); }
+  .frame-wrap { position: absolute; inset: 0; display: flex; justify-content: center; padding: 20px; }
+  .frame-wrap iframe { width: 100%; height: 100%; border: 0; border-radius: 24px; background: #fff; box-shadow: var(--ring); transition: width .35s ease; }
+  .frame-wrap.tablet iframe { width: 768px; } .frame-wrap.phone iframe { width: 375px; }
+  .flash { position: absolute; inset: 20px; border-radius: 24px; pointer-events: none; box-shadow: inset 0 0 0 2px var(--c, var(--ink)); opacity: 0; transition: opacity .6s; }
+  .flash.show { opacity: 1; transition: none; }
+  .placeholder { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px; }
+  .placeholder .box { color: var(--stone); font-size: 15px; max-width: 300px; line-height: 1.55; }
+  .placeholder .box .tile { --c: var(--stone); width: 52px; height: 52px; border-radius: 16px; margin: 0 auto 16px; color: var(--charcoal); }
+  .placeholder b { display: block; color: var(--ink); font-weight: 500; font-size: 17px; margin-bottom: 4px; }
+
+  .code { position: absolute; inset: 0; display: none; grid-template-columns: 200px 1fr; background: var(--paper); }
+  .code.on { display: grid; }
+  .files { border-right: 1px solid var(--line); padding: 10px; overflow-y: auto; background: var(--linen); }
+  .files button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: transparent; border: 0; padding: 8px 12px; border-radius: 999px;
+    font: 13px ui-monospace, monospace; color: var(--graphite); }
+  .files button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .files button.on, .files button:hover { background: var(--paper); color: var(--ink); box-shadow: var(--ring); }
+  .files button.changed::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ink); flex: none; }
+  .codehead { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--line); font: 12px ui-monospace, monospace; color: var(--stone); }
+  .codepane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  pre { margin: 0; padding: 20px; overflow: auto; flex: 1; font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--charcoal); tab-size: 2; }
+
+  /* ---------- editor ---------- */
+  textarea.editor { flex: 1; width: 100%; border: 0; outline: none; resize: none; margin: 0; padding: 20px; background: var(--paper);
+    font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--charcoal); tab-size: 2; white-space: pre; overflow: auto; }
+  textarea.editor[readonly] { background: var(--linen); color: var(--graphite); }
+  .codehead { gap: 10px; min-height: 48px; padding: 8px 12px 8px 16px; }
+  .codehead #codeName { color: var(--ink); }
+  .dirty-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
+  .save-state { font: 12px "Inter", sans-serif; color: var(--stone); display: inline-flex; align-items: center; gap: 5px; }
+  .save-state.err { color: var(--danger); }
+  .autosave { display: inline-flex; align-items: center; gap: 8px; font: 12px "Inter", sans-serif; color: var(--graphite); cursor: pointer; }
+  .autosave input { appearance: none; width: 32px; height: 20px; border-radius: 999px; background: var(--line-strong); position: relative; cursor: pointer; margin: 0; transition: background .2s; }
+  .autosave input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .autosave input:checked { background: var(--espresso); }
+  .autosave input:checked::after { transform: translateX(12px); }
+
+  .file-note { flex: 1; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--graphite); font-size: 14px; background: var(--linen); overflow: auto; }
+  .file-note img { max-width: 100%; max-height: 60vh; border-radius: 12px; box-shadow: var(--ring); background: #fff; display: block; margin: 0 auto 12px; }
+  .file-note .tile { --c: var(--stone); width: 48px; height: 48px; border-radius: 14px; margin: 0 auto 12px; }
+  .file-note b { display: block; color: var(--ink); font-weight: 500; margin-bottom: 4px; }
+  .file-note p { margin: 0 auto; max-width: 380px; line-height: 1.55; }
+  .files button small { font: 11px "Inter", sans-serif; color: var(--stone); flex: none; }
+  .files-total { font-size: 11px; color: var(--stone); padding: 10px 12px 4px; border-top: 1px solid var(--line); margin-top: 8px; }
+  .fatal { position: fixed; inset: 0; z-index: 200; background: var(--linen); display: grid; place-items: center; padding: 24px; }
+  .fatal .row { display: flex; gap: 8px; justify-content: center; }
+
+  /* ---------- attachments ---------- */
+  .attachments { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .attachments[hidden] { display: none; }
+  .att { position: relative; width: 64px; height: 64px; border-radius: 12px; overflow: hidden; background: var(--linen); box-shadow: var(--ring); }
+  .att img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .att.loading::after { content: ""; position: absolute; inset: 0; background: rgba(255,255,255,.6); animation: blink 1s infinite; }
+  .att button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 999px; border: 0; background: rgba(22,15,12,.75); color: #fff;
+    display: grid; place-items: center; padding: 0; }
+  .composer .attach { width: 46px; height: 46px; }
+  .composer.drag { box-shadow: inset 0 0 0 2px var(--ink); }
+  .msg.user .imgs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .msg.user .imgs img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; display: block; background: rgba(255,255,255,.15); }
+
+  /* ---------- retry + cost on agent cards ---------- */
+  .who .retry { margin-left: 4px; width: 28px; height: 28px; }
+  .msg.agent.working .retry { display: none; }
+  .who .cost { font-feature-settings: "tnum"; }
+  .model-badge { font: 10.5px ui-monospace, monospace; color: var(--stone); background: var(--paper); box-shadow: var(--ring); border-radius: 999px; padding: 1px 6px; line-height: 1.5; }
+  .agent-tile.s-working .model-badge { background: rgba(255,255,255,.12); color: rgba(255,255,255,.8); box-shadow: none; }
+
+  /* ---------- presets menu ---------- */
+  .menu-wrap { position: relative; }
+  .menu { position: absolute; bottom: calc(100% + 8px); right: 0; z-index: 30; width: 300px; background: var(--paper); border-radius: 18px; padding: 6px;
+    box-shadow: var(--ring), 0 18px 40px rgba(27, 6, 36, .12); display: none; }
+  .menu.open { display: block; }
+  .menu .mi { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; background: none; border: 0; padding: 10px 12px; border-radius: 12px; font-size: 14px; }
+  .menu .mi:hover { background: var(--linen); }
+  .menu .mi .ic { margin-top: 1px; color: var(--stone); }
+  .menu .mi b { font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .menu .mi small { display: block; color: var(--stone); font-size: 12px; margin-top: 2px; line-height: 1.4; }
+  .menu .mi.on { background: var(--bone); }
+  .menu .mi .del { margin-left: auto; color: var(--stone); padding: 2px; border-radius: 6px; }
+  .menu .mi .del:hover { color: var(--danger); }
+  .menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 4px; }
+
+  /* ---------- big panels (versions, stats) ---------- */
+  dialog.panel { border: 0; border-radius: 24px; padding: 0; width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); background: var(--linen); color: var(--ink);
+    box-shadow: var(--ring); display: none; flex-direction: column; overflow: hidden; }
+  dialog.panel[open] { display: flex; }
+  dialog.panel::backdrop { background: rgba(27, 6, 36, .28); backdrop-filter: blur(2px); }
+  .panel-head { display: flex; align-items: center; gap: 12px; padding: 20px 24px; background: var(--paper); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .panel-head h2 { margin: 0; font-weight: 400; font-size: 26px; letter-spacing: -.03em; display: flex; align-items: center; gap: 10px; }
+  .panel-body { overflow: auto; padding: 20px 24px 24px; }
+  .note { font-size: 13px; color: var(--stone); margin: 0 0 16px; display: flex; gap: 8px; align-items: flex-start; line-height: 1.5; }
+
+  .vlist { display: flex; flex-direction: column; gap: 6px; }
+  .vrow { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center; background: var(--paper); border-radius: 16px; padding: 12px 14px; }
+  .vrow .vn { font: 12px ui-monospace, monospace; color: var(--stone); text-align: center; }
+  .vrow .vn .tile { width: 36px; height: 36px; border-radius: 11px; margin: 0 auto 4px; }
+  .vrow b { font-weight: 500; font-size: 15px; }
+  .vrow small { display: block; font-size: 12px; color: var(--stone); margin-top: 2px; }
+  .vrow .vact { display: flex; gap: 2px; }
+  .vrow.current { box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .difffile { background: var(--paper); border-radius: 16px; margin-bottom: 10px; overflow: hidden; }
+  .difffile summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 16px; font: 13px ui-monospace, monospace; }
+  .difffile summary::-webkit-details-marker { display: none; }
+  .difffile .plus { color: #1f7a3f; } .difffile .minus { color: var(--danger); }
+  .difffile pre { margin: 0; padding: 0 0 12px; font: 12px/1.6 ui-monospace, monospace; overflow-x: auto; }
+  .difffile pre span { display: block; padding: 0 16px; white-space: pre; }
+  .difffile pre .a { background: #e8f5ec; color: #1f5a33; } .difffile pre .r { background: #fbeaea; color: #7f2222; } .difffile pre .h { color: var(--stone); background: var(--linen); }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+  .kpi { background: var(--paper); border-radius: 16px; padding: 16px 18px; }
+  .kpi b { display: block; font-weight: 400; font-size: 28px; letter-spacing: -.03em; line-height: 1.1; font-feature-settings: "tnum"; }
+  .kpi span { font-size: 12px; color: var(--stone); }
+  .stable { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--paper); border-radius: 16px; overflow: hidden; font-size: 13.5px; margin-bottom: 16px; }
+  .stable th { text-align: left; font-weight: 500; font-size: 12px; color: var(--stone); background: var(--paper); padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .stable td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; font-feature-settings: "tnum"; white-space: nowrap; }
+  .stable tr:last-child td { border-bottom: 0; }
+  .stable td.num, .stable th.num { text-align: right; }
+  .stable .ag { display: flex; align-items: center; gap: 10px; }
+  .stable .ag .tile { width: 28px; height: 28px; border-radius: 9px; }
+  .sbar { height: 6px; border-radius: 999px; background: var(--linen); min-width: 80px; overflow: hidden; }
+  .sbar i { display: block; height: 100%; border-radius: 999px; background: var(--ink); }
+  .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #1f7a3f; margin-right: 6px; }
+  .status-dot.stopped { background: var(--stone); } .status-dot.error { background: var(--danger); }
+  h4.sec { margin: 8px 0 10px; font-weight: 500; font-size: 14px; color: var(--charcoal); }
+  @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+
+  /* resume card (after a stop / error) */
+  .msg.resume-card { align-self: stretch; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line-strong); border-radius: 18px; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 12px; }
+  .resume-card .rc-text { display: flex; align-items: center; gap: 12px; }
+  .resume-card .rc-text .tile { --c: var(--stone); }
+  .resume-card.error .rc-text .tile { --c: var(--danger); color: var(--danger); }
+  .resume-card b { display: block; font-weight: 500; font-size: 15px; }
+  .resume-card small { display: block; font-size: 13px; color: var(--stone); margin-top: 2px; line-height: 1.4; }
+  .resume-card .rc-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-left: 48px; }
+  .resume-card.used { box-shadow: var(--ring); opacity: .75; }
+  .resume-card.used .rc-actions { display: none; }
+
+  /* ---------- team panel ---------- */
+  .team { border-top: 1px solid var(--line); background: var(--paper); flex: none; position: relative; }
+  .progress { position: absolute; top: -1px; left: 0; height: 2px; background: var(--ink); width: 0; transition: width .6s ease; }
+  .team-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; min-height: 56px; flex-wrap: wrap; }
+  .team-head h3 { margin: 0; font-size: 15px; font-weight: 500; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; }
+  .team-head .count { font-size: 13px; color: var(--stone); }
+  .team-head .now { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--graphite); }
+  .team-head .now b { color: var(--ink); font-weight: 500; }
+  .team-head .clock { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--graphite); background: var(--linen); border-radius: 999px; padding: 5px 10px; font-feature-settings: "tnum"; }
+  .team-head a.lnk { color: var(--graphite); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 10px; border-radius: 999px; }
+  .team-head a.lnk:hover { color: var(--ink); background: var(--linen); }
+  .team.collapsed .team-row { display: none; }
+  .team.collapsed .team-head { min-height: 52px; }
+
+  .team-row { display: flex; gap: 10px; padding: 0 16px 16px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding: 16px; }
+  .agent-tile { position: relative; flex: none; width: 210px; min-height: 148px; border-radius: 18px; padding: 12px; background: var(--linen); box-shadow: var(--ring);
+    display: flex; flex-direction: column; gap: 4px; cursor: pointer; scroll-snap-align: start; text-align: left; transition: background .25s, color .25s, opacity .25s, transform .15s; }
+  .agent-tile:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .agent-tile:active { transform: scale(.985); }
+  .agent-tile .t-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .agent-tile .tile { width: 34px; height: 34px; border-radius: 11px; }
+  .agent-tile .t-num { font: 11px ui-monospace, monospace; color: var(--stone); margin-right: auto; }
+  .agent-tile .t-name { font-size: 14px; font-weight: 500; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agent-tile .t-status { font-size: 12px; color: var(--stone); display: flex; align-items: center; gap: 6px; font-feature-settings: "tnum"; }
+  .agent-tile .t-last { font: 11.5px ui-monospace, monospace; color: var(--stone); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 15px; }
+  .agent-tile .t-desc { font-size: 12px; line-height: 1.45; color: var(--graphite); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; }
+  .agent-tile.off .t-desc { color: var(--stone); }
+  .agent-tile.s-working .t-desc { display: none; }
+  .agent-tile.s-done .t-desc, .agent-tile.s-stopped .t-desc { -webkit-line-clamp: 2; }
+
+  .sw { width: 32px; height: 20px; border-radius: 999px; border: 0; padding: 0; background: var(--line-strong); position: relative; flex: none; transition: background .2s; }
+  .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .sw.on { background: var(--espresso); }
+  .sw.on::after { transform: translateX(12px); }
+  .sw:disabled { opacity: .5; cursor: default; }
+
+  .agent-tile.off { opacity: .5; background: transparent; box-shadow: inset 0 0 0 1px var(--line); border: 1px dashed transparent; }
+  .agent-tile.off .tile { background: var(--linen); color: var(--stone); }
+  .agent-tile.s-waiting { background: var(--paper); }
+  .agent-tile.s-working { background: var(--espresso); color: #fff; box-shadow: none; }
+  .agent-tile.s-working .tile { background: rgba(255, 255, 255, .12); color: #fff; }
+  .agent-tile.s-working .t-num, .agent-tile.s-working .t-status, .agent-tile.s-working .t-last { color: rgba(255, 255, 255, .7); }
+  .agent-tile.s-working .typing span { background: #fff; }
+  .agent-tile.s-working .sw.on { background: rgba(255, 255, 255, .3); }
+  .agent-tile.s-done { background: var(--bone); }
+  .agent-tile.s-done .t-status { color: var(--charcoal); }
+  .agent-tile.s-stopped { background: var(--paper); box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .agent-tile.s-stopped .t-status { color: var(--danger); }
+  .agent-tile.s-pending { background: var(--paper); }
+  .agent-tile.s-pending .t-status { color: var(--ash); }
+  .team-head .paused { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--graphite); }
+  .team-head .paused b { color: var(--ink); font-weight: 500; }
+
+  @media (max-width: 900px) {
+    body { grid-template-columns: 1fr; grid-template-rows: 55vh 45vh; }
+    .chat { border-right: 0; border-bottom: 1px solid var(--line); }
+    .url, .seg .lbl { display: none; }
+    .code { grid-template-columns: 140px 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<section class="chat">
+  <div class="bar">
+    <a class="logo" href="/" title="Home"><span class="mark"><i data-icon="logo" data-size="18"></i></span></a>
+    <div class="title">
+      <div class="name" id="pname" title="Edit name and description" role="button" tabindex="0">…</div>
+      <div class="sub"><button class="desc" id="pdesc" title="Edit name and description"></button>
+        <span aria-hidden="true">·</span><button class="pid mono" id="pid" title="Copy project id"></button></div>
+    </div>
+    <span class="conn" id="conn" title="Connecting…"></span>
+    <a class="icon-btn" href="/guide" title="Guide" aria-label="Guide"><i data-icon="help" data-size="17"></i></a>
+    <button class="icon-btn" id="menu" title="Projects" aria-label="Projects"><i data-icon="folder" data-size="17"></i></button>
+    <button class="btn btn-dark btn-sm" data-new title="New project"><i data-icon="plus" data-size="16"></i>New</button>
+  </div>
+
+  <aside class="drawer" id="drawer" aria-label="Projects">
+    <div class="head"><h2>Projects</h2><button class="btn btn-dark btn-sm" data-new><i data-icon="plus" data-size="16"></i>New project</button></div>
+    <label class="search"><i data-icon="search" data-size="16"></i><input class="input" id="psearch" placeholder="Search projects" autocomplete="off"></label>
+    <div class="plist" id="plist"></div>
+    <div class="foot">
+      <a href="/projects"><span>All projects</span><i data-icon="arrow-right" data-size="16"></i></a>
+      <a href="/agents"><span>Edit the agent team</span><i data-icon="arrow-right" data-size="16"></i></a>
+      <a href="/guide"><span>Guide</span><i data-icon="arrow-right" data-size="16"></i></a>
+    </div>
+  </aside>
+
+  <div class="messages" id="messages"></div>
+
+  <form class="composer" id="composer">
+    <div class="attachments" id="attachments" hidden></div>
+    <div class="row">
+      <button type="button" class="icon-btn attach" id="attach" title="Attach reference images (or paste / drop them)" aria-label="Attach images"><i data-icon="paperclip" data-size="17"></i></button>
+      <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+      <textarea class="input" id="input" rows="1" placeholder="Describe what to build…" aria-label="Prompt"></textarea>
+      <button class="send" id="send" type="submit" title="Send" aria-label="Send"></button>
+    </div>
+    <div class="hint"><span><kbd>Enter</kbd> send · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line</span><span id="teamHint"></span></div>
+  </form>
+</section>
+
+<section class="stage">
+  <div class="toolbar">
+    <div class="seg" id="tabs" role="tablist">
+      <button data-tab="preview" class="on"><i data-icon="eye" data-size="16"></i><span class="lbl">Preview</span></button>
+      <button data-tab="code"><i data-icon="code" data-size="16"></i><span class="lbl">Code</span></button>
+    </div>
+    <div class="seg" id="devices">
+      <button data-device="desktop" class="on" title="Desktop"><i data-icon="monitor" data-size="16"></i></button>
+      <button data-device="tablet" title="Tablet · 768px"><i data-icon="tablet" data-size="16"></i></button>
+      <button data-device="phone" title="Phone · 375px"><i data-icon="phone" data-size="16"></i></button>
+    </div>
+    <span class="spacer"></span>
+    <span class="url" id="url"></span>
+    <button class="icon-btn" id="reload" title="Reload preview" aria-label="Reload preview"><i data-icon="refresh" data-size="16"></i></button>
+    <button class="icon-btn" id="open" title="Open in a new tab" aria-label="Open in a new tab"><i data-icon="external" data-size="16"></i></button>
+    <button class="icon-btn" id="historyBtn" title="Versions — history of the code" aria-label="Versions"><i data-icon="history" data-size="17"></i></button>
+    <button class="icon-btn" id="statsBtn" title="Cost &amp; time per agent" aria-label="Stats"><i data-icon="chart" data-size="17"></i></button>
+    <a class="btn btn-ghost btn-sm" id="download" title="Download the code as .zip"><i data-icon="download" data-size="16"></i>.zip</a>
+  </div>
+
+  <div class="view">
+    <div class="placeholder" id="placeholder"><div class="box">
+      <div class="tile"><i data-icon="monitor" data-size="24"></i></div>
+      <b>Nothing to preview yet</b>
+      The page appears here as soon as the HTML agent writes <span class="mono">index.html</span>.
+    </div></div>
+    <div class="frame-wrap" id="frameWrap"><iframe id="frame" title="Live preview"></iframe></div>
+    <div class="flash" id="flash"></div>
+    <div class="code" id="code">
+      <nav class="files" id="files"></nav>
+      <div class="codepane">
+        <div class="codehead">
+          <i data-icon="file" data-size="14"></i><span id="codeName"></span><span class="dirty-dot" id="dirtyDot" hidden title="Unsaved changes"></span>
+          <span class="save-state" id="saveState"></span><span class="spacer"></span>
+          <label class="autosave" title="Save automatically a moment after you stop typing"><span>Auto-save</span><input type="checkbox" id="autosave"></label>
+          <button class="btn btn-dark btn-sm" id="saveFile" title="Save (Ctrl+S)"><i data-icon="save" data-size="14"></i>Save</button>
+          <button class="icon-btn plain" id="copyCode" title="Copy file" aria-label="Copy file"><i data-icon="copy" data-size="16"></i></button></div>
+        <textarea class="editor" id="source" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-label="File contents"></textarea>
+        <div class="file-note" id="fileNote" hidden></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="team" id="team" aria-label="Agent team">
+    <div class="progress" id="progress"></div>
+    <div class="team-head" id="teamHead"></div>
+    <div class="team-row" id="teamRow"></div>
+  </section>
+</section>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const TOOL_ICON = { Read: "eye", Write: "file-plus", Edit: "pencil", Glob: "folder", Grep: "search" };
+const TOOL_VERB = { Read: "Reading", Write: "Writing", Edit: "Editing", Glob: "Looking in", Grep: "Searching" };
+const EXAMPLES = [
+  "A landing page for a cozy neighbourhood coffee shop",
+  "A portfolio for a freelance product designer",
+  "A pricing page for a small SaaS with three plans",
+];
+const MAX_ACTIONS = 4;
+
+let AGENTS = [], BY_ID = {}, PID = null, project = null, selected = new Set();
+let busy = false, ws, lastSeq = 0, replaying = false;
+let currentFile = "index.html", changed = new Set(), cards = {};
+let run = null;   // { agents: [...ids], index, started }
+const status = {}; // agent id -> { state: waiting|working|done|stopped, started, ended, last }
+let collapsed = false, lastPrompt = "";
+let paused = null;  // saved run that was stopped / failed / interrupted: { agents, done, current, next, request, status, resumable }
+try { collapsed = localStorage.getItem("teamCollapsed") === "1"; } catch {}
+
+// ================================================================ boot
+function fatal(err, title = "The studio couldn't open this project") {
+  document.querySelector(".fatal")?.remove();
+  document.body.insertAdjacentHTML("beforeend", `<div class="fatal"><div class="err-state" role="alert" style="max-width:480px">
+    <span class="tile">${icon("alert", { size: 22 })}</span><b>${esc(title)}</b><p>${esc(err?.message || String(err))}</p>
+    <div class="row"><button class="btn btn-dark btn-sm" onclick="location.reload()">${icon("refresh", { size: 14 })}Try again</button>
+    <a class="btn btn-ghost btn-sm" href="/projects">Your projects</a></div></div></div>`);
+}
+
+async function boot() {
+  const m = location.pathname.match(/^\/p\/([0-9a-f-]{36})$/i);
+  if (!m) return location.replace("/projects");
+  PID = m[1];
+  try {
+    [AGENTS, project] = await Promise.all([api("/api/agents"), api(`/api/projects/${PID}`)]);
+  } catch (err) {
+    if (err.status === 404) { toast("That project doesn't exist any more", "err"); return setTimeout(() => location.replace("/projects"), 900); }
+    return fatal(err);
+  }
+  AGENTS.forEach(a => BY_ID[a.id] = a);
+  await loadPresets();
+
+  selected = new Set(project.agents.filter(id => BY_ID[id]));
+  renderHeader(); renderTeam(); setBusy(false);
+  $("url").textContent = `/work/${PID.slice(0, 8)}…/index.html`;
+  $("url").title = `/work/${PID}/index.html`;
+  $("download").href = `/api/projects/${PID}/download`;
+
+  replaying = true; $("messages").classList.add("replay");
+  project.events.forEach(handle);
+  replaying = false; $("messages").classList.remove("replay");
+  if (!project.events.length) showEmpty();
+  if (!project.busy) {
+    run = null; markStopped();
+    paused = project.run?.resumable ? project.run : null;
+    if (paused) {
+      restoreStatuses(paused);
+      // a run cut off by a server restart has no "stopped" event in the chat: add its card now
+      if (!document.querySelector(".resume-card:not(.used)")) addResumeCard(paused);
+    } else disableResumeCards();
+    renderTeam();
+  }
+  scrollDown();
+
+  reloadPreview();
+  connect();
+  setInterval(tick, 1000);
+  if (needsDetails()) editDetails({ required: true });
+}
+
+function renderHeader() {
+  $("pname").textContent = project.name;
+  const missing = !project.description;
+  $("pdesc").textContent = missing ? "Add a description" : project.description;
+  $("pdesc").classList.toggle("missing", missing);
+  $("pdesc").title = missing ? "Every project needs a description" : project.description;
+  $("pid").innerHTML = `${icon("copy", { size: 12 })}#${PID.slice(0, 8)}`;
+  $("pid").title = "Copy project id: " + PID;
+  document.title = `${project.name} · Agents Atelier`;
+}
+
+let wsFails = 0, wasConnected = false, reconnectTimer, bannerTimer;
+function connect() {
+  clearTimeout(reconnectTimer);
+  try { ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/${PID}`); }
+  catch { reconnectTimer = setTimeout(connect, 3000); return; }
+  ws.onopen = () => {
+    $("conn").classList.add("on"); $("conn").title = "Connected";
+    wsFails = 0; clearTimeout(bannerTimer); $("connBanner")?.remove();
+    if (wasConnected) { resync(); toast("Reconnected to the server"); }
+    wasConnected = true;
+  };
+  ws.onclose = (e) => {
+    $("conn").classList.remove("on"); $("conn").title = "Reconnecting…";
+    if (e.code === 4404) { toast("This project was deleted", "err"); return setTimeout(() => location.replace("/projects"), 900); }
+    wsFails++;
+    if (!$("connBanner")) { clearTimeout(bannerTimer); bannerTimer = setTimeout(showConnBanner, 2000); }
+    reconnectTimer = setTimeout(connect, Math.min(1500 * wsFails, 10000));
+  };
+  ws.onmessage = (e) => {
+    let ev;
+    try { ev = JSON.parse(e.data); } catch { return console.warn("Ignored a message the studio couldn't read", e.data); }
+    try { handle(ev); } catch (err) { console.error("Couldn't show an event", ev, err); }
+  };
+}
+function showConnBanner() {
+  if ($("connBanner") || ws?.readyState === 1) return;
+  $("messages").insertAdjacentHTML("beforebegin", `<div class="conn-banner" id="connBanner" role="status">${icon("alert", { size: 16 })}
+    <span>Lost the connection to the server — reconnecting… Agents keep working on the server.</span><span class="spacer"></span>
+    <button class="btn btn-ghost btn-sm" type="button" id="reconnectNow">Retry now</button></div>`);
+  $("reconnectNow").onclick = () => { wsFails = 0; connect(); };
+}
+/* After a reconnect: show what happened while we were away (events are numbered, duplicates are skipped). */
+async function resync() {
+  try {
+    const p = await api(`/api/projects/${PID}`);
+    p.events.forEach(handle);
+    if (!p.busy && busy) {
+      setBusy(false); run = null; markStopped();
+      paused = p.run?.resumable ? p.run : null;
+      renderTeam();
+    }
+    reloadPreview();
+  } catch (err) { console.warn("Resync failed", err); }
+}
+function wsSend(msg) {
+  if (ws?.readyState !== 1) { toast("Not connected to the server — reconnecting…", "err"); return false; }
+  ws.send(JSON.stringify(msg));
+  return true;
+}
+
+// ================================================================ events
+function handle(ev) {
+  if (ev.seq !== undefined) {
+    if (ev.type !== "file_changed" && ev.seq <= lastSeq) return;
+    lastSeq = Math.max(lastSeq, ev.seq);
+  }
+  const a = BY_ID[ev.agent] || (ev.agent ? { id: ev.agent, name: ev.agent, icon: "bot", color: "#766a7c" } : null);
+  const now = ev.ts ? ev.ts * 1000 : Date.now();
+  switch (ev.type) {
+    case "hello": setBusy(ev.busy); break;
+    case "needs_details":
+      if (lastPrompt && !$("input").value) { $("input").value = lastPrompt; autosize(); }
+      editDetails({ required: true, note: ev.text });
+      break;
+    case "user":
+      addMsg(`<div class="msg user">${(ev.images || []).length ? `<div class="imgs">${ev.images.map(i =>
+        `<a href="/work/${PID}/${esc(i)}" target="_blank" rel="noopener"><img src="/work/${PID}/${esc(i)}" alt="Reference image"></a>`).join("")}</div>` : ""}${esc(ev.text)}</div>`);
+      break;
+    case "run_start":
+      setBusy(true);
+      if (ev.retry) {
+        const ra = BY_ID[ev.agents[0]];
+        run = { agents: AGENTS.filter(x => selected.has(x.id) || x.id === ev.agents[0]).map(x => x.id), index: -1, started: now, retry: ev.agents[0] };
+        status[ev.agents[0]] = { state: "waiting" };
+        addSystem(`Retrying ${ra?.name || ev.agents[0]}${ev.note ? ` — “${ev.note}”` : ""}`);
+        renderTeam();
+        break;
+      }
+      if (ev.agents) selected = new Set(ev.agents.filter(id => BY_ID[id]));
+      run = { agents: ev.agents || [...selected], index: -1, started: now };
+      paused = null; disableResumeCards();
+      Object.keys(status).forEach(k => { if (!(ev.done || []).includes(k)) delete status[k]; });
+      run.agents.forEach(id => { if (!(ev.done || []).includes(id)) status[id] = { state: "waiting" }; else status[id] = { ...(status[id] || {}), state: "done" }; });
+      if (ev.name && project && ev.name !== project.name) { project.name = ev.name; renderHeader(); }
+      renderTeam();
+      break;
+    case "agent_start":
+      if (run) run.index = run.agents.indexOf(a.id);
+      status[a.id] = { state: "working", started: now, last: "" };
+      cards[a.id] = addAgentCard(a, now, run ? run.index + 1 : 0, run ? run.agents.length : 0);
+      renderTeam();
+      break;
+    case "tool":
+      addAction(ev.agent, ev.tool, ev.target);
+      if (status[ev.agent]) { status[ev.agent].last = `${TOOL_VERB[ev.tool] || ev.tool} ${ev.target}`; renderTile(ev.agent); }
+      break;
+    case "agent_text": setCardText(ev.agent, ev.text); break;
+    case "file_changed":
+      changed.add(ev.file);
+      if (a) flash(a.color);
+      reloadPreview(); refreshCode();
+      break;
+    case "agent_done":
+      status[a.id] = { ...(status[a.id] || {}), state: "done", ended: now };
+      finishCard(a.id, ev.text, now, ev.stat);
+      if (!replaying && $("statsPanel")?.open) loadStats();
+      if (!replaying && ev.version && $("historyPanel")?.open) loadVersions();
+      renderTeam();
+      break;
+    case "run_done": {
+      if (ev.retry) {
+        setBusy(false); const r = run?.retry; run = null; renderTeam();
+        addSystem(`${BY_ID[r]?.name || "Agent"} finished its retry`);
+        if (!replaying) toast("Retry finished");
+        break;
+      }
+      const took = run ? ` in ${duration((now - run.started) / 1000)}` : "";
+      setBusy(false); run = null; renderTeam();
+      addMsg(`<div class="msg done-card">
+        <span class="lbl"><span class="tile">${icon("check", { size: 16 })}</span>Team finished${took}</span>
+        <a class="btn btn-ghost btn-sm" href="/api/projects/${PID}/download">${icon("download", { size: 16 })}.zip</a>
+        <button class="btn btn-dark btn-sm" data-new>${icon("plus", { size: 16 })}New project</button></div>`);
+      if (!replaying) toast("The team finished the page");
+      break;
+    }
+    case "run_stopped":
+      setBusy(false); run = null; markStopped();
+      if (ev.retry) { addSystem("Retry stopped"); paused = ev.run?.resumable ? ev.run : paused; renderTeam(); break; }
+      paused = ev.run?.resumable ? ev.run : null;
+      if (paused) addResumeCard(paused); else addSystem("Stopped");
+      renderTeam();
+      break;
+    case "error":
+      setBusy(false); run = null; markStopped();
+      addMsg(`<div class="msg error">${icon("alert", { size: 16 })}<span>${esc(ev.text)}</span></div>`);
+      paused = ev.run?.resumable ? ev.run : paused;
+      if (ev.run?.resumable) addResumeCard(ev.run);
+      renderTeam();
+      break;
+    case "versions": if ($("historyPanel")?.open) loadVersions(); break;
+    case "restored":
+      if (!replaying) { reloadPreview(); refreshCode(true); if ($("historyPanel")?.open) loadVersions(); toast(`Restored version ${ev.version}`); }
+      addSystem(`Restored version ${ev.version}${ev.backup ? ` (the code before was saved as v${ev.backup})` : ""}`);
+      break;
+    case "resume": {
+      const from = BY_ID[ev.from]?.name || "the next agent";
+      addSystem(ev.mode === "continue" ? `Continuing from ${from}…` : `Starting again from ${from}…`);
+      break;
+    }
+  }
+}
+
+// ================================================================ chat
+function showEmpty() {
+  const team = AGENTS.filter(a => selected.has(a.id));
+  $("messages").innerHTML = `<div class="empty" id="empty">
+    <div class="stack">${team.slice(0, 7).map(a => `<span title="${esc(a.name)}">${icon(a.icon, { size: 16 })}</span>`).join("")}</div>
+    <h3>What should the team build?</h3>
+    Describe a page and ${team.length} agent${team.length === 1 ? "" : "s"} will build it, one after another.
+    <div class="chips">${EXAMPLES.map(t => `<button class="chip" data-example="${esc(t)}">${icon("sparkles", { size: 16 })}${esc(t)}</button>`).join("")}</div>
+  </div>`;
+}
+$("messages").addEventListener("click", (e) => {
+  const chip = e.target.closest("[data-example]");
+  if (chip) { $("input").value = chip.dataset.example; autosize(); $("input").focus(); }
+  const more = e.target.closest(".more");
+  if (more) { const box = more.parentElement; box.classList.toggle("open"); updateMore(box); }
+});
+
+function addMsg(html) {
+  $("empty")?.remove();
+  $("messages").insertAdjacentHTML("beforeend", html);
+  if (!replaying) scrollDown();
+  return $("messages").lastElementChild;
+}
+const scrollDown = () => {
+  const m = $("messages");
+  m.scrollTop = m.scrollHeight;
+};
+const addSystem = (t) => addMsg(`<div class="msg system">${esc(t)}</div>`);
+
+function addAgentCard(a, started, step, total) {
+  const el = addMsg(`<div class="msg agent working" data-agent="${esc(a.id)}" style="--c:${a.color}">
+    <div class="who"><span class="tile">${icon(a.icon, { size: 18 })}</span>
+      <span class="nm" title="${esc(a.description || "")}">${esc(a.name)} agent${step ? `<small>Step ${step} of ${total}</small>` : ""}</span>
+      <span class="state"><span class="timer">0s</span><span class="typing"><span></span><span></span><span></span></span></span>
+      <button class="icon-btn plain retry" data-retry="${esc(a.id)}" title="Retry ${esc(a.name)} — run only this agent again">${icon("refresh", { size: 15 })}</button></div>
+    <div class="actions"></div><div class="text"></div></div>`);
+  el.dataset.started = started;
+  return el;
+}
+function addAction(id, tool, target) {
+  const card = cards[id]; if (!card) return;
+  const box = card.querySelector(".actions");
+  box.querySelector(".more")?.remove();
+  box.insertAdjacentHTML("beforeend",
+    `<div class="action">${icon(TOOL_ICON[tool] || "file", { size: 13 })}${TOOL_VERB[tool] || tool} <b>${esc(target)}</b></div>`);
+  updateMore(box);
+  if (!replaying) scrollDown();
+}
+function updateMore(box) {
+  const items = [...box.querySelectorAll(".action")];
+  items.forEach((el, i) => el.classList.toggle("hidden", i < items.length - MAX_ACTIONS));
+  box.querySelector(".more")?.remove();
+  const hidden = items.length - MAX_ACTIONS;
+  if (hidden > 0) box.insertAdjacentHTML("afterbegin",
+    `<button class="more" type="button">${box.classList.contains("open") ? "Show less" : `Show ${hidden} earlier step${hidden > 1 ? "s" : ""}`}</button>`);
+}
+function setCardText(id, text) {
+  const card = cards[id]; if (!card) return;
+  card.querySelector(".text").textContent = text || "";
+  if (!replaying) scrollDown();
+}
+function finishCard(id, text, ended, stat) {
+  const card = cards[id]; if (!card) return;
+  setCardText(id, text);
+  card.classList.remove("working");
+  const took = card.dataset.started && ended ? ` · ${duration((ended - card.dataset.started) / 1000)}` : "";
+  const cost = stat?.cost ? ` · <span class="cost" title="Estimated API cost">${money(stat.cost)}</span>` : "";
+  card.querySelector(".state").innerHTML = `${icon("check", { size: 14 })}Done${took}${cost}`;
+  if (stat?.model) card.querySelector(".nm small")?.insertAdjacentHTML("beforeend", ` · ${esc(stat.model.replace(/^claude-/, ""))}`);
+}
+function markStopped() {
+  Object.values(status).forEach(st => {
+    if (st.state === "working") st.state = "stopped";
+    else if (st.state === "waiting") st.state = "pending";
+  });
+  document.querySelectorAll(".msg.agent.working").forEach(c => {
+    c.classList.remove("working");
+    c.querySelector(".state").textContent = "Stopped";
+  });
+}
+function tick() {
+  if (!run) return;
+  document.querySelectorAll(".msg.agent.working .timer").forEach(t => {
+    t.textContent = duration((Date.now() - t.closest(".msg").dataset.started) / 1000);
+  });
+  Object.keys(status).forEach(id => status[id].state === "working" && renderTile(id));
+  renderTeamHead();
+}
+
+function setBusy(b) {
+  busy = b;
+  $("send").innerHTML = icon(b ? "stop" : "arrow-up", { size: 18, stroke: 2 });
+  $("send").classList.toggle("stop", b);
+  $("send").title = b ? "Stop the agents" : "Send";
+  $("input").placeholder = b ? "Agents are working… press the stop button to stop them" : "Describe what to build…";
+  const dl = $("download");
+  dl.setAttribute("aria-disabled", b ? "true" : "false");
+  dl.title = b ? "Available when the agents finish" : "Download the code as .zip";
+  dl.innerHTML = icon(b ? "lock" : "download", { size: 16 }) + ".zip";
+  document.querySelectorAll(".sw").forEach(x => x.disabled = b);
+  $("historyBtn").title = "Versions — history of the code";
+  updateEditorLock();
+  updateSend();
+}
+function updateSend() { $("send").disabled = !busy && !$("input").value.trim(); }
+
+$("composer").onsubmit = async (e) => {
+  e.preventDefault();
+  if (busy) { wsSend({ type: "stop" }); return; }
+  if (!await flushEdits()) return;
+  const text = $("input").value.trim();
+  if (!text) return;
+  if (ws?.readyState !== 1) return toast("Not connected to the server — reconnecting…", "err");
+  if (!selected.size) return toast("Switch on at least one agent first", "err");
+  if (attachments.some(x => x.loading)) return toast("Images are still uploading…");
+  lastPrompt = text;
+  if (!wsSend({ type: "prompt", text, agents: [...selected], images: attachments.map(x => x.path) })) return;
+  $("input").value = ""; autosize();
+  attachments = []; renderAttachments();
+};
+$("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); }
+});
+const autosize = () => { $("input").style.height = "auto"; $("input").style.height = $("input").scrollHeight + "px"; updateSend(); };
+$("input").addEventListener("input", autosize);
+
+// name + description (both required) & copy id
+const needsDetails = () => !project.description || project.name === "Untitled project";
+async function editDetails({ required = false, note = "" } = {}) {
+  const details = await projectDialog({
+    title: required ? "Name this project" : "Project details", ok: required ? "Save and continue" : "Save",
+    name: project.name === "Untitled project" ? "" : project.name, description: project.description || "",
+    note: note || (required ? "This project is missing its name or description. The agents read both, so be specific." : ""),
+    cancellable: !required,
+  });
+  if (!details) return;
+  try {
+    project = { ...project, ...(await api(`/api/projects/${PID}`, { method: "PATCH", body: JSON.stringify(details) })) };
+    renderHeader(); toast("Project details saved");
+  } catch (err) { toast(err.message, "err"); }
+}
+$("pname").addEventListener("click", () => editDetails());
+$("pname").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); editDetails(); } });
+$("pdesc").addEventListener("click", () => editDetails());
+$("pid").onclick = async () => {
+  try { await navigator.clipboard.writeText(PID); toast("Project id copied"); } catch { toast(PID); }
+};
+
+// ================================================================ stop · continue · start again
+function restoreStatuses(r) {
+  Object.keys(status).forEach(k => delete status[k]);
+  r.agents.forEach(id => {
+    status[id] = { state: r.done.includes(id) ? "done" : id === r.current ? "stopped" : "pending" };
+  });
+}
+function disableResumeCards() {
+  document.querySelectorAll(".resume-card:not(.used)").forEach(c => c.classList.add("used"));
+}
+function addResumeCard(r) {
+  disableResumeCards();
+  const at = BY_ID[r.next]?.name || r.next, total = r.agents.length, doneN = r.done.length;
+  const title = r.status === "error" ? `Run failed at ${at}` : r.status === "interrupted" ? `Run interrupted at ${at}` : `Run stopped at ${at}`;
+  const why = r.status === "interrupted" ? "The server restarted while the agents were working. " : "";
+  addMsg(`<div class="msg resume-card ${r.status === "error" ? "error" : ""}">
+    <div class="rc-text"><span class="tile">${icon(r.status === "error" ? "alert" : "pause", { size: 18 })}</span>
+      <div><b>${esc(title)}</b><small>${why}${doneN} of ${total} agents finished — their work is saved. Continue from ${esc(at)}, or run the whole team again.</small></div></div>
+    <div class="rc-actions">
+      <button class="btn btn-dark btn-sm" data-resume="continue">${icon("play", { size: 14 })}Continue from ${esc(at)}</button>
+      <button class="btn btn-ghost btn-sm" data-resume="restart">${icon("refresh", { size: 14 })}Start again</button>
+    </div></div>`);
+}
+async function resumeRun(mode) {
+  if (busy || !paused) return;
+  if (ws?.readyState !== 1) return toast("Not connected to the server yet", "err");
+  if (mode === "restart" && !await confirmDialog({
+    title: "Start again?", ok: "Start again",
+    text: `All ${paused.agents.length} agents will run again from the first one, on the same request. The files built so far are kept and reworked.` })) return;
+  if (!await flushEdits()) return;
+  wsSend({ type: mode });
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-resume]");
+  if (b) resumeRun(b.dataset.resume);
+});
+
+// ================================================================ projects drawer
+document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
+
+let projectList = [], drawerTimer;
+async function loadProjects() {
+  try { projectList = await api("/api/projects"); renderProjects(); }
+  catch (err) { showError($("plist"), err, loadProjects, "Couldn't load your projects"); }
+}
+function renderProjects() {
+  const q = $("psearch").value.trim().toLowerCase();
+  const list = projectList.filter(p => !q || p.name.toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q) || p.id.startsWith(q));
+  $("plist").innerHTML = list.map(p => `
+    <a class="pitem ${p.id === PID ? "current" : ""}" href="/p/${p.id}">
+      <span class="thumb">${icon(p.has_preview ? "monitor" : "file", { size: 16 })}</span>
+      <div class="info">
+        <div class="pname">${esc(p.name)}</div>
+        <div class="pdesc">${esc(p.description || "No description yet")}</div>
+        <div class="meta">${p.busy ? `<span class="badge live">Working</span>` : p.paused ? `<span class="badge">Paused</span>` : ""}<span class="mono">#${p.id.slice(0, 8)}</span>· ${ago(p.updated)}</div>
+      </div>
+      <span class="tools">
+        ${p.busy ? "" : `<span class="icon-btn plain" role="button" tabindex="0" data-dl="${p.id}" title="Download .zip">${icon("download", { size: 16 })}</span>`}
+        <span class="icon-btn plain danger" role="button" tabindex="0" data-del="${p.id}" title="Delete">${icon("trash", { size: 16 })}</span>
+      </span>
+    </a>`).join("") || `<div class="msg system" style="padding:24px">${q ? "No project matches." : "No projects yet."}</div>`;
+}
+function toggleDrawer(open = !$("drawer").classList.contains("open")) {
+  $("drawer").classList.toggle("open", open);
+  $("menu").classList.toggle("on", open);
+  clearInterval(drawerTimer);
+  if (open) { loadProjects(); drawerTimer = setInterval(loadProjects, 4000); setTimeout(() => $("psearch").focus(), 200); }
+}
+$("menu").onclick = (e) => { e.stopPropagation(); toggleDrawer(); };
+$("psearch").addEventListener("input", renderProjects);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("drawer").classList.contains("open")) toggleDrawer(false); });
+document.addEventListener("click", (e) => {
+  if ($("drawer").classList.contains("open") && !e.target.closest("#drawer, #menu, dialog")) toggleDrawer(false);
+});
+$("plist").addEventListener("click", async (e) => {
+  const dl = e.target.closest("[data-dl]"), del = e.target.closest("[data-del]");
+  if (!dl && !del) return;
+  e.preventDefault(); e.stopPropagation();
+  if (dl) { location.href = `/api/projects/${dl.dataset.dl}/download`; return; }
+  const p = projectList.find(x => x.id === del.dataset.del);
+  const ok = await confirmDialog({ title: "Delete project?", text: `“${p?.name}” and all its files will be removed. This cannot be undone.`, ok: "Delete", danger: true });
+  if (!ok) return;
+  try { await api(`/api/projects/${p.id}`, { method: "DELETE" }); }
+  catch (err) { return toast(err.message, "err"); }
+  if (p.id === PID) location.replace("/projects"); else { toast("Project deleted"); loadProjects(); }
+});
+
+// ================================================================ team panel
+const tileEl = (id) => document.querySelector(`.agent-tile[data-id="${CSS.escape(id)}"]`);
+
+function tileHTML(a, i) {
+  const on = selected.has(a.id), st = status[a.id];
+  const state = st?.state || (on ? "ready" : "off");
+  let line = "", last = "";
+  if (!on && !st) line = "Off · skipped";
+  else if (state === "ready") line = "Ready";
+  else if (state === "waiting") line = `${icon("clock", { size: 12 })}Waiting`;
+  else if (state === "working") {
+    line = `<span class="typing"><span></span><span></span><span></span></span>Working · ${duration((Date.now() - st.started) / 1000)}`;
+    last = st.last || "Reading the project…";
+  } else if (state === "done") {
+    line = `${icon("check", { size: 12 })}Done${st.started && st.ended ? " · " + duration((st.ended - st.started) / 1000) : ""}`;
+  } else if (state === "stopped") line = `${icon("pause", { size: 12 })}Stopped here`;
+  else if (state === "pending") line = `${icon("clock", { size: 12 })}Not started`;
+  return `<div class="agent-tile s-${state} ${on || st ? "" : "off"}" data-id="${esc(a.id)}" style="--c:${a.color}" tabindex="0"
+      role="button" aria-label="${esc(a.name)} agent, ${state}${a.description ? ": " + esc(a.description) : ""}"
+      title="${esc(a.description ? a.description + "\n\n" : "")}${cards[a.id] ? "Click to show in chat" : on ? "Click to switch off" : "Click to switch on"}">
+    <div class="t-top"><span class="tile">${icon(a.icon, { size: 17 })}</span><span class="t-num">${String(i + 1).padStart(2, "0")}</span>
+      ${a.model ? `<span class="model-badge" title="Runs on ${esc(a.model)}">${esc(a.model)}</span>` : ""}
+      <button class="sw ${on ? "on" : ""}" data-toggle role="switch" aria-checked="${on}" aria-label="Use ${esc(a.name)}" ${busy ? "disabled" : ""}></button></div>
+    <div class="t-name">${esc(a.name)}</div>
+    <div class="t-status">${line}</div>
+    ${state === "working" ? `<div class="t-last">${esc(last)}</div>` : `<div class="t-desc">${esc(a.description || "")}</div>`}
+  </div>`;
+}
+function renderTile(id) {
+  const el = tileEl(id), i = AGENTS.findIndex(a => a.id === id);
+  if (el && i >= 0) el.outerHTML = tileHTML(AGENTS[i], i);
+}
+function renderTeam() {
+  $("team").classList.toggle("collapsed", collapsed);
+  $("teamRow").innerHTML = AGENTS.map(tileHTML).join("");
+  renderTeamHead();
+  // keep the working agent in view
+  const working = Object.keys(status).find(id => status[id].state === "working");
+  if (working && !replaying) tileEl(working)?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+}
+function renderTeamHead() {
+  const team = AGENTS.filter(a => selected.has(a.id));
+  $("teamHint").textContent = `${team.length} agent${team.length === 1 ? "" : "s"} on`;
+  const chevron = `<button class="icon-btn plain" id="collapse" title="${collapsed ? "Show" : "Hide"} the team" aria-expanded="${!collapsed}">
+    ${icon(collapsed ? "chevron-up" : "chevron-down", { size: 16 })}</button>`;
+  if (run && busy) {
+    const total = run.agents.length, i = Math.max(run.index, 0), cur = BY_ID[run.agents[i]];
+    const done = Object.values(status).filter(s => s.state === "done").length;
+    $("progress").style.width = `${((done + (run.index >= 0 ? .5 : 0)) / total) * 100}%`;
+    $("teamHead").innerHTML = `<h3>${icon("users", { size: 16 })}Team</h3>
+      <span class="now"><span class="typing"><span></span><span></span><span></span></span>
+        Step <b>${i + 1}</b> of ${total} · <b>${esc(cur?.name || "…")}</b> is working</span>
+      <span class="spacer"></span>
+      <span class="clock">${icon("clock", { size: 13 })}${duration((Date.now() - run.started) / 1000)}</span>${chevron}`;
+  } else if (paused) {
+    const total = paused.agents.length, doneN = paused.done.length, at = BY_ID[paused.next];
+    $("progress").style.width = `${(doneN / total) * 100}%`;
+    $("teamHead").innerHTML = `<h3>${icon("users", { size: 16 })}Team</h3>
+      <span class="paused">${icon("pause", { size: 14 })}${paused.status === "error" ? "Failed" : paused.status === "interrupted" ? "Interrupted" : "Stopped"}
+        at <b>${esc(at?.name || paused.next)}</b> · ${doneN} of ${total} done</span>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" data-resume="restart">${icon("refresh", { size: 14 })}Start again</button>
+      <button class="btn btn-dark btn-sm" data-resume="continue">${icon("play", { size: 14 })}Continue</button>${chevron}`;
+  } else {
+    $("progress").style.width = "0";
+    $("teamHead").innerHTML = `<h3>${icon("users", { size: 16 })}Team</h3>
+      <span class="count">${team.length} of ${AGENTS.length} on</span>
+      <span class="spacer"></span>
+      <span class="menu-wrap">
+        <button class="btn btn-ghost btn-sm" id="presetsBtn" aria-haspopup="true">${icon("sliders", { size: 14 })}${esc(matchingPreset()?.name || "Presets")}${icon("chevron-up", { size: 13 })}</button>
+        <div class="menu" id="presetsMenu" role="menu"></div>
+      </span>
+      <a class="lnk" href="/agents">${icon("pencil", { size: 13 })}Edit agents</a>${chevron}`;
+  }
+}
+async function saveSelection() {
+  renderTeam();
+  if ($("empty")) showEmpty();
+  try { await api(`/api/projects/${PID}`, { method: "PATCH", body: JSON.stringify({ agents: [...selected] }) }); }
+  catch (err) { toast(`Couldn't save the team: ${err.message}`, "err"); }
+}
+function toggleAgent(id) {
+  if (busy) return toast("Agents are working — stop them to change the team");
+  selected.has(id) ? selected.delete(id) : selected.add(id);
+  if (status[id] && !selected.has(id)) delete status[id];
+  saveSelection();
+}
+function showCard(id) {
+  const card = cards[id]; if (!card) return false;
+  card.scrollIntoView({ behavior: "smooth", block: "start" });
+  card.classList.add("highlight"); setTimeout(() => card.classList.remove("highlight"), 1400);
+  return true;
+}
+$("teamRow").addEventListener("click", (e) => {
+  const t = e.target.closest(".agent-tile"); if (!t) return;
+  if (e.target.closest("[data-toggle]")) return toggleAgent(t.dataset.id);
+  if (!showCard(t.dataset.id) && !busy) toggleAgent(t.dataset.id);
+});
+$("teamRow").addEventListener("keydown", (e) => {
+  const t = e.target.closest(".agent-tile");
+  if (t && e.target === t && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); t.click(); }
+});
+$("teamHead").addEventListener("click", (e) => {
+  if (e.target.closest("#collapse")) {
+    collapsed = !collapsed;
+    try { localStorage.setItem("teamCollapsed", collapsed ? "1" : "0"); } catch {}
+    return renderTeam();
+  }
+  if (busy) return;
+  if (e.target.closest("#presetsBtn")) { e.stopPropagation(); togglePresets(); }
+});
+
+// ================================================================ preview
+const workUrl = () => `/work/${PID}/index.html`;
+let reloadTimer;
+function reloadPreview() {
+  if (replaying || !PID) return;
+  clearTimeout(reloadTimer);
+  reloadTimer = setTimeout(async () => {
+    let res;
+    try { res = await fetch(workUrl(), { method: "HEAD", cache: "no-store" }); }
+    catch { return; }   // server unreachable: keep showing the last preview; the banner explains
+    $("placeholder").style.display = res.ok ? "none" : "grid";
+    $("frameWrap").style.visibility = res.ok ? "visible" : "hidden";
+    if (!res.ok) return;
+    let y = 0; try { y = $("frame").contentWindow.scrollY; } catch {}
+    $("frame").onload = () => { try { $("frame").contentWindow.scrollTo(0, y); } catch {} };
+    $("frame").src = workUrl() + "?t=" + Date.now();
+  }, 150);
+}
+function flash(color) {
+  if (replaying) return;
+  const f = $("flash"); f.style.setProperty("--c", color);
+  f.classList.add("show"); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("show")));
+}
+$("reload").onclick = reloadPreview;
+$("open").onclick = () => window.open(workUrl(), "_blank");
+$("devices").onclick = (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  [...$("devices").children].forEach(x => x.classList.toggle("on", x === b));
+  $("frameWrap").className = "frame-wrap " + b.dataset.device;
+};
+$("tabs").onclick = (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  [...$("tabs").children].forEach(x => x.classList.toggle("on", x === b));
+  $("code").classList.toggle("on", b.dataset.tab === "code");
+  if (b.dataset.tab === "code") refreshCode();
+};
+
+// ================================================================ code view
+let fileCache = [];
+async function refreshCode(force = false) {
+  if (replaying || !$("code").classList.contains("on")) return;
+  try { fileCache = await api(`/api/projects/${PID}/files`); }
+  catch (err) { $("files").innerHTML = `<div class="msg error" style="margin:4px">${esc(err.message)}</div>`; return; }
+  if (fileCache.length && !fileCache.some(f => f.path === currentFile)) currentFile = fileCache[0].path;
+  const total = fileCache.reduce((n, f) => n + f.size, 0);
+  $("files").innerHTML = fileCache.map(f =>
+    `<button data-path="${esc(f.path)}" class="${f.path === currentFile ? "on" : ""} ${changed.has(f.path) ? "changed" : ""}" title="${esc(f.path)} · ${fmtSize(f.size)}">
+      ${icon(f.kind === "image" ? "image" : f.path.endsWith(".md") ? "file" : "code", { size: 14 })}<span>${esc(f.path)}</span><small>${fmtSize(f.size)}</small></button>`
+  ).join("") + (fileCache.length ? `<div class="files-total">${fileCache.length} file${fileCache.length === 1 ? "" : "s"} · ${fmtSize(total)}</div>`
+                                  : `<div class="msg system" style="padding:12px">No files yet</div>`);
+  const f = fileCache.find(f => f.path === currentFile);
+  $("codeName").textContent = f ? `${f.path} · ${fmtSize(f.size)}` : "";
+  if (editor.dirty && editor.path === currentFile && !force) return;   // never overwrite unsaved typing
+  showFileBody(f);
+}
+function showFileBody(f) {
+  const text = f && f.content !== null && f.content !== undefined;
+  $("source").hidden = !!f && !text;
+  $("fileNote").hidden = !f || text;
+  editor.path = text ? f.path : null; editor.saved = text ? f.content : ""; editor.dirty = false;
+  $("source").value = editor.saved;
+  if (f && !text) {
+    $("fileNote").innerHTML = f.kind === "image"
+      ? `<div><img src="${esc(f.url)}?t=${Date.now()}" alt="${esc(f.path)}"><b>${esc(f.path)}</b><p>Image · ${fmtSize(f.size)} — reference images can't be edited here.</p></div>`
+      : f.too_large
+      ? `<div><span class="tile">${icon("file", { size: 22 })}</span><b>Too large to open here</b><p>${esc(f.path)} is ${fmtSize(f.size)}; the editor opens files up to 500 KB. Download the .zip to edit it in your own editor.</p></div>`
+      : `<div><span class="tile">${icon("file", { size: 22 })}</span><b>Binary file</b><p>${esc(f.path)} (${fmtSize(f.size)}) isn't text, so it can't be shown here.</p></div>`;
+  }
+  updateEditorLock();
+}
+// ---------- editable code view (auto-save switch, Ctrl+S, Tab inserts spaces)
+const EDITABLE = /\.(html?|css|js|md|svg|json|txt|xml|webmanifest)$/i;
+const editor = { path: null, saved: "", dirty: false, timer: null, saving: false };
+let autosaveOn = true;
+try { autosaveOn = localStorage.getItem("autosave") !== "0"; } catch {}
+$("autosave").checked = autosaveOn;
+
+function updateEditorLock() {
+  $("source").readOnly = busy || !editor.path || !EDITABLE.test(editor.path);
+  updateEditorState();
+}
+function updateEditorState(msg, isErr = false) {
+  $("dirtyDot").hidden = !editor.dirty;
+  $("saveFile").hidden = autosaveOn;
+  $("saveFile").disabled = busy || !editor.dirty;
+  const st = $("saveState");
+  st.classList.toggle("err", isErr);
+  st.textContent = msg ?? (
+    !editor.path ? "" :
+    busy ? "Read-only while agents work" :
+    !EDITABLE.test(editor.path) ? "Read-only file type" :
+    editor.dirty ? (autosaveOn ? "Saving soon…" : "Unsaved changes") : "Saved");
+}
+async function saveFile() {
+  if (!editor.dirty || busy || editor.saving || !editor.path) return;
+  editor.saving = true;
+  const path = editor.path, content = $("source").value;
+  const bytes = new Blob([content]).size;
+  if (bytes > 500 * 1024) { editor.saving = false; return updateEditorState(`Too large to save here (${fmtSize(bytes)} — limit 500 KB)`, true); }
+  updateEditorState("Saving…");
+  try {
+    await api(`/api/projects/${PID}/files`, { method: "PUT", body: JSON.stringify({ path, content }) });
+    if (editor.path === path) { editor.saved = content; editor.dirty = $("source").value !== content; }
+    const cached = fileCache.find(f => f.path === path); if (cached) cached.content = content;
+    updateEditorState(editor.dirty ? undefined : "Saved");
+    reloadPreview();
+  } catch (err) {
+    updateEditorState(err.message, true);
+  } finally {
+    editor.saving = false;
+    if (editor.dirty && autosaveOn) scheduleSave();
+  }
+}
+function scheduleSave() { clearTimeout(editor.timer); editor.timer = setTimeout(saveFile, 800); }
+async function flushEdits() {
+  if (!editor.dirty) return true;
+  clearTimeout(editor.timer);
+  await saveFile();
+  if (editor.dirty) toast("Couldn't save your code edits first", "err");
+  return !editor.dirty;
+}
+$("source").addEventListener("input", () => {
+  editor.dirty = $("source").value !== editor.saved;
+  updateEditorState();
+  if (editor.dirty && autosaveOn) scheduleSave();
+});
+$("source").addEventListener("keydown", (e) => {
+  if (e.key === "Tab" && !$("source").readOnly) {
+    e.preventDefault();
+    const t = e.target; t.setRangeText("  ", t.selectionStart, t.selectionEnd, "end");
+    t.dispatchEvent(new Event("input"));
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); clearTimeout(editor.timer); saveFile(); }
+});
+$("saveFile").onclick = () => { clearTimeout(editor.timer); saveFile(); };
+$("autosave").onchange = () => {
+  autosaveOn = $("autosave").checked;
+  try { localStorage.setItem("autosave", autosaveOn ? "1" : "0"); } catch {}
+  updateEditorState();
+  if (autosaveOn && editor.dirty) scheduleSave();
+};
+$("files").onclick = async (e) => {
+  const b = e.target.closest("button"); if (!b || b.dataset.path === editor.path) return;
+  if (editor.dirty) {
+    if (autosaveOn) { if (!await flushEdits()) return; }
+    else if (!await confirmDialog({ title: "Discard changes?", text: `You have unsaved changes in ${editor.path}.`, ok: "Discard", danger: true })) return;
+  }
+  currentFile = b.dataset.path; changed.delete(currentFile); editor.dirty = false;
+  refreshCode(true);
+};
+$("copyCode").onclick = async () => {
+  try { await navigator.clipboard.writeText($("source").value); toast("File copied"); } catch { toast("Copy failed", "err"); }
+};
+window.addEventListener("beforeunload", (e) => { if (editor.dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+// ---------- reference images (attach button, paste, drag & drop)
+let attachments = [];   // { preview, path, url, loading }
+function renderAttachments() {
+  $("attachments").hidden = !attachments.length;
+  $("attachments").innerHTML = attachments.map((a, i) => `<div class="att ${a.loading ? "loading" : ""}" title="${a.loading ? "Uploading…" : esc(a.path)}">
+    <img src="${a.preview}" alt="Attached image"><button type="button" data-rm="${i}" aria-label="Remove image">${icon("x", { size: 12, stroke: 2 })}</button></div>`).join("");
+}
+async function addImages(files) {
+  for (const file of [...files]) {
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) { toast(`${file.name}: use PNG, JPG, WebP or GIF`, "err"); continue; }
+    if (file.size > 5e6) { toast(`${file.name} is over 5 MB`, "err"); continue; }
+    if (attachments.length >= 6) { toast("Up to 6 images per prompt", "err"); break; }
+    const data = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(file); });
+    const item = { preview: data, loading: true };
+    attachments.push(item); renderAttachments();
+    try { Object.assign(item, await api(`/api/projects/${PID}/uploads`, { method: "POST", body: JSON.stringify({ name: file.name, data }) }), { loading: false }); }
+    catch (err) { attachments = attachments.filter(x => x !== item); toast(err.message, "err"); }
+    renderAttachments();
+  }
+}
+$("attach").onclick = () => $("fileInput").click();
+$("fileInput").onchange = () => { addImages($("fileInput").files); $("fileInput").value = ""; };
+$("attachments").onclick = (e) => { const b = e.target.closest("[data-rm]"); if (b) { attachments.splice(+b.dataset.rm, 1); renderAttachments(); } };
+$("input").addEventListener("paste", (e) => {
+  const imgs = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith("image/"));
+  if (imgs.length) { e.preventDefault(); addImages(imgs); }
+});
+["dragenter", "dragover"].forEach(t => $("composer").addEventListener(t, (e) => {
+  if ([...e.dataTransfer.types].includes("Files")) { e.preventDefault(); $("composer").classList.add("drag"); }
+}));
+["dragleave", "drop"].forEach(t => $("composer").addEventListener(t, () => $("composer").classList.remove("drag")));
+$("composer").addEventListener("drop", (e) => { if (e.dataTransfer.files.length) { e.preventDefault(); addImages(e.dataTransfer.files); } });
+
+// ---------- retry one agent
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-retry]"); if (!b) return;
+  if (busy) return toast("Agents are working — wait or stop them first");
+  const a = BY_ID[b.dataset.retry];
+  const note = await promptDialog({
+    title: `Retry ${a?.name || "agent"}?`, ok: "Retry", optional: true, multiline: true, max: 500,
+    text: `Only the ${a?.name} agent runs again, on the last request. A version of the current code is saved first, so you can go back.`,
+    label: "Extra instruction", placeholder: "e.g. use a warmer palette and bigger headings",
+  });
+  if (note === null || !await flushEdits()) return;
+  wsSend({ type: "retry", agent: a.id, note });
+});
+
+// ---------- panels (versions, stats)
+function ensurePanel(id, title, iconName, actions = "") {
+  let d = $(id);
+  if (d) return d;
+  d = document.createElement("dialog");
+  d.className = "panel"; d.id = id;
+  d.innerHTML = `<div class="panel-head"><h2>${icon(iconName, { size: 22 })}${esc(title)}</h2><span class="spacer"></span>${actions}
+    <button class="icon-btn plain" data-close title="Close" aria-label="Close">${icon("x", { size: 18 })}</button></div><div class="panel-body"></div>`;
+  d.addEventListener("click", (e) => { if (e.target === d || e.target.closest("[data-close]")) d.close(); });
+  document.body.append(d);
+  return d;
+}
+
+// ---------- versions
+const vfolder = (n) => `/work/.versions/${PID}/${String(n).padStart(4, "0")}/index.html`;
+function openHistory() {
+  ensurePanel("historyPanel", "Versions", "history",
+    `<button class="btn btn-dark btn-sm" id="saveVersion">${icon("save", { size: 14 })}Save version now</button>`).showModal();
+  loadVersions();
+}
+async function loadVersions() {
+  const body = $("historyPanel").querySelector(".panel-body");
+  let list;
+  try { list = await api(`/api/projects/${PID}/versions`); }
+  catch (err) { return showError(body, err, loadVersions, "Couldn't load the versions"); }
+  body.innerHTML = `<p class="note">${icon("alert", { size: 14 })}<span>A version is saved before every run and after each agent. Restoring saves the current code first, so you can always come back.</span></p>` +
+    (list.length ? `<div class="vlist">${list.map((v, i) => {
+      const a = BY_ID[v.agent];
+      const ic = a ? a.icon : v.kind === "manual" ? "save" : v.kind === "backup" ? "history" : "file";
+      return `<div class="vrow ${i === 0 ? "current" : ""}">
+        <div class="vn"><span class="tile" style="--c:${a?.color || "#766a7c"}">${icon(ic, { size: 16 })}</span>v${v.n}</div>
+        <div><b>${esc(v.label)}</b> ${i === 0 ? `<span class="badge">latest</span>` : ""}
+          <small>${ago(v.ts)} · ${v.files} file${v.files === 1 ? "" : "s"} · ${(v.size / 1024).toFixed(1)} KB${v.request ? ` · “${esc(v.request)}”` : ""}</small></div>
+        <div class="vact">
+          <a class="icon-btn plain" href="${vfolder(v.n)}" target="_blank" rel="noopener" title="Open this version">${icon("external", { size: 16 })}</a>
+          <button class="icon-btn plain" data-vdiff="${v.n}" title="Compare with the current code">${icon("compare", { size: 16 })}</button>
+          <a class="icon-btn plain" href="/api/projects/${PID}/versions/${v.n}/download" title="Download this version as .zip">${icon("download", { size: 16 })}</a>
+          <button class="btn btn-ghost btn-sm" data-vrestore="${v.n}">Restore</button>
+        </div></div>`;
+    }).join("")}</div>` : `<p class="note">No versions yet — they appear when the first run starts.</p>`);
+}
+async function showDiff(n) {
+  const body = $("historyPanel").querySelector(".panel-body");
+  body.innerHTML = `<p class="note">Comparing…</p>`;
+  let files;
+  try { files = await api(`/api/projects/${PID}/versions/${n}/diff`); }
+  catch (err) { return showError(body, err, () => showDiff(n), `Couldn't compare v${n}`); }
+  body.innerHTML = `<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" data-vback>${icon("arrow-right", { size: 14, cls: "flip" })}All versions</button>
+      <span class="note" style="margin:0">Changes from <b>v${n}</b> to the current code</span><span class="spacer"></span>
+      <button class="btn btn-dark btn-sm" data-vrestore="${n}">Restore v${n}</button></div>` +
+    (files.length ? files.map((f, i) => `<details class="difffile" ${i < 4 ? "open" : ""}>
+      <summary>${icon(f.status === "added" ? "file-plus" : f.status === "removed" ? "trash" : "pencil", { size: 14 })}${esc(f.path)}
+        <span class="badge">${f.status}</span><span class="spacer"></span><span class="plus">+${f.added}</span><span class="minus">−${f.removed}</span></summary>
+      <pre>${f.diff.split("\n").map(l => `<span class="${l.startsWith("@@") ? "h" : l.startsWith("+") ? "a" : l.startsWith("-") ? "r" : ""}">${esc(l) || " "}</span>`).join("")}</pre>
+    </details>`).join("") : `<p class="note">No differences — the current code is identical to v${n}.</p>`);
+}
+document.addEventListener("click", async (e) => {
+  const diff = e.target.closest("[data-vdiff]"), restore = e.target.closest("[data-vrestore]");
+  if (e.target.closest("[data-vback]")) return loadVersions();
+  if (diff) return showDiff(+diff.dataset.vdiff);
+  if (e.target.closest("#saveVersion")) {
+    if (busy) return toast("Versions are saved automatically while agents work");
+    if (!await flushEdits()) return;
+    const label = await promptDialog({ title: "Save a version", label: "Label", placeholder: "e.g. Before trying a dark theme", ok: "Save version", optional: true, max: 80 });
+    if (label === null) return;
+    try { const v = await api(`/api/projects/${PID}/versions`, { method: "POST", body: JSON.stringify({ label }) }); toast(`Saved as v${v.n}`); loadVersions(); }
+    catch (err) { toast(err.message, "err"); }
+  }
+  if (restore) {
+    const n = +restore.dataset.vrestore;
+    if (busy) return toast("Agents are working — restore when they finish");
+    if (!await confirmDialog({ title: `Restore version ${n}?`, ok: "Restore",
+      text: "The project's code goes back to this version. The current code is saved as a new version first, so nothing is lost." })) return;
+    if (!await flushEdits()) return;
+    try { await api(`/api/projects/${PID}/versions/${n}/restore`, { method: "POST" }); }
+    catch (err) { toast(err.message, "err"); }
+  }
+});
+$("historyBtn").onclick = openHistory;
+
+// ---------- stats (cost & time)
+let statsScope = "project";
+function openStats() {
+  const d = ensurePanel("statsPanel", "Cost & time", "chart",
+    `<div class="seg" id="statsScope"><button data-scope="project" class="on">This project</button><button data-scope="all">All projects</button></div>`);
+  d.showModal();
+  loadStats();
+}
+async function loadStats() {
+  const body = $("statsPanel").querySelector(".panel-body");
+  let data;
+  try { data = await api(`/api/stats${statsScope === "project" ? `?project=${PID}` : ""}`); }
+  catch (err) { return showError(body, err, loadStats, "Couldn't load the stats"); }
+  const t = data.totals, maxCost = Math.max(...data.agents.map(a => a.cost), 1e-9), maxSec = Math.max(...data.agents.map(a => a.seconds), 1e-9);
+  const where = statsScope === "project" ? "in this project " : "";
+  body.innerHTML = `
+    <div class="kpis">
+      <div class="kpi"><b>${money(t.cost)}</b><span>estimated cost</span></div>
+      <div class="kpi"><b>${duration(t.seconds)}</b><span>total agent time</span></div>
+      <div class="kpi"><b>${t.runs}</b><span>agent runs${t.failed ? ` · ${t.failed} stopped or failed` : ""}</span></div>
+      <div class="kpi"><b>${compact(t.tokens_in + t.tokens_out)}</b><span>tokens · ${compact(t.tokens_in)} in · ${compact(t.tokens_out)} out</span></div>
+    </div>
+    <p class="note">${icon("alert", { size: 14 })}<span>Cost is the API-equivalent estimate Claude Code reports for each agent run. On a Claude subscription you aren't billed per call, but it shows which agents use the most.</span></p>
+    ${data.agents.length ? `
+    <h4 class="sec">Per agent</h4>
+    <table class="stable"><thead><tr><th>Agent</th><th>Model</th><th class="num">Runs</th><th class="num">Avg time</th><th>Time share</th><th class="num">Avg cost</th><th>Cost share</th><th class="num">Total cost</th></tr></thead><tbody>
+    ${data.agents.map(a => `<tr>
+      <td><span class="ag"><span class="tile" style="--c:${a.color}">${icon(a.icon, { size: 14 })}</span>${esc(a.name)}</span></td>
+      <td class="mono">${esc(a.models.map(m => m.replace(/^claude-/, "")).join(", ") || "—")}</td>
+      <td class="num">${a.runs}${a.done < a.runs ? ` <span style="color:var(--stone)">(${a.runs - a.done} not finished)</span>` : ""}</td>
+      <td class="num">${duration(a.avg_seconds)}</td>
+      <td><div class="sbar" title="${duration(a.seconds)}"><i style="width:${(a.seconds / maxSec * 100).toFixed(1)}%"></i></div></td>
+      <td class="num">${money(a.avg_cost)}</td>
+      <td><div class="sbar" title="${money(a.cost)}"><i style="width:${(a.cost / maxCost * 100).toFixed(1)}%"></i></div></td>
+      <td class="num">${money(a.cost)}</td></tr>`).join("")}
+    </tbody></table>
+    <h4 class="sec">Recent agent runs</h4>
+    <table class="stable"><thead><tr><th>Agent</th>${statsScope === "all" ? "<th>Project</th>" : ""}<th>Request</th><th class="num">Time</th><th class="num">Tokens</th><th class="num">Cost</th><th class="num">When</th></tr></thead><tbody>
+    ${data.recent.map(e => `<tr>
+      <td><span class="status-dot ${e.status}" title="${e.status}"></span>${esc(BY_ID[e.agent]?.name || e.agent)}</td>
+      ${statsScope === "all" ? `<td>${esc(e.project_name)}</td>` : ""}
+      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${esc(e.request || "")}">${esc(e.request || "")}</td>
+      <td class="num">${duration(e.seconds || 0)}</td><td class="num">${compact((e.tokens_in || 0) + (e.tokens_out || 0))}</td>
+      <td class="num">${e.cost ? money(e.cost) : "—"}</td><td class="num">${ago(e.ts)}</td></tr>`).join("")}
+    </tbody></table>` : `<p class="note">No agent has run ${where}yet. Stats appear after the first run.</p>`}`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("#statsScope [data-scope]"); if (!b) return;
+  statsScope = b.dataset.scope;
+  document.querySelectorAll("#statsScope button").forEach(x => x.classList.toggle("on", x === b));
+  loadStats();
+});
+$("statsBtn").onclick = openStats;
+
+// ---------- team presets
+let presets = [];
+async function loadPresets() { try { presets = await api("/api/presets"); } catch { presets = []; } }
+function matchingPreset() {
+  const cur = [...selected].sort().join(",");
+  return presets.find(p => p.agents.length && [...p.agents].sort().join(",") === cur);
+}
+function togglePresets(open) {
+  const m = $("presetsMenu"); if (!m) return;
+  const show = open ?? !m.classList.contains("open");
+  if (show) renderPresetsMenu();
+  m.classList.toggle("open", show);
+}
+function renderPresetsMenu() {
+  const cur = matchingPreset();
+  $("presetsMenu").innerHTML = presets.map(p => `
+    <button class="mi ${cur?.id === p.id ? "on" : ""}" data-preset="${esc(p.id)}" role="menuitem">
+      ${icon(cur?.id === p.id ? "check" : p.builtin ? "users" : "sliders", { size: 15 })}
+      <span><b>${esc(p.name)} <span class="badge">${p.agents.length}</span></b>
+      <small>${esc(p.description || p.agents.map(id => BY_ID[id]?.name || id).join(", "))}</small></span>
+      ${p.builtin ? "" : `<span class="del" data-preset-del="${esc(p.id)}" title="Delete preset">${icon("trash", { size: 14 })}</span>`}
+    </button>`).join("") +
+    `<hr><button class="mi" data-preset-save role="menuitem">${icon("plus", { size: 15 })}<span><b>Save current team as a preset…</b><small>${selected.size} agent${selected.size === 1 ? "" : "s"} on</small></span></button>`;
+}
+document.addEventListener("click", async (e) => {
+  const menu = $("presetsMenu");
+  if (!menu?.classList.contains("open")) return;
+  const del = e.target.closest("[data-preset-del]"), pick = e.target.closest("[data-preset]"), save = e.target.closest("[data-preset-save]");
+  if (del) {
+    e.stopPropagation();
+    const p = presets.find(x => x.id === del.dataset.presetDel);
+    togglePresets(false);
+    if (!await confirmDialog({ title: `Delete “${p.name}”?`, text: "The preset is removed. Your agents are not changed.", ok: "Delete", danger: true })) return;
+    try { await api(`/api/presets/${encodeURIComponent(p.id)}`, { method: "DELETE" }); await loadPresets(); renderTeamHead(); toast("Preset deleted"); }
+    catch (err) { toast(err.message, "err"); }
+  } else if (pick) {
+    const p = presets.find(x => x.id === pick.dataset.preset);
+    togglePresets(false);
+    if (p && !busy) { selected = new Set(p.agents); saveSelection(); toast(`Team set to “${p.name}”`); }
+  } else if (save) {
+    togglePresets(false);
+    const name = await promptDialog({ title: "Save team as a preset", label: "Preset name", placeholder: "e.g. Landing page sprint", ok: "Save preset", max: 40,
+      text: `${selected.size} agents: ${AGENTS.filter(a => selected.has(a.id)).map(a => a.name).join(", ")}.` });
+    if (!name) return;
+    try { await api("/api/presets", { method: "POST", body: JSON.stringify({ name, agents: [...selected] }) }); await loadPresets(); renderTeamHead(); toast(`Preset “${name}” saved`); }
+    catch (err) { toast(err.message, "err"); }
+  } else if (!e.target.closest("#presetsMenu, #presetsBtn")) togglePresets(false);
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") togglePresets(false); });
+
+boot();
+</script>
+</body>
+</html>
