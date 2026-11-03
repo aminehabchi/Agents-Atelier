@@ -138,7 +138,8 @@ Set these in front of the command, for example `AGENT_MODEL=sonnet PORT=9000 ./r
 
 ### Your first page in five steps
 
-1. **Create a project.** On the **Projects** page, click **New project**, then give it a name and a description.
+1. **Create a project.** On the **Projects** page, click **New project**, then give it a name, a description and its
+   pages (one per line: *Home, About, Contact* — or just *Home* for a single page).
    Both are required, and the agents read them with every prompt. Example: *"Lumen Bikes — a repair shop in Lyon.
    One page that makes people book a repair: services with prices, opening hours, location."*
 2. **Describe the page.** *"A one-page site with a hero and a booking button, services with prices, opening hours
@@ -168,16 +169,33 @@ Set these in front of the command, for example `AGENT_MODEL=sonnet PORT=9000 ./r
 | Chat                       | Prompt the team, attach reference images, stop a run                                     |
 | Agent cards                | See each agent's steps, time and cost; **retry** that agent with an extra instruction   |
 | After a stop or an error   | **Continue** from the stopped agent (finished ones are skipped) or **Start again**       |
-| Preview                    | The live page at desktop, tablet or phone width, or open it in a new tab                 |
+| Preview                    | The live page at desktop, tablet or phone width, a page switcher for multi-page sites, or open it in a new tab |
 | Code                       | Edit any file, with **Auto-save** on or off (Save button or Ctrl/Cmd+S)                  |
 | Versions (clock button)    | A version after every agent: open, compare line by line, download or restore            |
 | Cost & time (chart button) | Estimated cost, time and tokens per agent, for this project or all projects              |
 | Team panel                 | Switch agents on or off, choose a preset, jump to an agent's card, follow progress       |
 
+### Multi-page sites
+
+Give a project several pages (Home, About, Contact…) when you create it, or later under **Edit name, description
+and pages**. The first page is always `index.html`; the others get file names from their titles (`about.html`,
+`contact.html`). Every agent receives the page list. The UX agent plans each page, the Copywriter writes text per page,
+and the HTML agent builds every page with the same header, navigation and footer and shared `style.css` / `script.js`.
+In the studio, the page switcher above the preview shows any page, and marks pages that aren't built yet.
+
+### Command palette and dark mode
+
+- Press **Ctrl+K** (⌘K on a Mac), or the search button in the header, on any page. Jump to any project, agent, team or
+  page, or run an action: new project, import or export, theme, and in the studio: versions, cost & time, download,
+  stop, continue, switch view, device or page.
+- The theme button in the header cycles **system → light → dark**. Your choice is remembered in the browser.
+  Generated pages keep their own colours.
+
 ### Keyboard shortcuts
 
 | Keys                    | Action                                         |
 |-------------------------|------------------------------------------------|
+| `Ctrl+K` / `⌘K`         | Command palette (any page)                     |
 | `Enter` / `Shift+Enter` | Send the prompt / new line                     |
 | `Ctrl+S`                | Save the open file in the Code tab             |
 | `Esc`                   | Close a menu, dialog or the projects drawer    |
@@ -250,6 +268,20 @@ reusing the CSS variables in :root. Don't change the light theme.
 - **The number in the file name sets the order.** Drag agents on the Agents page to reorder them.
 - **`agents/_common.md`** holds the shared rules every agent follows. Edit it to change what all agents know.
 - Full details are in [doc.md](doc.md#3-agents).
+
+## Sharing agents and teams
+
+| Export                          | Where                                   | File                                             |
+|---------------------------------|-----------------------------------------|--------------------------------------------------|
+| One agent                       | its page → **Export**                   | `<id>.md`: the agent file itself                 |
+| One team, with its agents       | its page → **Export**                   | `team-<id>.json`                                 |
+| Everything                      | Agents or Teams page → **Export all**   | `.zip` with all agents, shared rules and your teams |
+
+**Import** (Agents or Teams page, or the command palette) accepts any of these files. You always see a preview first:
+what will be added, replaced, kept, or can't be imported, and why. When something with the same id already exists,
+choose **Keep both** (it's imported as a copy, e.g. `dark-mode-2`), **Replace mine** or **Keep mine**. Imported agents
+are checked like new ones. A model your machine doesn't know is cleared to the default, with a note. Shared rules are
+only replaced when you choose **Replace mine**.
 
 ## Good to know
 

@@ -22,3 +22,5 @@ In the body:
 - Section headings that read well as an outline.
 
 Don't rewrite visible copy beyond the <h1> or headings, and don't add keyword stuffing or hidden text.
+
+Multi-page sites: give every page its own title, meta description and Open Graph tags; put the JSON-LD on the home page.

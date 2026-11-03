@@ -1,13 +1,36 @@
 /* Shared tokens and components for every Agents Atelier page. */
+/* Light is the default; [data-theme="dark"] is set by ui.js (from the toggle or the system setting). */
 :root {
   --ink: #1b0624; --espresso: #160f0c; --ash: #766a7c; --graphite: #444444; --stone: #898683; --charcoal: #292421;
   --paper: #ffffff; --linen: #f7f7f5; --bone: #edece7; --mist: #eeeeee;
-  --line: rgba(27, 6, 36, .10); --line-strong: rgba(27, 6, 36, .22);
+  --line: rgb(var(--fg-rgb) / .10); --line-strong: rgb(var(--fg-rgb) / .22);
   --ring: rgba(0, 0, 0, .05) 0 0 0 1px inset;
   --danger: #9b2c2c;
+  --on-espresso: #ffffff;           /* text and icons on espresso (dark) fills */
+  --on-espresso-rgb: 255 255 255;
+  --fg-rgb: 27 6 36;                /* base for translucent lines, scrollbars and shadows */
+  --knob: #ffffff;                  /* switch knobs */
+  --scrim: rgba(27, 6, 36, .28);    /* behind dialogs */
+  --ok: #1f7a3f;
+  --add-bg: #e8f5ec; --add-fg: #1f5a33; --del-bg: #fbeaea; --del-fg: #7f2222;
+  color-scheme: light;
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   font-feature-settings: "cv03", "cv04", "cv09", "cv11";
 }
+:root[data-theme="dark"] {
+  --ink: #f1ecf3; --espresso: #ece5dc; --ash: #a99db0; --graphite: #c9c3be; --stone: #918b86; --charcoal: #e0d9d2;
+  --paper: #1c1917; --linen: #121010; --bone: #2a2522; --mist: #24201e;
+  --fg-rgb: 255 248 240;
+  --ring: rgba(255, 248, 240, .07) 0 0 0 1px inset;
+  --danger: #f09090;
+  --on-espresso: #17110e; --on-espresso-rgb: 23 17 14;
+  --knob: #1c1917;
+  --scrim: rgba(0, 0, 0, .6);
+  --ok: #7fd59a;
+  --add-bg: #15301f; --add-fg: #a6e8bb; --del-bg: #3a1a1a; --del-fg: #f5b5b5;
+  color-scheme: dark;
+}
+
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--linen); color: var(--ink); -webkit-font-smoothing: antialiased; }
@@ -27,24 +50,24 @@ p, li { text-wrap: pretty; }
 /* ---------- scrollbars: thin, rounded, warm ---------- */
 ::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(27, 6, 36, .16); border-radius: 999px; border: 4px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-thumb:hover { background-color: rgba(27, 6, 36, .34); }
-::-webkit-scrollbar-thumb:active { background-color: rgba(27, 6, 36, .5); }
+::-webkit-scrollbar-thumb { background: rgb(var(--fg-rgb) / .16); border-radius: 999px; border: 4px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--fg-rgb) / .34); }
+::-webkit-scrollbar-thumb:active { background-color: rgb(var(--fg-rgb) / .5); }
 ::-webkit-scrollbar-corner { background: transparent; }
 @supports not selector(::-webkit-scrollbar) {
-  * { scrollbar-width: thin; scrollbar-color: rgba(27, 6, 36, .22) transparent; }
+  * { scrollbar-width: thin; scrollbar-color: rgb(var(--fg-rgb) / .22) transparent; }
 }
 .btn[aria-disabled="true"], .icon-btn[aria-disabled="true"] { opacity: .35; pointer-events: none; cursor: default; }
 
 /* ---------- buttons ---------- */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; padding: 0 18px; height: 40px; font-size: 14px; line-height: 1;
   border: 1px solid transparent; white-space: nowrap; text-decoration: none; transition: background .2s, border-color .2s, color .2s; }
-.btn-dark { background: var(--espresso); color: #fff; }
+.btn-dark { background: var(--espresso); color: var(--on-espresso); }
 .btn-dark:hover { background: var(--charcoal); }
 .btn-ghost { background: transparent; border-color: var(--line-strong); color: var(--ink); }
 .btn-ghost:hover { border-color: var(--graphite); background: var(--paper); }
-.btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover { background: #7f2222; }
+.btn-danger { background: var(--danger); color: var(--paper); }
+.btn-danger:hover { filter: brightness(.9); }
 .btn-sm { padding: 0 12px; height: 32px; font-size: 13px; gap: 6px; }
 .btn-lg { border-radius: 60px; padding: 0 30px; height: 60px; font-size: 16px; gap: 10px; }
 .icon-btn { background: var(--paper); border: 1px solid var(--line); border-radius: 999px; width: 36px; height: 36px; flex: none;
@@ -56,7 +79,7 @@ p, li { text-wrap: pretty; }
 
 /* ---------- brand ---------- */
 .logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; letter-spacing: -.02em; text-decoration: none; font-size: 16px; }
-.logo .mark { width: 32px; height: 32px; border-radius: 9px; background: var(--espresso); color: #fff; display: grid; place-items: center; flex: none; }
+.logo .mark { width: 32px; height: 32px; border-radius: 9px; background: var(--espresso); color: var(--on-espresso); display: grid; place-items: center; flex: none; }
 
 /* ---------- inputs ---------- */
 .input { background: var(--mist); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; font: inherit; font-size: 15px; outline: none; }
@@ -68,21 +91,21 @@ p, li { text-wrap: pretty; }
 
 /* ---------- badges ---------- */
 .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 0 10px; height: 22px; line-height: 1; font-size: 12px; white-space: nowrap; background: var(--bone); color: var(--graphite); }
-.badge.live { background: var(--espresso); color: #fff; }
-.badge.live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: blink 1s infinite; }
+.badge.live { background: var(--espresso); color: var(--on-espresso); }
+.badge.live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--on-espresso); animation: blink 1s infinite; }
 @keyframes blink { 50% { opacity: .25; } }
 
 /* ---------- dialog ---------- */
 dialog.modal { border: 0; border-radius: 24px; padding: 28px; width: min(420px, calc(100vw - 32px)); background: var(--paper); color: var(--ink);
   box-shadow: var(--ring); }
-dialog.modal::backdrop { background: rgba(27, 6, 36, .28); backdrop-filter: blur(2px); }
+dialog.modal::backdrop { background: var(--scrim); backdrop-filter: blur(2px); }
 dialog.modal h3 { margin: 0 0 8px; font-weight: 400; font-size: 24px; letter-spacing: -.02em; }
 dialog.modal p { margin: 0 0 24px; color: var(--graphite); font-size: 15px; line-height: 1.55; }
 dialog.modal .row { display: flex; gap: 8px; justify-content: flex-end; }
 
 /* ---------- toast ---------- */
 .toasts { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: grid; gap: 8px; z-index: 100; pointer-events: none; }
-.toast { display: flex; align-items: center; gap: 8px; background: var(--espresso); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 14px;
+.toast { display: flex; align-items: center; gap: 8px; background: var(--espresso); color: var(--on-espresso); padding: 10px 16px; border-radius: 999px; font-size: 14px;
   animation: toast-in .25s ease; }
 .toast.err { background: var(--danger); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
@@ -115,3 +138,38 @@ dialog.project-modal .row { margin-top: 8px; }
   color: var(--danger); font-size: 13px; border-bottom: 1px solid color-mix(in srgb, var(--danger) 25%, transparent); }
 .conn-banner .spacer { flex: 1; }
 .conn-banner .btn { height: 28px; }
+
+/* ---------- header tools (search + theme), added by ui.js ---------- */
+.hdr-tools { display: inline-flex; gap: 6px; align-items: center; }
+header.top .hdr-tools { margin-left: auto; margin-right: -12px; }
+.links + .hdr-tools { margin-left: 0; }
+
+/* ---------- command palette ---------- */
+dialog.palette { border: 0; padding: 0; width: min(640px, calc(100vw - 24px)); margin: 10vh auto auto; border-radius: 20px; background: var(--paper); color: var(--ink);
+  box-shadow: var(--ring), 0 24px 60px rgb(0 0 0 / .25); overflow: hidden; }
+dialog.palette::backdrop { background: var(--scrim); backdrop-filter: blur(2px); }
+.pal-input { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); color: var(--stone); }
+.pal-input input { flex: 1; border: 0; outline: none; background: transparent; color: var(--ink); font: inherit; font-size: 16px; }
+.pal-list { max-height: min(60vh, 460px); overflow-y: auto; padding: 6px; }
+.pal-group { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--stone); padding: 10px 12px 4px; }
+.pal-item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: none; border: 0; padding: 9px 12px; border-radius: 12px; color: var(--graphite); }
+.pal-item span { min-width: 0; }
+.pal-item b { display: block; font-weight: 500; color: var(--ink); font-size: 14px; }
+.pal-item small { display: block; font-size: 12px; color: var(--stone); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 520px; }
+.pal-item.on { background: var(--bone); }
+.pal-empty { padding: 20px; text-align: center; color: var(--stone); font-size: 14px; margin: 0; }
+.pal-foot { display: flex; gap: 16px; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--stone); }
+dialog.palette kbd, .pal-foot kbd { font: 11px ui-monospace, monospace; background: var(--linen); border-radius: 5px; padding: 1px 6px; box-shadow: var(--ring); margin-right: 2px; }
+
+/* ---------- import dialog ---------- */
+dialog.import-modal { width: min(600px, calc(100vw - 32px)); }
+.imp-list { list-style: none; margin: 4px 0 8px; padding: 0; max-height: 46vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.imp-list li { display: flex; gap: 10px; align-items: flex-start; background: var(--linen); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.imp-list .imp-kind { color: var(--stone); margin-top: 2px; }
+.imp-list .imp-main { flex: 1; min-width: 0; }
+.imp-list .imp-main b { font-weight: 500; }
+.imp-list small { display: block; color: var(--stone); font-size: 12px; margin-top: 2px; }
+.imp-list .imp-error { box-shadow: inset 0 0 0 1px var(--danger); }
+.imp-list .imp-error .badge { color: var(--danger); }
+.imp-list .imp-same, .imp-list .imp-skip { opacity: .65; }
+dialog.import-modal select.input { width: 100%; }

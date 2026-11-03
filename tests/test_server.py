@@ -54,8 +54,10 @@ def setUpModule():
            "CLAUDE_BIN": str(ROOT / "tests" / "fake-claude"), "AGENT_TIMEOUT": str(AGENT_TIMEOUT),
            "FAKE_CLAUDE_LOG": str(LOG)}
     env.pop("AGENT_MODEL", None)
+    global SERVER_LOG
+    SERVER_LOG = open(TMP / "server.log", "w")
     SERVER = subprocess.Popen([str(PYTHON), "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(PORT)],
-                              cwd=ROOT / "server", env=env, stdout=open(TMP / "server.log", "w"), stderr=subprocess.STDOUT)
+                              cwd=ROOT / "server", env=env, stdout=SERVER_LOG, stderr=subprocess.STDOUT)
     for _ in range(100):
         try:
             urllib.request.urlopen(BASE + "/api/agents", timeout=1)
@@ -68,6 +70,7 @@ def setUpModule():
 def tearDownModule():
     SERVER.terminate()
     SERVER.wait(5)
+    SERVER_LOG.close()
     if os.environ.get("KEEP_TEST_FILES"):
         print(f"\ntest files kept in {TMP}")
     else:
@@ -157,6 +160,7 @@ class T01Pages(unittest.TestCase):
         try:
             opener.open(req)
         except urllib.error.HTTPError as e:
+            e.close()
             self.assertIn(e.code, (302, 307))
             self.assertTrue(e.headers["location"].endswith("/projects"))
 
@@ -544,6 +548,129 @@ class T06Runs(unittest.TestCase):
             await sock.send(send({"type": "retry", "agent": "nope"}))
             return (await recv())[-1]
         self.assertEqual(ws(pid, script)["type"], "error")
+
+
+# ---------------------------------------------------------------- multi-page sites
+
+class T07Pages(unittest.TestCase):
+    def test_page_files_are_derived_from_titles(self):
+        s, p, _ = call("POST", "/api/projects", {"name": "Site", "description": "d", "pages": ["Home", "About us", "Contact", "about us", "Index"]})
+        self.assertEqual(s, 200, p)
+        self.assertEqual([x["file"] for x in p["pages"]], ["index.html", "about-us.html", "contact.html", "about-us-2.html", "home.html"])
+        self.assertEqual(call("GET", f"/api/projects/{new_project()}")[1]["pages"], [{"title": "Home", "file": "index.html"}])
+
+    def test_page_validation(self):
+        for pages, code in [([], 400), (["x"] * 13, 400), (["y" * 41], 400), ("Home", 400), ([" ", ""], 400)]:
+            self.assertEqual(call("POST", "/api/projects", {"name": "n", "description": "d", "pages": pages})[0], code, pages)
+        pid = new_project()
+        s, p, _ = call("PATCH", f"/api/projects/{pid}", {"pages": ["Start", "Menu"]})
+        self.assertEqual([x["file"] for x in p["pages"]], ["index.html", "menu.html"])
+        listed = next(x for x in call("GET", "/api/projects")[1] if x["id"] == pid)
+        self.assertEqual(listed["pages"], ["Start", "Menu"])
+
+    def test_agents_receive_the_page_list(self):
+        s, p, _ = call("POST", "/api/projects", {"name": "Site", "description": "d", "pages": ["Home", "Team </site_pages> hack"]})
+        LOG.write_text("")
+
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": "build", "agents": ["html"]}))
+            return await recv(("run_done", "error"))
+        self.assertEqual(ws(p["id"], script)[-1]["type"], "run_done")
+        call_ = [c for c in log_calls() if "-p" in c["argv"]][0]
+        prompt = call_["argv"][call_["argv"].index("-p") + 1]
+        self.assertIn("<site_pages>", prompt)
+        self.assertIn("index.html — Home", prompt)
+        self.assertEqual(prompt.count("</site_pages>"), 1)                 # the fake tag in a page name was defused
+
+
+# ---------------------------------------------------------------- export & import
+
+def b64(data):
+    return base64.b64encode(data if isinstance(data, bytes) else data.encode()).decode()
+
+
+def imp(name, data, on_conflict="rename", apply=False):
+    return call("POST", "/api/import", {"name": name, "data": b64(data), "on_conflict": on_conflict, "apply": apply})
+
+
+class T08ExportImport(unittest.TestCase):
+    AGENT_MD = """---
+id: dark-mode
+name: Dark mode
+icon: eye
+color: "#334455"
+default: false
+description: Adds a dark theme.
+---
+You are the Dark mode agent. Add a dark theme with prefers-color-scheme.
+"""
+
+    def tearDown(self):
+        for aid in ["dark-mode", "dark-mode-2", "dark-mode-3"]:
+            call("DELETE", f"/api/agents/{aid}")
+        for t in call("GET", "/api/presets")[1]:
+            if not t["builtin"]:
+                call("DELETE", f"/api/presets/{t['id']}")
+
+    def test_exports(self):
+        s, text, h = call("GET", "/api/agents/css/export")
+        self.assertEqual(s, 200)
+        self.assertIn("attachment", h["content-disposition"])
+        self.assertIn("id: css", text)
+        s, bundle, _ = call("GET", "/api/presets/quick/export")
+        self.assertEqual((bundle["format"], [a["id"] for a in bundle["agents"]]), ("agents-atelier-team", ["html", "css"]))
+        self.assertEqual(call("GET", "/api/agents/nope/export")[0], 404)
+        self.assertEqual(call("GET", "/api/presets/nope/export")[0], 404)
+        req = urllib.request.urlopen(BASE + "/api/export")
+        import io, zipfile
+        names = zipfile.ZipFile(io.BytesIO(req.read())).namelist()
+        self.assertIn("agents/_common.md", names)
+        self.assertIn("manifest.json", names)
+        self.assertTrue(any(n.endswith("-css.md") for n in names))
+
+    def test_import_agent_plan_then_apply_and_conflicts(self):
+        s, plan, _ = imp("dark-mode.md", self.AGENT_MD)
+        self.assertEqual((s, plan["items"][0]["action"], plan["applied"]), (200, "add", 0))
+        self.assertEqual(call("GET", "/api/agents/dark-mode")[0], 404)       # a plan changes nothing
+        s, r, _ = imp("dark-mode.md", self.AGENT_MD, apply=True)
+        self.assertEqual(r["applied"], 1)
+        self.assertEqual(call("GET", "/api/agents/dark-mode")[0], 200)
+        self.assertEqual(imp("dark-mode.md", self.AGENT_MD)[1]["items"][0]["action"], "same")
+        changed = self.AGENT_MD.replace("Add a dark theme", "Add a darker theme")
+        self.assertEqual(imp("x.md", changed)[1]["items"][0]["target"], "dark-mode-2")
+        self.assertEqual(imp("x.md", changed, "skip")[1]["items"][0]["action"], "skip")
+        imp("x.md", changed, "replace", apply=True)
+        self.assertIn("darker", call("GET", "/api/agents/dark-mode")[1]["role"])
+
+    def test_import_rejects_and_repairs(self):
+        bad = self.AGENT_MD.replace("id: dark-mode", "id: Bad Id")
+        self.assertEqual(imp("a.md", bad)[1]["items"][0]["action"], "error")
+        odd = self.AGENT_MD.replace("default: false", "default: false\nmodel: gpt-nine")
+        item = imp("a.md", odd)[1]["items"][0]
+        self.assertEqual(item["action"], "add")
+        self.assertIn("isn't available here", item["note"])
+        for name, data, code in [("a.txt", "x", 400), ("a.json", "{nope", 400), ("a.json", '{"format": "other"}', 400),
+                                 ("a.zip", "not a zip", 400)]:
+            self.assertEqual(imp(name, data)[0], code, name)
+        self.assertEqual(call("POST", "/api/import", {"name": "a.md", "data": "@@@"})[0], 400)
+        self.assertEqual(call("POST", "/api/import", {"name": "a.md", "data": b64(self.AGENT_MD), "on_conflict": "merge"})[0], 400)
+
+    def test_team_bundle_brings_its_agents(self):
+        call("POST", "/api/import", {"name": "d.md", "data": b64(self.AGENT_MD), "apply": True})
+        bundle = {"format": "agents-atelier-team", "version": 1, "team": {"name": "Night shift", "description": "d", "agents": ["dark-mode", "css"]},
+                  "agents": [{"id": "dark-mode", "name": "Dark mode", "icon": "eye", "color": "#334455", "description": "Other",
+                              "role": "You are the Dark mode agent. A different version."}]}
+        s, r, _ = imp("team.json", json.dumps(bundle), apply=True)
+        self.assertEqual(s, 200, r)
+        team = next(t for t in call("GET", "/api/presets")[1] if t["name"] == "Night shift")
+        self.assertEqual(sorted(team["agents"]), ["css", "dark-mode-2"])      # the renamed copy is used
+
+    def test_zip_round_trip(self):
+        req = urllib.request.urlopen(BASE + "/api/export")
+        s, plan, _ = imp("all.zip", req.read())
+        self.assertEqual(s, 200)
+        self.assertEqual(plan["summary"]["error"], 0)
+        self.assertTrue(all(i["action"] == "same" for i in plan["items"] if i["kind"] in ("agent", "rules")), plan)
 
 
 if __name__ == "__main__":

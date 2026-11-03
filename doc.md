@@ -45,7 +45,9 @@ server/
     ├── guide.html    /guide       user guide
     ├── base.css      design tokens + shared components (buttons, inputs, dialogs, toasts, error states)
     ├── site.css      layout for content pages (header, nav, page)
-    ├── ui.js         api(), toast(), confirmDialog(), projectDialog(), promptDialog(), showError(), fmtSize(), …
+    ├── teams.html    /teams…      team pages
+    ├── ui.js         api(), toast(), dialogs, showError(), fmtSize(), theme (setTheme/cycleTheme),
+    │                 command palette (openPalette, registerCommands), importFlow()
     ├── icons.js      hand-drawn SVG line icons: icon(name) and <i data-icon="name">
     └── logo.svg      logo and favicon
 ```
@@ -85,6 +87,7 @@ agents/
   "updated": 1793721792.00,         // bumped on every save (sorting, "last activity")
   "history": ["a landing page…"],   // requests whose run finished (last 6 go into the prompt)
   "agents": ["ux", "design", …],    // the team switched on for this project
+  "pages": [{"title": "Home", "file": "index.html"}, {"title": "About", "file": "about.html"}],   // first = index.html
   "run": {                          // the latest run, kept for Continue / Start again
     "request": "…", "images": ["uploads/x.png"],
     "agents": ["ux", "html"], "done": ["ux"], "notes": ["- UX agent: …"],
@@ -179,7 +182,8 @@ claude -p "<prompt>"
 
 The working directory is `work/<uuid>/`, so file tools are confined to the project folder.
 
-The **prompt** is built from:
+The **prompt** is built from (each in its own tagged block, see §9):
+- the site's pages (`<site_pages>`: one page, or the list of files with the shared header/nav/footer rule)
 - the project name and description
 - the last 6 finished requests
 - the current request
@@ -251,9 +255,9 @@ All responses are JSON. Errors are always `{"detail": "<readable message>"}`, pl
 |--------|----------------------------------------|--------------------------------------|------------------------------------------|
 | GET    | `/api/projects`                        | —                                    | all projects, most recent first (list)   |
 | GET    | `/api/projects?page=&per_page=&q=&status=&sort=` | `status`: all · working · built · empty; `sort`: updated · created · name; `per_page` ≤ 96 | `{items, page, per_page, pages, total, counts, prompts}` |
-| POST   | `/api/projects`                        | `{name, description}`                | both required                            |
+| POST   | `/api/projects`                        | `{name, description, pages?}`        | both required; `pages` is a list of page titles (default `["Home"]`, max 12) |
 | GET    | `/api/projects/<id>`                   | —                                    | metadata + `events` + `busy` + `run` summary |
-| PATCH  | `/api/projects/<id>`                   | any of `{name, description, agents}` |                                          |
+| PATCH  | `/api/projects/<id>`                   | any of `{name, description, agents, pages}` |                                   |
 | DELETE | `/api/projects/<id>`                   | —                                    | `409` while busy; also deletes versions  |
 | GET    | `/api/projects/<id>/files`             | —                                    | `[{path, size, kind, content?, url?, too_large?}]` |
 | PUT    | `/api/projects/<id>/files`             | `{path, content}`                    | text files only, ≤ 500 KB, `409` while busy |
@@ -291,6 +295,10 @@ images get a `url` instead.
 | POST     | `/api/presets`          | `{name, description?, agents}`; the id comes from the name and is made unique |
 | PUT      | `/api/presets/<id>`     | edit a saved team (`400` for built-in teams)                       |
 | DELETE   | `/api/presets/<id>`     | saved teams only                                                   |
+| GET      | `/api/agents/<id>/export` | the agent's `.md` file (download)                              |
+| GET      | `/api/presets/<id>/export` | the team as a bundle `{format: "agents-atelier-team", version: 1, team, agents}` |
+| GET      | `/api/export`           | `.zip`: `agents/*.md`, `agents/_common.md`, `agents/_presets.json`, `manifest.json` |
+| POST     | `/api/import`           | `{name, data: base64, on_conflict: rename·replace·skip, apply}`; without `apply` it returns the plan only. Accepts `.md`, team `.json`, `.zip` (≤ 300 files, 5 MB unpacked) |
 | GET      | `/api/models`           | the model list: `{default, options: [{id, label, kind: alias·full·custom, source, note}], alias_source}` |
 | POST     | `/api/models/check`     | `{model}`: asks the Claude CLI to answer with that model; on success it's added to `agents/_models.json` |
 | GET      | `/api/stats?project=<id>` | `{totals, agents: [per agent], recent: [last 30 runs]}`; omit `project` for all projects |

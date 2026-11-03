@@ -11,7 +11,7 @@ header.top.clear { position: absolute; inset: 0 0 auto; background: transparent;
 .links a { display: inline-flex; align-items: center; gap: 7px; height: 36px; line-height: 1; text-decoration: none; font-size: 14px; color: var(--charcoal); padding: 0 14px; border-radius: 999px; }
 .links a .ic, .links a i[data-icon] { color: var(--stone); }
 .links a:hover .ic, .links a.on .ic, .links a.on i[data-icon], .links a:hover i[data-icon] { color: var(--ink); }
-.links a:hover { background: rgba(255, 255, 255, .7); }
+.links a:hover { background: color-mix(in srgb, var(--paper) 70%, transparent); }
 .links a.on { background: var(--paper); box-shadow: var(--ring); }
 
 .page { padding-top: 32px; padding-bottom: 120px; }
@@ -22,7 +22,7 @@ header.top.clear { position: absolute; inset: 0 0 auto; background: transparent;
 .seg { display: flex; background: var(--paper); box-shadow: var(--ring); border-radius: 999px; padding: 3px; }
 .seg button { background: transparent; border: 0; padding: 7px 14px; border-radius: 999px; font-size: 13px; color: var(--stone); }
 .seg button:hover { color: var(--ink); }
-.seg button.on { background: var(--espresso); color: #fff; }
+.seg button.on { background: var(--espresso); color: var(--on-espresso); }
 
 @media (max-width: 760px) {
   .links a { font-size: 0; gap: 0; padding: 0; width: 36px; justify-content: center; }

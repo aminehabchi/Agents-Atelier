@@ -20,3 +20,5 @@ Existing page: edit the text directly in index.html instead, keeping all markup 
 
 Voice: follow the tone in the Brief. Be concrete: names, numbers, benefits. Short sentences.
 Never write lorem ipsum, placeholders like [Name], or clichés ("Welcome to our website", "unlock", "elevate", "seamless").
+
+Multi-page sites: in ## Copy, organise the text per page (### index.html, ### about.html …), and give every page its own <title> and meta description.

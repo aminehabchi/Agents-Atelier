@@ -1,3 +1,25 @@
+/* ---------- theme: light · dark · system (applied before the page paints) ---------- */
+(function () {
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  const pref = () => { try { return localStorage.getItem("theme") || "system"; } catch { return "system"; } };
+  const apply = () => {
+    const p = pref();
+    document.documentElement.dataset.theme = p === "system" ? (media.matches ? "dark" : "light") : p;
+    document.documentElement.dataset.themePref = p;
+    document.querySelectorAll("[data-theme-btn]").forEach(b => { b.innerHTML = icon(themeIcon(), { size: 17 }); b.title = themeTitle(); });
+  };
+  const themeIcon = () => ({ light: "sun", dark: "moon", system: "monitor" })[pref()];
+  const themeTitle = () => `Theme: ${pref()} — click to change`;
+  window.getTheme = pref;
+  window.setTheme = (p) => { try { localStorage.setItem("theme", p); } catch {} apply(); };
+  window.cycleTheme = () => { const order = ["system", "light", "dark"]; setTheme(order[(order.indexOf(pref()) + 1) % 3]); toast(`Theme: ${pref()}`); };
+  window.themeIcon = themeIcon; window.themeTitle = themeTitle;
+  media.addEventListener?.("change", () => pref() === "system" && apply());
+  window.addEventListener("storage", (e) => e.key === "theme" && apply());
+  document.documentElement.dataset.theme = pref() === "system" ? (media.matches ? "dark" : "light") : pref();
+  window.applyTheme = apply;
+})();
+
 /* Small shared helpers: api(), esc(), ago(), toast(), confirmDialog(). */
 window.esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -103,7 +125,7 @@ window.confirmDialog = ({ title, text, ok = "Confirm", danger = false }) => new 
 
 /* Name + description dialog. Both fields are required.
  * Resolves to { name, description } or null if cancelled. */
-window.projectDialog = ({ title = "New project", ok = "Create project", name = "", description = "", note = "", cancellable = true } = {}) =>
+window.projectDialog = ({ title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true } = {}) =>
   new Promise((resolve) => {
     const d = document.createElement("dialog");
     d.className = "modal project-modal";
@@ -118,6 +140,9 @@ window.projectDialog = ({ title = "New project", ok = "Create project", name = "
           <textarea class="input" name="description" maxlength="300" rows="3" required
             placeholder="e.g. A cozy neighbourhood café in Lyon. One page with the menu, opening hours and a booking button.">${esc(description)}</textarea>
           <small class="err" data-for="description"></small></label>
+        <label class="pfield"><span>Pages <em>one per line · the first is the home page</em></span>
+          <textarea class="input" name="pages" rows="3" placeholder="Home&#10;About&#10;Contact">${esc((pages || ["Home"]).join("\n"))}</textarea>
+          <small class="err" data-for="pages"></small></label>
         <div class="row">
           ${cancellable ? `<button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>` : ""}
           <button class="btn btn-dark" value="ok">${esc(ok)}</button>
@@ -141,7 +166,9 @@ window.projectDialog = ({ title = "New project", ok = "Create project", name = "
     form.addEventListener("submit", (e) => {
       if (e.submitter?.value !== "ok") return;                 // cancel
       if (!check()) { e.preventDefault(); return; }
-      result = { name: f.name.value.trim(), description: f.description.value.trim() };
+      const pageList = f.pages.value.split("\n").map(x => x.trim()).filter(Boolean);
+      if (pageList.length > 12) { e.preventDefault(); d.querySelector('[data-for="pages"]').textContent = "Up to 12 pages."; return; }
+      result = { name: f.name.value.trim(), description: f.description.value.trim(), pages: pageList.length ? pageList : ["Home"] };
     });
     f.description.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); form.requestSubmit(form.querySelector('[value="ok"]')); }
@@ -195,3 +222,185 @@ window.promptDialog = ({ title, text = "", label = "", placeholder = "", value =
 
 window.money = (usd) => usd >= 1 ? `$${usd.toFixed(2)}` : usd >= 0.01 ? `$${usd.toFixed(3)}` : usd > 0 ? `$${usd.toFixed(4)}` : "$0";
 window.compact = (n) => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n || 0);
+
+
+/* ---------- import agents / teams (used by the Agents and Teams pages and the command palette) ---------- */
+window.importFlow = () => new Promise((resolve) => {
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = ".md,.json,.zip";
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return resolve(false);
+    if (file.size > 6 * 1024 * 1024) { toast("That file is larger than 6 MB", "err"); return resolve(false); }
+    const data = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(",")[1] || ""); fr.readAsDataURL(file); });
+    let policy = "rename";
+    const plan = async () => api("/api/import", { method: "POST", body: JSON.stringify({ name: file.name, data, on_conflict: policy }) });
+    let p;
+    try { p = await plan(); } catch (err) { toast(err.message, "err"); return resolve(false); }
+    const d = document.createElement("dialog");
+    d.className = "modal project-modal import-modal";
+    const LABEL = { add: "Add", rename: "Add as copy", replace: "Replace", skip: "Skip", same: "Already have", error: "Can't import" };
+    const render = () => {
+      const doable = p.items.filter(i => ["add", "rename", "replace"].includes(i.action)).length;
+      d.innerHTML = `<h3>Import ${esc(file.name)}</h3>
+        <p>Check what will happen before anything changes.</p>
+        <label class="pfield"><span>When something already exists</span>
+          <select class="input" id="impPolicy">
+            <option value="rename" ${policy === "rename" ? "selected" : ""}>Keep both — import as a copy</option>
+            <option value="replace" ${policy === "replace" ? "selected" : ""}>Replace mine with the imported one</option>
+            <option value="skip" ${policy === "skip" ? "selected" : ""}>Keep mine — skip it</option></select></label>
+        <ul class="imp-list">${p.items.map(i => `<li class="imp-${i.action}">
+          <span class="imp-kind">${icon(i.kind === "team" ? "layers" : i.kind === "rules" ? "file" : "bot", { size: 14 })}</span>
+          <span class="imp-main"><b>${esc(i.name || i.id || "")}</b>${i.target && i.target !== i.id ? ` <span class="mono">→ ${esc(i.target)}</span>` : ""}
+          ${i.note ? `<small>${esc(i.note)}</small>` : ""}</span><span class="badge">${LABEL[i.action] || i.action}</span></li>`).join("")}</ul>
+        <div class="row"><button class="btn btn-ghost" value="cancel">Cancel</button>
+          <button class="btn btn-dark" value="ok" ${doable ? "" : "disabled"}>${doable ? `Import ${doable} item${doable === 1 ? "" : "s"}` : "Nothing to import"}</button></div>`;
+      d.querySelector("#impPolicy").onchange = async (e) => {
+        policy = e.target.value;
+        try { p = await plan(); render(); } catch (err) { toast(err.message, "err"); }
+      };
+    };
+    render();
+    document.body.append(d);
+    d.addEventListener("click", async (e) => {
+      const b = e.target.closest("button[value]");
+      if (e.target === d || b?.value === "cancel") { d.close(); return resolve(false); }
+      if (b?.value === "ok") {
+        b.disabled = true;
+        try {
+          const r = await api("/api/import", { method: "POST", body: JSON.stringify({ name: file.name, data, on_conflict: policy, apply: true }) });
+          toast(`Imported ${r.applied} item${r.applied === 1 ? "" : "s"}`); d.close(); resolve(true);
+        } catch (err) { toast(err.message, "err"); b.disabled = false; }
+      }
+    });
+    d.addEventListener("close", () => d.remove());
+    d.showModal();
+  };
+  input.click();
+});
+
+/* ---------- command palette: Ctrl/Cmd+K on every page ---------- */
+(function () {
+  const providers = [];
+  /* Pages add their own commands: a list of {title, group, icon, run, hint?, when?},
+     or a function returning such a list (called each time the palette opens). */
+  window.registerCommands = (listOrFn) => providers.push(listOrFn);
+  const pageCommands = () => providers.flatMap(p => typeof p === "function" ? p() : p).filter(c => !c.when || c.when());
+  let cache = null, cacheAt = 0;
+
+  async function dynamicCommands() {
+    if (cache && Date.now() - cacheAt < 20000) return cache;
+    const [projects, agents, teams] = await Promise.all([
+      api("/api/projects").catch(() => []), api("/api/agents").catch(() => []), api("/api/presets").catch(() => [])]);
+    cache = [
+      ...projects.map(p => ({ group: "Projects", icon: p.busy ? "zap" : "folder", title: p.name, hint: p.description, run: () => location.href = `/p/${p.id}` })),
+      ...agents.map(a => ({ group: "Agents", icon: a.icon, title: a.name, hint: a.description, run: () => location.href = `/agents/${encodeURIComponent(a.id)}` })),
+      ...teams.map(t => ({ group: "Teams", icon: t.builtin ? "users" : "sliders", title: t.name, hint: `${t.agents.length} agents${t.description ? " · " + t.description : ""}`,
+                          run: () => location.href = `/teams/${encodeURIComponent(t.id)}` })),
+    ];
+    cacheAt = Date.now();
+    return cache;
+  }
+  const staticCommands = () => [
+    { group: "Go to", icon: "home", title: "Home", run: () => location.href = "/" },
+    { group: "Go to", icon: "grid", title: "Projects", run: () => location.href = "/projects" },
+    { group: "Go to", icon: "users", title: "Agents", run: () => location.href = "/agents" },
+    { group: "Go to", icon: "layers", title: "Teams", run: () => location.href = "/teams" },
+    { group: "Go to", icon: "book", title: "Guide", run: () => location.href = "/guide" },
+    { group: "Go to", icon: "file", title: "Shared rules", run: () => location.href = "/agents/rules" },
+    { group: "Create", icon: "plus", title: "New project", run: () => newProject() },
+    { group: "Create", icon: "plus", title: "New agent", run: () => location.href = "/agents/new" },
+    { group: "Create", icon: "plus", title: "New team", run: () => location.href = "/teams/new" },
+    { group: "Agents & teams", icon: "download", title: "Export all agents and teams (.zip)", run: () => location.href = "/api/export" },
+    { group: "Agents & teams", icon: "file-plus", title: "Import agents or teams…", run: async () => { if (await importFlow()) location.reload(); } },
+    { group: "Appearance", icon: "sun", title: "Theme: light", run: () => setTheme("light") },
+    { group: "Appearance", icon: "moon", title: "Theme: dark", run: () => setTheme("dark") },
+    { group: "Appearance", icon: "monitor", title: "Theme: follow the system", run: () => setTheme("system") },
+  ];
+
+  /* How well `q` matches `text`: 0 = no match. Substrings and word starts win; scattered letters only count
+     when they stay close together, so "css" doesn't match "follow the system". */
+  function score(q, text) {
+    if (!q) return 1;
+    const t = (text || "").toLowerCase();
+    const at = t.indexOf(q);
+    if (at === 0) return 100 - t.length / 100;
+    if (at > 0) return (" -/·:".includes(t[at - 1]) ? 80 : 60) - t.length / 100;
+    let i = 0, s = 0, prev = -1, gaps = 0;
+    for (const ch of q) {
+      const j = t.indexOf(ch, i);
+      if (j < 0) return 0;
+      if (prev >= 0) gaps += j - prev - 1;
+      s += j === prev + 1 ? 3 : (j === 0 || " -/·:".includes(t[j - 1]) ? 2 : 0);
+      prev = j; i = j + 1;
+    }
+    return gaps > q.length * 2 ? 0 : 20 + s - gaps;
+  }
+
+  let dlg, list = [], active = 0;
+  async function open() {
+    if (dlg?.open) return dlg.querySelector("input").select();
+    dlg = document.createElement("dialog");
+    dlg.className = "palette";
+    dlg.setAttribute("aria-label", "Command palette");
+    dlg.innerHTML = `<div class="pal-input">${icon("search", { size: 18 })}<input type="text" placeholder="Search projects, agents, teams and actions…"
+        aria-label="Search" autocomplete="off" spellcheck="false"><kbd>Esc</kbd></div>
+      <div class="pal-list" role="listbox"></div>
+      <div class="pal-foot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Ctrl</kbd>+<kbd>K</kbd> anywhere</span></div>`;
+    document.body.append(dlg);
+    const input = dlg.querySelector("input"), box = dlg.querySelector(".pal-list");
+    let all = [...pageCommands(), ...staticCommands()];
+    const render = () => {
+      const q = input.value.trim().toLowerCase();
+      list = all.map(c => ({ c, s: Math.max(score(q, c.title), c.group.toLowerCase().startsWith(q) ? 50 : 0,
+                                             c.hint && c.hint.toLowerCase().includes(q) ? 30 : 0) }))
+                .filter(x => x.s > 0).sort((a, b) => b.s - a.s).slice(0, 60).map(x => x.c);
+      if (!q) list.sort((a, b) => all.indexOf(a) - all.indexOf(b));
+      const groups = [...new Set(list.map(c => c.group))];          // each heading once, best group first
+      list = groups.flatMap(g => list.filter(c => c.group === g));
+      active = Math.min(active, Math.max(list.length - 1, 0));
+      let group = "";
+      box.innerHTML = list.map((c, i) => {
+        const head = c.group !== group ? `<div class="pal-group">${esc(group = c.group)}</div>` : "";
+        return `${head}<button class="pal-item ${i === active ? "on" : ""}" data-i="${i}" role="option" aria-selected="${i === active}">
+          ${icon(c.icon || "arrow-right", { size: 16 })}<span><b>${esc(c.title)}</b>${c.hint ? `<small>${esc(c.hint)}</small>` : ""}</span></button>`;
+      }).join("") || `<p class="pal-empty">Nothing matches “${esc(input.value)}”.</p>`;
+      box.querySelector(".pal-item.on")?.scrollIntoView({ block: "nearest" });
+    };
+    const run = (i) => { const c = list[i]; if (!c) return; dlg.close(); try { c.run(); } catch (e) { toast(e.message, "err"); } };
+    input.addEventListener("input", () => { active = 0; render(); });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") { e.preventDefault(); active = Math.min(active + 1, list.length - 1); render(); }
+      if (e.key === "ArrowUp") { e.preventDefault(); active = Math.max(active - 1, 0); render(); }
+      if (e.key === "Enter") { e.preventDefault(); run(active); }
+    });
+    box.addEventListener("mousemove", (e) => { const b = e.target.closest(".pal-item"); if (b && +b.dataset.i !== active) { active = +b.dataset.i; render(); } });
+    box.addEventListener("click", (e) => { const b = e.target.closest(".pal-item"); if (b) run(+b.dataset.i); });
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+    dlg.addEventListener("close", () => { dlg.remove(); dlg = null; });
+    active = 0; render(); dlg.showModal(); input.focus();
+    try { all = [...all, ...(await dynamicCommands())]; if (dlg) render(); } catch {}
+  }
+  window.openPalette = open;
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); open(); }
+  });
+
+  /* header buttons: search (palette) and theme, added to every page */
+  document.addEventListener("DOMContentLoaded", () => {
+    const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+    const make = () => {
+      const wrap = document.createElement("span");
+      wrap.className = "hdr-tools";
+      wrap.innerHTML = `<button class="icon-btn pal-btn" type="button" title="Search and commands (${mac ? "⌘" : "Ctrl+"}K)" aria-label="Search and commands">${icon("search", { size: 17 })}</button>
+        <button class="icon-btn" type="button" data-theme-btn aria-label="Change theme">${icon(themeIcon(), { size: 17 })}</button>`;
+      wrap.querySelector(".pal-btn").onclick = open;
+      wrap.querySelector("[data-theme-btn]").onclick = () => cycleTheme();
+      wrap.querySelector("[data-theme-btn]").title = themeTitle();
+      return wrap;
+    };
+    const site = document.querySelector("header.top .wrap");
+    if (site) site.insertBefore(make(), site.lastElementChild);
+    const studio = document.querySelector(".chat .bar");
+    if (studio) studio.insertBefore(make(), document.getElementById("menu"));
+  });
+})();

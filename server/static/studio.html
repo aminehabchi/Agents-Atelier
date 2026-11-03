@@ -71,7 +71,7 @@
   .msg { max-width: 100%; font-size: 14px; line-height: 1.55; animation: pop .25s ease; }
   .replay .msg { animation: none; }
   @keyframes pop { from { opacity: 0; transform: translateY(6px); } }
-  .msg.user { align-self: flex-end; background: var(--espresso); color: #fff; padding: 10px 16px; border-radius: 20px 20px 6px 20px; max-width: 85%; white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; background: var(--espresso); color: var(--on-espresso); padding: 10px 16px; border-radius: 20px 20px 6px 20px; max-width: 85%; white-space: pre-wrap; }
   .msg.agent { background: var(--paper); box-shadow: var(--ring); border-radius: 18px; padding: 14px 16px; scroll-margin: 16px; transition: box-shadow .3s; }
   .msg.agent.highlight { box-shadow: inset 0 0 0 2px var(--ink); }
   .msg.agent.working { box-shadow: inset 0 0 0 1px var(--line-strong); }
@@ -105,7 +105,7 @@
   .composer { padding: 12px 16px 14px; border-top: 1px solid var(--line); background: var(--paper); flex: none; }
   .composer .row { display: flex; gap: 8px; align-items: flex-end; }
   .composer textarea { flex: 1; resize: none; max-height: 180px; min-height: 46px; line-height: 1.45; }
-  .send { height: 46px; width: 46px; border: 0; border-radius: 999px; background: var(--espresso); color: #fff; display: grid; place-items: center; flex: none; transition: background .2s; }
+  .send { height: 46px; width: 46px; border: 0; border-radius: 999px; background: var(--espresso); color: var(--on-espresso); display: grid; place-items: center; flex: none; transition: background .2s; }
   .send:hover { background: var(--charcoal); }
   .send:disabled { opacity: .35; cursor: default; }
   .send.stop { background: var(--paper); color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
@@ -146,6 +146,13 @@
   .codepane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   pre { margin: 0; padding: 20px; overflow: auto; flex: 1; font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--charcoal); tab-size: 2; }
 
+  /* ---------- page switcher ---------- */
+  .page-pick { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 30px 0 12px; border-radius: 999px;
+    background: var(--linen); box-shadow: var(--ring); color: var(--stone); font-size: 13px; max-width: 220px; }
+  .page-pick select { appearance: none; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; outline: none; cursor: pointer; min-width: 0; text-overflow: ellipsis; }
+  .page-pick::after { content: ""; position: absolute; right: 12px; top: 50%; width: 6px; height: 6px; border: solid var(--stone); border-width: 0 1.5px 1.5px 0; transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+  .page-pick select option { background: var(--paper); color: var(--ink); }
+
   /* ---------- editor ---------- */
   textarea.editor { flex: 1; width: 100%; border: 0; outline: none; resize: none; margin: 0; padding: 20px; background: var(--paper);
     font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--charcoal); tab-size: 2; white-space: pre; overflow: auto; }
@@ -157,7 +164,7 @@
   .save-state.err { color: var(--danger); }
   .autosave { display: inline-flex; align-items: center; gap: 8px; font: 12px "Inter", sans-serif; color: var(--graphite); cursor: pointer; }
   .autosave input { appearance: none; width: 32px; height: 20px; border-radius: 999px; background: var(--line-strong); position: relative; cursor: pointer; margin: 0; transition: background .2s; }
-  .autosave input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .autosave input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--knob); transition: transform .2s; }
   .autosave input:checked { background: var(--espresso); }
   .autosave input:checked::after { transform: translateX(12px); }
 
@@ -176,25 +183,25 @@
   .attachments[hidden] { display: none; }
   .att { position: relative; width: 64px; height: 64px; border-radius: 12px; overflow: hidden; background: var(--linen); box-shadow: var(--ring); }
   .att img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .att.loading::after { content: ""; position: absolute; inset: 0; background: rgba(255,255,255,.6); animation: blink 1s infinite; }
+  .att.loading::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--paper) 60%, transparent); animation: blink 1s infinite; }
   .att button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 999px; border: 0; background: rgba(22,15,12,.75); color: #fff;
     display: grid; place-items: center; padding: 0; }
   .composer .attach { width: 46px; height: 46px; }
   .composer.drag { box-shadow: inset 0 0 0 2px var(--ink); }
   .msg.user .imgs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-  .msg.user .imgs img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; display: block; background: rgba(255,255,255,.15); }
+  .msg.user .imgs img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; display: block; background: rgb(var(--on-espresso-rgb) / .15); }
 
   /* ---------- retry + cost on agent cards ---------- */
   .who .retry { margin-left: 4px; width: 28px; height: 28px; }
   .msg.agent.working .retry { display: none; }
   .who .cost { font-feature-settings: "tnum"; }
   .model-badge { font: 10.5px ui-monospace, monospace; color: var(--stone); background: var(--paper); box-shadow: var(--ring); border-radius: 999px; padding: 1px 6px; line-height: 1.5; }
-  .agent-tile.s-working .model-badge { background: rgba(255,255,255,.12); color: rgba(255,255,255,.8); box-shadow: none; }
+  .agent-tile.s-working .model-badge { background: rgb(var(--on-espresso-rgb) / .12); color: rgb(var(--on-espresso-rgb) / .8); box-shadow: none; }
 
   /* ---------- presets menu ---------- */
   .menu-wrap { position: relative; }
   .menu { position: absolute; bottom: calc(100% + 8px); right: 0; z-index: 30; width: 300px; background: var(--paper); border-radius: 18px; padding: 6px;
-    box-shadow: var(--ring), 0 18px 40px rgba(27, 6, 36, .12); display: none; }
+    box-shadow: var(--ring), 0 18px 40px rgb(0 0 0 / .18); display: none; }
   .menu.open { display: block; }
   .menu .mi { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; background: none; border: 0; padding: 10px 12px; border-radius: 12px; font-size: 14px; text-decoration: none; color: inherit; }
   .menu .mi:hover { background: var(--linen); }
@@ -210,7 +217,7 @@
   dialog.panel { border: 0; border-radius: 24px; padding: 0; width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); background: var(--linen); color: var(--ink);
     box-shadow: var(--ring); display: none; flex-direction: column; overflow: hidden; }
   dialog.panel[open] { display: flex; }
-  dialog.panel::backdrop { background: rgba(27, 6, 36, .28); backdrop-filter: blur(2px); }
+  dialog.panel::backdrop { background: var(--scrim); backdrop-filter: blur(2px); }
   .panel-head { display: flex; align-items: center; gap: 12px; padding: 20px 24px; background: var(--paper); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   .panel-head h2 { margin: 0; font-weight: 400; font-size: 26px; letter-spacing: -.03em; display: flex; align-items: center; gap: 10px; }
   .panel-body { overflow: auto; padding: 20px 24px 24px; }
@@ -227,10 +234,10 @@
   .difffile { background: var(--paper); border-radius: 16px; margin-bottom: 10px; overflow: hidden; }
   .difffile summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 16px; font: 13px ui-monospace, monospace; }
   .difffile summary::-webkit-details-marker { display: none; }
-  .difffile .plus { color: #1f7a3f; } .difffile .minus { color: var(--danger); }
+  .difffile .plus { color: var(--ok); } .difffile .minus { color: var(--danger); }
   .difffile pre { margin: 0; padding: 0 0 12px; font: 12px/1.6 ui-monospace, monospace; overflow-x: auto; }
   .difffile pre span { display: block; padding: 0 16px; white-space: pre; }
-  .difffile pre .a { background: #e8f5ec; color: #1f5a33; } .difffile pre .r { background: #fbeaea; color: #7f2222; } .difffile pre .h { color: var(--stone); background: var(--linen); }
+  .difffile pre .a { background: var(--add-bg); color: var(--add-fg); } .difffile pre .r { background: var(--del-bg); color: var(--del-fg); } .difffile pre .h { color: var(--stone); background: var(--linen); }
 
   .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
   .kpi { background: var(--paper); border-radius: 16px; padding: 16px 18px; }
@@ -245,7 +252,7 @@
   .stable .ag .tile { width: 28px; height: 28px; border-radius: 9px; }
   .sbar { height: 6px; border-radius: 999px; background: var(--linen); min-width: 80px; overflow: hidden; }
   .sbar i { display: block; height: 100%; border-radius: 999px; background: var(--ink); }
-  .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #1f7a3f; margin-right: 6px; }
+  .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 6px; }
   .status-dot.stopped { background: var(--stone); } .status-dot.error { background: var(--danger); }
   h4.sec { margin: 8px 0 10px; font-weight: 500; font-size: 14px; color: var(--charcoal); }
   @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
@@ -301,7 +308,7 @@
   .agent-tile.s-done .t-desc, .agent-tile.s-stopped .t-desc { -webkit-line-clamp: 2; }
 
   .sw { width: 32px; height: 20px; border-radius: 999px; border: 0; padding: 0; background: var(--line-strong); position: relative; flex: none; transition: background .2s; }
-  .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--knob); transition: transform .2s; }
   .sw.on { background: var(--espresso); }
   .sw.on::after { transform: translateX(12px); }
   .sw:disabled { opacity: .5; cursor: default; }
@@ -309,11 +316,11 @@
   .agent-tile.off { opacity: .5; background: transparent; box-shadow: inset 0 0 0 1px var(--line); border: 1px dashed transparent; }
   .agent-tile.off .tile { background: var(--linen); color: var(--stone); }
   .agent-tile.s-waiting { background: var(--paper); }
-  .agent-tile.s-working { background: var(--espresso); color: #fff; box-shadow: none; }
-  .agent-tile.s-working .tile { background: rgba(255, 255, 255, .12); color: #fff; }
-  .agent-tile.s-working .t-num, .agent-tile.s-working .t-status, .agent-tile.s-working .t-last { color: rgba(255, 255, 255, .7); }
-  .agent-tile.s-working .typing span { background: #fff; }
-  .agent-tile.s-working .sw.on { background: rgba(255, 255, 255, .3); }
+  .agent-tile.s-working { background: var(--espresso); color: var(--on-espresso); box-shadow: none; }
+  .agent-tile.s-working .tile { background: rgb(var(--on-espresso-rgb) / .12); color: var(--on-espresso); }
+  .agent-tile.s-working .t-num, .agent-tile.s-working .t-status, .agent-tile.s-working .t-last { color: rgb(var(--on-espresso-rgb) / .7); }
+  .agent-tile.s-working .typing span { background: var(--on-espresso); }
+  .agent-tile.s-working .sw.on { background: rgb(var(--on-espresso-rgb) / .3); }
   .agent-tile.s-done { background: var(--bone); }
   .agent-tile.s-done .t-status { color: var(--charcoal); }
   .agent-tile.s-stopped { background: var(--paper); box-shadow: inset 0 0 0 1px var(--line-strong); }
@@ -342,7 +349,6 @@
         <span aria-hidden="true">·</span><button class="pid mono" id="pid" title="Copy project id"></button></div>
     </div>
     <span class="conn" id="conn" title="Connecting…"></span>
-    <a class="icon-btn" href="/guide" title="Guide" aria-label="Guide"><i data-icon="help" data-size="17"></i></a>
     <button class="icon-btn" id="menu" title="Projects" aria-label="Projects"><i data-icon="folder" data-size="17"></i></button>
     <button class="btn btn-dark btn-sm" data-new title="New project"><i data-icon="plus" data-size="16"></i>New</button>
   </div>
@@ -383,6 +389,8 @@
       <button data-device="tablet" title="Tablet · 768px"><i data-icon="tablet" data-size="16"></i></button>
       <button data-device="phone" title="Phone · 375px"><i data-icon="phone" data-size="16"></i></button>
     </div>
+    <label class="page-pick" title="Page shown in the preview"><i data-icon="file" data-size="15"></i>
+      <select id="pageSel" aria-label="Page shown in the preview"></select></label>
     <span class="spacer"></span>
     <span class="url" id="url"></span>
     <button class="icon-btn" id="reload" title="Reload preview" aria-label="Reload preview"><i data-icon="refresh" data-size="16"></i></button>
@@ -466,8 +474,7 @@ async function boot() {
 
   selected = new Set(project.agents.filter(id => BY_ID[id]));
   renderHeader(); renderTeam(); setBusy(false);
-  $("url").textContent = `/work/${PID.slice(0, 8)}…/index.html`;
-  $("url").title = `/work/${PID}/index.html`;
+  renderPages();
   $("download").href = `/api/projects/${PID}/download`;
 
   replaying = true; $("messages").classList.add("replay");
@@ -487,6 +494,7 @@ async function boot() {
   scrollDown();
 
   reloadPreview();
+  refreshPages();
   connect();
   setInterval(tick, 1000);
   if (needsDetails()) editDetails({ required: true });
@@ -603,6 +611,7 @@ function handle(ev) {
     case "agent_text": setCardText(ev.agent, ev.text); break;
     case "file_changed":
       changed.add(ev.file);
+      if (/\.html?$/i.test(ev.file || "") && !replaying) refreshPagesSoon();
       if (a) flash(a.color);
       reloadPreview(); refreshCode();
       break;
@@ -794,13 +803,14 @@ async function editDetails({ required = false, note = "" } = {}) {
   const details = await projectDialog({
     title: required ? "Name this project" : "Project details", ok: required ? "Save and continue" : "Save",
     name: project.name === "Untitled project" ? "" : project.name, description: project.description || "",
+    pages: (project.pages || [{ title: "Home" }]).map(p => p.title),
     note: note || (required ? "This project is missing its name or description. The agents read both, so be specific." : ""),
     cancellable: !required,
   });
   if (!details) return;
   try {
     project = { ...project, ...(await api(`/api/projects/${PID}`, { method: "PATCH", body: JSON.stringify(details) })) };
-    renderHeader(); toast("Project details saved");
+    renderHeader(); renderPages(); toast("Project details saved");
   } catch (err) { toast(err.message, "err"); }
 }
 $("pname").addEventListener("click", () => editDetails());
@@ -1011,7 +1021,30 @@ $("teamHead").addEventListener("click", (e) => {
 });
 
 // ================================================================ preview
-const workUrl = () => `/work/${PID}/index.html`;
+let currentPage = "index.html", builtPages = new Set();
+const workUrl = () => `/work/${PID}/${currentPage}`;
+
+/* The page switcher lists the planned pages (project.pages) plus any other .html file the agents made. */
+function renderPages() {
+  const planned = (project.pages || [{ title: "Home", file: "index.html" }]);
+  const extra = [...builtPages].filter(f => !planned.some(p => p.file === f)).sort();
+  const opts = [...planned.map(p => ({ file: p.file, label: `${p.title} · ${p.file}` })), ...extra.map(f => ({ file: f, label: f }))];
+  if (!opts.some(o => o.file === currentPage)) currentPage = "index.html";
+  $("pageSel").innerHTML = opts.map(o => `<option value="${esc(o.file)}" ${o.file === currentPage ? "selected" : ""}>${esc(o.label)}${builtPages.size && !builtPages.has(o.file) ? " — not built yet" : ""}</option>`).join("");
+  $("pageSel").closest(".page-pick").hidden = opts.length < 2;
+  $("url").textContent = `/work/${PID.slice(0, 8)}…/${currentPage}`;
+  $("url").title = workUrl();
+}
+let pagesTimer;
+function refreshPagesSoon() { clearTimeout(pagesTimer); pagesTimer = setTimeout(refreshPages, 400); }
+async function refreshPages() {
+  try {
+    const files = await api(`/api/projects/${PID}/files`);
+    builtPages = new Set(files.filter(f => /^[^/]+\.html?$/i.test(f.path)).map(f => f.path));
+    renderPages();
+  } catch { /* the preview keeps working; the list refreshes next time */ }
+}
+$("pageSel").onchange = (e) => { currentPage = e.target.value; renderPages(); reloadPreview(); };
 let reloadTimer;
 function reloadPreview() {
   if (replaying || !PID) return;
@@ -1397,6 +1430,29 @@ document.addEventListener("click", async (e) => {
   } else if (!e.target.closest("#presetsMenu, #presetsBtn")) togglePresets(false);
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") togglePresets(false); });
+
+// ================================================================ command palette: studio actions
+registerCommands([
+  { group: "This project", icon: "eye", title: "Show the preview", run: () => document.querySelector('[data-tab="preview"]').click() },
+  { group: "This project", icon: "code", title: "Show the code", run: () => document.querySelector('[data-tab="code"]').click() },
+  { group: "This project", icon: "monitor", title: "Preview: desktop width", run: () => document.querySelector('[data-device="desktop"]').click() },
+  { group: "This project", icon: "tablet", title: "Preview: tablet width (768px)", run: () => document.querySelector('[data-device="tablet"]').click() },
+  { group: "This project", icon: "phone", title: "Preview: phone width (375px)", run: () => document.querySelector('[data-device="phone"]').click() },
+  { group: "This project", icon: "external", title: "Open the page in a new tab", run: () => $("open").click() },
+  { group: "This project", icon: "history", title: "Versions", hint: "open, compare, restore", run: () => openHistory() },
+  { group: "This project", icon: "save", title: "Save a version now", when: () => !busy, run: () => { openHistory(); setTimeout(() => $("saveVersion")?.click(), 50); } },
+  { group: "This project", icon: "chart", title: "Cost & time", run: () => openStats() },
+  { group: "This project", icon: "download", title: "Download the code (.zip)", when: () => !busy, run: () => location.href = `/api/projects/${PID}/download` },
+  { group: "This project", icon: "pencil", title: "Edit name, description and pages", run: () => editDetails() },
+  { group: "This project", icon: "paperclip", title: "Attach reference images", run: () => $("attach").click() },
+  { group: "This project", icon: "users", title: "Show or hide the team panel", run: () => document.getElementById("collapse")?.click() },
+  { group: "Run", icon: "stop", title: "Stop the agents", when: () => busy, run: () => wsSend({ type: "stop" }) },
+  { group: "Run", icon: "play", title: "Continue the stopped run", when: () => !busy && !!paused, run: () => resumeRun("continue") },
+  { group: "Run", icon: "refresh", title: "Start the run again", when: () => !busy && !!paused, run: () => resumeRun("restart") },
+  { group: "Run", icon: "message", title: "Write a prompt", run: () => $("input").focus() },
+]);
+registerCommands(() => [...new Set([...(project?.pages || []).map(p => p.file), ...builtPages])].map(f => ({
+  group: "Pages", icon: "file", title: `Preview ${f}`, run: () => { currentPage = f; renderPages(); reloadPreview(); } })));
 
 boot();
 </script>

@@ -22,3 +22,5 @@ Write index.html:
 - Use the copy verbatim. Use inline SVG or assets/ for imagery, with meaningful alt text (or alt="" if decorative).
 
 Create empty style.css and script.js if they are missing (never overwrite existing ones). Do not write CSS or JS.
+
+Multi-page sites: write every page listed in <site_pages>, each linking style.css and script.js, with the same header, navigation (links to every page, aria-current="page" on the current one) and footer. Pages that already exist: edit them, don't start over.
