@@ -17,7 +17,8 @@
   .bar-top h1 { margin: 0 auto 0 0; font-weight: 400; font-size: 40px; letter-spacing: 0; line-height: 1.1; }
   .crumb { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--graphite); text-decoration: none; margin-bottom: 18px; }
   .crumb:hover { color: var(--ink); }
-  .note { font-size: 13px; color: var(--stone); margin: 0 0 16px; display: flex; gap: 8px; line-height: 1.5; }
+  .note { font-size: 13px; color: var(--stone); margin: 0 0 16px; display: flex; gap: 8px; align-items: flex-start; line-height: 1.5; }
+  .note > .ic { margin-top: calc((1lh - 14px) / 2); }
   .tile { width: 36px; height: 36px; border-radius: 2px; display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
   .card { background: var(--paper); border-radius: 2px; box-shadow: var(--ring); padding: 28px; }
   .card h2 { margin: 0 0 14px; font-weight: 500; font-size: 16px; display: flex; align-items: center; gap: 8px; }

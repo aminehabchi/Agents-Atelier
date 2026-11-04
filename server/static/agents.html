@@ -22,7 +22,8 @@
   .fchip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 2px; border: 1px solid var(--line); background: var(--paper); font-size: 13px; color: var(--graphite); line-height: 1; }
   .fchip:hover { border-color: var(--graphite); color: var(--ink); }
   .fchip.on { background: var(--espresso); border-color: var(--espresso); color: var(--on-espresso); }
-  .hint { font-size: 13px; color: var(--stone); margin: 0 0 12px; display: flex; gap: 6px; align-items: center; }
+  .hint { font-size: 13px; color: var(--stone); margin: 0 0 12px; display: flex; gap: 6px; align-items: flex-start; line-height: 1.5; }
+  .hint > .ic { margin-top: calc((1lh - 13px) / 2); }
   .tile { width: 36px; height: 36px; border-radius: 2px; display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
   .badge.mono { font-family: ui-monospace, monospace; }
 
@@ -100,7 +101,9 @@
   .switch input:checked::after { transform: translateX(16px); }
   .form-actions { display: flex; gap: 8px; align-items: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
   .form-actions .status { font-size: 13px; color: var(--stone); margin-right: auto; display: inline-flex; gap: 6px; align-items: center; }
-  .note { font-size: 13px; color: var(--stone); margin: 0 0 20px; display: flex; gap: 8px; line-height: 1.5; }
+  .note { font-size: 13px; color: var(--stone); margin: 0 0 20px; display: flex; gap: 8px; align-items: flex-start; line-height: 1.5; }
+  .note > .ic { margin-top: calc((1lh - 16px) / 2); }
+  .note > .ic[width="14"] { margin-top: calc((1lh - 14px) / 2); }
 
   @media (max-width: 900px) {
     .grid2, .fields { grid-template-columns: 1fr; }

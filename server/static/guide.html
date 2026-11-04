@@ -39,12 +39,13 @@
   .stepc p { margin: 0; font-size: 15px; color: var(--graphite); line-height: 1.55; }
 
   .anatomy { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; }
-  .part { background: var(--paper); border-radius: 2px; padding: 24px; display: grid; grid-template-columns: 44px 1fr; column-gap: 16px; row-gap: 4px; align-items: start; }
-  .part .ico { grid-row: span 2; }
-  .part h3 { margin: 0; align-self: center; min-height: 22px; display: flex; align-items: center; }
+  .part { background: var(--paper); border-radius: 2px; padding: 24px; display: grid; grid-template-columns: 44px 1fr; grid-template-rows: 44px auto; column-gap: 16px; row-gap: 8px; align-content: start; }
+  .part .ico { grid-row: 1; }
+  .part h3 { margin: 0; align-self: center; display: flex; align-items: center; }
+  .part ul { grid-column: 2; }
   .part ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; font-size: 15px; color: var(--graphite); line-height: 1.5; }
   .part li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; }
-  .part li > i[data-icon] { color: var(--stone); margin-top: 2px; }
+  .part li > i[data-icon] { color: var(--stone); height: 1.5em; }  /* one line of the 1.5 line-height text */
 
   .tips { display: grid; gap: 10px; margin-top: 24px; }
   .tip { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

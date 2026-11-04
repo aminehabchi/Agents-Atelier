@@ -80,7 +80,9 @@
     background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
   .who .nm { font-weight: 500; font-size: 15px; letter-spacing: 0; }
   .who .nm small { display: block; font-weight: 400; font-size: 12px; color: var(--stone); letter-spacing: 0; }
-  .who .state { margin-left: auto; color: var(--stone); font-size: 12px; display: inline-flex; align-items: center; gap: 6px; font-feature-settings: "tnum"; }
+  .who .state { margin-left: auto; color: var(--stone); font-size: 12px; display: inline-flex; align-items: center; gap: 6px; font-feature-settings: "tnum"; white-space: nowrap; flex: none; }
+  .who .nm { min-width: 0; }
+  .who .nm, .who .nm small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .typing { display: inline-flex; gap: 3px; }
   .typing span { width: 4px; height: 4px; border-radius: 50%; background: var(--ink); animation: blink 1s infinite; }
   .typing span:nth-child(2) { animation-delay: .15s; } .typing span:nth-child(3) { animation-delay: .3s; }
@@ -99,7 +101,8 @@
   .msg.done-card .lbl { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 14px; min-width: 160px; }
   .msg.done-card .lbl .tile { --c: var(--ink); }
   .msg.error { color: var(--danger); background: var(--paper); box-shadow: inset 0 0 0 1px var(--danger); border-radius: 2px; padding: 10px 14px; font-size: 13px;
-    white-space: pre-wrap; display: flex; gap: 8px; }
+    white-space: pre-wrap; display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+  .msg.error > .ic { margin-top: calc((1lh - 16px) / 2); }
 
   /* composer */
   .composer { padding: 12px 16px 14px; border-top: 1px solid var(--line); background: var(--paper); flex: none; }
@@ -195,7 +198,7 @@
   .who .retry { margin-left: 4px; width: 28px; height: 28px; }
   .msg.agent.working .retry { display: none; }
   .who .cost { font-feature-settings: "tnum"; }
-  .model-badge { font: 10.5px ui-monospace, monospace; color: var(--stone); background: var(--paper); box-shadow: var(--ring); border-radius: 2px; padding: 1px 6px; line-height: 1.5; }
+  .model-badge { display: inline-flex; align-items: center; gap: 3px; text-decoration: none; font: 10.5px var(--font); color: var(--stone); background: var(--paper); box-shadow: var(--ring); border-radius: 2px; padding: 1px 6px; line-height: 1.5; }
   .agent-tile.s-working .model-badge { background: rgb(var(--on-espresso-rgb) / .12); color: rgb(var(--on-espresso-rgb) / .8); box-shadow: none; }
 
   /* ---------- presets menu ---------- */
@@ -205,7 +208,9 @@
   .menu.open { display: block; }
   .menu .mi { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; background: none; border: 0; padding: 10px 12px; border-radius: 2px; font-size: 14px; text-decoration: none; color: inherit; }
   .menu .mi:hover { background: var(--linen); }
-  .menu .mi .ic { margin-top: 1px; color: var(--stone); }
+  .menu .mi { line-height: 20px; }
+  .menu .mi > .ic { margin-top: calc((20px - 15px) / 2); color: var(--stone); }
+  .menu .mi small { line-height: 1.4; }
   .menu .mi b { font-weight: 500; display: flex; align-items: center; gap: 6px; }
   .menu .mi small { display: block; color: var(--stone); font-size: 12px; margin-top: 2px; line-height: 1.4; }
   .menu .mi.on { background: var(--bone); }
@@ -222,6 +227,7 @@
   .panel-head h2 { margin: 0; font-weight: 400; font-size: 26px; letter-spacing: 0; display: flex; align-items: center; gap: 10px; }
   .panel-body { overflow: auto; padding: 20px 24px 24px; }
   .note { font-size: 13px; color: var(--stone); margin: 0 0 16px; display: flex; gap: 8px; align-items: flex-start; line-height: 1.5; }
+  .note > .ic { margin-top: calc((1lh - 14px) / 2); }
 
   .vlist { display: flex; flex-direction: column; gap: 6px; }
   .vrow { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center; background: var(--paper); border-radius: 2px; padding: 12px 14px; }
