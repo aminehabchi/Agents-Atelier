@@ -779,7 +779,7 @@ function setBusy(b) {
   $("send").innerHTML = icon(b ? "stop" : "arrow-up", { size: 18, stroke: 2 });
   $("send").classList.toggle("stop", b);
   $("send").title = b ? "Stop the agents" : "Send";
-  $("input").placeholder = b ? "Agents are working… press the stop button to stop them" : "Describe what to build…";
+  $("input").placeholder = b ? "Agents are working… (■ to stop)" : "Describe what to build…";
   const dl = $("download");
   dl.setAttribute("aria-disabled", b ? "true" : "false");
   dl.title = b ? "Available when the agents finish" : "Download the code as .zip";

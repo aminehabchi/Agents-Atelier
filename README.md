@@ -1,14 +1,20 @@
 # Agents Atelier
 
-**Describe a web page. A team of specialist AI agents builds it in front of you, one after another.**
+**Describe a web page. A team of specialist AI agents builds its front end in front of you, one after another.**
 
-Agents Atelier is a local web app that turns a short description into a finished web page, using a *team* of
-AI agents instead of a single one. A UX agent plans the page, a Design System agent picks the colours and fonts,
+Agents Atelier is a local web app for building **front ends only**: it turns a short description into a finished
+static website (one page or several linked pages) in plain HTML, CSS and JavaScript, using a *team* of AI agents
+instead of a single one. A UX agent plans the page, a Design System agent picks the colours and fonts,
 a Copywriter writes the text, then HTML, CSS, Responsive, JS and Animation agents build it. An Accessibility agent
 audits it, and a Critic reviews and scores the result.
 
-You watch every step live. You can stop, steer, retry or roll back any of them, and at the end you download a plain
-HTML, CSS and JavaScript page that's yours.
+You watch every step live. You can stop, steer, retry or roll back any of them, and at the end you download plain
+HTML, CSS and JavaScript files that are yours.
+
+> **Front end only.** The agents write the part of a site that runs in the browser: layout, styles, copy, images
+> (SVG), interactions and animations. They don't build a back end: no server code, database, user accounts,
+> payments or APIs. Forms, logins and data in the result are front-end mock-ups; connect them to a real back end
+> yourself if you need one.
 
 Every agent is your own **Claude Code** running with a different role, so there's no API key and no account to
 create. Everything runs on your machine.
@@ -48,8 +54,9 @@ accept or re-roll. Agents Atelier works more like a small design studio:
 | Fixed behaviour                             | Every agent is a **Markdown file you can edit**, with its own model            |
 | Hosted, often framework code                | **Runs locally**, outputs plain HTML/CSS/JS with **no build step**             |
 
-It's a good fit for landing pages, portfolios, product pages, event pages, prototypes, and for learning how a page is
-built step by step by reading what each specialist did.
+It's a good fit for landing pages, portfolios, product pages, event pages, small brochure sites, UI prototypes and
+mock-ups to hand to a back-end developer, and for learning how a page is built step by step by reading what each
+specialist did. It's not meant for web apps that need a server, a database or logins.
 
 ## How it works
 
@@ -341,12 +348,18 @@ only replaced when you choose **Replace mine**.
 No. Agents Atelier runs your installed Claude Code, which uses your existing login and plan.
 
 **What does it produce?**
-A single page: `index.html`, `style.css`, `script.js`, plus SVG assets if the Assets agent is on. It uses no
-framework and needs no build step, so it works on any static host.
+A static front end: one HTML file per page (`index.html` is the home page), a shared `style.css` and `script.js`,
+plus SVG files in `assets/` if the Assets agent is on. It uses no framework and needs no build step, so it works by
+opening `index.html` or on any static host.
 
-**Can it build multi-page sites or apps with a backend?**
-Not yet. The agents' shared rules target one page of plain HTML/CSS/JS. You can change those rules in
-`agents/_common.md` if you want to experiment.
+**Can it build multi-page sites?**
+Yes. List the pages when you create the project (for example Home, About, Contact). The agents build each one with
+the same header, navigation and footer.
+
+**Can it build a back end, a database or logins?**
+No, this project is for front ends only. The agents' shared rules (`agents/_common.md`) limit them to static
+HTML/CSS/JS that runs in the browser. A contact form or login screen will look and behave right on the page, but
+nothing is sent or stored; wire it to your own back end afterwards.
 
 **Why is it slower than single-AI builders?**
 Ten specialists each do a careful pass. For small changes, use the **Quick** preset or switch agents off. You can

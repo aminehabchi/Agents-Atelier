@@ -126,7 +126,7 @@
     <article>
       <section id="start">
         <h2><span class="num">01</span>Quick start</h2>
-        <p>Agents Atelier runs on your machine and uses your own Claude Code login, so there's no API key to set up.</p>
+        <p>Agents Atelier builds <b>front ends only</b>: static websites in plain HTML, CSS and JavaScript. It runs on your machine and uses your own Claude Code login, so there's no API key to set up.</p>
         <div class="steps">
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="code" data-size="20"></i></span><span class="n">STEP 1</span></div>
             <h3>Start the server</h3><p>Run <code>./run.sh</code> in the project folder, then open <code>localhost:8001</code>.</p></div>
@@ -266,6 +266,8 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
           <div>Nothing is lost. Agents that finished keep their work, and the run is saved. The chat and the Team panel then offer <b>Continue</b>, which picks up at the agent that was stopped and skips the ones already done, or <b>Start again</b>, which runs the whole team again on the same request. The same choice appears if an agent fails or the server restarts mid-run.</div></details>
         <details><summary>Can the team build a site with several pages?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>Yes. List the pages when you create the project (or later, in its details), one per line — for example Home, About, Contact. The agents build every page with the same header, navigation and footer, and the switcher above the preview shows each one.</div></details>
+        <details><summary>Can the team build a back end, a database or logins?<i data-icon="chevron-down" data-size="18"></i></summary>
+          <div>No. Agents Atelier is for front ends only: the agents write static HTML, CSS and JavaScript that runs in the browser. Forms and login screens look and behave right on the page, but nothing is sent or stored; connect them to your own back end afterwards.</div></details>
         <details><summary>Why is the download button locked?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>While agents are working, files change every few seconds, so a download could catch a half-finished page. The button unlocks as soon as the run finishes or you stop it.</div></details>
         <details><summary>Can I edit the generated code myself?<i data-icon="chevron-down" data-size="18"></i></summary>
