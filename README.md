@@ -13,6 +13,10 @@ HTML, CSS and JavaScript page that's yours.
 Every agent is your own **Claude Code** running with a different role, so there's no API key and no account to
 create. Everything runs on your machine.
 
+![The Agents Atelier studio: chat with the agents on the left, live preview of the page being built on the right, and the agent team below](docs/screenshots/studio.png)
+
+*The studio: talk to the team on the left, watch the page being built on the right, and see each agent's step in the team strip below.*
+
 > Technical documentation (architecture, API, data formats, internals) is in **[doc.md](doc.md)**.
 
 ## Contents
@@ -380,6 +384,7 @@ Set `KEEP_TEST_FILES=1` to keep the temporary folder for inspection.
 ├── README.md        this file
 ├── doc.md           technical documentation
 ├── run.sh           start the server
+├── docs/            screenshots used in this README
 ├── agents/          the agent team: one Markdown file per agent, shared rules, saved presets
 ├── server/          the Python server (FastAPI) and the web pages
 ├── tests/           automated tests and a fake Claude CLI

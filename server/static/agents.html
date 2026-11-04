@@ -4,30 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#f7f7f5">
+<meta name="theme-color" content="#f4efea">
 <title>Agents · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
 <script src="/static/icons.js"></script>
 <script src="/static/ui.js"></script>
 <style>
   .bar-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
-  .bar-top h1 { margin: 0 auto 0 0; font-weight: 400; font-size: 40px; letter-spacing: -.05em; line-height: 1.1; }
+  .bar-top h1 { margin: 0 auto 0 0; font-weight: 400; font-size: 40px; letter-spacing: 0; line-height: 1.1; }
   .crumb { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--graphite); text-decoration: none; margin-bottom: 18px; }
   .crumb:hover { color: var(--ink); }
   .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
   .controls .search { flex: 1 1 240px; max-width: 360px; }
-  .fchip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); font-size: 13px; color: var(--graphite); line-height: 1; }
+  .fchip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 2px; border: 1px solid var(--line); background: var(--paper); font-size: 13px; color: var(--graphite); line-height: 1; }
   .fchip:hover { border-color: var(--graphite); color: var(--ink); }
   .fchip.on { background: var(--espresso); border-color: var(--espresso); color: var(--on-espresso); }
   .hint { font-size: 13px; color: var(--stone); margin: 0 0 12px; display: flex; gap: 6px; align-items: center; }
-  .tile { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
+  .tile { width: 36px; height: 36px; border-radius: 2px; display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
   .badge.mono { font-family: ui-monospace, monospace; }
 
   /* ---------- list ---------- */
-  .alist { background: var(--paper); border-radius: 24px; box-shadow: var(--ring); overflow: hidden; }
+  .alist { background: var(--paper); border-radius: 2px; box-shadow: var(--ring); overflow: hidden; }
   .arow { position: relative; display: grid; grid-template-columns: 18px 26px 36px minmax(0, 1fr) auto auto 18px; gap: 14px; align-items: center;
     padding: 14px 18px 14px 12px; border-bottom: 1px solid var(--line); text-decoration: none; transition: background .15s; }
   .arow:last-child { border-bottom: 0; }
@@ -42,16 +42,16 @@
   .arow .meta { display: flex; gap: 6px; align-items: center; }
   .arow .teams { font-size: 12px; color: var(--stone); white-space: nowrap; }
   .arow .go { color: var(--stone); }
-  .rules-row { display: flex; align-items: center; gap: 14px; background: var(--paper); border-radius: 18px; box-shadow: var(--ring); padding: 14px 18px; text-decoration: none; margin-bottom: 12px; }
+  .rules-row { display: flex; align-items: center; gap: 14px; background: var(--paper); border-radius: 2px; box-shadow: var(--ring); padding: 14px 18px; text-decoration: none; margin-bottom: 12px; }
   .rules-row:hover { background: var(--linen); }
   .rules-row b { font-weight: 500; } .rules-row small { display: block; color: var(--stone); font-size: 13px; }
   .rules-row .go { margin-left: auto; color: var(--stone); }
 
   /* ---------- view ---------- */
-  .card { background: var(--paper); border-radius: 24px; box-shadow: var(--ring); padding: 28px; }
+  .card { background: var(--paper); border-radius: 2px; box-shadow: var(--ring); padding: 28px; }
   .vhead { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
-  .vhead .tile { width: 64px; height: 64px; border-radius: 20px; }
-  .vhead h1 { margin: 0; font-weight: 400; font-size: 40px; letter-spacing: -.05em; line-height: 1.05; }
+  .vhead .tile { width: 64px; height: 64px; border-radius: 2px; }
+  .vhead h1 { margin: 0; font-weight: 400; font-size: 40px; letter-spacing: 0; line-height: 1.05; }
   .vhead .sub { font: 12px ui-monospace, monospace; color: var(--stone); margin-top: 6px; }
   .vhead .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
   .vhead .acts { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
@@ -59,13 +59,13 @@
   .grid2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 16px; align-items: start; }
   .card h2 { margin: 0 0 14px; font-weight: 500; font-size: 16px; display: flex; align-items: center; gap: 8px; }
   .card h2 .spacer { flex: 1; }
-  pre.role { margin: 0; white-space: pre-wrap; font: 13.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--charcoal); background: var(--linen); border-radius: 14px; padding: 18px; }
+  pre.role { margin: 0; white-space: pre-wrap; font: 13.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--charcoal); background: var(--linen); border-radius: 2px; padding: 18px; }
   .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .kv div { background: var(--linen); border-radius: 14px; padding: 14px; }
-  .kv b { display: block; font-weight: 400; font-size: 24px; letter-spacing: -.03em; font-feature-settings: "tnum"; }
+  .kv div { background: var(--linen); border-radius: 2px; padding: 14px; }
+  .kv b { display: block; font-weight: 400; font-size: 24px; letter-spacing: 0; font-feature-settings: "tnum"; }
   .kv span { font-size: 12px; color: var(--stone); }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 999px; background: var(--linen); text-decoration: none; font-size: 13px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 2px; background: var(--linen); text-decoration: none; font-size: 13px; }
   .chip:hover { background: var(--bone); }
   .empty-note { font-size: 14px; color: var(--stone); margin: 0; }
   .pager-nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; }
@@ -86,15 +86,15 @@
   .check-result { font-size: 13px; display: flex; gap: 6px; align-items: center; }
   .check-result.ok { color: var(--ok); } .check-result.err { color: var(--danger); }
   .icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
-  .icons button { aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--line); background: var(--paper); display: grid; place-items: center; color: var(--graphite); }
+  .icons button { aspect-ratio: 1; border-radius: 2px; border: 1px solid var(--line); background: var(--paper); display: grid; place-items: center; color: var(--graphite); }
   .icons button:hover { border-color: var(--graphite); color: var(--ink); }
   .icons button.on { background: var(--espresso); color: var(--on-espresso); border-color: var(--espresso); }
   .colors { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .colors button { width: 28px; height: 28px; border-radius: 999px; border: 0; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+  .colors button { width: 28px; height: 28px; border-radius: 2px; border: 0; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
   .colors button.on { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
   .colors input[type=color] { width: 36px; height: 30px; border: 0; padding: 0; background: none; cursor: pointer; }
   .switch { display: flex; align-items: center; gap: 12px; cursor: pointer; font-size: 14px; color: var(--graphite); }
-  .switch input { appearance: none; width: 40px; height: 24px; border-radius: 999px; background: var(--line-strong); position: relative; cursor: pointer; transition: background .2s; margin: 0; flex: none; }
+  .switch input { appearance: none; width: 40px; height: 24px; border-radius: 2px; background: var(--line-strong); position: relative; cursor: pointer; transition: background .2s; margin: 0; flex: none; }
   .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--knob); transition: transform .2s; }
   .switch input:checked { background: var(--espresso); }
   .switch input:checked::after { transform: translateX(16px); }

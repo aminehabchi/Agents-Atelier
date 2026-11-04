@@ -1,28 +1,27 @@
 /* Layout shared by the content pages (landing, projects, agents). */
-body { font-size: 16px; line-height: 1.55; }
+body { font-size: 15px; line-height: 1.6; }
 .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
-header.top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--linen) 88%, transparent); backdrop-filter: blur(10px);
-  border-bottom: 1px solid transparent; transition: border-color .2s; }
-header.top.scrolled { border-bottom-color: var(--line); }
+header.top { position: sticky; top: 0; z-index: 20; background: var(--paper); border-bottom: 1.5px solid var(--line-strong); }
 header.top .wrap { height: 68px; display: flex; align-items: center; gap: 24px; }
-header.top.clear { position: absolute; inset: 0 0 auto; background: transparent; backdrop-filter: none; }
+header.top.clear { position: sticky; }
 .links { display: flex; gap: 4px; margin: 0 auto; }
-.links a { display: inline-flex; align-items: center; gap: 7px; height: 36px; line-height: 1; text-decoration: none; font-size: 14px; color: var(--charcoal); padding: 0 14px; border-radius: 999px; }
+.links a { display: inline-flex; align-items: center; gap: 7px; height: 36px; line-height: 1; text-decoration: none; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; color: var(--ink); padding: 0 12px; border: 1.5px solid transparent; border-radius: 2px; }
 .links a .ic, .links a i[data-icon] { color: var(--stone); }
 .links a:hover .ic, .links a.on .ic, .links a.on i[data-icon], .links a:hover i[data-icon] { color: var(--ink); }
-.links a:hover { background: color-mix(in srgb, var(--paper) 70%, transparent); }
-.links a.on { background: var(--paper); box-shadow: var(--ring); }
+.links a:hover { background: var(--ice); }
+.links a.on { background: var(--sky); color: var(--on-sky); border-color: var(--line-strong); }
+.links a.on .ic, .links a.on i[data-icon] { color: var(--on-sky) !important; }
 
 .page { padding-top: 32px; padding-bottom: 120px; }
-.eyebrow { font-size: 14px; color: var(--stone); margin: 0 0 12px; }
-.page-title { font-weight: 400; font-size: clamp(40px, 6vw, 72px); line-height: 1; letter-spacing: -.06em; margin: 0 0 16px; }
-.lead { color: var(--graphite); font-size: 18px; max-width: 640px; margin: 0; }
+.eyebrow { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--stone); margin: 0 0 12px; }
+.page-title { font-weight: 300; font-size: clamp(32px, 5vw, 56px); line-height: 1.05; text-transform: uppercase; letter-spacing: 0; margin: 0 0 16px; }
+.lead { color: var(--graphite); font-size: 16px; line-height: 1.6; max-width: 640px; margin: 0; }
 
-.seg { display: flex; background: var(--paper); box-shadow: var(--ring); border-radius: 999px; padding: 3px; }
-.seg button { background: transparent; border: 0; padding: 7px 14px; border-radius: 999px; font-size: 13px; color: var(--stone); }
+.seg { display: flex; background: var(--paper); box-shadow: var(--ring); border-radius: 2px; padding: 3px; gap: 2px; }
+.seg button { background: transparent; border: 0; padding: 7px 14px; border-radius: 2px; font-size: 13px; color: var(--stone); }
 .seg button:hover { color: var(--ink); }
-.seg button.on { background: var(--espresso); color: var(--on-espresso); }
+.seg button.on { background: var(--sky); color: var(--on-sky); box-shadow: inset 0 0 0 1.5px var(--line-strong); }
 
 @media (max-width: 760px) {
   .links a { font-size: 0; gap: 0; padding: 0; width: 36px; justify-content: center; }

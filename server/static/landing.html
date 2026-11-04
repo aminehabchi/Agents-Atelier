@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#f7f7f5">
+<meta name="theme-color" content="#f4efea">
 <title>Agents Atelier</title>
 <meta name="description" content="Describe a web page. A team of specialist AI agents builds it in front of you, one after another.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
 <script src="/static/icons.js"></script>
@@ -16,8 +16,8 @@
 <style>
   :root {
     --max: 1200px;
-    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-    font-feature-settings: "cv03", "cv04", "cv09", "cv11";
+    font-family: var(--font);
+    
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -26,61 +26,73 @@
   .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
 
   body { font-size: 18px; line-height: 1.5; }
-  .hero .btn-ghost { background: color-mix(in srgb, var(--paper) 60%, transparent); }
-  :root[data-theme="dark"] .hero svg.paint { filter: brightness(.5) saturate(.85); }
-  header.top.clear .links a:hover { background: color-mix(in srgb, var(--paper) 50%, transparent); }
 
   /* ---------- hero ---------- */
-  .hero { position: relative; min-height: 100vh; display: grid; place-items: center; text-align: center; overflow: hidden; padding: 120px 24px 200px; }
-  .hero svg.paint { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
-  .hero .stack { position: relative; z-index: 1; max-width: 920px; }
-  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--espresso); color: var(--on-espresso); border-radius: 999px; padding: 6px 14px; font-size: 13px; text-decoration: none; }
+  .hero { position: relative; display: grid; place-items: center; text-align: center; overflow: hidden; padding: 96px 24px 96px; }
+  .hero .stack { position: relative; z-index: 1; max-width: 1040px; width: 100%; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--canary); color: #383838; border: 1.5px solid #383838; border-radius: 2px; padding: 5px 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; text-decoration: none; }
   .pill span { opacity: .6; }
-  h1 { font-weight: 400; font-size: clamp(48px, 8vw, 80px); line-height: 1; letter-spacing: -.06em; margin: 28px 0 24px; }
-  .sub { font-size: 20px; letter-spacing: -.01em; line-height: 1.4; color: var(--graphite); max-width: 620px; margin: 0 auto 40px; }
+  h1 { font-weight: 300; font-size: clamp(34px, 5.6vw, 56px); line-height: 1.08; text-transform: uppercase; margin: 28px 0 24px; }
+  .sub { font-size: 17px; line-height: 1.6; color: var(--graphite); max-width: 640px; margin: 0 auto 40px; }
+  .doodle { position: absolute; z-index: 0; pointer-events: none; }
+  .d1 { width: 170px; left: 6%; top: 120px; } .d2 { width: 120px; right: 8%; top: 90px; }
+  .d3 { width: 64px; left: 12%; top: 420px; transform: rotate(-12deg); } .d4 { width: 70px; right: 11%; top: 360px; transform: rotate(10deg); }
+  .d5 { width: 130px; right: 15%; top: 250px; }
+  .shot { position: relative; margin: 72px auto 0; background: var(--paper); border: 2px solid var(--line-strong); border-radius: 2px; box-shadow: var(--hard); text-align: left; }
+  .shot-bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 2px solid var(--line-strong); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  .shot-bar span { width: 10px; height: 10px; border: 1.5px solid var(--line-strong); border-radius: 50%; }
+  .shot-bar span:nth-child(1) { background: #f38e84; } .shot-bar span:nth-child(2) { background: var(--canary); } .shot-bar span:nth-child(3) { background: #38c1b0; }
+  .shot-bar b { font-weight: 500; margin-left: 10px; color: var(--stone); }
+  .shot img { display: block; width: 100%; height: auto; }
+  .bubble { position: absolute; right: -18px; top: -26px; background: var(--paper); border: 2px solid var(--line-strong); border-radius: 2px; padding: 8px 12px; font-size: 13px; font-weight: 500; box-shadow: var(--hard-sm); transform: rotate(3deg); }
+  .marquee { background: var(--canary); color: #383838; overflow: hidden; border-block: 1.5px solid #383838; }
+  .marquee .track { display: flex; width: max-content; gap: 40px; padding: 14px 0; font-size: 18px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; animation: marquee 40s linear infinite; }
+  .marquee .track span::after { content: "✦"; margin-left: 40px; }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+  @media (max-width: 860px) { .doodle { display: none; } .bubble { right: 8px; } }
   .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; align-items: center; }
 
   /* ---------- sections ---------- */
   section.block { padding: 100px 0; }
   .eyebrow { font-size: 14px; color: var(--stone); margin: 0 0 16px; }
-  h2 { font-weight: 400; font-size: clamp(32px, 4.4vw, 44px); line-height: 1.1; letter-spacing: -.05em; margin: 0 0 20px; max-width: 760px; }
+  h2 { font-weight: 400; font-size: clamp(32px, 4.4vw, 44px); line-height: 1.1; letter-spacing: 0; margin: 0 0 20px; max-width: 760px; }
   .lead { color: var(--graphite); max-width: 640px; margin: 0; }
 
   .team { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 28px; padding: 40px 0 0; color: var(--stone); font-size: 15px; }
   .team span { display: inline-flex; align-items: center; gap: 8px; filter: grayscale(1); opacity: .8; }
 
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 64px; }
-  .stat b { display: block; font-weight: 400; font-size: clamp(56px, 7vw, 80px); line-height: 1; letter-spacing: -.06em; font-feature-settings: "tnum", "zero"; }
+  .stat b { display: block; font-weight: 400; font-size: clamp(56px, 7vw, 80px); line-height: 1; letter-spacing: 0; font-feature-settings: "tnum", "zero"; }
   .stat span { display: block; font-size: 14px; color: var(--stone); margin-top: 12px; }
 
   .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 56px; }
-  .card { background: var(--paper); border-radius: 16px; padding: 32px; }
+  .card { background: var(--paper); border-radius: 2px; padding: 32px; }
   .card svg { width: 28px; height: 28px; stroke: var(--charcoal); fill: none; stroke-width: 1.25; }
-  .card h3 { font-weight: 500; font-size: 24px; letter-spacing: -.02em; line-height: 1.3; margin: 24px 0 8px; }
+  .card h3 { font-weight: 500; font-size: 24px; letter-spacing: 0; line-height: 1.3; margin: 24px 0 8px; }
   .card p { font-size: 16px; line-height: 1.6; color: var(--graphite); margin: 0; }
   .card .n { font: 12px ui-monospace, monospace; color: var(--stone); float: right; }
 
-  .pipeline { background: var(--paper); border-radius: 24px; box-shadow: var(--ring); padding: 40px; margin-top: 56px; }
+  .pipeline { background: var(--paper); border-radius: 2px; box-shadow: var(--ring); padding: 40px; margin-top: 56px; }
   .flow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  .flow .step { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 6px 14px 6px 6px; font-size: 15px; background: var(--linen); box-shadow: var(--ring); text-decoration: none; transition: background .2s; }
+  .flow .step { display: inline-flex; align-items: center; gap: 8px; border-radius: 2px; padding: 6px 14px 6px 6px; font-size: 15px; background: var(--linen); box-shadow: var(--ring); text-decoration: none; transition: background .2s; }
   .flow .step:hover { background: var(--bone); }
-  .flow .step .si { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; background: var(--paper); color: var(--ink); box-shadow: var(--ring); }
+  .flow .step .si { width: 28px; height: 28px; border-radius: 2px; display: grid; place-items: center; background: var(--paper); color: var(--ink); box-shadow: var(--ring); }
   .flow .arrow { color: var(--stone); }
   .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
   .flow .step.off { opacity: .45; }
   .legend { margin: 24px 0 0; font-size: 14px; color: var(--stone); }
 
   .projects { margin-top: 40px; display: grid; gap: 8px; }
-  .proj { display: flex; align-items: center; gap: 16px; background: var(--paper); border-radius: 16px; padding: 18px 24px; text-decoration: none; transition: background .2s; }
+  .proj { display: flex; align-items: center; gap: 16px; background: var(--paper); border-radius: 2px; padding: 18px 24px; text-decoration: none; transition: background .2s; }
   .proj:hover { background: var(--bone); }
   .proj .name { flex: 1; min-width: 0; font-size: 17px; line-height: 1.3; }
   .proj .name, .proj .name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .proj .name small { display: block; font-size: 14px; color: var(--stone); margin-top: 2px; }
   .proj .id { font: 13px ui-monospace, monospace; color: var(--stone); }
   .proj .go { color: var(--stone); }
-  .proj .thumb { width: 40px; height: 40px; border-radius: 12px; background: var(--linen); display: grid; place-items: center; color: var(--stone); flex: none; }
+  .proj .thumb { width: 40px; height: 40px; border-radius: 2px; background: var(--linen); display: grid; place-items: center; color: var(--stone); flex: none; }
   .proj .badge { flex: none; }
-  .card .ico { width: 48px; height: 48px; border-radius: 14px; background: var(--linen); display: grid; place-items: center; color: var(--charcoal); }
+  .card .ico { width: 48px; height: 48px; border-radius: 2px; background: var(--linen); display: grid; place-items: center; color: var(--charcoal); }
 
   .final { text-align: center; padding: 120px 0 140px; }
   .final h2 { margin: 0 auto 32px; }
@@ -88,17 +100,31 @@
   footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 
   .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 56px; }
-  .feature { background: var(--paper); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 10px; }
-  .feature .ico { width: 44px; height: 44px; border-radius: 14px; background: var(--linen); display: grid; place-items: center; color: var(--charcoal); }
-  .feature h3 { font-weight: 500; font-size: 20px; letter-spacing: -.02em; line-height: 1.3; margin: 8px 0 0; }
+  .feature { background: var(--paper); border-radius: 2px; padding: 28px; display: flex; flex-direction: column; gap: 10px; }
+  .feature .ico { width: 44px; height: 44px; border-radius: 2px; background: var(--linen); display: grid; place-items: center; color: var(--charcoal); }
+  .feature h3 { font-weight: 500; font-size: 20px; letter-spacing: 0; line-height: 1.3; margin: 8px 0 0; }
   .feature p { font-size: 15px; line-height: 1.6; color: var(--graphite); margin: 0; }
-  .feature .tag { align-self: flex-start; font-size: 12px; color: var(--stone); background: var(--linen); border-radius: 999px; padding: 3px 10px; margin-top: auto; }
-  .flow .step .mb { font: 10.5px ui-monospace, monospace; color: var(--stone); background: var(--paper); border-radius: 999px; padding: 1px 6px; box-shadow: var(--ring); }
+  .feature .tag { align-self: flex-start; font-size: 12px; color: var(--stone); background: var(--linen); border-radius: 2px; padding: 3px 10px; margin-top: auto; }
+  .flow .step .mb { font: 10.5px ui-monospace, monospace; color: var(--stone); background: var(--paper); border-radius: 2px; padding: 1px 6px; box-shadow: var(--ring); }
   .proj .meta { font-size: 13px; color: var(--stone); white-space: nowrap; }
   .reveal { opacity: 0; transform: translateY(16px); transition: opacity .7s ease, transform .7s ease; }
   .reveal.in { opacity: 1; transform: none; }
   @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
 
+  /* crayon rhythm: each tile gets the next pencil from the cup */
+  .stat { border: 0; border-left: 3px solid var(--line-strong); padding-left: 20px; }
+  .card .ico, .feature .ico { background: var(--c, var(--ice)); color: #383838; border: 1.5px solid var(--line-strong); }
+  .cards > :nth-child(8n+1), .features > :nth-child(8n+1) { --c: #f38e84; } .cards > :nth-child(8n+2), .features > :nth-child(8n+2) { --c: #f5b161; }
+  .cards > :nth-child(8n+3), .features > :nth-child(8n+3) { --c: #38c1b0; } .features > :nth-child(8n+4) { --c: #b291de; }
+  .features > :nth-child(8n+5) { --c: #b3c419; } .features > :nth-child(8n+6) { --c: #7597ee; }
+  .features > :nth-child(8n+7) { --c: #84a6bc; } .features > :nth-child(8n+8) { --c: #e1c427; }
+  .feature { border-color: var(--line-strong); }
+  .feature .tag { border: 1px solid var(--line-strong); background: var(--pale); color: var(--ink); text-transform: uppercase; font-size: 10.5px; letter-spacing: .05em; }
+  .stat b { font-weight: 300; }
+  h2 { text-transform: uppercase; font-weight: 300; }
+  .final { background: var(--paper); border-top: 1.5px solid var(--line-strong); }
+  footer { border-top-color: var(--line-strong); }
+  .flow .step { background: var(--paper); }
   @media (max-width: 860px) {
     nav ul { display: none; }
     nav .wrap { justify-content: space-between; }
@@ -125,69 +151,30 @@
 </header>
 
 <header class="hero">
-  <!-- the one painted moment: a watercolor sunset -->
-  <svg class="paint" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-    <defs>
-      <filter id="wc" x="-10%" y="-10%" width="120%" height="120%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="7" result="n"/>
-        <feDisplacementMap in="SourceGraphic" in2="n" scale="38"/>
-        <feGaussianBlur stdDeviation="2.2"/>
-      </filter>
-      <filter id="soft"><feGaussianBlur stdDeviation="40"/></filter>
-      <filter id="grain">
-        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3"/>
-        <feColorMatrix values="0 0 0 0 .2  0 0 0 0 .1  0 0 0 0 .05  0 0 0 .06 0"/>
-      </filter>
-      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#f6d9cf"/>
-        <stop offset=".35" stop-color="#f7c6b0"/>
-        <stop offset=".6" stop-color="#f9b98f"/>
-        <stop offset=".78" stop-color="#fbd7a8"/>
-      </linearGradient>
-      <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#f4b994"/>
-        <stop offset=".5" stop-color="#d9a9a6"/>
-        <stop offset="1" stop-color="#b9b2b8"/>
-      </linearGradient>
-      <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" style="stop-color: var(--linen)" stop-opacity="0"/>
-        <stop offset=".55" style="stop-color: var(--linen)" stop-opacity=".2"/>
-        <stop offset="1" style="stop-color: var(--linen)"/>
-      </linearGradient>
-      <radialGradient id="glow" cx=".5" cy=".5" r=".5">
-        <stop offset="0" stop-color="#fff2d6"/>
-        <stop offset=".4" stop-color="#ffd6a0" stop-opacity=".8"/>
-        <stop offset="1" stop-color="#ffb98a" stop-opacity="0"/>
-      </radialGradient>
-    </defs>
-    <rect width="1440" height="900" fill="url(#sky)"/>
-    <ellipse cx="1000" cy="170" rx="420" ry="110" fill="#f3b7c1" opacity=".45" filter="url(#soft)"/>
-    <ellipse cx="300" cy="230" rx="380" ry="90" fill="#efc0d0" opacity=".5" filter="url(#soft)"/>
-    <circle cx="760" cy="500" r="260" fill="url(#glow)"/>
-    <circle cx="760" cy="505" r="62" fill="#fff0cf" opacity=".95" filter="url(#wc)"/>
-    <g filter="url(#wc)">
-      <path d="M-40 560 L120 440 L230 500 L380 380 L520 480 L640 430 L760 510 L900 400 L1040 470 L1180 360 L1320 450 L1480 400 L1480 600 L-40 600Z" fill="#c9a2b4" opacity=".75"/>
-      <path d="M-40 590 L90 500 L220 560 L330 480 L470 545 L600 500 L720 560 L860 490 L1000 555 L1120 470 L1260 540 L1380 490 L1480 530 L1480 620 L-40 620Z" fill="#a9879f" opacity=".8"/>
-      <rect x="-40" y="600" width="1520" height="180" fill="url(#water)"/>
-      <path d="M560 615 Q760 600 960 615 L900 650 Q760 640 620 650Z" fill="#ffe3b8" opacity=".75"/>
-      <path d="M640 670 Q760 662 880 670 L850 690 Q760 684 670 690Z" fill="#ffe3b8" opacity=".55"/>
-      <path d="M-40 740 Q200 690 420 720 Q620 750 820 715 Q1080 670 1480 720 L1480 920 L-40 920Z" fill="#9fb48c"/>
-      <path d="M-40 800 Q260 760 520 790 Q800 820 1080 780 Q1300 755 1480 790 L1480 920 L-40 920Z" fill="#7f9c74"/>
-    </g>
-    <rect width="1440" height="900" filter="url(#grain)"/>
-    <rect y="420" width="1440" height="480" fill="url(#fade)"/>
-  </svg>
+  <!-- hand-drawn doodles, pencil-loose on purpose -->
+  <svg class="doodle d1" viewBox="0 0 160 90" aria-hidden="true"><path d="M22 70c-14 1-18-16-5-20-3-15 15-24 26-14 6-17 32-18 38-1 12-9 30-1 27 14 15 1 17 21 1 22z" fill="var(--paper)" stroke="var(--wet)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 60c8 4 18 4 26 0" fill="none" stroke="var(--wet)" stroke-width="2" stroke-linecap="round"/></svg>
+  <svg class="doodle d2" viewBox="0 0 120 80" aria-hidden="true"><path d="M18 60c-12 0-13-15-2-17-1-12 14-18 22-9 5-13 26-12 29 2 10-6 24 1 21 12 12 2 11 13 0 13z" fill="var(--paper)" stroke="var(--ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <svg class="doodle d3" viewBox="0 0 80 80" aria-hidden="true"><path d="M14 64 40 14l27 49z" fill="var(--canary)" stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round"/><path d="M33 50l7-14 7 14" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/></svg>
+  <svg class="doodle d4" viewBox="0 0 90 90" aria-hidden="true"><path d="M45 8c2 20 6 30 37 37-31 6-35 16-37 37-3-21-7-31-37-37 30-7 34-17 37-37z" fill="var(--orange)" stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round"/></svg>
+  <svg class="doodle d5" viewBox="0 0 120 60" aria-hidden="true"><path d="M6 40c18-26 38-26 52-6s34 20 54-8" fill="none" stroke="var(--wet)" stroke-width="2.6" stroke-linecap="round"/><path d="M98 20l15 5-6 14" fill="none" stroke="var(--wet)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
 
   <div class="stack">
-    <a class="pill" href="#features">New <span>·</span> versions, retries, live code editing and cost tracking</a>
+    <a class="pill" href="#features">New <span>·</span> multi-page sites, teams, command palette, dark mode</a>
     <h1>Describe a page.<br>Watch a team build it.</h1>
     <p class="sub">A crew of specialist AI agents — UX, design, copy, HTML, CSS, motion, accessibility — takes your prompt and builds a real web page, one after another, right in front of you. Stop them, steer them, roll back any step.</p>
     <div class="ctas">
       <a class="btn btn-dark btn-lg" href="/projects">See your projects<i data-icon="arrow-right" data-size="18"></i></a>
-      <a class="btn btn-ghost" href="/guide"><i data-icon="book" data-size="16"></i>Read the guide</a>
+      <a class="btn btn-ghost btn-lg" href="/guide"><i data-icon="book" data-size="18"></i>Read the guide</a>
     </div>
+    <figure class="shot">
+      <div class="shot-bar"><span></span><span></span><span></span><b>studio — live preview</b></div>
+      <img src="/static/studio-shot.png" alt="The studio: chat with the agents on the left, live preview on the right, the agent team below" width="1440" height="900">
+      <span class="bubble">I'm on the CSS now&nbsp;✎</span>
+    </figure>
   </div>
 </header>
+
+<div class="marquee" aria-hidden="true"><div class="track" id="marquee"></div></div>
 
 <main>
   <section class="block" id="how">
@@ -313,6 +300,8 @@ document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) 
 window.addEventListener("scroll", () => document.querySelector("header.top").classList.toggle("scrolled", scrollY > 4));
 api("/api/agents").then(agents => {
   document.getElementById("statAgents").textContent = agents.length;
+  const words = agents.map(a => `<span>${esc(a.name)}</span>`).join("");
+  document.getElementById("marquee").innerHTML = words + words;
   document.getElementById("flow").innerHTML = agents.map((a, i) =>
     `${i ? icon("arrow-right", { size: 14, cls: "arrow" }) : ""}<a class="step ${a.default ? "" : "off"}" href="/agents/${encodeURIComponent(a.id)}"
       title="${esc(a.description || "Edit " + a.name)}"><span class="si">${icon(a.icon, { size: 15 })}</span>${esc(a.name)}${a.model ? `<span class="mb">${esc(a.model)}</span>` : ""}</a>`).join("");
