@@ -34,12 +34,14 @@ For what the app does and how to run it, see [README.md](README.md).
 
 ```
 server/
+├── config.py     settings: reads .env (shell variables win), parses and checks every value
+├── serve.py      starts uvicorn with HOST/PORT/LOG_LEVEL from config (used by run.sh)
 ├── main.py       FastAPI app: pages, JSON API, WebSocket, run pipeline, stats, error handling
 ├── agents.py     agents/ loader and editor (frontmatter parser, validation, ordering, presets)
 ├── versions.py   code snapshots: create, list, diff, restore, prune
 └── static/
     ├── landing.html  /            home page
-    ├── projects.html /projects    projects list (server-side pagination)
+    ├── projects.html /projects    projects list (server-side pagination, lazy thumbnails)
     ├── studio.html   /p/<uuid>    the studio: chat, preview, code editor, team, versions, stats
     ├── agents.html   /agents      agent editor
     ├── guide.html    /guide       user guide
@@ -48,9 +50,21 @@ server/
     ├── teams.html    /teams…      team pages
     ├── ui.js         api(), toast(), dialogs, showError(), fmtSize(), theme (setTheme/cycleTheme),
     │                 command palette (openPalette, registerCommands), importFlow()
+    │                 pagination (paginate, pagerHTML, bindPager, perPagePref), lazy loading (lazyEach, onVisible),
+    │                 motion (staggered .enter, countUp)
     ├── icons.js      hand-drawn SVG line icons: icon(name) and <i data-icon="name">
     └── logo.svg      logo and favicon
 ```
+
+
+**Pagination and lazy loading.** Every list uses the same pager (`pagerHTML` in `ui.js`, styles in `base.css`).
+Projects, versions and "recent agent runs" are paged **on the server** (`page`, `per_page`; the answer carries
+`page, pages, per_page, total`). Agents, teams and the per-agent stats table are paged in the browser, since they
+are small and already loaded. Each list remembers its "per page" choice in `localStorage` (`perPage:<list>`).
+Lazy: project thumbnails (iframes) load when they near the screen; images use `loading="lazy"`; the landing page
+asks for its 6 recent projects only when that section scrolls into view; the studio replays the whole chat once
+(to rebuild agent states) but keeps only the last 40 messages in the page and puts earlier ones back 30 at a
+time when you scroll up (`foldHistory` / `showEarlier`).
 
 ---
 
@@ -273,7 +287,7 @@ images get a `url` instead.
 
 | Method | Path                                             | Notes                                                    |
 |--------|--------------------------------------------------|----------------------------------------------------------|
-| GET    | `/api/projects/<id>/versions`                    | newest first: `{n, label, kind, agent, request, ts, files, size, hash}` |
+| GET    | `/api/projects/<id>/versions?page=&per_page=`    | newest first: `{n, label, kind, agent, request, ts, files, size, hash}`; with `page`, one page: `{items, page, pages, per_page, total}` (per_page ≤ 100, page clamped) |
 | POST   | `/api/projects/<id>/versions`                    | `{label?}`; `400` if nothing changed, `409` while busy    |
 | GET    | `/api/projects/<id>/versions/<n>/diff?against=m` | per-file unified diff, from version n to the current code (or to version m) |
 | POST   | `/api/projects/<id>/versions/<n>/restore`        | saves the current code first (`backup`), then restores; broadcasts `restored` |
@@ -301,7 +315,7 @@ images get a `url` instead.
 | POST     | `/api/import`           | `{name, data: base64, on_conflict: rename·replace·skip, apply}`; without `apply` it returns the plan only. Accepts `.md`, team `.json`, `.zip` (≤ 300 files, 5 MB unpacked) |
 | GET      | `/api/models`           | the model list: `{default, options: [{id, label, kind: alias·full·custom, source, note}], alias_source}` |
 | POST     | `/api/models/check`     | `{model}`: asks the Claude CLI to answer with that model; on success it's added to `agents/_models.json` |
-| GET      | `/api/stats?project=<id>` | `{totals, agents: [per agent], recent: [last 30 runs]}`; omit `project` for all projects |
+| GET      | `/api/stats?project=<id>&page=&per_page=` | `{totals, agents: [per agent], recent: [last 30 runs]}`; omit `project` for all projects. With `page`, `recent` is one page of **all** runs (newest first) and `recent_pager` = `{page, pages, per_page, total}` |
 
 ---
 

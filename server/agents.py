@@ -28,7 +28,9 @@ import re
 import time
 from pathlib import Path
 
-AGENTS_DIR = Path(os.environ.get("ATELIER_AGENTS") or Path(__file__).resolve().parent.parent / "agents")
+import config
+
+AGENTS_DIR = config.AGENTS_DIR
 COMMON_FILE = AGENTS_DIR / "_common.md"
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")

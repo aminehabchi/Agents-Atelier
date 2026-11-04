@@ -96,20 +96,6 @@
   .skel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(237, 236, 231, .8), transparent); animation: shimmer 1.2s infinite; }
   @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 
-  /* pagination */
-  .pager { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 28px; }
-  .pager:empty { display: none; }
-  .pager .info { font-size: 13px; color: var(--stone); font-feature-settings: "tnum"; }
-  .pager .info b { color: var(--ink); font-weight: 500; }
-  .pages { display: flex; align-items: center; gap: 4px; }
-  .pages button { min-width: 36px; height: 36px; padding: 0 10px; border-radius: 2px; border: 1px solid transparent; background: transparent; line-height: 1;
-    font-size: 14px; color: var(--graphite); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-feature-settings: "tnum"; }
-  .pages button:hover:not(:disabled) { background: var(--paper); border-color: var(--line); color: var(--ink); }
-  .pages button.on { background: var(--espresso); color: var(--on-espresso); }
-  .pages button:disabled { opacity: .35; cursor: default; }
-  .pages .gap { color: var(--stone); width: 24px; text-align: center; }
-  .ic.flip { transform: scaleX(-1); }
-  .pager .per { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--stone); }
 
   @media (max-width: 900px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
@@ -241,8 +227,8 @@ function syncUrl() {
 // ================================================================ render
 function renderStats() {
   const c = data.counts;
-  $("s-all").textContent = c.all; $("s-built").textContent = c.built;
-  $("s-working").textContent = c.working; $("s-prompts").textContent = data.prompts;
+  countUp($("s-all"), c.all); countUp($("s-built"), c.built);
+  countUp($("s-working"), c.working); countUp($("s-prompts"), data.prompts);
   document.querySelectorAll("[data-count]").forEach(el => el.textContent = c[el.dataset.count] ?? "");
 }
 
@@ -334,30 +320,9 @@ function rowHTML(p) {
   </div>`;
 }
 
-function pageList(cur, total) {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const set = new Set([1, total, cur, cur - 1, cur + 1]);
-  if (cur <= 3) [2, 3, 4].forEach(n => set.add(n));
-  if (cur >= total - 2) [total - 1, total - 2, total - 3].forEach(n => set.add(n));
-  const nums = [...set].filter(n => n >= 1 && n <= total).sort((a, b) => a - b);
-  const out = [];
-  nums.forEach((n, i) => { if (i && n - nums[i - 1] > 1) out.push("…"); out.push(n); });
-  return out;
-}
-
 function renderPager() {
   const { page, pages, total, per_page } = data;
-  const from = (page - 1) * per_page + 1, to = Math.min(total, page * per_page);
-  $("pager").innerHTML = `
-    <span class="info">Showing <b>${from}–${to}</b> of ${total}</span>
-    <div class="pages">
-      <button data-page="${page - 1}" ${page <= 1 ? "disabled" : ""} aria-label="Previous page">${icon("arrow-right", { size: 16, cls: "flip" })}Prev</button>
-      ${pageList(page, pages).map(n => n === "…" ? `<span class="gap">…</span>`
-        : `<button class="num ${n === page ? "on" : ""}" data-page="${n}" ${n === page ? 'aria-current="page"' : ""} aria-label="Page ${n}">${n}</button>`).join("")}
-      <button data-page="${page + 1}" ${page >= pages ? "disabled" : ""} aria-label="Next page">Next${icon("arrow-right", { size: 16 })}</button>
-    </div>
-    <label class="per">Per page
-      <select class="input" id="perPage">${[12, 24, 48].map(n => `<option ${n === per_page ? "selected" : ""}>${n}</option>`).join("")}</select></label>`;
+  $("pager").innerHTML = pagerHTML({ page, pages, total, perPage: per_page }, { sizes: [12, 24, 48], always: true });
 }
 
 const thumbs = new IntersectionObserver((entries) => entries.forEach(e => {
@@ -380,14 +345,9 @@ $("views").onclick = (e) => {
   const b = e.target.closest("[data-view]"); if (!b) return;
   state.view = b.dataset.view; syncControls(); syncUrl(); signature = ""; render();
 };
-$("pager").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-page]"); if (!b || b.disabled) return;
-  state.page = +b.dataset.page; load();
-  document.querySelector(".controls").scrollIntoView({ behavior: "smooth", block: "start" });
-});
-$("pager").addEventListener("change", (e) => {
-  if (e.target.id === "perPage") { state.per_page = +e.target.value; state.page = 1; load(); }
-});
+bindPager($("pager"),
+  (page) => { state.page = page; load(); document.querySelector(".controls").scrollIntoView({ behavior: "smooth", block: "start" }); },
+  (n) => { state.per_page = n; state.page = 1; load(); });
 function syncControls() {
   document.querySelectorAll("[data-status]").forEach(b => b.classList.toggle("on", b.dataset.status === state.status));
   document.querySelectorAll("[data-view]").forEach(b => b.classList.toggle("on", b.dataset.view === state.view));

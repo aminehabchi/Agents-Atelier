@@ -157,6 +157,7 @@ function setTitle(t) { document.title = `${t} · Agents Atelier`; }
 
 // ================================================================ list: /agents
 let agents = [], filter = "all", query = "";
+let agentsPage = 1, agentsPer = perPagePref("agents", 10);
 async function listView() {
   setTitle("Agents");
   app.innerHTML = `<p class="note">Loading…</p>`;
@@ -179,12 +180,16 @@ async function listView() {
       <button class="fchip ${filter === "off" ? "on" : ""}" data-filter="off">Optional <span>${agents.filter(a => !a.default).length}</span></button>
     </div>
     <p class="hint">${icon("menu", { size: 13 })}Agents run top to bottom. Drag the handle — or press Alt+↑/↓ — to change the order.</p>
-    <div class="alist" id="list"></div>`;
+    <div class="alist" id="list"></div>
+    <nav class="pager compact" id="agentsPager" aria-label="Pages of agents"></nav>`;
   const draw = () => {
     const q = query.toLowerCase();
     const shown = agents.filter(a => (filter === "all" || (filter === "on") === a.default) &&
       (!q || a.name.toLowerCase().includes(q) || a.id.includes(q) || (a.description || "").toLowerCase().includes(q)));
-    $("list").innerHTML = shown.map(a => `
+    const pg = paginate(shown, agentsPage, agentsPer);
+    agentsPage = pg.page;
+    $("agentsPager").innerHTML = pagerHTML(pg, { noun: "agents" });
+    $("list").innerHTML = pg.items.map(a => `
       <a class="arow" href="/agents/${encodeURIComponent(a.id)}" data-id="${esc(a.id)}" draggable="${!q && filter === "all"}">
         <span class="grip" title="Drag to reorder">${q || filter !== "all" ? "" : icon("menu", { size: 13 })}</span>
         <span class="num">${String(agents.indexOf(a) + 1).padStart(2, "0")}</span>
@@ -198,9 +203,11 @@ async function listView() {
       </a>`).join("") || `<p class="note" style="padding:20px">No agent matches.</p>`;
   };
   draw();
-  $("q").addEventListener("input", (e) => { query = e.target.value.trim(); draw(); });
+  bindPager($("agentsPager"), (p) => { agentsPage = p; draw(); $("list").scrollIntoView({ block: "nearest", behavior: "smooth" }); },
+    (n) => { agentsPer = n; savePerPage("agents", n); agentsPage = 1; draw(); });
+  $("q").addEventListener("input", (e) => { query = e.target.value.trim(); agentsPage = 1; draw(); });
   $("importBtn").onclick = async () => { if (await importFlow()) listView(); };
-  app.querySelectorAll("[data-filter]").forEach(b => b.onclick = () => { filter = b.dataset.filter; listView(); });
+  app.querySelectorAll("[data-filter]").forEach(b => b.onclick = () => { filter = b.dataset.filter; agentsPage = 1; listView(); });
   enableReorder(draw);
 }
 
@@ -228,6 +235,7 @@ function enableReorder(draw) {
     const ids = agents.map(a => a.id), i = ids.indexOf(r.dataset.id), j = i + (e.key === "ArrowUp" ? -1 : 1);
     if (j < 0 || j >= ids.length) return;
     [ids[i], ids[j]] = [ids[j], ids[i]];
+    agentsPage = Math.floor(j / agentsPer) + 1;   // follow the agent if it moves onto the next or previous page
     await saveOrder(ids, draw);
     list.querySelector(`.arow[data-id="${CSS.escape(r.dataset.id)}"]`)?.focus();
   });

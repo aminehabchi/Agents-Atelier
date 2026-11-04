@@ -49,6 +49,25 @@
   .marquee .track { display: flex; width: max-content; gap: 40px; padding: 14px 0; font-size: 18px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; animation: marquee 40s linear infinite; }
   .marquee .track span::after { content: "✦"; margin-left: 40px; }
   @keyframes marquee { to { transform: translateX(-50%); } }
+  /* hero motion: the stack rises in line by line, doodles drift like they were drawn on a breathing page */
+  .hero .stack > * { animation: rise .6s cubic-bezier(.2, .7, .2, 1) both; }
+  .hero .stack > :nth-child(2) { animation-delay: .08s; } .hero .stack > :nth-child(3) { animation-delay: .16s; }
+  .hero .stack > .shot { animation: land .7s .3s cubic-bezier(.2, .7, .2, 1) both; }
+  .doodle { animation: fade .8s .4s both; }
+  .d1 > *, .d2 > * { animation: drift 9s ease-in-out infinite alternate; }
+  .d2 > * { animation-duration: 12s; animation-direction: alternate-reverse; }
+  .d3, .d4, .d5 { animation: fade .8s .4s both, bob 5s ease-in-out 1.2s infinite; }
+  .d4 { animation-duration: .8s, 6.5s; }
+  .d4 path { transform-origin: 45px 45px; animation: twinkle 7s ease-in-out infinite; }
+  .d5 { animation-duration: .8s, 4.2s; }
+  .bubble { animation: bubble 3.6s ease-in-out 1.2s infinite; }
+  @keyframes drift { to { transform: translateX(14px); } }
+  @keyframes bob { 50% { translate: 0 -8px; } }
+  @keyframes twinkle { 0%, 70%, 100% { transform: rotate(0) scale(1); } 80% { transform: rotate(25deg) scale(1.15); } 90% { transform: rotate(-6deg) scale(.95); } }
+  @keyframes bubble { 50% { transform: rotate(1deg) translateY(-4px); } }
+  .marquee:hover .track { animation-play-state: paused; }
+  .feature .ico, .card .ico { transition: transform .25s cubic-bezier(.3, 1.6, .5, 1); }
+  .feature:hover .ico, .card:hover .ico { transform: rotate(-6deg) scale(1.08); }
   @media (max-width: 860px) { .doodle { display: none; } .bubble { right: 8px; } }
   .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; align-items: center; }
 
@@ -159,7 +178,7 @@
   <svg class="doodle d5" viewBox="0 0 120 60" aria-hidden="true"><path d="M6 40c18-26 38-26 52-6s34 20 54-8" fill="none" stroke="var(--wet)" stroke-width="2.6" stroke-linecap="round"/><path d="M98 20l15 5-6 14" fill="none" stroke="var(--wet)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
 
   <div class="stack">
-    <h1>Describe a page.<br>Watch a team build it.</h1>
+    <h1>Describe a page.<br><span class="caret">Watch a team build it.</span></h1>
     <p class="sub">A crew of specialist AI agents — UX, design, copy, HTML, CSS, motion, accessibility — takes your prompt and builds a real web page, one after another, right in front of you. Stop them, steer them, roll back any step.</p>
     <div class="ctas">
       <a class="btn btn-dark btn-lg" href="/projects">See your projects<i data-icon="arrow-right" data-size="18"></i></a>
@@ -167,7 +186,7 @@
     </div>
     <figure class="shot">
       <div class="shot-bar"><span></span><span></span><span></span><b>studio — live preview</b></div>
-      <img src="/static/studio-shot.png" alt="The studio: chat with the agents on the left, live preview on the right, the agent team below" width="1440" height="900">
+      <img src="/static/studio-shot.png" loading="lazy" decoding="async" alt="The studio: chat with the agents on the left, live preview on the right, the agent team below" width="1440" height="900">
       <span class="bubble">I'm on the CSS now&nbsp;✎</span>
     </figure>
   </div>
@@ -298,7 +317,7 @@
 document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
 window.addEventListener("scroll", () => document.querySelector("header.top").classList.toggle("scrolled", scrollY > 4));
 api("/api/agents").then(agents => {
-  document.getElementById("statAgents").textContent = agents.length;
+  countUp(document.getElementById("statAgents"), agents.length);
   const words = agents.map(a => `<span>${esc(a.name)}</span>`).join("");
   document.getElementById("marquee").innerHTML = words + words;
   document.getElementById("flow").innerHTML = agents.map((a, i) =>
@@ -306,9 +325,12 @@ api("/api/agents").then(agents => {
       title="${esc(a.description || "Edit " + a.name)}"><span class="si">${icon(a.icon, { size: 15 })}</span>${esc(a.name)}${a.model ? `<span class="mb">${esc(a.model)}</span>` : ""}</a>`).join("");
 }).catch((err) => { document.getElementById("flow").innerHTML = `<span class="legend">Couldn't load the team: ${esc(err.message)}</span>`; });
 
-api("/api/projects").then(list => {
-  const el = document.getElementById("projects-list");
-  el.innerHTML = list.slice(0, 6).map(p => `
+/* only the 6 most recent projects are needed here, so ask the server for just that page,
+   and only when the section is about to scroll into view */
+const projectsEl = document.getElementById("projects-list");
+onVisible(projectsEl, () => api("/api/projects?page=1&per_page=6").then(({ items: list, total }) => {
+  const el = projectsEl;
+  el.innerHTML = list.map(p => `
     <a class="proj" href="/p/${p.id}">
       <span class="thumb">${icon(p.has_preview ? "monitor" : "file", { size: 18 })}</span>
       <span class="name">${esc(p.name)}<small>${esc(p.description || "No description yet")}</small></span>
@@ -318,11 +340,14 @@ api("/api/projects").then(list => {
       <span class="go">${icon("arrow-right", { size: 18 })}</span>
     </a>`).join("") ||
     `<a class="proj" href="/projects?new=1"><span class="thumb">${icon("plus", { size: 18 })}</span><span class="name">No projects yet — start your first one</span><span class="go">${icon("arrow-right", { size: 18 })}</span></a>`;
-}).catch((err) => showError(document.getElementById("projects-list"), err, () => location.reload(), "Couldn't load your projects"));
+  if (total > list.length) el.insertAdjacentHTML("beforeend", `<a class="proj more" href="/projects"><span class="thumb">${icon("grid", { size: 18 })}</span><span class="name">See all ${total} projects</span><span class="go">${icon("arrow-right", { size: 18 })}</span></a>`);
+}).catch((err) => showError(projectsEl, err, () => location.reload(), "Couldn't load your projects")));
 
 const io = new IntersectionObserver((entries) => entries.forEach(e => {
   if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
 }), { threshold: .15 });
+/* siblings in a grid reveal one after another */
+document.querySelectorAll(".stats, .cards, .features").forEach(g => [...g.children].forEach((c, i) => c.style.transitionDelay = `${i * 70}ms`));
 document.querySelectorAll(".reveal").forEach(el => io.observe(el));
 </script>
 </body>

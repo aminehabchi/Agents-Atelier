@@ -22,6 +22,7 @@ work/
 .DS_Store
 Thumbs.db
 
-# Local environment overrides
+# Local settings (copy .env.example to .env). The example is committed, your .env is not.
 .env
 .env.*
+!.env.example

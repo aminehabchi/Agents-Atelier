@@ -16,9 +16,11 @@ import tempfile
 import time
 from pathlib import Path
 
-AGENTS_DIR = Path(os.environ.get("ATELIER_AGENTS") or Path(__file__).resolve().parent.parent / "agents")
+import config
+
+AGENTS_DIR = config.AGENTS_DIR
 VERIFIED_FILE = AGENTS_DIR / "_models.json"
-CLAUDE = os.environ.get("CLAUDE_BIN", "claude")
+CLAUDE = config.CLAUDE_BIN
 
 FALLBACK_ALIASES = ["fable", "opus", "sonnet"]
 KNOWN_FULL = [
@@ -81,7 +83,7 @@ def catalog() -> dict:
             options.append({"id": v["name"], "label": v["name"], "kind": "custom", "source": "checked with the Claude CLI",
                             "note": f"resolves to {v.get('resolved') or v['name']}"})
             seen.add(v["name"])
-    env = os.environ.get("AGENT_MODEL", "")
+    env = config.AGENT_MODEL or ""
     default = {"id": "", "label": f"Default ({env})" if env else "Default (your Claude Code model)",
                "note": "AGENT_MODEL is set on the server" if env else "whatever model Claude Code uses by default"}
     return {"default": default, "options": options, "alias_source": source}

@@ -55,30 +55,31 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 
+import config
 import agents as team_files
 from agents import default_ids, load_agents, load_common
 from versions import Versions
 import models as model_catalog
 
 ROOT = Path(__file__).resolve().parent.parent
-WORK = Path(os.environ.get("ATELIER_WORK") or ROOT / "work")   # tests point this at a temporary folder
+WORK = config.WORK_DIR   # ATELIER_WORK in .env; tests point this at a temporary folder
 META = WORK / ".projects"
 STATIC = Path(__file__).resolve().parent / "static"
 META.mkdir(parents=True, exist_ok=True)
 VERS = Versions(WORK)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.basicConfig(level=getattr(logging, config.LOG_LEVEL, logging.INFO), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("agents-atelier")
 
-MAX_BODY = 8 * 1024 * 1024          # largest request body we accept (an image upload is ~6.7 MB as base64)
-MAX_IMAGE = 5 * 1024 * 1024         # largest reference image
-MAX_EDIT = 500 * 1024               # largest file the Code tab will load or save
-AGENT_TIMEOUT = int(os.environ.get("AGENT_TIMEOUT", "900"))   # seconds before a stuck agent is stopped
+MAX_BODY = config.MAX_BODY          # largest request body we accept (an image upload is ~6.7 MB as base64)
+MAX_IMAGE = config.MAX_IMAGE        # largest reference image
+MAX_EDIT = config.MAX_EDIT          # largest file the Code tab will load or save
+AGENT_TIMEOUT = config.AGENT_TIMEOUT   # seconds before a stuck agent is stopped
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif"}
 TEXT_EXT = {".html", ".css", ".js", ".md", ".svg", ".json", ".txt", ".xml", ".webmanifest"}
 
-CLAUDE = os.environ.get("CLAUDE_BIN", "claude")
-MODEL = os.environ.get("AGENT_MODEL")  # e.g. "sonnet" for faster runs; default = your Claude Code default
+CLAUDE = config.CLAUDE_BIN
+MODEL = config.AGENT_MODEL  # e.g. "sonnet" for faster runs; default = your Claude Code default
 
 app = FastAPI()
 
@@ -337,7 +338,7 @@ def run_summary(run: dict) -> dict:
 
 # ---------------------------------------------------------------- http
 
-ALLOWED_HOSTS = {"localhost", "127.0.0.1", "[::1]"} | set(filter(None, os.environ.get("ATELIER_HOSTS", "").split(",")))
+ALLOWED_HOSTS = {"localhost", "127.0.0.1", "[::1]"} | config.ALLOWED_HOSTS
 
 
 def _host_ok(host: str) -> bool:
@@ -862,9 +863,21 @@ def _version_call(fn, *args):
         raise HTTPException(404, "Unknown version")
 
 
+def page_of(items: list, page: int, per_page: int, limit: int = 100) -> dict:
+    """One page of `items`, with the totals the shared pager needs (page is clamped to the last page)."""
+    per_page = max(1, min(per_page, limit))
+    total = len(items)
+    pages = max(1, -(-total // per_page))
+    page = max(1, min(page, pages))
+    start = (page - 1) * per_page
+    return {"items": items[start:start + per_page], "page": page, "pages": pages, "per_page": per_page, "total": total}
+
+
 @app.get("/api/projects/{pid}/versions")
-async def list_versions(pid: str):
-    return VERS.list(load_meta(pid)["id"])
+async def list_versions(pid: str, page: int | None = None, per_page: int = 10):
+    """Newest first. Without `page`: the whole list. With `page`: one page plus totals."""
+    versions = VERS.list(load_meta(pid)["id"])
+    return versions if page is None else page_of(versions, page, per_page)
 
 
 @app.post("/api/projects/{pid}/versions")
@@ -926,7 +939,7 @@ def record_stat(pid: str, entry: dict):
 
 
 @app.get("/api/stats")
-async def get_stats(project: str | None = None):
+async def get_stats(project: str | None = None, page: int | None = None, per_page: int = 10):
     if project:
         metas = [load_meta(project)]
     else:
@@ -964,7 +977,10 @@ async def get_stats(project: str | None = None):
               "tokens_in": sum(e.get("tokens_in") or 0 for e in entries),
               "tokens_out": sum(e.get("tokens_out") or 0 for e in entries),
               "failed": sum(e["status"] != "done" for e in entries)}
-    return {"totals": totals, "agents": agents, "recent": entries[-30:][::-1]}
+    if page is None:
+        return {"totals": totals, "agents": agents, "recent": entries[-30:][::-1]}
+    recent = page_of(entries[::-1], page, per_page)   # every run, newest first, one page at a time
+    return {"totals": totals, "agents": agents, "recent": recent.pop("items"), "recent_pager": recent}
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")

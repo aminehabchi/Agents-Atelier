@@ -52,7 +52,7 @@ def setUpModule():
     BASE = f"http://127.0.0.1:{PORT}"
     env = {**os.environ, "ATELIER_WORK": str(TMP / "work"), "ATELIER_AGENTS": str(TMP / "agents"),
            "CLAUDE_BIN": str(ROOT / "tests" / "fake-claude"), "AGENT_TIMEOUT": str(AGENT_TIMEOUT),
-           "FAKE_CLAUDE_LOG": str(LOG)}
+           "FAKE_CLAUDE_LOG": str(LOG), "ATELIER_ENV_FILE": str(TMP / "no.env")}   # ignore your own .env
     env.pop("AGENT_MODEL", None)
     global SERVER_LOG
     SERVER_LOG = open(TMP / "server.log", "w")
@@ -250,6 +250,14 @@ class T02Projects(unittest.TestCase):
         finally:
             (TMP / "work" / ".projects" / f"{bad}.json").unlink()
 
+    def test_stats_pagination(self):
+        s, data, _ = call("GET", "/api/stats?page=1&per_page=5")
+        self.assertEqual(s, 200)
+        self.assertLessEqual(len(data["recent"]), 5)
+        self.assertEqual(set(data["recent_pager"]), {"page", "pages", "per_page", "total"})
+        s, data, _ = call("GET", "/api/stats")
+        self.assertNotIn("recent_pager", data)                                    # no page: unchanged answer
+
     def test_stats_unknown_project(self):
         self.assertEqual(call("GET", "/api/stats?project=00000000-0000-4000-8000-000000000000")[0], 404)
         s, r, _ = call("GET", "/api/stats")
@@ -316,6 +324,20 @@ class T03Files(unittest.TestCase):
         for path in ["/versions/999/diff", "/versions/999/download"]:
             self.assertEqual(call("GET", f"/api/projects/{self.pid}{path}")[0], 404, path)
         self.assertEqual(call("POST", f"/api/projects/{self.pid}/versions/999/restore")[0], 404)
+
+    def test_versions_pagination(self):
+        for i in range(3):
+            self.put("index.html", f"<h1>v{i}</h1>")
+            self.assertEqual(call("POST", f"/api/projects/{self.pid}/versions", {"label": f"V{i}"})[0], 200)
+        s, everything, _ = call("GET", f"/api/projects/{self.pid}/versions")
+        self.assertIsInstance(everything, list)                                   # no page: the whole list, as before
+        s, pg, _ = call("GET", f"/api/projects/{self.pid}/versions?page=1&per_page=2")
+        self.assertEqual((s, len(pg["items"]), pg["page"], pg["per_page"]), (200, 2, 1, 2))
+        self.assertEqual(pg["total"], len(everything))
+        self.assertEqual(pg["items"][0]["n"], everything[0]["n"])                # newest first
+        s, last, _ = call("GET", f"/api/projects/{self.pid}/versions?page=99&per_page=2")
+        self.assertEqual(last["page"], last["pages"])                            # clamped to the last page
+        self.assertEqual(call("GET", f"/api/projects/{self.pid}/versions?page=x")[0], 422)
 
 
 # ---------------------------------------------------------------- agents, models, teams
@@ -675,3 +697,45 @@ You are the Dark mode agent. Add a dark theme with prefers-color-scheme.
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# ---------------------------------------------------------------- settings (.env)
+
+class T09Settings(unittest.TestCase):
+    """config.load_env: .env values fill in what the environment doesn't already set."""
+    def setUp(self):
+        os.environ["ATELIER_ENV_FILE"] = str(TMP / "no.env")    # importing config must not read your own .env
+        sys.path.insert(0, str(ROOT / "server"))
+        import config
+        self.config = config
+        self.keys = ["ATL_A", "ATL_B", "ATL_C", "ATL_D", "ATL_E", "ATL_KEEP"]
+        for k in self.keys:
+            os.environ.pop(k, None)
+
+    def tearDown(self):
+        for k in self.keys:
+            os.environ.pop(k, None)
+        sys.path.remove(str(ROOT / "server"))
+
+    def test_parsing_and_precedence(self):
+        f = TMP / "test.env"
+        f.write_text("# a comment\n\nATL_A=plain\nexport ATL_B = \"quoted # not a comment\"\nATL_C='single'\n"
+                     "ATL_D=value # trailing comment\nnot a setting\nATL_E=\nATL_KEEP=from-file\n")
+        os.environ["ATL_KEEP"] = "from-shell"
+        found = self.config.load_env(f)
+        self.assertEqual(os.environ["ATL_A"], "plain")
+        self.assertEqual(os.environ["ATL_B"], "quoted # not a comment")
+        self.assertEqual(os.environ["ATL_C"], "single")
+        self.assertEqual(os.environ["ATL_D"], "value")
+        self.assertEqual(os.environ["ATL_E"], "")
+        self.assertEqual(os.environ["ATL_KEEP"], "from-shell")                  # the shell wins
+        self.assertEqual(found["ATL_KEEP"], "from-file")
+        self.assertEqual(self.config.load_env(TMP / "missing.env"), {})          # no file is fine
+
+    def test_example_file_lists_every_setting(self):
+        example = (ROOT / ".env.example").read_text()
+        source = (ROOT / "server" / "config.py").read_text()
+        import re
+        used = set(re.findall(r'(?:environ\.get|_int|_mb|_path)\("([A-Z_]+)"', source)) - {"ATELIER_ENV_FILE"}
+        for name in used:
+            self.assertRegex(example, rf"(?m)^{name}=", f"{name} is missing from .env.example")

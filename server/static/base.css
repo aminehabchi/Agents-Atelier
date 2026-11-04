@@ -201,3 +201,45 @@ dialog.import-modal select.input { width: 100%; }
 .pcard:hover, .proj:hover, .tm:hover { transform: translate(-3px, 3px); box-shadow: 0 0 0 0 var(--shadow-c); }
 .menu { border: 1.5px solid var(--line-strong); }
 h1, h2, h3 { letter-spacing: .01em; }
+
+/* ---------- motion ----------
+   One vocabulary everywhere: things "land" on the paper. They rise in, or drop from the pressed position
+   up onto their hard shadow. Lists stagger (--i is set by ui.js). Reduced motion turns all of it off (see above). */
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes land { 0% { opacity: 0; transform: translate(-6px, 6px); box-shadow: 0 0 0 0 var(--shadow-c); } 60% { opacity: 1; } }
+@keyframes drop { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes fade { from { opacity: 0; } }
+.enter { animation: rise .5s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(min(var(--i, 0), 14) * 40ms); }
+.enter.lands { animation-name: land; animation-duration: .45s; }
+dialog[open] { animation: land .28s cubic-bezier(.2, .7, .2, 1); }
+dialog[open]::backdrop { animation: fade .2s ease; }
+.menu.open { animation: drop .16s ease; }
+.page-title, .crumb { animation: rise .45s cubic-bezier(.2, .7, .2, 1) both; }
+.page-title ~ .lead, .page-title + p { animation: rise .45s .06s cubic-bezier(.2, .7, .2, 1) both; }
+header.top .logo .mark { transition: transform .3s cubic-bezier(.3, 1.6, .5, 1); }
+header.top .logo:hover .mark { transform: rotate(-8deg) scale(1.06); }
+.icon-btn { transition: border-color .2s, color .2s, background .15s, transform .12s; }
+.icon-btn:active { transform: scale(.92); }
+.links a { transition: background .15s, color .15s; }
+/* a terminal caret for headlines */
+.caret::after { content: ""; display: inline-block; width: .5em; height: .9em; margin-left: .12em; vertical-align: -.08em; background: var(--sky); border: 1.5px solid var(--line-strong); animation: caret 1.05s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+
+/* ---------- pagination (shared: pagerHTML() in ui.js) ---------- */
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 28px; }
+.pager:empty { display: none; }
+.pager .info { font-size: 13px; color: var(--stone); font-feature-settings: "tnum"; }
+.pager .info b { color: var(--ink); font-weight: 500; }
+.pages { display: flex; align-items: center; gap: 4px; }
+.pages button { min-width: 36px; height: 36px; padding: 0 10px; border-radius: 2px; border: 1px solid transparent; background: transparent; line-height: 1;
+  font-size: 14px; color: var(--graphite); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-feature-settings: "tnum"; }
+.pages button:hover:not(:disabled) { background: var(--paper); border-color: var(--line-strong); color: var(--ink); }
+.pages button.on { background: var(--sky); color: var(--on-sky); border-color: var(--line-strong); }
+.pages button:disabled { opacity: .35; cursor: default; }
+.pages .gap { color: var(--stone); width: 24px; text-align: center; }
+.pager .per { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--stone); }
+.pager select.input { height: 36px; padding: 0 30px 0 12px; font-size: 13px; }
+.pager.compact { margin-top: 16px; }
+.pager.compact .pages button { min-width: 32px; height: 32px; font-size: 13px; }
+.more-sentinel { height: 1px; }
+.load-more { display: flex; justify-content: center; padding: 12px 0 4px; }

@@ -129,14 +129,32 @@ starts in a second. Stop the server with `Ctrl+C`.
 
 ### Settings
 
-Set these in front of the command, for example `AGENT_MODEL=sonnet PORT=9000 ./run.sh`.
+Settings live in a **`.env`** file at the project root. Copy the example, then change what you need:
 
-| Variable        | Default                | What it does                                                                  |
-|-----------------|------------------------|-------------------------------------------------------------------------------|
-| `PORT`          | `8001`                 | Port the server listens on (only on `127.0.0.1`, your own machine)            |
-| `AGENT_MODEL`   | your Claude Code model | Model for agents that don't set their own `model:` (e.g. `sonnet`)            |
-| `CLAUDE_BIN`    | `claude`               | Path to the Claude Code executable, if it isn't on your `PATH`                |
-| `AGENT_TIMEOUT` | `900`                  | Seconds before a stuck agent is stopped (you can then press **Continue**)     |
+```bash
+cp .env.example .env
+```
+
+`.env` is ignored by git; `.env.example` is committed and documents every setting. A variable set on the command
+line wins over the file, for a one-off change: `AGENT_MODEL=sonnet PORT=9000 ./run.sh`.
+
+| Variable         | Default                | What it does                                                                  |
+|------------------|------------------------|-------------------------------------------------------------------------------|
+| `HOST`           | `127.0.0.1`            | Address the server listens on. Keep it local: the app has no login            |
+| `PORT`           | `8001`                 | Port the server listens on                                                    |
+| `ATELIER_HOSTS`  | *(empty)*              | Extra host names allowed to reach the server, comma-separated                 |
+| `LOG_LEVEL`      | `INFO`                 | `DEBUG`, `INFO`, `WARNING` or `ERROR`                                         |
+| `ATELIER_WORK`   | `work`                 | Folder for projects, chat history and versions                                |
+| `ATELIER_AGENTS` | `agents`               | Folder for agent files, shared rules and saved teams                          |
+| `CLAUDE_BIN`     | `claude`               | Path to the Claude Code executable, if it isn't on your `PATH`                |
+| `AGENT_MODEL`    | your Claude Code model | Model for agents that don't set their own `model:` (e.g. `sonnet`)            |
+| `AGENT_TIMEOUT`  | `900`                  | Seconds before a stuck agent is stopped (you can then press **Continue**)     |
+| `MAX_BODY_MB`    | `8`                    | Largest request the server accepts                                            |
+| `MAX_IMAGE_MB`   | `5`                    | Largest reference image                                                       |
+| `MAX_EDIT_KB`    | `500`                  | Largest file the Code tab opens or saves                                      |
+| `MAX_VERSIONS`   | `150`                  | Versions kept per project (the oldest go first)                               |
+
+Relative folder paths start at the project root. Restart the server after changing `.env`.
 
 ## Using it
 
@@ -384,6 +402,7 @@ Set `KEEP_TEST_FILES=1` to keep the temporary folder for inspection.
 ├── README.md        this file
 ├── doc.md           technical documentation
 ├── run.sh           start the server
+├── .env.example     every setting, documented (copy it to .env)
 ├── docs/            screenshots used in this README
 ├── agents/          the agent team: one Markdown file per agent, shared rules, saved presets
 ├── server/          the Python server (FastAPI) and the web pages

@@ -169,13 +169,24 @@ async function listView() {
       <a class="btn btn-dark" href="/teams/new">${icon("plus", { size: 16 })}New team</a></div>
     <p class="note">${icon("alert", { size: 14 })}<span>A team is a set of agents that run together, always in the agents' order. Pick one in a project's Team panel. Times and costs are estimates from past runs (about ${DEFAULT_SECONDS}s for agents that haven't run yet).</span></p>
     <p class="sec-title">Your teams</p>
-    <div class="tgrid">${mine.map(card).join("")}
-      <a class="newcard" href="/teams/new"><div><span class="tile">${icon("plus", { size: 20 })}</span><b style="font-weight:500">New team</b>
-        <div style="font-size:13px;color:var(--stone);margin-top:4px">Choose agents for a kind of job</div></div></a></div>
+    <div class="tgrid" id="mine"></div>
+    <nav class="pager compact" id="teamsPager" aria-label="Pages of your teams"></nav>
     <p class="sec-title">Built-in teams</p>
     <div class="tgrid">${builtin.map(card).join("")}</div>`;
+  const newCard = `<a class="newcard" href="/teams/new"><div><span class="tile">${icon("plus", { size: 20 })}</span><b style="font-weight:500">New team</b>
+        <div style="font-size:13px;color:var(--stone);margin-top:4px">Choose agents for a kind of job</div></div></a>`;
+  const drawMine = () => {
+    const pg = paginate(mine, teamsPage, teamsPer);
+    teamsPage = pg.page;
+    $("mine").innerHTML = pg.items.map(card).join("") + (pg.page === pg.pages ? newCard : "");
+    $("teamsPager").innerHTML = pagerHTML(pg, { sizes: [6, 12, 24], noun: "teams" });
+  };
+  drawMine();
+  bindPager($("teamsPager"), (p) => { teamsPage = p; drawMine(); $("mine").scrollIntoView({ block: "nearest", behavior: "smooth" }); },
+    (n) => { teamsPer = n; savePerPage("teams", n); teamsPage = 1; drawMine(); });
   $("importBtn").onclick = async () => { if (await importFlow()) listView(); };
 }
+let teamsPage = 1, teamsPer = perPagePref("teams", 6);
 
 // ================================================================ view: /teams/<id>
 async function detailView(id) {

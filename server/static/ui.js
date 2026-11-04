@@ -404,3 +404,111 @@ window.importFlow = () => new Promise((resolve) => {
     if (studio) studio.insertBefore(make(), document.getElementById("menu"));
   });
 })();
+
+/* ---------- motion: stagger list items in as they appear, count numbers up ----------
+   Anything matching ENTER gets .enter with --i = its position among its siblings, the first time it is added
+   to the page. Studio tiles and chat messages re-render constantly, so they only animate during the first paint. */
+(() => {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { window.countUp = (el, v) => { el.textContent = v; }; return; }
+  const ENTER = ".pcard, .grid > .row, .stat, .arow, .tcard, .card, .feature, .part, .stepc, .tip, .tm, .vrow, .kpi, .proj, .newcard, .err-state, .empty";
+  const FIRST_PAINT_ONLY = ".agent-tile";
+  const LANDS = ".pcard, .tcard, .feature, .tm, .proj, .newcard";
+  let settled = false;
+  const seen = new WeakSet();
+  function mark(el) {
+    if (seen.has(el) || el.closest(".reveal:not(.in)") || el.classList.contains("reveal")) return;
+    seen.add(el);
+    const sibs = [...el.parentElement.children].filter(c => c.matches(ENTER) || c.matches(FIRST_PAINT_ONLY));
+    el.style.setProperty("--i", Math.max(0, sibs.indexOf(el)));
+    el.classList.add("enter");
+    if (el.matches(LANDS)) el.classList.add("lands");
+    el.addEventListener("animationend", () => el.classList.remove("enter", "lands"), { once: true });
+  }
+  function scan(root) {
+    if (!(root instanceof Element)) return;
+    const sel = settled ? ENTER : ENTER + ", " + FIRST_PAINT_ONLY;
+    if (root.matches(sel)) mark(root);
+    root.querySelectorAll(sel).forEach(mark);
+  }
+  const mo = new MutationObserver(list => list.forEach(m => m.addedNodes.forEach(scan)));
+  document.addEventListener("DOMContentLoaded", () => {
+    scan(document.body);
+    mo.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => { settled = true; }, 1500);
+  });
+
+  /* count a number up from what is shown now to `value` (plain integers only) */
+  window.countUp = (el, value) => {
+    const to = Number(value), from = parseInt(el.textContent, 10) || 0;
+    if (!Number.isFinite(to) || to === from) { el.textContent = value; return; }
+    const t0 = performance.now(), dur = Math.min(900, 250 + Math.abs(to - from) * 40);
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = Math.round(from + (to - from) * e);
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+})();
+
+/* ---------- pagination, shared by every list ----------
+   pageList(3, 10) -> [1, 2, 3, 4, "…", 10]
+   paginate(items, page, perPage) -> { items, page, pages, total, perPage }   (page is clamped)
+   pagerHTML(state, { sizes, noun }) -> the Prev / 1 2 3 / Next / Per page bar (empty when it fits on one page)
+   bindPager(el, onPage, onPerPage) wires the bar's clicks.
+   perPagePref(key, fallback) / savePerPage(key, n) remember the per-page choice per list. */
+function pageList(cur, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const set = new Set([1, total, cur, cur - 1, cur + 1]);
+  if (cur <= 3) [2, 3, 4].forEach(n => set.add(n));
+  if (cur >= total - 2) [total - 1, total - 2, total - 3].forEach(n => set.add(n));
+  const nums = [...set].filter(n => n >= 1 && n <= total).sort((a, b) => a - b);
+  const out = [];
+  nums.forEach((n, i) => { if (i && n - nums[i - 1] > 1) out.push("…"); out.push(n); });
+  return out;
+}
+function paginate(items, page, perPage) {
+  const total = items.length, pages = Math.max(1, Math.ceil(total / perPage));
+  page = Math.min(Math.max(1, page || 1), pages);
+  return { items: items.slice((page - 1) * perPage, page * perPage), page, pages, total, perPage };
+}
+function pagerHTML({ page, pages, total, perPage }, { sizes = [10, 20, 50], noun = "", always = false } = {}) {
+  if (!total || (!always && total <= Math.min(...sizes))) return "";
+  const from = total ? (page - 1) * perPage + 1 : 0, to = Math.min(total, page * perPage);
+  return `
+    <span class="info">Showing <b>${from}–${to}</b> of ${total}${noun ? " " + noun : ""}</span>
+    ${pages > 1 ? `<div class="pages">
+      <button type="button" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""} aria-label="Previous page">${icon("arrow-right", { size: 16, cls: "flip" })}Prev</button>
+      ${pageList(page, pages).map(n => n === "…" ? `<span class="gap">…</span>`
+        : `<button type="button" class="num ${n === page ? "on" : ""}" data-page="${n}" ${n === page ? 'aria-current="page"' : ""} aria-label="Page ${n}">${n}</button>`).join("")}
+      <button type="button" data-page="${page + 1}" ${page >= pages ? "disabled" : ""} aria-label="Next page">Next${icon("arrow-right", { size: 16 })}</button>
+    </div>` : "<span></span>"}
+    <label class="per">Per page
+      <select class="input" data-per-page>${sizes.map(n => `<option ${n === perPage ? "selected" : ""}>${n}</option>`).join("")}</select></label>`;
+}
+function bindPager(el, onPage, onPerPage) {
+  el.addEventListener("click", (e) => { const b = e.target.closest("[data-page]"); if (b && !b.disabled) onPage(+b.dataset.page); });
+  el.addEventListener("change", (e) => { if (e.target.matches("[data-per-page]")) onPerPage(+e.target.value); });
+}
+function perPagePref(key, fallback) {
+  try { return +localStorage.getItem("perPage:" + key) || fallback; } catch { return fallback; }
+}
+function savePerPage(key, n) { try { localStorage.setItem("perPage:" + key, n); } catch {} }
+
+/* ---------- lazy loading helpers ----------
+   lazyEach(root): <img data-src> / <iframe data-src> load when they come near the screen.
+   onVisible(el, fn): run fn once, when el scrolls into view (used for "load more" sentinels). */
+const lazyObserver = "IntersectionObserver" in window ? new IntersectionObserver((entries) => entries.forEach(e => {
+  if (!e.isIntersecting) return;
+  const el = e.target; lazyObserver.unobserve(el);
+  if (el.dataset.src) { el.src = el.dataset.src; el.removeAttribute("data-src"); }
+}), { rootMargin: "300px" }) : null;
+function lazyEach(root = document) {
+  root.querySelectorAll("img[data-src], iframe[data-src]").forEach(el => lazyObserver ? lazyObserver.observe(el) : (el.src = el.dataset.src));
+}
+function onVisible(el, fn, root = null) {
+  if (!("IntersectionObserver" in window)) { fn(); return; }
+  const io = new IntersectionObserver((entries) => { if (entries.some(e => e.isIntersecting)) { io.disconnect(); fn(); } }, { root, rootMargin: "200px" });
+  io.observe(el);
+  return io;
+}

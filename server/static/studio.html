@@ -285,7 +285,7 @@
 
   /* ---------- team panel ---------- */
   .team { border-top: 1px solid var(--line); background: var(--paper); flex: none; position: relative; }
-  .progress { position: absolute; top: -1px; left: 0; height: 2px; background: var(--ink); width: 0; transition: width .6s ease; }
+  .progress { position: absolute; top: -1px; left: 0; height: 3px; background: var(--sky); box-shadow: 0 0 0 1px var(--line-strong); width: 0; transition: width .6s cubic-bezier(.2, .7, .2, 1); }
   .team-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; min-height: 56px; flex-wrap: wrap; }
   .team-head h3 { margin: 0; font-size: 15px; font-weight: 500; letter-spacing: 0; display: flex; align-items: center; gap: 8px; }
   .team-head .count { font-size: 13px; color: var(--stone); }
@@ -322,7 +322,14 @@
   .agent-tile.off { opacity: .5; background: transparent; box-shadow: inset 0 0 0 1px var(--line); border: 1px dashed transparent; }
   .agent-tile.off .tile { background: var(--linen); color: var(--stone); }
   .agent-tile.s-waiting { background: var(--paper); }
-  .agent-tile.s-working { background: var(--espresso); color: var(--on-espresso); box-shadow: none; }
+  /* the working agent: sky-blue, lifted onto its hard shadow, with a scribbling crayon line along the bottom */
+  .agent-tile.s-working { --on-espresso: #383838; --on-espresso-rgb: 56 56 56; background: var(--sky); color: #383838;
+    box-shadow: inset 0 0 0 2px #383838, var(--hard-sm); transform: translate(3px, -3px); overflow: hidden; }
+  .agent-tile.s-working::after { content: ""; position: absolute; left: 0; bottom: 0; height: 4px; width: 40%; background: #383838; animation: scribble 1.3s ease-in-out infinite alternate; }
+  @keyframes scribble { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+  .agent-tile { transition: transform .2s ease, box-shadow .2s ease, background .2s; }
+  .agent-tile.flip { animation: stamp .45s cubic-bezier(.3, 1.5, .5, 1); }
+  @keyframes stamp { 0% { scale: .94; } 100% { scale: 1; } }
   .agent-tile.s-working .tile { background: rgb(var(--on-espresso-rgb) / .12); color: var(--on-espresso); }
   .agent-tile.s-working .t-num, .agent-tile.s-working .t-status, .agent-tile.s-working .t-last { color: rgb(var(--on-espresso-rgb) / .7); }
   .agent-tile.s-working .typing span { background: var(--on-espresso); }
@@ -497,6 +504,7 @@ async function boot() {
     } else disableResumeCards();
     renderTeam();
   }
+  foldHistory();
   scrollDown();
 
   reloadPreview();
@@ -584,7 +592,7 @@ function handle(ev) {
       break;
     case "user":
       addMsg(`<div class="msg user">${(ev.images || []).length ? `<div class="imgs">${ev.images.map(i =>
-        `<a href="/work/${PID}/${esc(i)}" target="_blank" rel="noopener"><img src="/work/${PID}/${esc(i)}" alt="Reference image"></a>`).join("")}</div>` : ""}${esc(ev.text)}</div>`);
+        `<a href="/work/${PID}/${esc(i)}" target="_blank" rel="noopener"><img src="/work/${PID}/${esc(i)}" loading="lazy" decoding="async" alt="Reference image"></a>`).join("")}</div>` : ""}${esc(ev.text)}</div>`);
       break;
     case "run_start":
       setBusy(true);
@@ -833,6 +841,42 @@ function restoreStatuses(r) {
     status[id] = { state: r.done.includes(id) ? "done" : id === r.current ? "stopped" : "pending" };
   });
 }
+/* ---------- long chats: keep only the latest messages in the page, load earlier ones on scroll up ----------
+   The whole history is replayed once (that is how agent states and resume cards are rebuilt), then everything
+   but the last CHAT_WINDOW messages is taken out of the page and kept in `folded`. Scrolling to the top (or the
+   button) puts the previous batch back, keeping the scroll position steady. */
+const CHAT_WINDOW = 40, CHAT_BATCH = 30;
+let folded = [], foldObserver = null;
+function foldHistory() {
+  const box = $("messages"), all = [...box.children];
+  if (all.length <= CHAT_WINDOW + 10) return;
+  folded = all.slice(0, all.length - CHAT_WINDOW);
+  folded.forEach(n => n.remove());
+  box.insertAdjacentHTML("afterbegin", `<div class="load-more" id="earlier"><button class="btn btn-ghost btn-sm" type="button">${icon("history", { size: 14 })}<span></span></button></div>`);
+  $("earlier").querySelector("button").onclick = showEarlier;
+  updateEarlier();
+}
+function updateEarlier() {
+  const el = $("earlier"); if (!el) return;
+  if (!folded.length) { foldObserver?.disconnect(); el.remove(); return; }
+  el.querySelector("span").textContent = `Show ${folded.length} earlier message${folded.length === 1 ? "" : "s"}`;
+  foldObserver?.disconnect();
+  foldObserver = onVisible(el, showEarlier, $("messages"));
+}
+function showEarlier() {
+  const box = $("messages"), anchor = $("earlier"); if (!anchor || !folded.length) return;
+  const batch = folded.splice(Math.max(0, folded.length - CHAT_BATCH));
+  // a stale "Continue / Start again" card must not come back to life
+  if (!paused || document.querySelector(".resume-card:not(.used)"))
+    batch.forEach(n => (n.matches?.(".resume-card") ? [n] : [...(n.querySelectorAll?.(".resume-card") || [])]).forEach(c => c.classList.add("used")));
+  const before = box.scrollHeight, top = box.scrollTop;
+  box.classList.add("replay");               // no pop-in animation for history
+  anchor.after(...batch);
+  box.scrollTop = top + (box.scrollHeight - before);
+  requestAnimationFrame(() => box.classList.remove("replay"));
+  updateEarlier();
+}
+
 function disableResumeCards() {
   document.querySelectorAll(".resume-card:not(.used)").forEach(c => c.classList.add("used"));
 }
@@ -944,7 +988,14 @@ function tileHTML(a, i) {
 }
 function renderTile(id) {
   const el = tileEl(id), i = AGENTS.findIndex(a => a.id === id);
-  if (el && i >= 0) el.outerHTML = tileHTML(AGENTS[i], i);
+  if (!el || i < 0) return;
+  const was = [...el.classList].find(c => c.startsWith("s-"));
+  el.outerHTML = tileHTML(AGENTS[i], i);
+  // a short "stamp" when an agent starts or finishes, so the change is easy to catch
+  const now = tileEl(id), is = now && [...now.classList].find(c => c.startsWith("s-"));
+  if (now && was !== is && (is === "s-working" || is === "s-done") && !replaying) {
+    now.classList.add("flip"); now.addEventListener("animationend", () => now.classList.remove("flip"), { once: true });
+  }
 }
 function renderTeam() {
   $("team").classList.toggle("collapsed", collapsed);
@@ -1112,7 +1163,7 @@ function showFileBody(f) {
   $("source").value = editor.saved;
   if (f && !text) {
     $("fileNote").innerHTML = f.kind === "image"
-      ? `<div><img src="${esc(f.url)}?t=${Date.now()}" alt="${esc(f.path)}"><b>${esc(f.path)}</b><p>Image · ${fmtSize(f.size)} — reference images can't be edited here.</p></div>`
+      ? `<div><img src="${esc(f.url)}?t=${Date.now()}" loading="lazy" decoding="async" alt="${esc(f.path)}"><b>${esc(f.path)}</b><p>Image · ${fmtSize(f.size)} — reference images can't be edited here.</p></div>`
       : f.too_large
       ? `<div><span class="tile">${icon("file", { size: 22 })}</span><b>Too large to open here</b><p>${esc(f.path)} is ${fmtSize(f.size)}; the editor opens files up to 500 KB. Download the .zip to edit it in your own editor.</p></div>`
       : `<div><span class="tile">${icon("file", { size: 22 })}</span><b>Binary file</b><p>${esc(f.path)} (${fmtSize(f.size)}) isn't text, so it can't be shown here.</p></div>`;
@@ -1271,18 +1322,22 @@ function openHistory() {
     `<button class="btn btn-dark btn-sm" id="saveVersion">${icon("save", { size: 14 })}Save version now</button>`).showModal();
   loadVersions();
 }
+let vPage = 1, vPer = perPagePref("versions", 10);
 async function loadVersions() {
   const body = $("historyPanel").querySelector(".panel-body");
-  let list;
-  try { list = await api(`/api/projects/${PID}/versions`); }
+  let res;
+  try { res = await api(`/api/projects/${PID}/versions?page=${vPage}&per_page=${vPer}`); }
   catch (err) { return showError(body, err, loadVersions, "Couldn't load the versions"); }
+  vPage = res.page;
+  const list = res.items, first = res.page === 1;
   body.innerHTML = `<p class="note">${icon("alert", { size: 14 })}<span>A version is saved before every run and after each agent. Restoring saves the current code first, so you can always come back.</span></p>` +
     (list.length ? `<div class="vlist">${list.map((v, i) => {
       const a = BY_ID[v.agent];
       const ic = a ? a.icon : v.kind === "manual" ? "save" : v.kind === "backup" ? "history" : "file";
-      return `<div class="vrow ${i === 0 ? "current" : ""}">
+      const latest = first && i === 0;
+      return `<div class="vrow ${latest ? "current" : ""}">
         <div class="vn"><span class="tile" style="--c:${a?.color || "#766a7c"}">${icon(ic, { size: 16 })}</span>v${v.n}</div>
-        <div><b>${esc(v.label)}</b> ${i === 0 ? `<span class="badge">latest</span>` : ""}
+        <div><b>${esc(v.label)}</b> ${latest ? `<span class="badge">latest</span>` : ""}
           <small>${ago(v.ts)} · ${v.files} file${v.files === 1 ? "" : "s"} · ${(v.size / 1024).toFixed(1)} KB${v.request ? ` · “${esc(v.request)}”` : ""}</small></div>
         <div class="vact">
           <a class="icon-btn plain" href="${vfolder(v.n)}" target="_blank" rel="noopener" title="Open this version">${icon("external", { size: 16 })}</a>
@@ -1290,7 +1345,10 @@ async function loadVersions() {
           <a class="icon-btn plain" href="/api/projects/${PID}/versions/${v.n}/download" title="Download this version as .zip">${icon("download", { size: 16 })}</a>
           <button class="btn btn-ghost btn-sm" data-vrestore="${v.n}">Restore</button>
         </div></div>`;
-    }).join("")}</div>` : `<p class="note">No versions yet — they appear when the first run starts.</p>`);
+    }).join("")}</div><nav class="pager compact" id="vPager" aria-label="Pages of versions">${pagerHTML({ ...res, perPage: res.per_page }, { sizes: [10, 25, 50], noun: "versions" })}</nav>`
+      : `<p class="note">No versions yet — they appear when the first run starts.</p>`);
+  const pager = $("vPager");
+  if (pager) bindPager(pager, (p) => { vPage = p; loadVersions(); }, (n) => { vPer = n; savePerPage("versions", n); vPage = 1; loadVersions(); });
 }
 async function showDiff(n) {
   const body = $("historyPanel").querySelector(".panel-body");
@@ -1340,10 +1398,13 @@ function openStats() {
   d.showModal();
   loadStats();
 }
+let agentsPg, sPage = 1, sPer = perPagePref("statsAgents", 10), rPage = 1, rPer = perPagePref("statsRuns", 10);
 async function loadStats() {
   const body = $("statsPanel").querySelector(".panel-body");
   let data;
-  try { data = await api(`/api/stats${statsScope === "project" ? `?project=${PID}` : ""}`); }
+  const qs = new URLSearchParams({ page: rPage, per_page: rPer });
+  if (statsScope === "project") qs.set("project", PID);
+  try { data = await api(`/api/stats?${qs}`); }
   catch (err) { return showError(body, err, loadStats, "Couldn't load the stats"); }
   const t = data.totals, maxCost = Math.max(...data.agents.map(a => a.cost), 1e-9), maxSec = Math.max(...data.agents.map(a => a.seconds), 1e-9);
   const where = statsScope === "project" ? "in this project " : "";
@@ -1358,7 +1419,7 @@ async function loadStats() {
     ${data.agents.length ? `
     <h4 class="sec">Per agent</h4>
     <table class="stable"><thead><tr><th>Agent</th><th>Model</th><th class="num">Runs</th><th class="num">Avg time</th><th>Time share</th><th class="num">Avg cost</th><th>Cost share</th><th class="num">Total cost</th></tr></thead><tbody>
-    ${data.agents.map(a => `<tr>
+    ${(agentsPg = paginate(data.agents, sPage, sPer), sPage = agentsPg.page, agentsPg).items.map(a => `<tr>
       <td><span class="ag"><span class="tile" style="--c:${a.color}">${icon(a.icon, { size: 14 })}</span>${esc(a.name)}</span></td>
       <td class="mono">${esc(a.models.map(m => m.replace(/^claude-/, "")).join(", ") || "—")}</td>
       <td class="num">${a.runs}${a.done < a.runs ? ` <span style="color:var(--stone)">(${a.runs - a.done} not finished)</span>` : ""}</td>
@@ -1368,6 +1429,7 @@ async function loadStats() {
       <td><div class="sbar" title="${money(a.cost)}"><i style="width:${(a.cost / maxCost * 100).toFixed(1)}%"></i></div></td>
       <td class="num">${money(a.cost)}</td></tr>`).join("")}
     </tbody></table>
+    <nav class="pager compact" id="sPager" aria-label="Pages of agents">${pagerHTML(agentsPg, { noun: "agents" })}</nav>
     <h4 class="sec">Recent agent runs</h4>
     <table class="stable"><thead><tr><th>Agent</th>${statsScope === "all" ? "<th>Project</th>" : ""}<th>Request</th><th class="num">Time</th><th class="num">Tokens</th><th class="num">Cost</th><th class="num">When</th></tr></thead><tbody>
     ${data.recent.map(e => `<tr>
@@ -1376,11 +1438,16 @@ async function loadStats() {
       <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${esc(e.request || "")}">${esc(e.request || "")}</td>
       <td class="num">${duration(e.seconds || 0)}</td><td class="num">${compact((e.tokens_in || 0) + (e.tokens_out || 0))}</td>
       <td class="num">${e.cost ? money(e.cost) : "—"}</td><td class="num">${ago(e.ts)}</td></tr>`).join("")}
-    </tbody></table>` : `<p class="note">No agent has run ${where}yet. Stats appear after the first run.</p>`}`;
+    </tbody></table>
+    <nav class="pager compact" id="rPager" aria-label="Pages of agent runs">${data.recent_pager ? pagerHTML({ ...data.recent_pager, perPage: data.recent_pager.per_page }, { noun: "runs" }) : ""}</nav>`
+    : `<p class="note">No agent has run ${where}yet. Stats appear after the first run.</p>`}`;
+  rPage = data.recent_pager?.page || 1;
+  if ($("sPager")) bindPager($("sPager"), (p) => { sPage = p; loadStats(); }, (n) => { sPer = n; savePerPage("statsAgents", n); sPage = 1; loadStats(); });
+  if ($("rPager")) bindPager($("rPager"), (p) => { rPage = p; loadStats(); }, (n) => { rPer = n; savePerPage("statsRuns", n); rPage = 1; loadStats(); });
 }
 document.addEventListener("click", (e) => {
   const b = e.target.closest("#statsScope [data-scope]"); if (!b) return;
-  statsScope = b.dataset.scope;
+  statsScope = b.dataset.scope; sPage = rPage = 1;
   document.querySelectorAll("#statsScope button").forEach(x => x.classList.toggle("on", x === b));
   loadStats();
 });

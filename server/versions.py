@@ -14,7 +14,9 @@ import shutil
 import time
 from pathlib import Path
 
-MAX_VERSIONS = 150
+import config
+
+MAX_VERSIONS = config.MAX_VERSIONS
 SKIP = {"uploads"}          # top-level folders that are not part of the code
 
 
