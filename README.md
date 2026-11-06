@@ -171,6 +171,9 @@ Relative folder paths start at the project root. Restart the server after changi
    pages (one per line: *Home, About, Contact* — or just *Home* for a single page).
    Both are required, and the agents read them with every prompt. Example: *"Lumen Bikes — a repair shop in Lyon.
    One page that makes people book a repair: services with prices, opening hours, location."*
+   To work on a site you already have, pick **Start from › Existing files** and choose its folder or a .zip. Only
+   HTML, CSS, JS, Markdown and assets (images, fonts, audio, video) are kept, and the site needs an `index.html`
+   at its top level (up to 40 MB, set with `MAX_SITE_IMPORT_MB`).
 2. **Describe the page.** *"A one-page site with a hero and a booking button, services with prices, opening hours
    and a map link. Calm, trustworthy, a bit playful."* You can attach a sketch or screenshot with the paperclip, or
    paste or drop it. Press **Enter**.

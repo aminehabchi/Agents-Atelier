@@ -124,8 +124,13 @@ window.confirmDialog = ({ title, text, ok = "Confirm", danger = false }) => new 
 });
 
 /* Name + description dialog. Both fields are required.
- * Resolves to { name, description } or null if cancelled. */
-window.projectDialog = ({ title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true } = {}) =>
+ * Resolves to { name, description, pages } or null if cancelled.
+ * With `allowImport`, the user can also start from an existing site: the result then has `source`
+ * ({ zip: File } or { files: [{ path, file }] }) instead of pages. */
+window.SITE_EXT = ["html", "htm", "css", "js", "mjs", "md", "png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "ico",
+  "woff", "woff2", "ttf", "otf", "mp4", "webm", "mp3", "ogg", "wav"];
+const MAX_SITE_MB = 40;
+window.projectDialog = ({ title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true, allowImport = false } = {}) =>
   new Promise((resolve) => {
     const d = document.createElement("dialog");
     d.className = "modal project-modal";
@@ -140,7 +145,21 @@ window.projectDialog = ({ title = "New project", ok = "Create project", name = "
           <textarea class="input" name="description" maxlength="300" rows="3" required
             placeholder="e.g. A cozy neighbourhood café in Lyon. One page with the menu, opening hours and a booking button.">${esc(description)}</textarea>
           <small class="err" data-for="description"></small></label>
-        <label class="pfield"><span>Pages <em>one per line · the first is the home page</em></span>
+        ${allowImport ? `<div class="pfield"><span>Start from</span>
+          <div class="src-pick" role="radiogroup" aria-label="Start from">
+            <button type="button" role="radio" aria-checked="true" data-src="blank">${icon("file-plus", { size: 14 })}A blank site</button>
+            <button type="button" role="radio" aria-checked="false" data-src="files">${icon("folder", { size: 14 })}Existing files</button>
+          </div></div>
+        <div class="pfield" data-import hidden><span>Your site <em>HTML, CSS, JS, Markdown and assets</em></span>
+          <div class="src-files">
+            <button type="button" class="btn btn-ghost btn-sm" data-choose="folder">${icon("folder", { size: 14 })}Choose folder…</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-choose="zip">${icon("download", { size: 14 })}Choose .zip…</button>
+            <input type="file" data-folder webkitdirectory multiple hidden>
+            <input type="file" data-zip accept=".zip,application/zip" hidden>
+          </div>
+          <small class="src-summary" data-summary>Needs an index.html at the top. Other files (server code, configs, .git…) are left out.</small>
+          <small class="err" data-for="source"></small></div>` : ""}
+        <label class="pfield" data-pages><span>Pages <em>one per line · the first is the home page</em></span>
           <textarea class="input" name="pages" rows="3" placeholder="Home&#10;About&#10;Contact">${esc((pages || ["Home"]).join("\n"))}</textarea>
           <small class="err" data-for="pages"></small></label>
         <div class="row">
@@ -162,10 +181,56 @@ window.projectDialog = ({ title = "New project", ok = "Create project", name = "
       }
       return good;
     };
+    // ---- start from existing files
+    let mode = "blank", source = null;
+    const srcErr = (t) => { const el = d.querySelector('[data-for="source"]'); if (el) el.textContent = t; };
+    const summary = (t) => d.querySelector("[data-summary]").textContent = t;
+    const extOf = (p) => (p.split(".").pop() || "").toLowerCase();
+    const junk = (p) => p.split("/").some(seg => seg.startsWith(".") || seg === "node_modules" || seg === "__MACOSX");
+    if (allowImport) {
+      d.querySelectorAll("[data-src]").forEach(b => b.addEventListener("click", () => {
+        mode = b.dataset.src;
+        d.querySelectorAll("[data-src]").forEach(x => x.setAttribute("aria-checked", x === b));
+        d.querySelector("[data-import]").hidden = mode !== "files";
+        d.querySelector("[data-pages]").hidden = mode === "files";
+        srcErr("");
+      }));
+      d.querySelector('[data-choose="folder"]').addEventListener("click", () => d.querySelector("[data-folder]").click());
+      d.querySelector('[data-choose="zip"]').addEventListener("click", () => d.querySelector("[data-zip]").click());
+      d.querySelector("[data-folder]").addEventListener("change", (e) => {
+        const all = [...e.target.files].map(file => ({ path: file.webkitRelativePath || file.name, file }));
+        const keep = all.filter(f => !junk(f.path) && SITE_EXT.includes(extOf(f.path)));
+        const size = keep.reduce((n, f) => n + f.file.size, 0);
+        srcErr(""); source = null;
+        if (!keep.length) return srcErr("No HTML, CSS, JS, Markdown or asset files in that folder.");
+        if (!keep.some(f => /\.html?$/i.test(f.path))) return srcErr("That folder has no .html page.");
+        if (size > MAX_SITE_MB * 1024 * 1024) return srcErr(`Those files add up to ${(size / 1048576).toFixed(1)} MB; the limit is ${MAX_SITE_MB} MB.`);
+        source = { files: keep };
+        const root = all[0]?.path.split("/")[0] || "folder";
+        summary(`${root}: ${keep.length} file${keep.length === 1 ? "" : "s"} (${(size / 1048576).toFixed(1)} MB)` +
+          (all.length > keep.length ? ` · ${all.length - keep.length} other file${all.length - keep.length === 1 ? "" : "s"} left out` : ""));
+        if (!f.name.value.trim()) f.name.value = root.slice(0, 80);
+      });
+      d.querySelector("[data-zip]").addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        srcErr(""); source = null;
+        if (!file) return;
+        if (file.size > MAX_SITE_MB * 1024 * 1024) return srcErr(`That .zip is ${(file.size / 1048576).toFixed(1)} MB; the limit is ${MAX_SITE_MB} MB.`);
+        source = { zip: file };
+        summary(`${file.name} (${(file.size / 1048576).toFixed(1)} MB) · only HTML, CSS, JS, Markdown and assets are kept`);
+        if (!f.name.value.trim()) f.name.value = file.name.replace(/\.zip$/i, "").slice(0, 80);
+      });
+    }
+
     let result = null;
     form.addEventListener("submit", (e) => {
       if (e.submitter?.value !== "ok") return;                 // cancel
       if (!check()) { e.preventDefault(); return; }
+      if (mode === "files") {
+        if (!source) { e.preventDefault(); srcErr("Choose a folder or a .zip with your site."); return; }
+        result = { name: f.name.value.trim(), description: f.description.value.trim(), source };
+        return;
+      }
       const pageList = f.pages.value.split("\n").map(x => x.trim()).filter(Boolean);
       if (pageList.length > 12) { e.preventDefault(); d.querySelector('[data-for="pages"]').textContent = "Up to 12 pages."; return; }
       result = { name: f.name.value.trim(), description: f.description.value.trim(), pages: pageList.length ? pageList : ["Home"] };
@@ -180,12 +245,30 @@ window.projectDialog = ({ title = "New project", ok = "Create project", name = "
     (f.name.value ? f.description : f.name).focus();
   });
 
-/* Ask for name + description, create the project, open it. */
+const fileBase64 = (file) => new Promise((resolve, reject) => {
+  const fr = new FileReader();
+  fr.onload = () => resolve(String(fr.result).split(",")[1] || "");
+  fr.onerror = () => reject(new Error(`Couldn't read ${file.name}.`));
+  fr.readAsDataURL(file);
+});
+
+/* Ask for name + description (and optionally existing files), create the project, open it. */
 window.newProject = async () => {
-  const details = await projectDialog();
+  const details = await projectDialog({ allowImport: true });
   if (!details) return;
   try {
-    const p = await api("/api/projects", { method: "POST", body: JSON.stringify(details) });
+    let p;
+    if (details.source) {
+      toast("Importing your site…");
+      const { name, description, source } = details;
+      const body = source.zip
+        ? { name, description, zip: await fileBase64(source.zip) }
+        : { name, description, files: await Promise.all(source.files.map(async x => ({ path: x.path, data: await fileBase64(x.file) }))) };
+      p = await api("/api/projects/import", { method: "POST", body: JSON.stringify(body), timeout: 120000 });
+      if (p.skipped?.length) sessionStorage.setItem("atelier-import-note", `Left out ${p.skipped.length} file${p.skipped.length === 1 ? "" : "s"} that aren't HTML, CSS, JS, Markdown or assets.`);
+    } else {
+      p = await api("/api/projects", { method: "POST", body: JSON.stringify(details) });
+    }
     location.href = `/p/${p.id}`;
   } catch (err) { toast(err.message, "err"); }
 };

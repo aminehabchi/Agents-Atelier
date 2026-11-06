@@ -83,5 +83,6 @@ AGENT_TIMEOUT = _int("AGENT_TIMEOUT", 900)
 # ---- limits
 MAX_BODY = _mb("MAX_BODY_MB", 8)
 MAX_IMAGE = _mb("MAX_IMAGE_MB", 5)
+MAX_SITE_IMPORT = _mb("MAX_SITE_IMPORT_MB", 40)   # largest existing site you can start a project from
 MAX_EDIT = int(float(os.environ.get("MAX_EDIT_KB", "").strip() or 500) * 1024)
 MAX_VERSIONS = _int("MAX_VERSIONS", 150)

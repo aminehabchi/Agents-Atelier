@@ -8,6 +8,7 @@ Run:  .venv/bin/python -m unittest discover -s tests -v
 
 import asyncio
 import base64
+import io
 import json
 import os
 import shutil
@@ -19,6 +20,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+import zipfile
 from pathlib import Path
 
 import websockets
@@ -420,14 +422,14 @@ class T05WebSocket(unittest.TestCase):
         async def script(sock, recv):
             answers = []
             for raw in ["not json{", send([1, 2]), send({"type": "dance"}), send({"type": "prompt", "text": "   "}),
-                        send({"type": "prompt", "text": 5}), send({"type": "prompt", "text": "x" * 4001})]:
+                        send({"type": "prompt", "text": 5}), send({"type": "prompt", "text": "x" * 10001})]:
                 await sock.send(raw)
                 answers.append((await recv())[-1])
             return answers
         answers = ws(pid, script)
         self.assertTrue(all(a["type"] == "error" for a in answers), answers)
         self.assertIn("Unknown message type", answers[2]["text"])
-        self.assertIn("4000", answers[5]["text"])
+        self.assertIn("10000", answers[5]["text"])
 
     def test_cross_site_websocket_is_refused(self):
         pid = new_project()
@@ -700,6 +702,63 @@ if __name__ == "__main__":
 
 
 # ---------------------------------------------------------------- settings (.env)
+
+class T08bSiteImport(unittest.TestCase):
+    """Starting a project from an existing site (folder or .zip)."""
+    def make_zip(self, files):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            for name, data in files.items():
+                z.writestr(name, data)
+        return b64(buf.getvalue())
+
+    def start(self, **source):
+        return call("POST", "/api/projects/import", {"name": "Old site", "description": "An existing site to improve.", **source})
+
+    def test_zip_keeps_only_web_files_and_drops_the_top_folder(self):
+        s, p, _ = self.start(zip=self.make_zip({
+            "mysite/index.html": "<title>Welcome home</title><h1>Hi</h1>",
+            "mysite/about.html": "<h1>About</h1>",
+            "mysite/css/style.css": "h1{}", "mysite/js/app.js": "1", "mysite/README.md": "# Notes",
+            "mysite/img/logo.png": b"\x89PNG", "mysite/server.py": "print(1)", "mysite/.env": "SECRET=1",
+            "mysite/node_modules/x/index.js": "1", "mysite/package.json": "{}"}))
+        self.assertEqual(s, 200, p)
+        files = {f["path"] for f in call("GET", f"/api/projects/{p['id']}/files")[1]}
+        self.assertEqual(files, {"index.html", "about.html", "css/style.css", "js/app.js", "README.md", "img/logo.png"})
+        self.assertEqual(sorted(p["skipped"]), ["mysite/package.json", "mysite/server.py"])
+        self.assertEqual(p["pages"][0], {"title": "Welcome home", "file": "index.html"})
+        self.assertEqual(p["pages"][1]["file"], "about.html")
+        self.assertTrue(p["imported"])
+        self.assertGreaterEqual(len(call("GET", f"/api/projects/{p['id']}/versions")[1]), 1)
+
+    def test_folder_upload(self):
+        s, p, _ = self.start(files=[{"path": "site/index.html", "data": b64("<p>hi</p>")},
+                                    {"path": "site/style.css", "data": b64("p{}")}])
+        self.assertEqual(s, 200, p)
+        self.assertEqual({f["path"] for f in call("GET", f"/api/projects/{p['id']}/files")[1]}, {"index.html", "style.css"})
+
+    def test_bad_sources_are_refused(self):
+        self.assertEqual(self.start()[0], 400)
+        self.assertEqual(self.start(zip=b64("not a zip"))[0], 400)
+        s, r, _ = self.start(zip=self.make_zip({"about.html": "x", "style.css": "y"}))
+        self.assertEqual(s, 400); self.assertIn("index.html", r["detail"])
+        s, r, _ = self.start(zip=self.make_zip({"app.py": "x"}))
+        self.assertEqual(s, 400); self.assertIn(".html", r["detail"])
+        s, r, _ = call("POST", "/api/projects/import", {"name": "", "description": "x", "zip": self.make_zip({"index.html": "x"})})
+        self.assertEqual(s, 400)
+
+    def test_paths_cannot_escape(self):
+        s, p, _ = self.start(files=[{"path": "index.html", "data": b64("x")}, {"path": "../evil.html", "data": b64("x")},
+                                    {"path": "/etc/x.html", "data": b64("x")}])
+        self.assertEqual(s, 200, p)
+        self.assertNotIn("evil.html", {f["path"] for f in call("GET", f"/api/projects/{p['id']}/files")[1]})
+        self.assertFalse((TMP / "work" / "evil.html").exists())
+
+    def test_renaming_pages_keeps_imported_files(self):
+        s, p, _ = self.start(zip=self.make_zip({"index.html": "<title>Home</title>", "contact-us.html": "<title>Reach us</title>"}))
+        s, m, _ = call("PATCH", f"/api/projects/{p['id']}", {"pages": ["Home", "Reach us", "Blog"]})
+        self.assertEqual([x["file"] for x in m["pages"]], ["index.html", "contact-us.html", "blog.html"])
+
 
 class T09Settings(unittest.TestCase):
     """config.load_env: .env values fill in what the environment doesn't already set."""

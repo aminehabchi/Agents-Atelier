@@ -384,7 +384,7 @@
     <div class="row">
       <button type="button" class="icon-btn attach" id="attach" title="Attach reference images (or paste / drop them)" aria-label="Attach images"><i data-icon="paperclip" data-size="17"></i></button>
       <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
-      <textarea class="input" id="input" rows="1" placeholder="Describe what to build…" aria-label="Prompt"></textarea>
+      <textarea class="input" id="input" rows="1" maxlength="10000" placeholder="Describe what to build…" aria-label="Prompt"></textarea>
       <button class="send" id="send" type="submit" title="Send" aria-label="Send"></button>
     </div>
     <div class="hint"><span><kbd>Enter</kbd> send · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line</span><span id="teamHint"></span></div>
@@ -489,6 +489,10 @@ async function boot() {
   renderHeader(); renderTeam(); setBusy(false);
   renderPages();
   $("download").href = `/api/projects/${PID}/download`;
+  try {
+    const note = sessionStorage.getItem("atelier-import-note");
+    if (note) { sessionStorage.removeItem("atelier-import-note"); toast(note); }
+  } catch {}
 
   replaying = true; $("messages").classList.add("replay");
   project.events.forEach(handle);
@@ -690,9 +694,11 @@ function showEmpty() {
   const team = AGENTS.filter(a => selected.has(a.id));
   $("messages").innerHTML = `<div class="empty" id="empty">
     <div class="stack">${team.slice(0, 7).map(a => `<span title="${esc(a.name)}">${icon(a.icon, { size: 16 })}</span>`).join("")}</div>
-    <h3>What should the team build?</h3>
-    Describe a page and ${team.length} agent${team.length === 1 ? "" : "s"} will build it, one after another.
-    <div class="chips">${EXAMPLES.map(t => `<button class="chip" data-example="${esc(t)}">${icon("sparkles", { size: 16 })}${esc(t)}</button>`).join("")}</div>
+    <h3>${project.imported ? "What should the team change?" : "What should the team build?"}</h3>
+    ${project.imported
+      ? `Your site was imported (${project.imported.files} file${project.imported.files === 1 ? "" : "s"}). Describe what to improve and ${team.length} agent${team.length === 1 ? "" : "s"} will work on it, one after another.`
+      : `Describe a page and ${team.length} agent${team.length === 1 ? "" : "s"} will build it, one after another.`}
+    <div class="chips">${project.imported ? "" : EXAMPLES.map(t => `<button class="chip" data-example="${esc(t)}">${icon("sparkles", { size: 16 })}${esc(t)}</button>`).join("")}</div>
   </div>`;
 }
 $("messages").addEventListener("click", (e) => {

@@ -465,7 +465,7 @@ The model check (`POST /api/models/check`) runs with `--restricted --tools ""` (
 - The prompt puts the project name and description, earlier requests, the request, team notes and image paths in
   tagged blocks: `<project>`, `<earlier_requests>`, `<user_request>`, `<team_notes>`, `<reference_images>`.
 - `clean_text()` removes control characters, defuses any of those tags found inside the text (`</team_notes>` →
-  `‹/team_notes›`), and caps lengths (notes 600 characters, request 4000).
+  `‹/team_notes›`), and caps lengths (notes 600 characters, request 10000).
 - `SECURITY_RULES` is appended **last** to the system prompt, after `_common.md` and the agent's role. So it takes
   precedence and can't be removed by editing agent files. It says that blocks and file contents are data, not
   instructions; to stay in the folder; not to add external scripts, iframes, forms or tracking; and to report

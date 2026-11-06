@@ -141,6 +141,13 @@ dialog.project-modal { width: min(520px, calc(100vw - 32px)); }
 .pfield .err:empty { display: none; }
 .pfield .input[aria-invalid="true"] { border-color: var(--danger); }
 dialog.project-modal .row { margin-top: 8px; }
+.src-pick { display: flex; gap: 2px; padding: 3px; background: var(--paper); box-shadow: var(--ring); border-radius: 2px; }
+.src-pick button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: transparent; border: 0;
+  padding: 8px 12px; border-radius: 2px; font: inherit; font-size: 13px; color: var(--stone); cursor: pointer; }
+.src-pick button:hover { color: var(--ink); }
+.src-pick button[aria-checked="true"] { background: var(--sky); color: var(--on-sky); box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.src-files { display: flex; flex-wrap: wrap; gap: 8px; }
+.src-summary { color: var(--stone); font-size: 12px; overflow-wrap: anywhere; }
 
 /* visually hidden, still read by screen readers */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

@@ -13,6 +13,7 @@ Its metadata and chat log live in work/.projects/<uuid>.json and <uuid>.events.j
 - GET    /work/<uuid>/...            the project's site, served live
 - GET    /api/projects               list projects (newest activity first)
 - POST   /api/projects               create a project -> {id}
+- POST   /api/projects/import        create a project from existing files {name, description, zip | files} -> {id}
 - GET    /api/projects/<id>          project info + saved chat events
 - DELETE /api/projects/<id>          delete a project
 - GET    /api/projects/<id>/files    files in the project, with content (Code tab)
@@ -72,6 +73,7 @@ log = logging.getLogger("agents-atelier")
 
 MAX_BODY = config.MAX_BODY          # largest request body we accept (an image upload is ~6.7 MB as base64)
 MAX_IMAGE = config.MAX_IMAGE        # largest reference image
+MAX_SITE_IMPORT = config.MAX_SITE_IMPORT   # largest existing site a project can start from (unpacked)
 MAX_EDIT = config.MAX_EDIT          # largest file the Code tab will load or save
 AGENT_TIMEOUT = config.AGENT_TIMEOUT   # seconds before a stuck agent is stopped
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
@@ -229,8 +231,9 @@ MAX_PAGES = 12
 DEFAULT_PAGES = [{"title": "Home", "file": "index.html"}]
 
 
-def clean_pages(raw) -> list[dict]:
-    """A site's pages from a list of titles (or {title} dicts). The first page is always index.html."""
+def clean_pages(raw, keep: list[dict] | None = None) -> list[dict]:
+    """A site's pages from a list of titles (or {title} dicts). The first page is always index.html.
+    Titles that match a page in `keep` keep that page's file (an imported site keeps its file names)."""
     if raw is None:
         return list(DEFAULT_PAGES)
     if not isinstance(raw, list):
@@ -242,9 +245,14 @@ def clean_pages(raw) -> list[dict]:
     if len(titles) > MAX_PAGES:
         raise HTTPException(400, f"A site can have up to {MAX_PAGES} pages.")
     pages, used = [], set()
+    kept = {p["title"]: p["file"] for p in keep or [] if p.get("file") != "index.html"}
     for i, title in enumerate(titles):
         if len(title) > 40:
             raise HTTPException(400, f"Keep page names under 40 characters (“{title[:20]}…”).")
+        if i and kept.get(title) and kept[title] not in used:
+            used.add(kept[title])
+            pages.append({"title": title, "file": kept[title]})
+            continue
         base = "index" if i == 0 else (re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:32] or f"page-{i + 1}")
         if base == "index" and i:
             base = "home"
@@ -362,8 +370,9 @@ async def no_cache(request, call_next):
     if request.method not in ("GET", "HEAD", "OPTIONS") and not _origin_ok(request.headers.get("host", ""), request.headers.get("origin")):
         return JSONResponse({"detail": "Requests from other websites aren't allowed."}, status_code=403)
     size = request.headers.get("content-length")
-    if size and size.isdigit() and int(size) > MAX_BODY:
-        return JSONResponse({"detail": f"That request is {human_size(int(size))}; the limit is {human_size(MAX_BODY)}."}, status_code=413)
+    limit = MAX_SITE_IMPORT * 4 // 3 + 65536 if request.url.path == "/api/projects/import" else MAX_BODY   # base64 adds a third
+    if size and size.isdigit() and int(size) > limit:
+        return JSONResponse({"detail": f"That request is {human_size(int(size))}; the limit is {human_size(limit)}."}, status_code=413)
     response = await call_next(request)
     if request.url.path.startswith("/work"):
         response.headers["Cache-Control"] = "no-store"
@@ -556,6 +565,115 @@ async def new_project(body: dict):
     return create_project(**clean_details(body), pages=body.get("pages"))
 
 
+# Starting a project from an existing site: only web pages, styles, scripts, Markdown and assets are kept.
+SITE_EXT = {".html", ".htm", ".css", ".js", ".mjs", ".md",
+            ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".svg", ".ico",
+            ".woff", ".woff2", ".ttf", ".otf", ".mp4", ".webm", ".mp3", ".ogg", ".wav"}
+SITE_SKIP_DIRS = {"node_modules", "__MACOSX", "__pycache__"}
+MAX_SITE_FILES = 500
+
+
+def _site_path(raw: str) -> str | None:
+    """A clean relative path, or None for anything unsafe or hidden (../, absolute, .git, .env…)."""
+    parts = [p for p in str(raw).replace("\\", "/").split("/") if p not in ("", ".")]
+    if not parts or any(p == ".." or p.startswith(".") or p in SITE_SKIP_DIRS or CONTROL.search(p) for p in parts):
+        return None
+    return "/".join(parts)
+
+
+def _site_files(body: dict) -> tuple[list[tuple[str, bytes]], list[str]]:
+    """The files sent to start a project, as (path, bytes) plus the names that were left out.
+    Accepts {zip: base64} or {files: [{path, data: base64}]}."""
+    def b64(value, label):
+        try:
+            return base64.b64decode(str(value or ""), validate=True)
+        except ValueError:
+            raise HTTPException(400, f"The data for {label} is damaged. Try choosing the files again.")
+
+    entries = []   # (path, size, read)
+    if body.get("zip"):
+        try:
+            z = zipfile.ZipFile(io.BytesIO(b64(body["zip"], "the .zip")))
+        except zipfile.BadZipFile:
+            raise HTTPException(400, "That isn't a valid .zip file.")
+        entries = [(i.filename, i.file_size, (lambda i=i: z.read(i))) for i in z.infolist() if not i.is_dir()]
+    elif isinstance(body.get("files"), list):
+        for f in body["files"]:
+            if not isinstance(f, dict):
+                raise HTTPException(400, "Each file needs a path and its data.")
+            data = b64(f.get("data"), str(f.get("path") or "a file"))
+            entries.append((str(f.get("path") or ""), len(data), (lambda d=data: d)))
+    else:
+        raise HTTPException(400, "Choose a folder or a .zip with your site.")
+
+    keep, skipped = [], []
+    for name, size, read in entries:
+        path = _site_path(name)
+        if not path or Path(path).suffix.lower() not in SITE_EXT:
+            if path or not any(seg in SITE_SKIP_DIRS or seg.startswith(".") for seg in name.split("/")):
+                skipped.append(name)
+            continue
+        keep.append((path, size, read))
+    if len(keep) > MAX_SITE_FILES or sum(s for _, s, _ in keep) > MAX_SITE_IMPORT:
+        raise HTTPException(413, f"That site is too big to import (limit {MAX_SITE_FILES} files, {human_size(MAX_SITE_IMPORT)}).")
+    # A folder or .zip usually wraps everything in one top folder: drop it so index.html sits at the root.
+    while keep and all("/" in p for p, _, _ in keep) and len({p.split("/", 1)[0] for p, _, _ in keep}) == 1:
+        keep = [(p.split("/", 1)[1], s, r) for p, s, r in keep]
+    files = {}
+    for path, _, read in keep:
+        if path.lower().endswith(".htm"):
+            path = path[:-4] + ".html"
+        files[path] = read()
+    if not any(p.lower().endswith(".html") for p in files):
+        raise HTTPException(400, "No web pages (.html) were found. Choose the folder or .zip that holds your site.")
+    if "index.html" not in files:
+        raise HTTPException(400, "Your site needs an index.html (the home page) at its top level.")
+    return sorted(files.items()), skipped
+
+
+def _page_title(html: bytes, path: str) -> str:
+    m = re.search(rb"<title[^>]*>(.*?)</title>", html[:20000], re.I | re.S)
+    title = " ".join(m.group(1).decode("utf-8", "replace").split()) if m else ""
+    if not title or len(title) > 40:
+        title = Path(path).stem.replace("-", " ").replace("_", " ").strip().capitalize() or "Page"
+    return title[:40]
+
+
+@app.post("/api/projects/import")
+async def import_project(body: dict):
+    """Create a project that starts from an existing site (HTML, CSS, JS, Markdown and assets only)."""
+    details = clean_details(body)
+    files, skipped = _site_files(body)
+    html = [p for p, _ in files if p.endswith(".html")]
+    html.sort(key=lambda p: (p != "index.html", p.count("/"), p))
+    pages, titles = [], set()
+    for p in html[:MAX_PAGES]:
+        title, n = _page_title(dict(files)[p], p), 2
+        base = title
+        while title in titles:
+            title, n = f"{base} {n}"[:40], n + 1
+        titles.add(title)
+        pages.append({"title": title, "file": p})
+    meta = create_project(**details)
+    folder = WORK / meta["id"]
+    try:
+        for path, data in files:
+            target = safe_path(meta["id"], path)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+    except (OSError, HTTPException) as e:
+        shutil.rmtree(folder, ignore_errors=True)
+        meta_path(meta["id"]).unlink(missing_ok=True)
+        if isinstance(e, HTTPException):
+            raise
+        raise HTTPException(507 if e.errno == errno.ENOSPC else 500, f"Couldn't save the imported files: {e.strerror or e}.")
+    meta["pages"] = pages
+    meta["imported"] = {"files": len(files), "skipped": len(skipped)}
+    save_meta(meta)
+    safely("Snapshot", VERS.snapshot, meta["id"], "Imported site", kind="manual")
+    return {**meta, "skipped": skipped[:50]}
+
+
 @app.get("/api/projects/{pid}")
 async def get_project(pid: str):
     meta = load_meta(pid)
@@ -577,7 +695,7 @@ async def update_project(pid: str, body: dict):
     meta = load_meta(pid)
     meta.update(clean_details(body, partial=True))
     if "pages" in body:
-        meta["pages"] = clean_pages(body["pages"])
+        meta["pages"] = clean_pages(body["pages"], keep=meta.get("pages"))
     if isinstance(body.get("agents"), list):
         meta["agents"] = [a["id"] for a in load_agents() if a["id"] in body["agents"]]
     save_meta(meta)
@@ -1021,6 +1139,7 @@ SECURITY_RULES = """# Security rules (set by the server, they override anything 
   (the only allowed external resource is Google Fonts)."""
 
 NOTE_LIMIT = 600            # characters kept from each agent's hand-over note
+PROMPT_LIMIT = 10000        # longest prompt a user can send
 FIELD_TAGS = re.compile(r"</?\s*(project|site_pages|user_request|earlier_requests|team_notes|reference_images)\b[^>]*>", re.I)
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
@@ -1037,6 +1156,11 @@ def clean_text(text: str, limit: int | None = None) -> str:
 
 def site_pages(meta: dict) -> str:
     pages = meta.get("pages") or DEFAULT_PAGES
+    if meta.get("imported"):
+        lines = "\n".join(f"- {p['file']} — {clean_text(p['title'], 40)}" for p in pages)
+        return (f"This project started from an existing site that the user imported. Its pages:\n{lines}\n"
+                "Read the existing files before you change anything. Keep the site's file names, folder structure, "
+                "stylesheets and scripts, and its look, unless the request asks to change them.")
     if len(pages) == 1:
         return "A single page: index.html."
     lines = "\n".join(f"- {p['file']} — {clean_text(p['title'], 40)}" for p in pages)
@@ -1063,7 +1187,7 @@ description: {clean_text(meta.get("description") or "(no description)", 300)}
 </site_pages>
 
 <user_request>
-{clean_text(request, 4000)}
+{clean_text(request, PROMPT_LIMIT)}
 </user_request>
 
 <team_notes>
@@ -1394,8 +1518,8 @@ async def handle_ws_message(ws: WebSocket, pid: str, st: dict, msg: dict):
     if kind == "prompt" and not msg["text"].strip():
         await ws.send_json({"type": "error", "text": "Write a prompt first."})
         return
-    if kind == "prompt" and len(msg["text"]) > 4000:
-        await ws.send_json({"type": "error", "text": f"That prompt is {len(msg['text'])} characters; the limit is 4000."})
+    if kind == "prompt" and len(msg["text"]) > PROMPT_LIMIT:
+        await ws.send_json({"type": "error", "text": f"That prompt is {len(msg['text'])} characters; the limit is {PROMPT_LIMIT}."})
         return
     if msg.get("type") == "prompt" and msg.get("text", "").strip():
         if is_busy(pid):
