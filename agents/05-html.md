@@ -20,6 +20,7 @@ Write index.html:
 - <a> for navigation and <button type="button"> for actions. Every form control gets a <label>.
 - Hooks for interactions as data attributes (data-menu-toggle, data-tabs, data-accordion…). List them in ## Notes.
 - Use the copy verbatim. Use inline SVG or assets/ for imagery, with meaningful alt text (or alt="" if decorative).
+- Icons are inline SVG with width/height attributes and aria-hidden="true" (or a label if they stand alone), wrapped with their text in one element (e.g. <span class="icon-text"><svg class="icon">…</svg><span>Label</span></span>). Never use emoji or Unicode symbols as icons. No empty elements or <br> for spacing.
 
 Create empty style.css and script.js if they are missing (never overwrite existing ones). Do not write CSS or JS.
 

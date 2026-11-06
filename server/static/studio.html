@@ -270,6 +270,13 @@
   .msg.security .head b { font-weight: 500; }
   .msg.security ul { margin: 8px 0 0 28px; padding: 0; font: 12px/1.6 ui-monospace, monospace; color: var(--graphite); }
   .msg.security p { margin: 8px 0 0 28px; font-size: 13px; color: var(--stone); }
+  .msg.sendback { align-self: stretch; background: var(--paper); box-shadow: var(--ring); border-radius: 2px; padding: 14px 16px; }
+  .msg.sendback .head { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+  .msg.sendback .head b { font-weight: 500; }
+  .msg.sendback ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+  .msg.sendback li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; color: var(--graphite); }
+  .msg.sendback li .who { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--ink); min-width: 120px; }
+  .msg.sendback li .who svg { flex-shrink: 0; display: block; }
 
   /* resume card (after a stop / error) */
   .msg.resume-card { align-self: stretch; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line-strong); border-radius: 2px; padding: 14px 16px;
@@ -619,7 +626,7 @@ function handle(ev) {
     case "agent_start":
       if (run) run.index = run.agents.indexOf(a.id);
       status[a.id] = { state: "working", started: now, last: "" };
-      cards[a.id] = addAgentCard(a, now, run ? run.index + 1 : 0, run ? run.agents.length : 0);
+      cards[a.id] = addAgentCard(a, now, run ? run.index + 1 : 0, run ? run.agents.length : 0, !!ev.fix);
       renderTeam();
       break;
     case "tool":
@@ -676,6 +683,19 @@ function handle(ev) {
         <p>Blocked actions never ran. Review the files (Code tab), or restore an earlier version if something looks wrong.</p></div>`);
       if (!replaying) toast("Security check: see the warning in the chat", "err");
       break;
+    case "send_back": {
+      const items = ev.items || [];
+      if (run) {
+        items.forEach(i => { status[i.agent] = { state: "waiting" }; });
+        status[ev.agent] = { state: "waiting" };
+      }
+      addMsg(`<div class="msg sendback"><div class="head">${icon("refresh", { size: 18 })}<span><b>${esc(a?.name || "Critic")} sent work back</b>
+        — round ${ev.round} of ${ev.rounds}. ${items.length === 1 ? "This agent fixes" : "These agents fix"} it, then ${esc(a?.name || "the Critic")} checks again.</span></div>
+        <ul>${items.map(i => { const t = BY_ID[i.agent] || { name: i.agent, icon: "bot", color: "#766a7c" };
+          return `<li><span class="who" style="color:${esc(t.color)}">${icon(t.icon, { size: 16 })}<span style="color:var(--ink)">${esc(t.name)}</span></span><span>${esc(i.note)}</span></li>`; }).join("")}</ul></div>`);
+      renderTeam();
+      break;
+    }
     case "versions": if ($("historyPanel")?.open) loadVersions(); break;
     case "restored":
       if (!replaying) { reloadPreview(); refreshCode(true); if ($("historyPanel")?.open) loadVersions(); toast(`Restored version ${ev.version}`); }
@@ -720,10 +740,10 @@ const scrollDown = () => {
 };
 const addSystem = (t) => addMsg(`<div class="msg system">${esc(t)}</div>`);
 
-function addAgentCard(a, started, step, total) {
+function addAgentCard(a, started, step, total, fix = false) {
   const el = addMsg(`<div class="msg agent working" data-agent="${esc(a.id)}" style="--c:${a.color}">
     <div class="who"><span class="tile">${icon(a.icon, { size: 18 })}</span>
-      <span class="nm" title="${esc(a.description || "")}">${esc(a.name)} agent${step ? `<small>Step ${step} of ${total}</small>` : ""}</span>
+      <span class="nm" title="${esc(a.description || "")}">${esc(a.name)} agent${fix ? `<small>Fixing the Critic's feedback</small>` : step ? `<small>Step ${step} of ${total}</small>` : ""}</span>
       <span class="state"><span class="timer">0s</span><span class="typing"><span></span><span></span><span></span></span></span>
       <button class="icon-btn plain retry" data-retry="${esc(a.id)}" title="Retry ${esc(a.name)} — run only this agent again">${icon("refresh", { size: 15 })}</button></div>
     <div class="actions"></div><div class="text"></div></div>`);

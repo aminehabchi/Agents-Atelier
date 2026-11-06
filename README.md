@@ -6,7 +6,7 @@ Agents Atelier is a local web app for building **front ends only**: it turns a s
 static website (one page or several linked pages) in plain HTML, CSS and JavaScript, using a *team* of AI agents
 instead of a single one. A UX agent plans the page, a Design System agent picks the colours and fonts,
 a Copywriter writes the text, then HTML, CSS, Responsive, JS and Animation agents build it. An Accessibility agent
-audits it, and a Critic reviews and scores the result.
+audits it, and a Critic reviews and scores the result, sending bigger problems back to the agent that owns them.
 
 You watch every step live. You can stop, steer, retry or roll back any of them, and at the end you download plain
 HTML, CSS and JavaScript files that are yours.
@@ -101,7 +101,7 @@ A typical run of the default team (times vary):
 | 3:20   | JS             | Adds the menu, forms and smooth scrolling                                    |
 | 3:50   | Animation      | Adds scroll reveals and micro-interactions                                   |
 | 4:20   | Accessibility  | Fixes contrast, focus, labels and headings (WCAG 2.2 AA)                     |
-| 5:00   | Critic         | Fixes the three biggest issues and scores the page out of 10                 |
+| 5:00   | Critic         | Fixes small issues, sends big ones back (up to 2 rounds), scores out of 10    |
 
 ### What every agent knows
 
@@ -252,7 +252,7 @@ In the studio, the page switcher above the preview shows any page, and marks pag
 | 12 | SEO            | off     | sonnet  | Title, meta description, Open Graph tags, structured data                      |
 | 13 | Performance    | off     | sonnet  | Leaner CSS and JS, smart loading, no layout shift                              |
 | 14 | QA             | off     | default | Traces links, buttons, forms and selectors like a tester, and fixes bugs       |
-| 15 | Critic         | on      | default | Reviews like a senior designer and engineer, fixes the top issues, scores it   |
+| 15 | Critic         | on      | default | Reviews, fixes small issues, sends big ones back to their agent, scores it     |
 
 "default" means your Claude Code model (or `AGENT_MODEL`). The mechanical agents use the faster `sonnet`, while the
 planning and judging agents use the stronger default.

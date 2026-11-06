@@ -86,3 +86,4 @@ MAX_IMAGE = _mb("MAX_IMAGE_MB", 5)
 MAX_SITE_IMPORT = _mb("MAX_SITE_IMPORT_MB", 40)   # largest existing site you can start a project from
 MAX_EDIT = int(float(os.environ.get("MAX_EDIT_KB", "").strip() or 500) * 1024)
 MAX_VERSIONS = _int("MAX_VERSIONS", 150)
+REVIEW_ROUNDS = _int("REVIEW_ROUNDS", 2)   # times the Critic may send work back to earlier agents in one run

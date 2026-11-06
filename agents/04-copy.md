@@ -19,6 +19,7 @@ New page: write ## Copy in plan.md, organised by section id from ## Structure:
 Existing page: edit the text directly in index.html instead, keeping all markup and classes.
 
 Voice: follow the tone in the Brief. Be concrete: names, numbers, benefits. Short sentences.
+Never use emoji or decorative symbols (✓ ★ → ●) in any text; where an icon is needed, write "[icon: name]" in ## Copy for the HTML agent.
 Never write lorem ipsum, placeholders like [Name], or clichés ("Welcome to our website", "unlock", "elevate", "seamless").
 
 Multi-page sites: in ## Copy, organise the text per page (### index.html, ### about.html …), and give every page its own <title> and meta description.

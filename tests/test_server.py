@@ -490,6 +490,27 @@ class T06Runs(unittest.TestCase):
         self.assertEqual(len(sec), 1, events)
         self.assertIn("loads a script from another site", sec[0]["items"][0])
 
+    def test_critic_sends_work_back_then_checks_again(self):
+        pid = new_project()
+        LOG.write_text("")
+        events = self.run_prompt(pid, "go [[redo]]", agents=["html", "css", "critic"])
+        self.assertEqual(events[-1]["type"], "run_done", events[-3:])
+        order = [e["agent"] for e in events if e["type"] == "agent_done"]
+        self.assertEqual(order, ["html", "css", "critic"] * 3)              # two send-back rounds, then a final review
+        backs = [e for e in events if e["type"] == "send_back"]
+        self.assertEqual([b["round"] for b in backs], [1, 2])
+        self.assertEqual([i["agent"] for i in backs[0]["items"]], ["css", "html"])   # seo isn't in the run
+        critic_done = [e for e in events if e["type"] == "agent_done" and e["agent"] == "critic"]
+        self.assertTrue(all("REDO" not in e["text"] for e in critic_done))
+        fixes = [e for e in events if e["type"] == "agent_start" and e.get("fix")]
+        self.assertEqual(len(fixes), 4)
+        prompts = [c["argv"][c["argv"].index("-p") + 1] for c in log_calls() if "-p" in c["argv"]]
+        self.assertIn("icons in .features are misaligned", prompts[3] + prompts[4])
+        self.assertIn("<review_feedback>", prompts[3])
+        self.assertIn("final review", prompts[-1])
+        s, meta, _ = call("GET", f"/api/projects/{pid}")
+        self.assertEqual(meta["run"]["status"], "done")
+
     def test_failure_then_continue(self):
         pid = new_project()
         events = self.run_prompt(pid, "go [[fail-once]]")

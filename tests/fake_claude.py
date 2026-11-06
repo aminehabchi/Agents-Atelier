@@ -14,6 +14,7 @@ Markers inside the prompt choose what happens during an agent run:
   [[slow]]          sleeps 2.5 s before finishing (to test stop / busy)
   [[escape]]        reports a blocked read of /etc/passwd (a permission denial)
   [[inject-script]] writes an external <script> into index.html (to test the safety scan)
+  [[redo]]          the Critic sends work back (REDO lines) whenever <send_back> lists agents
 
 Every call is appended to $FAKE_CLAUDE_LOG as one JSON line: {"argv": [...], "cwd": "..."}.
 """
@@ -104,4 +105,8 @@ page.write_text(content)
 out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": tid, "content": "ok"}]}})
 out({"type": "assistant", "message": {"content": [{"type": "text", "text": f"{agent} agent: did my step."}]}})
 denials = [{"tool_name": "Read", "tool_use_id": "toolu_x", "tool_input": {"file_path": "/etc/passwd"}}] if "[[escape]]" in prompt else []
-result(f"{agent} agent: did my step.", denials=denials)
+reply = f"{agent} agent: did my step."
+if "[[redo]]" in prompt and agent == "Critic" and "Agents you can send work back to" in prompt:
+    reply += ("\nREDO: css — icons in .features are misaligned; use the icon-text pattern"
+              "\nREDO: html — the hero has an empty spacer div\nREDO: seo — not in this run, must be ignored")
+result(reply, denials=denials)
