@@ -384,6 +384,9 @@ async def no_cache(request, call_next):
         response.headers["X-Content-Type-Options"] = "nosniff"
     elif request.url.path.startswith("/api/"):
         response.headers["X-Content-Type-Options"] = "nosniff"
+    elif request.url.path.startswith("/static/"):
+        # Revalidate every time (cheap: ETag → 304) so a refresh always picks up fixed scripts and styles.
+        response.headers["Cache-Control"] = "no-cache"
     return response
 
 

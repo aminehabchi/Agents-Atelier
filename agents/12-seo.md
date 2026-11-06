@@ -21,6 +21,8 @@ In the body:
 - Exactly one <h1> containing the main topic, and descriptive link text.
 - Section headings that read well as an outline.
 
+Nested pages with breadcrumbs: add a BreadcrumbList JSON-LD block that matches them.
+
 Don't rewrite visible copy beyond the <h1> or headings, and don't add keyword stuffing or hidden text.
 
 Multi-page sites: give every page its own title, meta description and Open Graph tags; put the JSON-LD on the home page.

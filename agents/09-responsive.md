@@ -13,7 +13,8 @@ Read: index.html, style.css and the mobile notes in ## Structure.
 
 Check the layout mentally at 320, 375, 768, 1024 and 1440px, then fix:
 - Breakpoints: min-width media queries at 640px, 960px and 1280px, in a commented /* Responsive */ block at the end of style.css (or inside the existing component sections, whichever the file already does).
-- No horizontal scroll: long words wrap (overflow-wrap), media is max-width: 100%, grids collapse to one column on phones.
+- No horizontal scroll: long words wrap (overflow-wrap), media is max-width: 100%, grids collapse to one column on phones. Tables either scroll inside their own wrapper or turn into stacked cards on phones.
+- Flexible layouts: max-width, %, fr, minmax() and auto-fit grids instead of fixed pixel widths on containers, cards or columns.
 - Never fix section heights to the screen (vh/dvh/svh units); sections grow with their content at every width.
 - Type and spacing scale with the screen (clamp() tokens or per-breakpoint overrides). Line length stays under ~75 characters.
 - Touch targets are at least 44×44px on mobile, with enough space between them.

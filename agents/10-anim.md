@@ -14,10 +14,12 @@ Read: index.html, style.css, script.js and ## Design tokens.
 Add:
 - Scroll reveals: put data-reveal on section headings and cards in index.html. In script.js, an IntersectionObserver adds .is-visible once, then stops watching. Stagger groups with a --i custom property (transition-delay: calc(var(--i) * 60ms)).
 - A short hero entrance on load (fade plus a 12–24px rise), 400–700ms.
-- Micro-interactions: button press (scale .98), card hover lift, link underline transitions, focus rings that animate in.
+- Micro-interactions: button press (scale .98), subtle card hover lift, link underline transitions, focus rings that animate in.
+- Modals, dropdowns and menus open and close naturally (fade plus a small scale or slide, 150–250ms); state changes (an item added, an error appearing, a tab switching) get a short transition so the change is understood.
 
 Rules:
 - Animate transform and opacity only. Use the --dur-* and --ease-* tokens.
 - Content must stay visible without JS: hide elements only under .js [data-reveal]:not(.is-visible).
 - Wrap all motion in @media (prefers-reduced-motion: no-preference), or neutralise it under reduce.
 - No infinite or attention-grabbing loops, no parallax that hurts scrolling.
+- Motion explains a change; never animate just to decorate. Keep it short and consistent: UI feedback 150–250ms, entrances at most 700ms, the same easing everywhere.

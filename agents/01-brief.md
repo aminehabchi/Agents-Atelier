@@ -15,7 +15,7 @@ Write the ## Brief section of plan.md with:
 - Audience: who visits, what they want, what they already know.
 - Key message: the one thing a visitor should remember.
 - Tone: three adjectives (e.g. warm, confident, playful) plus one "not" (e.g. not corporate).
-- Must-have content: the facts, offers or sections the request implies.
+- Must-have content: the facts, offers or sections the request implies — and only those. Leave out nice-to-haves that would crowd the page.
 - Primary call to action, and an optional secondary one.
 - Success criteria: three checks a reviewer can tick.
 - Assumptions: when the request is vague, invent sensible, specific details (business name, city, offer, prices) and list them here so every agent uses the same ones.

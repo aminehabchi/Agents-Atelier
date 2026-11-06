@@ -499,7 +499,9 @@ window.importFlow = () => new Promise((resolve) => {
   let settled = false;
   const seen = new WeakSet();
   function mark(el) {
-    if (seen.has(el) || el.closest(".reveal:not(.in)") || el.classList.contains("reveal")) return;
+    // MutationObserver callbacks run later: the node may already have been removed again (e.g. folded chat history)
+    if (seen.has(el) || !el.isConnected || !el.parentElement) return;
+    if (el.closest(".reveal:not(.in)") || el.classList.contains("reveal")) return;
     seen.add(el);
     const sibs = [...el.parentElement.children].filter(c => c.matches(ENTER) || c.matches(FIRST_PAINT_ONLY));
     el.style.setProperty("--i", Math.max(0, sibs.indexOf(el)));
@@ -513,9 +515,11 @@ window.importFlow = () => new Promise((resolve) => {
     if (root.matches(sel)) mark(root);
     root.querySelectorAll(sel).forEach(mark);
   }
-  const mo = new MutationObserver(list => list.forEach(m => m.addedNodes.forEach(scan)));
+  // purely decorative: a problem here must never break the page
+  const safeScan = (root) => { try { scan(root); } catch (err) { console.warn("Skipped an entrance animation", err); } };
+  const mo = new MutationObserver(list => list.forEach(m => m.addedNodes.forEach(safeScan)));
   document.addEventListener("DOMContentLoaded", () => {
-    scan(document.body);
+    safeScan(document.body);
     mo.observe(document.body, { childList: true, subtree: true });
     setTimeout(() => { settled = true; }, 1500);
   });

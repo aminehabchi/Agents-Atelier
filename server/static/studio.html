@@ -502,7 +502,7 @@ async function boot() {
   } catch {}
 
   replaying = true; $("messages").classList.add("replay");
-  project.events.forEach(handle);
+  (project.events || []).forEach(safeHandle);
   replaying = false; $("messages").classList.remove("replay");
   if (!project.events.length) showEmpty();
   if (!project.busy) {
@@ -558,7 +558,7 @@ function connect() {
   ws.onmessage = (e) => {
     let ev;
     try { ev = JSON.parse(e.data); } catch { return console.warn("Ignored a message the studio couldn't read", e.data); }
-    try { handle(ev); } catch (err) { console.error("Couldn't show an event", ev, err); }
+    safeHandle(ev);
   };
 }
 function showConnBanner() {
@@ -572,7 +572,7 @@ function showConnBanner() {
 async function resync() {
   try {
     const p = await api(`/api/projects/${PID}`);
-    p.events.forEach(handle);
+    (p.events || []).forEach(safeHandle);
     if (!p.busy && busy) {
       setBusy(false); run = null; markStopped();
       paused = p.run?.resumable ? p.run : null;
@@ -588,6 +588,15 @@ function wsSend(msg) {
 }
 
 // ================================================================ events
+/* One bad event (old format, damaged chat line…) must never stop the studio from opening or updating. */
+let badEvents = 0;
+function safeHandle(ev) {
+  try { if (ev && typeof ev === "object") handle(ev); }
+  catch (err) {
+    console.error("Couldn't show an event", ev, err);
+    if (!badEvents++) toast("Part of this project's history couldn't be shown (details in the browser console)", "err");
+  }
+}
 function handle(ev) {
   if (ev.seq !== undefined) {
     if (ev.type !== "file_changed" && ev.seq <= lastSeq) return;
@@ -624,6 +633,7 @@ function handle(ev) {
       renderTeam();
       break;
     case "agent_start":
+      if (!a) break;
       if (run) run.index = run.agents.indexOf(a.id);
       status[a.id] = { state: "working", started: now, last: "" };
       cards[a.id] = addAgentCard(a, now, run ? run.index + 1 : 0, run ? run.agents.length : 0, !!ev.fix);
@@ -641,6 +651,7 @@ function handle(ev) {
       reloadPreview(); refreshCode();
       break;
     case "agent_done":
+      if (!a) break;
       status[a.id] = { ...(status[a.id] || {}), state: "done", ended: now };
       finishCard(a.id, ev.text, now, ev.stat);
       if (!replaying && $("statsPanel")?.open) loadStats();
