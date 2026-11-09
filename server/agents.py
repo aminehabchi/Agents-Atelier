@@ -12,8 +12,8 @@ Who sees what
 The agents/ folder still matters:
   _common.md        the shared rules every agent receives (a file; only admins change it in the app)
   _orchestrator.md  the Orchestrator's instructions
-  NN-name.md        the first fill of the shared agents (copied into the database once; `manage.py sync-agents`
-                    copies them again)
+  NN-name.md        the source of the shared agents: `manage.py make-agents-migration` turns changes into a
+                    migration in server/migrations/, applied on startup
 
 Agent file format (also used for export and import):
 
@@ -142,7 +142,7 @@ async def load_agents(user: dict | None) -> list[dict]:
     uid = user["id"] if user else None
     rows = await db.pool.fetch(
         "SELECT * FROM agents WHERE owner_id IS NULL OR owner_id = $1 ORDER BY (owner_id IS NOT NULL), position, pk", uid)
-    # the user's own agent wins if a later shared agent took the same id (e.g. after manage.py sync-agents)
+    # the user's own agent wins if a later shared agent took the same id (e.g. after an agents migration)
     agents = list({r["slug"]: _agent(r, user) for r in rows}.values())
     order = list(await db.pool.fetchval("SELECT agent_order FROM users WHERE id = $1", uid) or []) if uid else []
     if order:
@@ -228,6 +228,8 @@ async def create_agent(user: dict, data: dict, position: int | None = None) -> d
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)""",
         None if shared else user["id"], agent["id"], agent["name"], agent["icon"], agent["color"], agent["default"],
         agent["description"], agent["model"], agent["tools"], agent["role"], pos)
+    if shared:
+        await db.pool.execute("DELETE FROM shared_removed WHERE kind = 'agent' AND slug = $1", agent["id"])
     if position is not None:
         ids = [a["id"] for a in await load_agents(user) if a["id"] != agent["id"]]
         ids.insert(max(0, min(int(position), len(ids))), agent["id"])
@@ -242,7 +244,7 @@ async def update_agent(user: dict, agent_id: str, data: dict) -> dict:
     clean = validate({"tools": target.get("tools", ""), **data}, new=False)   # a form without `tools` keeps it
     await db.pool.execute(
         """UPDATE agents SET name = $3, icon = $4, color = $5, is_default = $6, description = $7, model = $8, tools = $9,
-                             role = $10, updated_at = now()
+                             role = $10, origin = 'app', updated_at = now()
            WHERE slug = $1 AND owner_id IS NOT DISTINCT FROM $2""",
         agent_id, None if target["scope"] == "shared" else user["id"], clean["name"], clean["icon"], clean["color"],
         clean["default"], clean["description"], clean["model"], clean["tools"], clean["role"])
@@ -257,6 +259,8 @@ async def delete_agent(user: dict, agent_id: str):
         raise ValueError("Keep at least one shared agent.")
     await db.pool.execute("DELETE FROM agents WHERE slug = $1 AND owner_id IS NOT DISTINCT FROM $2",
                           agent_id, None if target["scope"] == "shared" else user["id"])
+    if target["scope"] == "shared":          # agent migrations won't bring it back
+        await db.pool.execute("INSERT INTO shared_removed (kind, slug) VALUES ('agent', $1) ON CONFLICT DO NOTHING", agent_id)
 
 
 async def reorder_agents(user: dict, ids: list[str]):
@@ -351,6 +355,8 @@ async def save_preset(user: dict, name: str, agent_ids: list[str], description: 
         pid, n = f"{base}-{n}", n + 1
     await db.pool.execute("INSERT INTO teams (owner_id, slug, name, description, agents, prompt) VALUES ($1, $2, $3, $4, $5, $6)",
                           None if shared else user["id"], pid, clean["name"], clean["description"], clean["agents"], clean["prompt"])
+    if shared:
+        await db.pool.execute("DELETE FROM shared_removed WHERE kind = 'team' AND slug = $1", pid)
     return await get_preset(user, pid)
 
 
@@ -361,7 +367,7 @@ async def update_preset(user: dict, preset_id: str, data: dict) -> dict:
     if not p["editable"]:
         raise PermissionError("Only an admin can change a shared team. Duplicate it to make your own version.")
     clean = await _clean_team(user, data)
-    await db.pool.execute("""UPDATE teams SET name = $3, description = $4, agents = $5, prompt = $6, updated_at = now()
+    await db.pool.execute("""UPDATE teams SET name = $3, description = $4, agents = $5, prompt = $6, origin = 'app', updated_at = now()
                              WHERE slug = $1 AND owner_id IS NOT DISTINCT FROM $2""",
                           preset_id, None if p["scope"] == "shared" else user["id"],
                           clean["name"], clean["description"], clean["agents"], clean["prompt"])
@@ -376,6 +382,8 @@ async def delete_preset(user: dict, preset_id: str):
         raise PermissionError("Only an admin can delete a shared team.")
     await db.pool.execute("DELETE FROM teams WHERE slug = $1 AND owner_id IS NOT DISTINCT FROM $2",
                           preset_id, None if p["scope"] == "shared" else user["id"])
+    if p["scope"] == "shared":
+        await db.pool.execute("INSERT INTO shared_removed (kind, slug) VALUES ('team', $1) ON CONFLICT DO NOTHING", preset_id)
 
 
 # ---------------------------------------------------------------- export & import

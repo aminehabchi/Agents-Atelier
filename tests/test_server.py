@@ -1961,6 +1961,94 @@ class T20UseCaseTeams(unittest.TestCase):
         self.assertEqual(json.loads(data)["team"]["prompt"] if isinstance(data, str) else data["team"]["prompt"], "Changed [x]")
 
 
+class T21Migrations(unittest.TestCase):
+    @staticmethod
+    def migrate_module():
+        sys.path.insert(0, str(ROOT / "server"))
+        try:
+            import migrate
+        finally:
+            sys.path.pop(0)
+        return migrate
+
+    def test_the_server_applied_every_migration(self):
+        migrate = self.migrate_module()
+        rows = asyncio.run(_db("SELECT version, name FROM schema_migrations ORDER BY version"))
+        self.assertEqual([r["name"] for r in rows], [m["name"] for m in migrate.available()])
+        # other tests edit some shared agents as an admin, which marks them 'app'; the rest still come from the migration
+        shared = asyncio.run(_db("SELECT count(*) AS n FROM agents WHERE owner_id IS NULL AND origin = 'migration'"))[0]["n"]
+        self.assertGreaterEqual(shared, 20)
+
+    def test_data_migrations_respect_admin_edits_deletions_and_order(self):
+        migrate = self.migrate_module()
+
+        async def go():
+            con = await asyncpg.connect(TEST_DB_URL)
+            tx = con.transaction()
+            await tx.start()
+            try:
+                await con.execute("UPDATE agents SET role = 'EDITED BY ADMIN', origin = 'app' WHERE owner_id IS NULL AND slug = 'css'")
+                await con.execute("DELETE FROM agents WHERE owner_id IS NULL AND slug = 'tidy'")
+                await con.execute("INSERT INTO shared_removed (kind, slug) VALUES ('agent', 'tidy')")
+                base = migrate.latest_data()
+                order = [a["slug"] for a in base["agents"]]
+                newbie = {"slug": "newbie", "name": "Newbie", "role": "You are new and help the team carefully.", "default": False}
+                agents = []
+                for a in base["agents"]:
+                    agents.append({**a, "role": a["role"] + " (v2)"})
+                    if a["slug"] == "html":
+                        agents.append(newbie)
+                await migrate.apply_data(con, {"agents": agents, "teams": []})
+                roles = {r["slug"]: r["role"] for r in await con.fetch("SELECT slug, role FROM agents WHERE owner_id IS NULL")}
+                slugs = [r["slug"] for r in await con.fetch("SELECT slug FROM agents WHERE owner_id IS NULL ORDER BY position")]
+                return roles, slugs, order
+            finally:
+                await tx.rollback()
+                await con.close()
+
+        roles, slugs, order = asyncio.run(go())
+        self.assertEqual(roles["css"], "EDITED BY ADMIN", "an admin's edit is never overwritten")
+        self.assertNotIn("tidy", roles, "a deleted shared agent doesn't come back")
+        self.assertTrue(roles["ux"].endswith("(v2)"), "agents a migration wrote are refreshed")
+        self.assertEqual(slugs[slugs.index("html") + 1], "newbie", "a new agent goes right after its predecessor")
+
+    def test_an_older_database_upgrades(self):
+        """A database made before migrations: tables but no schema_migrations, shared agents copied from files."""
+        migrate = self.migrate_module()
+        name = f"atelier_mig_{os.getpid()}_{time.time_ns() % 100000}"
+        asyncio.run(_pg_admin(f"CREATE DATABASE {name}"))
+        url = TEST_DB_URL.rsplit("/", 1)[0] + "/" + name
+
+        async def go():
+            con = await asyncpg.connect(url)
+            try:
+                await con.execute((migrate.DIR / "0001_schema.sql").read_text())
+                await con.execute("""INSERT INTO agents (owner_id, slug, name, role, position) VALUES (NULL, 'css', 'Old CSS', 'old role text here', 0)""")
+                done = await migrate.apply_all(con)
+                again = await migrate.apply_all(con)
+                css = await con.fetchrow("SELECT name, origin FROM agents WHERE owner_id IS NULL AND slug = 'css'")
+                teams = await con.fetchval("SELECT count(*) FROM teams WHERE owner_id IS NULL")
+                return done, again, css, teams
+            finally:
+                await con.close()
+        try:
+            done, again, css, teams = asyncio.run(go())
+        finally:
+            asyncio.run(_pg_admin(f"DROP DATABASE IF EXISTS {name} WITH (FORCE)"))
+        self.assertEqual(done, [m["name"] for m in migrate.available()])
+        self.assertEqual(again, [], "each migration runs once")
+        self.assertEqual((css["name"], css["origin"]), ("CSS", "migration"), "copied agents are refreshed from the migration")
+        self.assertGreaterEqual(teams, 20)
+
+    def test_the_migration_matches_the_agent_files(self):
+        """Editing agents/*.md without running make-agents-migration would leave the database behind."""
+        migrate = self.migrate_module()
+        now, data = migrate.snapshot_from_files(), migrate.latest_data()
+        self.assertEqual([a["slug"] for a in now["agents"]], [a["slug"] for a in data["agents"]])
+        self.assertEqual(now["agents"], data["agents"], "run: .venv/bin/python server/manage.py make-agents-migration")
+        self.assertEqual({t["slug"]: t for t in now["teams"]}, {t["slug"]: t for t in data["teams"]})
+
+
 class T12Database(unittest.TestCase):
     def test_shared_agents_were_filled_from_the_files(self):
         files = sorted(f.stem.split("-", 1)[1] for f in (TMP / "agents").glob("[0-9]*.md"))

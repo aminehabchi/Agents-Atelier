@@ -71,9 +71,10 @@ time when you scroll up (`foldHistory` / `showEarlier`).
 ## 2. Data
 
 Postgres (`server/db.py`, `database/docker-compose.yaml`) holds `users`, `sessions`, `email_codes`, `agents` and `teams`.
-An agent or team with `owner_id` NULL is shared; otherwise it belongs to that user. The tables are created on startup.
-The first time there's no shared agent, they are filled from `agents/*.md` and `agents/_presets.json`
-(`server/manage.py sync-agents` copies the files again). Everything else is a file, including project metadata, whose
+An agent or team with `owner_id` NULL is shared; otherwise it belongs to that user. Everything is built by the migrations in
+`server/migrations/` (`server/migrate.py`), applied on startup and recorded in `schema_migrations`: the tables, then the
+shared agents and teams. `manage.py make-agents-migration` turns edits to `agents/*.md` and `agents/_presets.json` into a
+new migration; an agent or team an admin edited (`origin = 'app'`) or deleted (`shared_removed`) is left alone. Everything else is a file, including project metadata, whose
 `owner` field holds the owner's user id:
 
 ```

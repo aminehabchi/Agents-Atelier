@@ -1,7 +1,10 @@
 """Admin commands, run from the project root:
 
   .venv/bin/python server/manage.py make-admin you@example.com   make an existing account an admin
-  .venv/bin/python server/manage.py sync-agents                  copy agents/*.md over the shared agents in the database
+  .venv/bin/python server/manage.py migrate                      apply pending migrations (the server also does it on start)
+  .venv/bin/python server/manage.py migrations                   list migrations and whether each one is applied
+  .venv/bin/python server/manage.py make-agents-migration [name] after editing agents/*.md or agents/_presets.json:
+                                                                 write the next migration with what changed
 """
 import asyncio
 import sys
@@ -9,7 +12,7 @@ import sys
 import asyncpg
 
 import config
-import db
+import migrate
 
 
 async def make_admin(email: str):
@@ -22,21 +25,50 @@ async def make_admin(email: str):
         await con.close()
 
 
-async def sync_agents():
+async def run_migrations():
     con = await asyncpg.connect(config.DATABASE_URL)
     try:
-        async with con.transaction():
-            print(f"Copied {await db.seed_from_files(con, replace=True)} agents from {config.AGENTS_DIR} into the shared agents.")
+        done = await migrate.apply_all(con)
+        print("Applied: " + ", ".join(done) if done else "Nothing to apply: the database is up to date.")
     finally:
         await con.close()
+
+
+async def list_migrations():
+    con = await asyncpg.connect(config.DATABASE_URL)
+    try:
+        seen = await migrate.applied(con)
+    finally:
+        await con.close()
+    for m in migrate.available():
+        row = seen.get(m["version"])
+        state = "pending" if not row else ("applied " + row["applied_at"].strftime("%Y-%m-%d %H:%M")
+                                           + ("  (changed since: add a new migration instead)" if row["checksum"] != m["checksum"] else ""))
+        print(f"{m['name']:<40} {state}")
+
+
+def make_agents_migration(name: str):
+    path = migrate.write_agents_migration(name)
+    if path:
+        print(f"Wrote {path.relative_to(migrate.DIR.parent.parent)}. It's applied the next time the server starts, "
+              "or now with: manage.py migrate")
+    else:
+        print("Nothing changed in agents/*.md or agents/_presets.json since the last agents migration.")
 
 
 def main():
     args = sys.argv[1:]
     if len(args) == 2 and args[0] == "make-admin":
         asyncio.run(make_admin(args[1]))
+    elif args == ["migrate"]:
+        asyncio.run(run_migrations())
+    elif args == ["migrations"]:
+        asyncio.run(list_migrations())
+    elif args[:1] == ["make-agents-migration"] and len(args) <= 2:
+        make_agents_migration(args[1] if len(args) == 2 else "shared_agents")
     elif args == ["sync-agents"]:
-        asyncio.run(sync_agents())
+        raise SystemExit("sync-agents was replaced by migrations: run `manage.py make-agents-migration`, "
+                         "then restart the server (or run `manage.py migrate`).")
     else:
         raise SystemExit(__doc__)
 

@@ -327,10 +327,21 @@ In the studio, choose a team from the Team panel, or save your current selection
 
 ## Customising the agents
 
-Agents are stored in Postgres and edited on the **Agents** page. The files in `agents/` fill the shared agents the
-first time the server starts; after that, editing a file changes nothing until an admin copies the files over the
-shared agents with `.venv/bin/python server/manage.py sync-agents`. `agents/_common.md` (the shared rules) and
-`agents/_orchestrator.md` stay files and apply on the next run.
+Agents are stored in Postgres and edited on the **Agents** page. The shared agents and teams come from **database
+migrations** in `server/migrations/`, which the server applies on startup, once each, in order:
+
+| Migration | What it does |
+|---|---|
+| `0001_schema.sql` | the tables |
+| `0002_shared_origin.sql` | remembers which shared agents and teams an admin edited or deleted |
+| `0003_shared_agents_and_teams.json` | the 27 shared agents and 20 use-case teams |
+
+To change the shared agents or teams, edit `agents/*.md` or `agents/_presets.json`, then run
+`.venv/bin/python server/manage.py make-agents-migration`. It writes the next migration with what changed, applied on
+the next start (or now with `manage.py migrate`; `manage.py migrations` lists them). A migration never overwrites an
+agent or team an admin edited in the app, and never brings back one an admin deleted. Never edit a migration that has
+been applied; add a new one. `agents/_common.md` (the shared rules) and `agents/_orchestrator.md` stay files and apply
+on the next run.
 
 The format, used by those files and by export and import, is a short header, then the instructions.
 

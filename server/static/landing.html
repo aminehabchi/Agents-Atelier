@@ -199,9 +199,98 @@
   .motion .proof li:nth-child(1) { animation-delay: 1s; } .motion .proof li:nth-child(2) { animation-delay: 1.07s; } .motion .proof li:nth-child(3) { animation-delay: 1.14s; } .motion .proof li:nth-child(4) { animation-delay: 1.21s; }
   @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
   @keyframes lift { from { opacity: 0; transform: perspective(1400px) rotateX(10deg) translateY(40px) scale(.96); } }
+
+  /* ================= each section's own motion (only with .motion: nobody who asked for less motion sees it) ================= */
+  /* hero: the headline rises word by word from behind a mask */
+  .hero-block h1 .w { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: .06em; margin-bottom: -.06em; }
+  .hero-block h1 .w > span { display: inline-block; }
+  .motion .hero-block h1 .line { animation: none; }
+  .motion .hero-block h1 .w > span { transform: translateY(105%); animation: word .8s cubic-bezier(.2, .7, .2, 1) forwards; animation-delay: calc(var(--i) * 70ms + 80ms); }
+  @keyframes word { to { transform: none; } }
+
+  /* why: the other tools' downsides get crossed out, then our card lights up */
+  .cmp:not(.us) li { position: relative; }
+  /* a strike-through that follows the words, even across lines */
+  .cmp .x { background: linear-gradient(var(--stone), var(--stone)) no-repeat 0 58% / 0% 1px; }
+  .motion .cmp .x { transition: background-size .6s ease; }
+  .motion #why.in-view .cmp:not(.us) .x { background-size: 100% 1px; }
+  .motion #why.in-view .cmp:not(.us) li { color: var(--stone); transition: color .5s .3s; }
+  .motion #why .cmp:nth-child(1) li:nth-child(2) .x { transition-delay: .25s; } .motion #why .cmp:nth-child(1) li:nth-child(3) .x { transition-delay: .5s; }
+  .motion #why .cmp:nth-child(2) li:nth-child(1) .x { transition-delay: .75s; } .motion #why .cmp:nth-child(2) li:nth-child(2) .x { transition-delay: 1s; } .motion #why .cmp:nth-child(2) li:nth-child(3) .x { transition-delay: 1.25s; }
+  .cmp.us ul.plain li::before { width: 6px; height: 6px; background: var(--sky); }
+  .motion #why.in-view .cmp.us { animation: glow 1.4s 1.4s ease-out both; }
+  @keyframes glow { 0% { box-shadow: inset 0 0 0 1.5px var(--sky), 0 0 0 0 rgb(0 99 225 / .5); } 100% { box-shadow: inset 0 0 0 1.5px var(--sky), 0 0 0 18px rgb(0 99 225 / 0); } }
+  .motion .cmp.us li { opacity: .3; transition: opacity .4s; }
+  .motion #why.in-view .cmp.us li { opacity: 1; } .motion #why.in-view .cmp.us li:nth-child(1) { transition-delay: 1.5s; } .motion #why.in-view .cmp.us li:nth-child(2) { transition-delay: 1.7s; } .motion #why.in-view .cmp.us li:nth-child(3) { transition-delay: 1.9s; }
+
+  /* examples: the two sites slide in from opposite sides like cards dealt on a table, then their facts pop */
+  .motion .ex.reveal { opacity: 0; transition: opacity .8s ease, transform .9s cubic-bezier(.2, .7, .2, 1); }
+  .motion .ex.reveal:nth-child(1) { transform: translateX(-60px) rotate(-3deg); } .motion .ex.reveal:nth-child(2) { transform: translateX(60px) rotate(3deg); }
+  .motion .ex.reveal.in { opacity: 1; transform: none; }
+  .motion .ex .ex-facts li { opacity: 0; transform: scale(.8); transition: opacity .3s, transform .4s cubic-bezier(.3, 1.6, .5, 1); }
+  .motion .ex.in .ex-facts li { opacity: 1; transform: none; }
+  .motion .ex.in .ex-facts li:nth-child(1) { transition-delay: .7s; } .motion .ex.in .ex-facts li:nth-child(2) { transition-delay: .8s; } .motion .ex.in .ex-facts li:nth-child(3) { transition-delay: .9s; }
+
+  /* build: a blue line runs down the list as you scroll through it */
+  ol.timeline { position: relative; }
+  ol.timeline::before, ol.timeline::after { content: ""; position: absolute; left: 12px; top: 18px; bottom: 18px; width: 1px; background: var(--line); }
+  ol.timeline::after { background: var(--sky); bottom: auto; height: calc((100% - 36px) * var(--p, 0)); transition: height .15s linear; }
+  ol.timeline li { position: relative; z-index: 1; }
+
+  /* features: each icon acts out its feature */
+  .feature .ico svg { transform-origin: 50% 50%; }
+  .motion .feature.in .ico svg { animation: var(--act) .9s .4s cubic-bezier(.3, 1.4, .5, 1) both; }
+  .motion .feature:hover .ico svg { animation: var(--act) .9s cubic-bezier(.3, 1.4, .5, 1); }
+  .features > :nth-child(1) { --act: act-pause; } .features > :nth-child(2) { --act: act-spin; } .features > :nth-child(3) { --act: act-rewind; }
+  .features > :nth-child(4) { --act: act-type; } .features > :nth-child(5) { --act: act-grow; } .features > :nth-child(6) { --act: act-slide; }
+  @keyframes act-pause { 0%, 100% { opacity: 1; } 25%, 75% { opacity: .2; } 50% { opacity: 1; transform: scale(1.15); } }
+  @keyframes act-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+  @keyframes act-rewind { from { transform: rotate(0); } to { transform: rotate(-360deg); } }
+  @keyframes act-type { 0%, 100% { transform: none; } 20% { transform: translateX(-3px); } 40% { transform: translateX(3px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(2px); } }
+  @keyframes act-grow { from { transform: scaleY(.2); transform-origin: bottom; } to { transform: none; } }
+  @keyframes act-slide { 0%, 100% { transform: none; } 30% { transform: translateX(4px); } 65% { transform: translateX(-4px); } }
+
+  /* output: the files are written one after another, then packed into a .zip */
+  .files .zipped { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 5px 12px; border-radius: var(--r-pill); background: var(--sky); color: #fff; font-size: 12px; }
+  .motion .files .in, .motion .files > span:first-child { min-height: 1.4em; }
+  .motion .files .zipped { opacity: 0; transform: translateY(8px) scale(.9); transition: opacity .4s, transform .5s cubic-bezier(.3, 1.6, .5, 1); }
+  .motion .files .zipped.on { opacity: 1; transform: none; }
+  .motion .points li { opacity: 0; transform: translateX(24px); transition: opacity .5s, transform .6s cubic-bezier(.2, .7, .2, 1); }
+  .motion #output.in-view .points li { opacity: 1; transform: none; }
+  .motion #output.in-view .points li:nth-child(2) { transition-delay: .12s; } .motion #output.in-view .points li:nth-child(3) { transition-delay: .24s; } .motion #output.in-view .points li:nth-child(4) { transition-delay: .36s; } .motion #output.in-view .points li:nth-child(5) { transition-delay: .48s; }
+
+  /* who: the cards lean towards the pointer */
+  #who .card { transform-style: preserve-3d; transition: transform .25s ease-out, box-shadow .25s; will-change: transform; }
+  .motion #who.in-view .card .ico { animation: bounce .7s cubic-bezier(.3, 1.6, .5, 1) both; }
+  .motion #who.in-view .card:nth-child(2) .ico { animation-delay: .12s; } .motion #who.in-view .card:nth-child(3) .ico { animation-delay: .24s; }
+  @keyframes bounce { from { transform: translateY(-14px) scale(.7); opacity: 0; } }
+
+  /* limits: a fence is drawn around what the agents may touch */
+  #limits .card { position: relative; }
+  .fence { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  .fence rect { fill: none; stroke: var(--sky); stroke-width: 1.5; stroke-dasharray: 6 6; }
+  .motion .fence rect { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 2s ease; }
+  .motion #limits.in-view .fence rect { stroke-dashoffset: 0; }
+  .fence-done .fence rect { stroke-dasharray: 6 6 !important; transition: none !important; }
+
+  /* faq: answers slide open */
+  .faq details > p { overflow: hidden; }
+
+  /* final: the team streams past, and the button breathes */
+  .stream { position: relative; display: flex; flex-direction: column; gap: 10px; margin: 0 auto 40px; max-width: 980px; overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+  .stream-row { display: flex; gap: 10px; width: max-content; }
+  .stream-row span { flex: none; padding: 8px 16px; border-radius: var(--r-pill); box-shadow: var(--ring); background: var(--paper); font-size: 14px; color: var(--graphite); white-space: nowrap; }
+  .motion .stream-row { animation: stream 60s linear infinite; }
+  .motion .stream-row:nth-child(2) { animation-direction: reverse; animation-duration: 70s; }
+  .stream:hover .stream-row { animation-play-state: paused; }
+  @keyframes stream { to { transform: translateX(-50%); } }
+  .motion .final .btn-dark { animation: breathe 3s 1s ease-in-out infinite; }
+  @keyframes breathe { 0%, 100% { box-shadow: 0 0 0 0 rgb(0 99 225 / .45); } 60% { box-shadow: 0 0 0 14px rgb(0 99 225 / 0); } }
+
   .reveal { opacity: 0; transform: translateY(12px); transition: opacity .6s ease, transform .6s ease; }
   .reveal.in { opacity: 1; transform: none; }
-  @media (prefers-reduced-motion: reduce) { .type::after, .m-a.now::before { animation: none; } .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } .live-dot, .hero-pill .dot, .ticker li.now .st { animation: none; } .ex, .ex-img img { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .stream-row, .final .btn-dark { animation: none !important; } .type::after, .m-a.now::before { animation: none; } .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } .live-dot, .hero-pill .dot, .ticker li.now .st { animation: none; } .ex, .ex-img img { transition: none; } }
   @media (max-width: 860px) {
     .hero-block { padding-top: 64px; }
     .stats, .cards, .cards.two, .features, .split, .compare, .examples { grid-template-columns: minmax(0, 1fr); }
@@ -508,6 +597,7 @@
 
   <section class="final">
     <div class="wrap">
+      <div class="stream" aria-hidden="true" id="stream"></div>
       <h2 class="reveal">What should the team build first?</h2>
       <p class="lead reveal final-sub">Create an account, describe your site in a few sentences, and watch ten specialists get to work.</p>
       <button class="btn btn-dark btn-lg reveal" data-show="guest" data-new>Start your first project<i data-icon="arrow-right" data-size="18"></i></button>
@@ -555,6 +645,113 @@ if (!calm) document.documentElement.classList.add("motion");
     steps.querySelectorAll(".type").forEach(type);
   }), { threshold: .35 }).observe(steps);
 })();
+
+/* ===== each section's own motion ===== */
+/* a section gets .in-view once it's well on screen (its animations start then) */
+const sectionSeen = new IntersectionObserver((entries) => entries.forEach(e => {
+  if (e.isIntersecting) { e.target.classList.add("in-view"); sectionSeen.unobserve(e.target); }
+}), { threshold: .25 });
+document.querySelectorAll("main section").forEach(s => calm ? s.classList.add("in-view") : sectionSeen.observe(s));
+
+/* why: wrap each downside's words so the strike-through can follow them (after translation) */
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".cmp:not(.us) li").forEach(li => { li.innerHTML = `<span class="x">${li.innerHTML}</span>`; });
+});
+
+/* hero: split the (already translated) headline into words, each rising in turn */
+document.addEventListener("DOMContentLoaded", () => {
+  if (calm) return;
+  const h1 = document.querySelector(".hero-block h1");
+  let i = 0;
+  h1.setAttribute("data-no-i18n", "");
+  h1.querySelectorAll(".line").forEach(line => {
+    line.innerHTML = line.textContent.trim().split(/\s+/).map(w => `<span class="w"><span style="--i:${i++}">${esc(w)}</span></span>`).join(" ");
+  });
+});
+
+/* build: how far the list has been scrolled through, as --p (0 to 1) */
+(() => {
+  const list = document.querySelector("ol.timeline");
+  if (!list) return;
+  let ticking = false;
+  const update = () => {
+    ticking = false;
+    const r = list.getBoundingClientRect(), mid = innerHeight * .6;
+    list.style.setProperty("--p", Math.max(0, Math.min(1, (mid - r.top) / r.height)).toFixed(3));
+  };
+  if (calm) { list.style.setProperty("--p", 1); return; }
+  addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+  update();
+})();
+
+/* output: type each file name, then pack them into a .zip */
+(() => {
+  const box = document.querySelector("#output .files");
+  if (!box) return;
+  const lines = [...box.querySelectorAll("span")];
+  const texts = lines.map(l => l.textContent);
+  box.insertAdjacentHTML("beforeend", `<span class="zipped">${icon("download", { size: 12 })}my-site.zip</span>`);
+  const zip = box.querySelector(".zipped");
+  if (calm) { zip.classList.add("on"); return; }
+  lines.forEach(l => { l.textContent = ""; });
+  new IntersectionObserver((entries, obs) => {
+    if (!entries[0].isIntersecting) return;
+    obs.disconnect();
+    let n = 0;
+    const next = () => {
+      if (n >= lines.length) { zip.classList.add("on"); return; }
+      const line = lines[n], text = texts[n++];
+      let c = 0;
+      const tick = () => { line.textContent = text.slice(0, ++c); c < text.length ? setTimeout(tick, 28) : setTimeout(next, 90); };
+      tick();
+    };
+    next();
+  }, { threshold: .5 }).observe(box);
+})();
+
+/* who: the cards lean towards the pointer */
+if (!calm && matchMedia("(hover: hover)").matches) {
+  document.querySelectorAll("#who .card").forEach(card => {
+    card.addEventListener("pointermove", (e) => {
+      const r = card.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+      card.style.transform = `perspective(800px) rotateX(${(-y * 6).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg) translateY(-2px)`;
+    });
+    card.addEventListener("pointerleave", () => { card.style.transform = ""; });
+  });
+}
+
+/* limits: draw a fence around "Kept inside the project" */
+(() => {
+  const card = document.querySelector("#limits .card");
+  if (!card) return;
+  card.insertAdjacentHTML("beforeend", `<svg class="fence" aria-hidden="true"><rect x="6" y="6" rx="12" ry="12" pathLength="1" style="width:calc(100% - 12px);height:calc(100% - 12px)"/></svg>`);
+  const rect = card.querySelector(".fence rect");
+  rect.addEventListener("transitionend", () => card.classList.add("fence-done"), { once: true });
+  if (calm) card.classList.add("fence-done");
+})();
+
+/* faq: answers slide open and closed */
+document.querySelectorAll(".faq details").forEach(d => {
+  const summary = d.querySelector("summary"), body = d.querySelector("p");
+  summary.addEventListener("click", (e) => {
+    if (calm || !body.animate) return;
+    e.preventDefault();
+    if (d.open) {
+      body.animate([{ height: body.offsetHeight + "px", opacity: 1 }, { height: "0px", opacity: 0 }], { duration: 220, easing: "ease-in" }).onfinish = () => { d.open = false; };
+    } else {
+      d.open = true;
+      const h = body.offsetHeight;
+      body.animate([{ height: "0px", opacity: 0 }, { height: h + "px", opacity: 1 }], { duration: 280, easing: "cubic-bezier(.2,.7,.2,1)" });
+    }
+  });
+});
+
+/* final: the whole team streams past the last question */
+api("/api/agents").then(agents => {
+  const row = (list) => `<div class="stream-row">${[...list, ...list].map(a => `<span>${esc(a.name)}</span>`).join("")}</div>`;
+  const half = Math.ceil(agents.length / 2);
+  document.getElementById("stream").innerHTML = row(agents.slice(0, half)) + row(agents.slice(half));
+}).catch(() => {});
 
 /* Numbers count up the first time they appear. */
 const counted = new IntersectionObserver((entries) => entries.forEach(e => {

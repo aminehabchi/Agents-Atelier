@@ -49,6 +49,19 @@
   .part li > i[data-icon] { color: var(--stone); height: 1.5em; }  /* one line of the 1.5 line-height text */
 
   .tips { display: grid; gap: 10px; margin-top: 24px; }
+  .sub-h { margin: 28px 0 8px; font-size: 18px; font-weight: 500; }
+  .recipe { list-style: none; counter-reset: r; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 16px 0; padding: 0; }
+  .recipe li { counter-increment: r; display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: var(--r-card); background: var(--paper); box-shadow: var(--ring); font-size: 13px; line-height: 1.45; color: var(--graphite); }
+  .recipe li::before { content: counter(r, decimal-leading-zero); font-family: var(--mono); font-size: 11px; color: var(--stone); }
+  .recipe b { font-size: 15px; font-weight: 500; color: var(--ink); }
+  .example { margin: 8px 0 16px; padding: 16px 18px; border-radius: var(--r-card); box-shadow: inset 0 0 0 1px var(--sky); background: var(--paper); }
+  .example .lbl { font-family: var(--mono); font-size: 12px; color: var(--stone); }
+  .example p { margin: 6px 0 0; font-size: 15px; line-height: 1.6; color: var(--ink); }
+  .advice { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
+  .advice-card { display: flex; gap: 12px; padding: 16px; border-radius: var(--r-card); background: var(--paper); box-shadow: var(--ring); }
+  .advice-card h3 { margin: 0 0 4px; font-size: 15px; font-weight: 500; }
+  .advice-card p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--graphite); }
+  .advice-card .ico { flex: none; display: grid; place-items: center; width: 34px; height: 34px; }
   .tip { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .tip > div { background: var(--paper); border-radius: var(--r); padding: 18px 20px; font-size: 15px; line-height: 1.55; color: var(--graphite); }
   .tip .lbl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--stone); margin-bottom: 6px; line-height: 1; }
@@ -88,7 +101,8 @@
     .layout { grid-template-columns: 1fr; gap: 24px; }
     .toc { position: static; flex-direction: row; flex-wrap: wrap; }
     .toc p { display: none; }
-    .steps, .anatomy, .tip { grid-template-columns: 1fr; }
+    .steps, .anatomy, .tip, .advice { grid-template-columns: 1fr; }
+    .recipe { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     article h2 { font-size: 34px; }
   }
 </style>
@@ -117,6 +131,7 @@
       <a href="#start"><i data-icon="play" data-size="16"></i>Quick start</a>
       <a href="#studio"><i data-icon="monitor" data-size="16"></i>The studio</a>
       <a href="#prompts"><i data-icon="lightbulb" data-size="16"></i>Writing prompts</a>
+      <a href="#advice"><i data-icon="sparkles" data-size="16"></i>Tips for good results</a>
       <a href="#team"><i data-icon="users" data-size="16"></i>The agent team</a>
       <a href="#custom"><i data-icon="pencil" data-size="16"></i>Custom agents</a>
       <a href="#projects"><i data-icon="folder" data-size="16"></i>Projects &amp; files</a>
@@ -188,6 +203,22 @@
       <section id="prompts">
         <h2><span class="num">03</span>Writing prompts</h2>
         <p>Agents only know what you tell them and what's already in the files. Specific prompts get specific pages.</p>
+        <h3 class="sub-h">The prompt recipe</h3>
+        <p>A good first prompt answers five questions in a few lines. You don't need special wording; plain sentences work best.</p>
+        <ol class="recipe">
+          <li><b>What</b><span>the business or product, and the kind of site</span></li>
+          <li><b>Who</b><span>the visitors you want to reach</span></li>
+          <li><b>Goal</b><span>the one thing visitors should do: book, call, buy, sign up</span></li>
+          <li><b>Content</b><span>pages and must-have facts: prices, hours, address, real reviews</span></li>
+          <li><b>Style</b><span>tone, colours, and a site or two you like</span></li>
+        </ol>
+        <div class="example">
+          <span class="lbl">Example</span>
+          <p data-no-i18n>Build a website for 9ahwti, a coffee shop in Casablanca's Gauthier district. It's for young professionals and students. The goal is to get them to book a table on WhatsApp. Pages: Home, Menu, Contact. Show the menu with prices, opening hours 7:00 to 22:00, and the address. Warm and modern, in Moroccan Darija, with brown and cream colours.</p>
+        </div>
+        <p>Starting from a use case fills in this structure for you: pick one in the studio and replace the parts in [brackets].</p>
+        <h3 class="sub-h">Follow-up prompts</h3>
+        <p>After the first build, ask for one change at a time and say where: the page, the section, and what should change. The Orchestrator then picks only the agents that change needs.</p>
         <div class="tips">
           <div class="tip">
             <div><span class="lbl"><i data-icon="x" data-size="14"></i>Vague</span>“a website for my business”</div>
@@ -204,14 +235,30 @@
         </div>
       </section>
 
+      <section id="advice">
+        <h2><span class="num">04</span>Tips for good results</h2>
+        <p>A few habits make the difference between a first draft and a site you can publish.</p>
+        <div class="advice">
+          <div class="advice-card"><span class="ico"><i data-icon="sparkles" data-size="18"></i></span><div><h3>Start from a use case</h3><p>Each use case picks the right agents and gives you a prompt to complete. It's the fastest way to a good first build.</p></div></div>
+          <div class="advice-card"><span class="ico"><i data-icon="clipboard" data-size="18"></i></span><div><h3>Answer the project questions</h3><p>Audience, goal, tone and must-have content go to every agent with every prompt, so you don't repeat them.</p></div></div>
+          <div class="advice-card"><span class="ico"><i data-icon="palette" data-size="18"></i></span><div><h3>Set up your brand kit once</h3><p>Your logo, colours and fonts then go into every new project automatically.</p></div></div>
+          <div class="advice-card"><span class="ico"><i data-icon="image" data-size="18"></i></span><div><h3>Show, don't only tell</h3><p>Attach a sketch or a screenshot of a page you like, and add your real photos. Agents look at them before they work.</p></div></div>
+          <div class="advice-card"><span class="ico"><i data-icon="zap" data-size="18"></i></span><div><h3>Use the smallest team for small changes</h3><p>A wording fix needs the Copywriter, not twelve agents. Switch off agents you don't need: runs are faster and cheaper.</p></div></div>
+          <div class="advice-card"><span class="ico"><i data-icon="refresh" data-size="18"></i></span><div><h3>Retry one agent instead of starting over</h3><p>Not happy with the colours? Retry only the CSS agent with an extra instruction, like “warmer palette, bigger headings”.</p></div></div>
+          <div class="advice-card"><span class="ico"><i data-icon="history" data-size="18"></i></span><div><h3>Save a version before big changes</h3><p>Versions are saved automatically, but naming one (“before the redesign”) makes it easy to come back to.</p></div></div>
+          <div class="advice-card"><span class="ico"><i data-icon="eye" data-size="18"></i></span><div><h3>Check before you publish</h3><p>Read every text, test the page on your phone, and look at the browser check in the chat. AI can make mistakes.</p></div></div>
+          <div class="advice-card"><span class="ico"><i data-icon="alert" data-size="18"></i></span><div><h3>Never let it invent facts</h3><p>Give real prices, hours, reviews and numbers. If you don't have them yet, say so; the agents won't make them up.</p></div></div>
+        </div>
+      </section>
+
       <section id="team">
-        <h2><span class="num">04</span>The agent team</h2>
+        <h2><span class="num">05</span>The agent team</h2>
         <p>Agents run in order, and each one does a single job. Faded agents are off by default; switch them on per project in the Team panel.</p>
         <div class="team-list" id="teamList"></div>
       </section>
 
       <section id="custom">
-        <h2><span class="num">05</span>Custom agents</h2>
+        <h2><span class="num">06</span>Custom agents</h2>
         <p>Shared agents are the same for everyone, and only an admin can change them. Duplicate one on the <a href="/agents">Agents page</a> to make your own version, or create a new one. Only you see your agents, and changes apply to the next run. The format below is what export and import use.</p>
 <pre class="code"><span class="c"># agents/16-dark-mode.md   ← the number sets the run order</span>
 ---
@@ -228,7 +275,7 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
       </section>
 
       <section id="projects">
-        <h2><span class="num">06</span>Projects &amp; files</h2>
+        <h2><span class="num">07</span>Projects &amp; files</h2>
         <p>Each project has its own name, description, UUID, URL, folder and saved chat. The name and description are required, and the agents read them with every prompt, so describe what the page is for and who it's for.</p>
         <table>
           <tr><th>Where</th><th>What</th></tr>
@@ -240,7 +287,7 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
       </section>
 
       <section id="keys">
-        <h2><span class="num">07</span>Shortcuts</h2>
+        <h2><span class="num">08</span>Shortcuts</h2>
         <table>
           <tr><th>Keys</th><th>Action</th></tr>
           <tr><td><kbd>Ctrl</kbd> + <kbd>K</kbd></td><td>Command palette: jump to anything or run an action (any page)</td></tr>
@@ -256,13 +303,13 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
       </section>
 
       <section id="faq">
-        <h2><span class="num">08</span>FAQ</h2>
+        <h2><span class="num">09</span>FAQ</h2>
         <details><summary>How long does a run take?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>Each agent takes about 20–60 seconds, so the default team of 10 needs roughly 5–8 minutes. Switch off agents you don't need, or start the server with <code>AGENT_MODEL=sonnet ./run.sh</code> for faster runs.</div></details>
         <details><summary>Does it cost anything?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>Agents use your Claude Code plan, and each agent counts as one Claude Code session. A run with 10 agents is about 10 sessions.</div></details>
         <details><summary>Can agents touch other files on my computer?<i data-icon="chevron-down" data-size="18"></i></summary>
-          <div>Each agent runs inside its project folder with file tools only (read, write, edit, search). Shell commands, web access and sub-agents are blocked.</div></details>
+          <div>Each agent runs inside its project folder with file tools only (read, write, edit, search). Shell commands and sub-agents are blocked, and only agents set to web research (like Research) can use the web.</div></details>
         <details><summary>What happens when I stop the agents?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>Nothing is lost. Agents that finished keep their work, and the run is saved. The chat and the Team panel then offer <b>Continue</b>, which picks up at the agent that was stopped and skips the ones already done, or <b>Start again</b>, which runs the whole team again on the same request. The same choice appears if an agent fails or the server restarts mid-run.</div></details>
         <details><summary>Can the team build a site with several pages?<i data-icon="chevron-down" data-size="18"></i></summary>
