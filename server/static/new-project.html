@@ -77,7 +77,9 @@ host.addEventListener("input", () => { dirty = true; });
 host.addEventListener("change", () => { dirty = true; });
 window.addEventListener("beforeunload", (e) => { if (dirty && !saving) e.preventDefault(); });   // long form: don't lose it to a stray click
 
-const form = fillProjectForm(host, { allowImport: true, askAssets: true, heading: false, cancelHref: "/projects" }, async (details, e) => {
+(async () => {
+const kit = await api("/api/brand").catch(() => null);
+const form = fillProjectForm(host, { allowImport: true, askAssets: true, heading: false, cancelHref: "/projects", brand: kit && !kit.empty ? kit : null }, async (details, e) => {
   e.preventDefault();
   const go = host.querySelector('button[value="ok"]');
   if (go.disabled) return;
@@ -90,6 +92,7 @@ const form = fillProjectForm(host, { allowImport: true, askAssets: true, heading
   go.textContent = "Create project";
 });
 form.focus();
+})();
 </script>
 </body>
 </html>

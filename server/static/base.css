@@ -290,14 +290,23 @@ main:focus { outline: 0; }
 .acct-head b { font-weight: 500; }
 .acct-head small { color: var(--stone); font-size: 12px; }
 .acct-head .badge { margin-top: 6px; }
-.acct-links, .acct-prefs { border-top: 1.5px solid var(--line); padding: 6px; }
+.acct-links { border-top: 1.5px solid var(--line); padding: 6px; }
 .acct-links a, .acct-links button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; background: none; border: 0; border-radius: var(--r); color: inherit; text-decoration: none; text-align: left; font-size: 14px; }
 .acct-links a:hover, .acct-links button:hover, .acct-links a:focus-visible, .acct-links button:focus-visible { background: var(--ice); }
-.acct-prefs { display: flex; flex-direction: column; gap: 8px; padding: 10px 16px; }
-.acct-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--graphite); }
-.acct-row .seg { display: flex; gap: 2px; padding: 2px; background: var(--paper); box-shadow: var(--ring); border-radius: var(--r); }
-.acct-row .seg button { display: grid; place-items: center; min-width: 30px; height: 26px; padding: 0 6px; background: transparent; border: 0; border-radius: var(--r); font-size: 11px; font-weight: 600; color: var(--stone); }
-.acct-row .seg button:hover { color: var(--ink); }
-.acct-row .seg button.on { background: var(--sky); color: var(--on-sky); }
 .lang-btn { font-size: 12px; font-weight: 600; letter-spacing: 0; }
 dialog.modal .acct-row { flex-wrap: wrap; }
+
+/* ---------- cookie notice ---------- */
+.cookie-note { position: fixed; right: 16px; bottom: 16px; z-index: 90; width: min(380px, calc(100vw - 32px)); padding: 16px; border-radius: var(--r-card, 16px); background: var(--steel, var(--paper)); color: var(--ink); box-shadow: var(--ring), 0 16px 40px rgb(0 0 0 / .3); font-size: 13px; line-height: 1.5; }
+.cookie-note p { margin: 0 0 12px; color: var(--graphite); }
+.cookie-note div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cookie-note a { color: var(--ink); }
+
+/* ---------- brand kit in the project form ---------- */
+.brand-row { display: flex; align-items: center; gap: 10px; }
+.brand-row input { width: 16px; height: 16px; accent-color: var(--sky); }
+.brand-sum { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 10px; border-radius: var(--r-pill, 59px); box-shadow: var(--ring); }
+.brand-sum img { height: 20px; width: auto; max-width: 48px; object-fit: contain; }
+.brand-sum i { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(var(--fg-rgb) / .2); }
+.brand-sum small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--graphite); }
+.brand-use .src-summary a { color: inherit; }

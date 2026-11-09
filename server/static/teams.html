@@ -87,6 +87,12 @@
     .vhead .acts { margin-left: 0; }
   }
   .team-filter { border-right: 0; padding-right: 0; margin-top: 16px; }
+  .starter { margin-top: 20px; padding: 16px 18px; border-radius: 12px; background: var(--mist); box-shadow: var(--ring); }
+  .starter-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .starter-head small { flex: 1; min-width: 200px; color: var(--stone); font-size: 12px; }
+  .starter-text { margin: 0; white-space: pre-wrap; font-family: var(--font); font-size: 15px; line-height: 1.6; color: var(--ink); }
+  .starter-text mark { background: rgb(0 99 225 / .16); color: inherit; padding: 0 2px; border-radius: 3px; }
+  #f-prompt { resize: vertical; min-height: 120px; line-height: 1.5; }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 </head>
@@ -114,7 +120,11 @@ let dirty = false;
 const go = (path) => { dirty = false; location.href = path; };
 window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
 window.addEventListener("scroll", () => document.querySelector("header.top").classList.toggle("scrolled", scrollY > 4));
-document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-new]")) newProject();
+  const start = e.target.closest("[data-start-team]");   // the studio picks this team and fills in its prompt
+  if (start) { try { sessionStorage.setItem("atelier-start-team", start.dataset.startTeam); } catch {} }
+});
 function setTitle(t) { document.title = `${t} · Agents Atelier`; }
 
 const parts = location.pathname.replace(/\/+$/, "").split("/").slice(2).map(decodeURIComponent);   // after /teams
@@ -221,11 +231,15 @@ async function detailView(id) {
         <div class="acts">
           <a class="btn btn-ghost btn-sm" href="/api/presets/${encodeURIComponent(t.id)}/export" title="Download this team and its agents as a .json file">${icon("download", { size: 14 })}Export</a>
           <a class="btn btn-ghost btn-sm" href="/teams/new?from=${encodeURIComponent(t.id)}">${icon("copy", { size: 14 })}Duplicate</a>
+          <a class="btn btn-dark btn-sm" href="/projects/new" data-start-team="${esc(t.id)}">${icon("plus", { size: 14 })}New project with this team</a>
           ${!t.editable ? "" : `<button class="btn btn-ghost btn-sm" id="del">${icon("trash", { size: 14 })}Delete</button>
           <a class="btn btn-dark btn-sm" href="/teams/${encodeURIComponent(t.id)}/edit">${icon("pencil", { size: 14 })}Edit</a>`}
         </div>
       </div>
       <p class="vdesc">${esc(t.description || "No description yet.")}</p>
+      ${t.prompt ? `<div class="starter"><div class="starter-head"><b>Starting prompt</b><small>Filled into the studio when you pick this team. Replace the parts in [brackets].</small>
+        <button class="btn btn-ghost btn-sm" type="button" id="copy-prompt">${icon("copy", { size: 14 })}Copy</button></div>
+        <pre class="starter-text" data-no-i18n>${esc(t.prompt).replace(/\[([^\]\n]{1,80})\]/g, '<mark>[$1]</mark>')}</pre></div>` : ""}
       <div class="kv">
         <div><b>${t.agents.length}</b><span>agents, run in order</span></div>
         <div><b>~${duration(est.seconds)}</b><span>estimated run time (${est.measured}/${est.total} measured)</span></div>
@@ -245,6 +259,9 @@ async function detailView(id) {
         </a>`;
       }).join("") || `<p class="note">This team has no agents left (they may have been deleted).</p>`}</div>
     </section>`;
+  $("copy-prompt")?.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(t.prompt); toast("Prompt copied"); } catch { toast("Copy failed", "err"); }
+  });
   $("del")?.addEventListener("click", async () => {
     if (!await confirmDialog({ title: `Delete “${t.name}”?`, text: "The team is removed. Its agents and your projects are not changed.", ok: "Delete", danger: true })) return;
     try { await api(`/api/presets/${encodeURIComponent(t.id)}`, { method: "DELETE" }); toast("Team deleted"); go("/teams"); }
@@ -263,8 +280,8 @@ async function formView(id) {
   const isNew = !id;
   const askScope = isNew && me?.role === "admin";
   const draft = { name: source ? (isNew ? `${source.name} copy` : source.name) : "", description: source?.description || "",
-                  agents: new Set(source ? source.agents : []) };
-  const snap = () => JSON.stringify([draft.name, draft.description, [...draft.agents].sort()]);
+                  prompt: source?.prompt || "", agents: new Set(source ? source.agents : []) };
+  const snap = () => JSON.stringify([draft.name, draft.description, draft.prompt, [...draft.agents].sort()]);
   const initial = snap();
   setTitle(isNew ? "New team" : `Edit ${source.name}`);
   app.innerHTML = `
@@ -276,6 +293,8 @@ async function formView(id) {
         <label class="field"><span>Name</span><input class="input" id="f-name" maxlength="40" value="${esc(draft.name)}" placeholder="e.g. Landing page sprint"></label>
         <label class="field"><span>Description <small id="dcount"></small></span>
           <input class="input" id="f-desc" maxlength="200" value="${esc(draft.description)}" placeholder="When to use this team"></label>
+        <label class="field"><span>Starting prompt <small>optional · put the parts to fill in between [brackets]</small></span>
+          <textarea class="input" id="f-prompt" maxlength="2000" rows="5" placeholder="e.g. Build a website for [business name], a [what you do] in [city]…">${esc(draft.prompt)}</textarea></label>
         <div class="field">
           <div class="pick-head"><span style="font-size:13px;font-weight:500">Agents <small style="font-weight:400;color:var(--stone)">· they always run in the order shown on the Agents page</small></span>
             <span class="spacer"></span>
@@ -309,12 +328,13 @@ async function formView(id) {
   draw();
   $("f-name").oninput = (e) => { draft.name = e.target.value; $("pv-name").textContent = draft.name || "New team"; draw(); };
   $("f-desc").oninput = (e) => { draft.description = e.target.value; draw(); };
+  $("f-prompt").oninput = (e) => { draft.prompt = e.target.value; draw(); };
   $("pick").onchange = (e) => { const c = e.target.closest("[data-id]"); if (!c) return; c.checked ? draft.agents.add(c.dataset.id) : draft.agents.delete(c.dataset.id); draw(); };
   $("allA").onclick = () => { draft.agents = new Set(base.agents.map(a => a.id)); draw(); };
   $("defA").onclick = () => { draft.agents = new Set(base.agents.filter(a => a.default).map(a => a.id)); draw(); };
   $("noneA").onclick = () => { draft.agents = new Set(); draw(); };
   $("save").onclick = async () => {
-    const body = { name: draft.name, description: draft.description, agents: [...draft.agents] };
+    const body = { name: draft.name, description: draft.description, prompt: draft.prompt, agents: [...draft.agents] };
     if (askScope && !$("f-shared").checked) body.scope = "mine";
     $("save").disabled = true;
     try {

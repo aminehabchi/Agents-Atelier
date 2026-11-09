@@ -26,6 +26,7 @@ from email.message import EmailMessage
 
 import config
 import db
+import limits
 
 log = logging.getLogger("agents-atelier.auth")
 
@@ -144,10 +145,14 @@ def _hash(text: str) -> str:
 async def register(body: dict) -> dict:
     email, password = clean_email(body.get("email")), check_password(body.get("password"))
     p = clean_profile(body)
+    if body.get("accept_terms") is not True:
+        raise AuthError("Please accept the Terms and the Privacy policy to create an account.")
+    if limits.is_disposable(email):
+        raise AuthError("Use a permanent email address. Temporary inboxes can't receive your account emails for long.")
     try:
         row = await db.pool.fetchrow(
-            """INSERT INTO users (id, email, password_hash, name, company, job_role, use_case, referral, language)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *""",
+            """INSERT INTO users (id, email, password_hash, name, company, job_role, use_case, referral, language, terms_accepted_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now()) RETURNING *""",
             uuid.uuid4(), email, hash_password(password),
             p["name"], p["company"], p["job_role"], p["use_case"], p["referral"],
             body.get("language") if body.get("language") in LANGUAGES else "")

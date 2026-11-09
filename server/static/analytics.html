@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#000000">
+<title>Analytics · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  :root { --chart: var(--sky); }
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+  .head .page-title { margin: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .stat-tile { padding: 18px 20px; border-radius: var(--r-card); background: var(--paper); box-shadow: var(--ring); min-width: 0; }
+  .stat-tile h2 { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--graphite); }
+  .stat-tile b { display: block; font-size: 32px; font-weight: 400; line-height: 1.1; letter-spacing: -0.03em; font-feature-settings: "tnum"; }
+  .stat-tile small { display: block; margin-top: 6px; font-size: 12px; color: var(--stone); }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .panel { padding: 20px; border-radius: var(--r-card); background: var(--paper); box-shadow: var(--ring); min-width: 0; }
+  .panel h2 { margin: 0 0 4px; font-size: 14px; font-weight: 500; }
+  .panel .total { margin: 0 0 12px; font-size: 12px; color: var(--stone); }
+  .plot { position: relative; height: 140px; margin-top: 20px; border-bottom: 1px solid var(--line-strong); }
+  .plot .top-line { position: absolute; left: 0; right: 0; top: 0; border-top: 1px dashed var(--line); }
+  .plot .top-label { position: absolute; right: 0; top: -18px; font-size: 11px; color: var(--stone); font-feature-settings: "tnum"; }
+  .bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 2px; }
+  .bar { position: relative; flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; background: none; border: 0; padding: 0; }
+  .bar:hover, .bar:focus-visible { background: var(--ice); }
+  .bar i { display: block; width: 70%; max-width: 14px; background: var(--chart); border-radius: 3px 3px 0 0; }
+  .bar .tip { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 3; display: none; padding: 5px 8px; border-radius: 8px; background: var(--steel); box-shadow: var(--ring); font-size: 11px; white-space: nowrap; color: var(--ink); }
+  .bar:first-child .tip, .bar:nth-child(2) .tip { left: 0; transform: none; }
+  .bar:last-child .tip, .bar:nth-last-child(2) .tip { left: auto; right: 0; transform: none; }
+  .bar:hover .tip, .bar:focus-visible .tip { display: block; }
+  .x-labels { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--stone); }
+  .hbars { display: flex; flex-direction: column; gap: 10px; }
+  .hbar-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; margin-bottom: 4px; }
+  .hbar-top span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hbar-top span:last-child { color: var(--graphite); font-feature-settings: "tnum"; }
+  .hbar-track i { display: block; height: 6px; min-width: 2px; background: var(--chart); border-radius: 0 3px 3px 0; }
+  .empty-note { margin: 0; padding: 20px 0; color: var(--stone); font-size: 13px; text-align: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { padding: 8px 10px; text-align: left; font-weight: 500; color: var(--graphite); border-bottom: 1px solid var(--line-strong); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+  td.num, th.num { text-align: right; font-feature-settings: "tnum"; white-space: nowrap; }
+  .table-wrap { overflow-x: auto; }
+  @media (max-width: 960px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid, .grid.two { grid-template-columns: minmax(0, 1fr); } }
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <nav class="links">
+      <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
+    </nav>
+    <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
+  </div>
+</header>
+<main class="wrap page">
+  <div class="head">
+    <h1 class="page-title">Analytics</h1>
+    <div class="seg" role="radiogroup" aria-label="Period" id="range">
+      <button type="button" role="radio" data-days="7">7 days</button>
+      <button type="button" role="radio" data-days="30">30 days</button>
+      <button type="button" role="radio" data-days="90">90 days</button>
+    </div>
+  </div>
+  <div id="app"><p>Loading…</p></div>
+</main>
+<script>
+document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
+const app = document.getElementById("app");
+let days = 30;
+try { days = +localStorage.getItem("analytics-days") || 30; } catch {}
+const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0) + "%";
+const dayLabel = (iso, opts = { day: "numeric", month: "short" }) => new Date(iso + "T00:00:00Z").toLocaleDateString(getLang(), { timeZone: "UTC", ...opts });
+
+function barChart(series, format = (v) => String(v)) {
+  const max = Math.max(...series.map(d => d.value));
+  if (!max) return `<p class="empty-note">Nothing in this period.</p>`;
+  return `<div class="plot"><span class="top-line"></span><span class="top-label" data-no-i18n>${esc(format(max))}</span>
+    <div class="bars">${series.map(d => `<button type="button" class="bar" aria-label="${esc(dayLabel(d.date))}: ${esc(format(d.value))}">
+      ${d.value ? `<i style="height:${(d.value / max) * 100}%"></i>` : ""}<span class="tip" data-no-i18n>${esc(dayLabel(d.date, { weekday: "short", day: "numeric", month: "short" }))}<br>${esc(format(d.value))}</span></button>`).join("")}</div></div>
+    <div class="x-labels" data-no-i18n><span>${esc(dayLabel(series[0].date))}</span><span>${esc(dayLabel(series[series.length - 1].date))}</span></div>`;
+}
+function hbars(rows) {
+  if (!rows.length) return `<p class="empty-note">No answers yet.</p>`;
+  const max = Math.max(...rows.map(r => r.value));
+  return `<div class="hbars">${rows.slice(0, 8).map(r => `<div><div class="hbar-top"><span>${esc(r.label)}</span><span>${r.value}</span></div>
+    <div class="hbar-track"><i style="width:${(r.value / max) * 100}%"></i></div></div>`).join("")}</div>`;
+}
+const LANG = { en: "English", fr: "Français", "": "Not set" };
+const sum = (s) => s.reduce((n, d) => n + d.value, 0);
+
+async function load() {
+  document.querySelectorAll("#range button").forEach(b => { const on = +b.dataset.days === days; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
+  let d;
+  try { d = await api(`/api/admin/analytics?days=${days}`); }
+  catch (err) { return showError(app, err, load, "Couldn't load the analytics"); }
+  const u = d.users, b = d.builds;
+  app.innerHTML = `
+    <section class="tiles" aria-label="Accounts">
+      <div class="stat-tile"><h2>Accounts</h2><b>${u.total}</b><small>${u.confirmed} confirmed (${pct(u.confirmed, u.total)}) · ${u.admins} admin${u.admins === 1 ? "" : "s"}</small></div>
+      <div class="stat-tile"><h2>New accounts</h2><b>${u.new}</b><small>in the last ${d.days} days</small></div>
+      <div class="stat-tile"><h2>Active users</h2><b>${u.active_7}</b><small>logged in during the last 7 days · ${u.active_1} today · ${u.active_30} in 30 days</small></div>
+      <div class="stat-tile"><h2>Not confirmed</h2><b>${u.unconfirmed}</b><small>accounts waiting for their email code</small></div>
+    </section>
+    <section class="tiles" aria-label="Builds">
+      <div class="stat-tile"><h2>Projects created</h2><b>${b.projects_in_range}</b><small>${b.projects} in total</small></div>
+      <div class="stat-tile"><h2>Agent runs</h2><b>${b.runs_in_range}</b><small>${b.runs} in total</small></div>
+      <div class="stat-tile"><h2>Estimated cost</h2><b>${money(b.cost_in_range)}</b><small>${money(b.cost)} in total · API equivalent</small></div>
+      <div class="stat-tile"><h2>Failed or stopped runs</h2><b>${pct(b.failed_in_range, b.runs_in_range)}</b><small>${b.failed_in_range} of ${b.runs_in_range} in this period</small></div>
+    </section>
+    <div class="grid">
+      <section class="panel"><h2>New accounts per day</h2><p class="total">${sum(d.series.signups)} in ${d.days} days</p>${barChart(d.series.signups)}</section>
+      <section class="panel"><h2>Agent runs per day</h2><p class="total">${sum(d.series.runs)} in ${d.days} days</p>${barChart(d.series.runs)}</section>
+      <section class="panel"><h2>Estimated cost per day</h2><p class="total" data-no-i18n>${money(sum(d.series.cost))}</p>${barChart(d.series.cost, money)}</section>
+    </div>
+    <div class="grid two">
+      <section class="panel"><h2>What best describes them</h2><p class="total">Confirmed accounts</p>${hbars(d.breakdown.job_role)}</section>
+      <section class="panel"><h2>What they build sites for</h2><p class="total">Confirmed accounts</p>${hbars(d.breakdown.use_case)}</section>
+      <section class="panel"><h2>How they heard about us</h2><p class="total">Confirmed accounts</p>${hbars(d.breakdown.referral)}</section>
+      <section class="panel"><h2>Language</h2><p class="total">Confirmed accounts</p>${hbars(d.breakdown.language.map(r => ({ ...r, label: LANG[r.label === "Not answered" ? "" : r.label] || r.label })))}</section>
+    </div>
+    <section class="panel"><h2>Top accounts by estimated cost</h2><p class="total">All time</p>
+      ${d.top_users.length ? `<div class="table-wrap"><table><thead><tr><th>Account</th><th class="num">Projects</th><th class="num">Agent runs</th><th class="num">Estimated cost</th><th class="num">Last run</th></tr></thead>
+        <tbody>${d.top_users.map(r => `<tr><td data-no-i18n>${esc(r.email)}</td><td class="num">${r.projects}</td><td class="num">${r.runs}</td><td class="num" data-no-i18n>${money(r.cost)}</td><td class="num">${r.last ? ago(r.last) : "-"}</td></tr>`).join("")}</tbody></table></div>`
+        : `<p class="empty-note">No projects yet.</p>`}
+    </section>`;
+}
+document.getElementById("range").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-days]");
+  if (!b) return;
+  days = +b.dataset.days;
+  try { localStorage.setItem("analytics-days", days); } catch {}
+  load();
+});
+load();
+</script>
+</body>
+</html>

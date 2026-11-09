@@ -1,1 +1,333 @@
-[]
+[
+  {
+    "id": "new-website",
+    "name": "New website from scratch",
+    "description": "A complete site from a description: plan, copy, design, code and a final review.",
+    "agents": [
+      "brief",
+      "ux",
+      "design",
+      "copy",
+      "html",
+      "css",
+      "js",
+      "responsive",
+      "anim",
+      "a11y",
+      "critic"
+    ],
+    "prompt": "Build a website for [business name], a [what you do] in [city].\nIt's for [who your visitors are], and the main goal is to get them to [book / call / buy / sign up].\nPages: [Home, About, Services, Contact].\nTone: [friendly / premium / playful]. Colours: [your colours, or \"you choose\"].\nMust include: [prices, opening hours, map, reviews, contact form]."
+  },
+  {
+    "id": "landing-page",
+    "name": "Landing page that converts",
+    "description": "One page with one goal: a clear offer, proof and a strong call to action.",
+    "agents": [
+      "brief",
+      "ux",
+      "design",
+      "copy",
+      "html",
+      "css",
+      "pricing",
+      "js",
+      "responsive",
+      "conversion",
+      "a11y",
+      "critic"
+    ],
+    "prompt": "Build a one-page landing page for [product or offer].\nIt's for [who it's for], who struggle with [their problem].\nThe one action I want: [book a demo / buy / join the waitlist].\nReal proof I can show: [numbers, reviews, logos, guarantees].\nAnswer these doubts near the button: [price, time, what happens next]."
+  },
+  {
+    "id": "improve-imported",
+    "name": "Improve an imported site",
+    "description": "Fix and polish a site you imported, keeping its content and brand.",
+    "agents": [
+      "auditor",
+      "copy",
+      "css",
+      "js",
+      "responsive",
+      "a11y",
+      "perf",
+      "qa",
+      "critic"
+    ],
+    "prompt": "Improve this site without changing what it says or its brand colours.\nFix bugs and broken links, make it work well on phones, improve accessibility and loading speed, and tighten the visual details.\nAlso: [anything specific that bothers you]."
+  },
+  {
+    "id": "redesign",
+    "name": "Redesign: new look, same content",
+    "description": "Keep the words and pages, change the visual design completely.",
+    "agents": [
+      "auditor",
+      "design",
+      "css",
+      "responsive",
+      "anim",
+      "a11y",
+      "critic"
+    ],
+    "prompt": "Give this site a new look and keep all its content and pages.\nNew style: [modern and minimal / warm and friendly / bold and colourful / luxury].\nKeep: [logo, brand colour, anything else].\nSites whose style I like: [links or descriptions]."
+  },
+  {
+    "id": "research-build",
+    "name": "Research, then build",
+    "description": "The Research agent studies the market and competitors first, then the team builds a better page.",
+    "agents": [
+      "brief",
+      "research",
+      "ux",
+      "design",
+      "copy",
+      "content",
+      "html",
+      "css",
+      "js",
+      "responsive",
+      "a11y",
+      "critic"
+    ],
+    "prompt": "Research [type of business] in [city or market]: what competitors offer, what customers praise and complain about.\nThen build a website for [business name] that does better than them, for [who the visitors are].\nMain goal: [what visitors should do]."
+  },
+  {
+    "id": "from-sketch",
+    "name": "Build from a sketch or screenshot",
+    "description": "Turn an attached sketch, wireframe or screenshot into a real page.",
+    "agents": [
+      "ux",
+      "design",
+      "copy",
+      "html",
+      "css",
+      "js",
+      "responsive",
+      "a11y",
+      "critic"
+    ],
+    "prompt": "Build the page shown in the attached image (attach it with the paperclip).\nFollow its layout and sections. [Keep its colours / use these colours instead: …].\nThe page is for [business], and the text should [be written for … / stay as in the image]."
+  },
+  {
+    "id": "restaurant-cafe",
+    "name": "Restaurant or café",
+    "description": "Menu with prices, opening hours, map, booking and local search.",
+    "agents": [
+      "brief",
+      "ux",
+      "design",
+      "copy",
+      "html",
+      "css",
+      "pricing",
+      "gallery",
+      "assets",
+      "js",
+      "forms",
+      "responsive",
+      "a11y",
+      "seo",
+      "local",
+      "critic"
+    ],
+    "prompt": "Build a website for [name], a [restaurant / café / bakery] in [neighbourhood, city].\nShow the menu with prices: [paste your menu or main dishes].\nOpening hours: [hours]. Address: [address]. Phone or WhatsApp: [number].\nBooking: [table booking form / WhatsApp button / phone only].\nAtmosphere: [cosy / modern / traditional]. Language: [language of the site]."
+  },
+  {
+    "id": "service-business",
+    "name": "Local service business",
+    "description": "Plumbers, salons, clinics, garages: services with prices, area served, reviews and quick contact.",
+    "agents": [
+      "brief",
+      "ux",
+      "design",
+      "copy",
+      "content",
+      "html",
+      "css",
+      "pricing",
+      "js",
+      "forms",
+      "responsive",
+      "a11y",
+      "seo",
+      "local",
+      "critic"
+    ],
+    "prompt": "Build a website for [business name], a [plumber / hair salon / dental clinic / garage] in [city].\nServices and prices: [list your main services, with prices or \"on request\"].\nArea served: [neighbourhoods or cities]. Opening hours: [hours].\nHow customers reach me: [phone, WhatsApp, booking form]. Address: [address, or \"we come to you\"].\nReal reviews or numbers I can show: [reviews, years in business, or \"none yet\"]."
+  },
+  {
+    "id": "portfolio",
+    "name": "Portfolio",
+    "description": "Show your work, your story and how to hire you.",
+    "agents": [
+      "brief",
+      "ux",
+      "design",
+      "copy",
+      "content",
+      "html",
+      "css",
+      "gallery",
+      "js",
+      "responsive",
+      "anim",
+      "a11y",
+      "critic"
+    ],
+    "prompt": "Build a portfolio for [your name], a [designer / photographer / developer / architect].\nProjects to show: [3 to 6 projects, one line each].\nWho I want to reach: [clients, studios, recruiters].\nHow they contact me: [email, form, LinkedIn]. Style: [minimal / bold / editorial]."
+  },
+  {
+    "id": "content-site",
+    "name": "Blog or content site",
+    "description": "Articles and guides that answer real questions, with clear navigation and search basics.",
+    "agents": [
+      "brief",
+      "research",
+      "ux",
+      "design",
+      "copy",
+      "content",
+      "html",
+      "css",
+      "js",
+      "responsive",
+      "a11y",
+      "seo",
+      "critic"
+    ],
+    "prompt": "Build a content site about [topic] for [who reads it].\nStart with these articles: [3 to 5 article titles or questions people ask].\nTone: [expert / friendly / practical]. Language: [language].\nWhat readers should do after reading: [subscribe / contact us / buy]."
+  },
+  {
+    "id": "product-page",
+    "name": "Product page",
+    "description": "Sell one product: benefits, details, reviews, questions and a clear buy button.",
+    "agents": [
+      "brief",
+      "ux",
+      "design",
+      "copy",
+      "html",
+      "css",
+      "pricing",
+      "js",
+      "responsive",
+      "conversion",
+      "a11y",
+      "seo",
+      "critic"
+    ],
+    "prompt": "Build a product page for [product name], which [what it does].\nPrice: [price]. Delivery and payment: [delivery time, cash on delivery, returns].\nWho buys it: [customers]. Main benefits: [3 benefits].\nReal reviews or proof I have: [reviews, numbers, or \"none yet\"]."
+  },
+  {
+    "id": "event-page",
+    "name": "Event page",
+    "description": "Date, programme, speakers, venue and registration.",
+    "agents": [
+      "brief",
+      "ux",
+      "design",
+      "copy",
+      "html",
+      "css",
+      "gallery",
+      "js",
+      "forms",
+      "responsive",
+      "a11y",
+      "local",
+      "critic"
+    ],
+    "prompt": "Build a page for [event name] on [date] at [venue, city].\nProgramme: [main sessions or schedule]. Speakers or guests: [names].\nRegistration: [form with name and email / ticket link]. Price: [free / price].\nWho it's for: [audience]."
+  },
+  {
+    "id": "multilingual",
+    "name": "Make it multilingual",
+    "description": "Add more languages, a language switcher and right-to-left layouts.",
+    "agents": [
+      "translator",
+      "css",
+      "qa"
+    ],
+    "prompt": "Make this site available in [English], [French] and [Arabic].\nThe main language is [main language]. Translate every page naturally for local readers, add a language switcher in the header, and lay out Arabic right to left."
+  },
+  {
+    "id": "legal-pages",
+    "name": "Legal pages",
+    "description": "Privacy policy and legal notice, linked from every footer.",
+    "agents": [
+      "legal",
+      "qa"
+    ],
+    "prompt": "Add a privacy policy and a legal notice (mentions légales) to this site.\nThe business: [company name, legal form, registration number, address, contact email].\nThe site's host: [host name and address].\nWhat the site collects: [contact form, newsletter, nothing]."
+  },
+  {
+    "id": "dark-mode",
+    "name": "Add a dark mode",
+    "description": "A dark theme that follows the visitor's system, with a toggle.",
+    "agents": [
+      "dark-theme",
+      "a11y",
+      "qa"
+    ],
+    "prompt": "Add a dark mode to this site. It should follow the visitor's system setting, have a toggle in the header that remembers the choice, and keep every text readable."
+  },
+  {
+    "id": "forms",
+    "name": "Contact and booking forms",
+    "description": "Forms with good fields, validation, errors and success messages.",
+    "agents": [
+      "forms",
+      "a11y",
+      "qa"
+    ],
+    "prompt": "Add a [contact / booking / quote request] form to the [Contact] page.\nFields: [name, email, phone, date, number of guests, message].\nAfter sending, tell visitors: [what happens next, e.g. \"we reply within a day\"]."
+  },
+  {
+    "id": "boost-conversions",
+    "name": "Boost conversions",
+    "description": "More visitors take the main action: clearer offer, real proof, less friction.",
+    "agents": [
+      "auditor",
+      "copy",
+      "responsive",
+      "conversion",
+      "critic"
+    ],
+    "prompt": "Make this site better at getting visitors to [book / call / buy / sign up].\nWhat visitors usually worry about: [price, trust, time, delivery].\nReal proof I can add: [reviews, numbers, guarantees, logos]. Don't invent any."
+  },
+  {
+    "id": "seo-speed",
+    "name": "SEO and speed checkup",
+    "description": "Search and sharing tags, structured data, faster loading and a bug check.",
+    "agents": [
+      "auditor",
+      "content",
+      "seo",
+      "local",
+      "perf",
+      "qa"
+    ],
+    "prompt": "Improve how this site appears in search and loads.\nThe searches people should find it for: [e.g. \"café in Casablanca\", \"wedding photographer Rabat\"].\nCity or area served: [city]."
+  },
+  {
+    "id": "accessibility-audit",
+    "name": "Accessibility audit",
+    "description": "Check and fix the site against WCAG 2.2 AA, then review it.",
+    "agents": [
+      "auditor",
+      "a11y",
+      "qa",
+      "critic"
+    ],
+    "prompt": "Check this site against WCAG 2.2 AA and fix every problem: contrast, keyboard use, focus, labels, headings and alt text.\nList what you changed in the review."
+  },
+  {
+    "id": "code-cleanup",
+    "name": "Code cleanup",
+    "description": "Tidy the code without changing how the site looks or works.",
+    "agents": [
+      "tidy",
+      "qa"
+    ],
+    "prompt": "Clean up this site's code without changing how it looks or works: remove unused CSS and code, merge duplicates and make the formatting consistent."
+  }
+]

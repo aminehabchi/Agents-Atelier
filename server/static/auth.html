@@ -70,6 +70,12 @@
   .auth-err:empty { display: none; }
   .auth-ok { color: var(--graphite); font-size: 13px; line-height: 1.5; margin: 0 0 16px; }
   .auth-ok:empty { display: none; }
+  .terms { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 4px; font-size: 13px; line-height: 1.5; color: var(--graphite); cursor: pointer; }
+  .terms input { flex: none; width: 16px; height: 16px; margin-top: 2px; accent-color: var(--sky); }
+  .terms a { color: var(--ink); }
+  .trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+  .legal-links { margin: 0; font-size: 12px; color: var(--stone); }
+  .legal-links a { color: var(--stone); }
   .note { background: var(--pale); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 8px 12px; font-size: 13px; line-height: 1.5; margin: 0 0 16px; }
   .forgot { margin: -6px 0 16px; text-align: right; font-size: 13px; }
   .forgot a { color: var(--graphite); }
@@ -112,6 +118,7 @@
     </div>
     <a class="brand m-brand" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
     <main class="auth-card" id="card"></main>
+    <p class="legal-links"><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
   </div>
 </div>
 <script>
@@ -268,7 +275,10 @@ async function registerView() {
         ${chips("job_role", "What best describes you?", opts.job_role)}
         ${chips("use_case", "What will you build sites for?", opts.use_case)}
         ${chips("referral", "How did you hear about us?", opts.referral)}
+        <label class="terms"><input type="checkbox" id="terms"><span>I agree to the <a href="/terms" target="_blank" rel="noopener">Terms of use</a> and the <a href="/privacy" target="_blank" rel="noopener">Privacy policy</a>.</span></label>
+        <small class="ferr" id="terms-err" role="alert"></small>
       </div>
+      <label class="trap" aria-hidden="true">Website <input type="text" id="website" name="website" tabindex="-1" autocomplete="off"></label>
       <p class="auth-err" id="err" role="alert"></p>
       <div class="actions"><button class="btn btn-ghost" type="button" id="back" hidden>Back</button>
         <button class="btn btn-dark grow" id="go">Continue</button></div>
@@ -310,12 +320,14 @@ async function registerView() {
     if (!checkStep1()) return showStep(1);
     if (step === 1) return showStep(2);
     const choice = (name) => card.querySelector(`input[name="${name}"]:checked`)?.value || "";
+    $("terms-err").textContent = $("terms").checked ? "" : "Please accept the Terms and the Privacy policy to continue.";
+    if (!$("terms").checked) return $("terms").focus();
     const done = busy($("go"), "Creating your account…");
     try {
       const { user } = await post("/api/auth/register", {
         name: $("name").value.trim(), email: $("email").value.trim(), password: $("password").value,
         company: $("company").value.trim(), job_role: choice("job_role"), use_case: choice("use_case"), referral: choice("referral"),
-        language: getLang(),
+        language: getLang(), accept_terms: $("terms").checked, website: $("website").value,
       });
       location.href = user.confirmed ? next : withNext("/confirm");
     } catch (err) {

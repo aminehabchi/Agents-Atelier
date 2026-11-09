@@ -114,5 +114,27 @@ if SMTP_SECURITY not in ("starttls", "ssl", "none"):
     raise SystemExit(f"Setting SMTP_SECURITY must be starttls, ssl or none, got {SMTP_SECURITY!r} (check your .env).")
 EMAIL_OUTBOX = _path("EMAIL_OUTBOX", Path()) if os.environ.get("EMAIL_OUTBOX", "").strip() else None   # also append emails to this file (JSON lines)
 
+def _yes(name: str, default: bool) -> bool:
+    value = os.environ.get(name, "").strip().lower()
+    return default if not value else value in ("1", "true", "yes", "on")
+
+
+# ---- sign-up protection (per IP address; the limits reset as time passes)
+TRUST_PROXY = _yes("TRUST_PROXY", False)          # behind a reverse proxy: read the visitor's IP from X-Forwarded-For
+SIGNUPS_PER_HOUR = _int("SIGNUPS_PER_HOUR", 5, low=0)          # new accounts per IP per hour (0 = no limit)
+LOGINS_PER_15_MIN = _int("LOGINS_PER_15_MIN", 30, low=0)       # login attempts per IP per 15 minutes
+RESETS_PER_HOUR = _int("RESETS_PER_HOUR", 10, low=0)           # password reset requests per IP per hour
+BLOCK_DISPOSABLE_EMAILS = _yes("BLOCK_DISPOSABLE_EMAILS", True)
+DISPOSABLE_DOMAINS_FILE = _path("DISPOSABLE_DOMAINS_FILE", Path()) if os.environ.get("DISPOSABLE_DOMAINS_FILE", "").strip() else None   # extra domains, one per line
+
+# ---- real browser checks before the QA agent and the Critic (needs Chrome or Chromium on the server)
+BROWSER_CHECKS = _yes("BROWSER_CHECKS", True)
+CHROME_BIN = os.environ.get("CHROME_BIN", "").strip()          # empty = look for google-chrome / chromium
+
+# ---- legal pages (shown on /terms and /privacy)
+LEGAL_NAME = os.environ.get("LEGAL_NAME", "").strip()          # who runs this service, e.g. "Atelier SARL"
+LEGAL_EMAIL = os.environ.get("LEGAL_EMAIL", "").strip().lower() or ADMIN_EMAIL
+LEGAL_ADDRESS = os.environ.get("LEGAL_ADDRESS", "").strip()
+
 # ---- project brief & assets (asked when a project is created)
 MAX_ASSETS = _int("MAX_ASSETS", 12)   # logo + photos a project can start with

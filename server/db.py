@@ -5,6 +5,7 @@ Tables
   sessions     login sessions (only a hash of the cookie token is stored)
   email_codes  the pending 6-digit confirmation code of each unconfirmed account (hashed)
   reset_codes  the pending 6-digit password reset code of an account (hashed), and its daily limits
+  brand_kits   an account's logo, colours and fonts, reused in new projects
   agents       every agent: owner_id NULL = shared (only admins change it), otherwise that user's own agent
   teams        saved teams, same ownership rule (the built-in teams are computed, not stored)
 
@@ -20,6 +21,7 @@ import config
 
 log = logging.getLogger("agents-atelier.db")
 pool: asyncpg.Pool | None = None
+MAX_TEAM_PROMPT = 2000   # a team's starting prompt
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -40,6 +42,16 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS use_case text NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referral text NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS language text NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS theme    text NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;
+
+CREATE TABLE IF NOT EXISTS brand_kits (
+    user_id      uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    colors       text[] NOT NULL DEFAULT '{}',
+    heading_font text NOT NULL DEFAULT '',
+    body_font    text NOT NULL DEFAULT '',
+    logo         text NOT NULL DEFAULT '',
+    updated_at   timestamptz NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS sessions (
     token_hash text PRIMARY KEY,
@@ -97,6 +109,7 @@ CREATE TABLE IF NOT EXISTS teams (
     updated_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS teams_owner_slug ON teams ((coalesce(owner_id::text, '')), slug);
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS prompt text NOT NULL DEFAULT '';
 """
 
 
@@ -149,9 +162,11 @@ async def seed_from_files(con, replace: bool = False) -> int:
     for t in store.read_preset_file():
         slug = store.slugify(t.get("id") or t.get("name") or "team")
         await con.execute(
-            """INSERT INTO teams (owner_id, slug, name, description, agents) VALUES (NULL, $1, $2, $3, $4)
-               ON CONFLICT ((coalesce(owner_id::text, '')), slug) DO NOTHING""",
-            slug, str(t.get("name") or slug)[:40], str(t.get("description") or "")[:200], [str(x) for x in t.get("agents") or []])
+            """INSERT INTO teams (owner_id, slug, name, description, agents, prompt) VALUES (NULL, $1, $2, $3, $4, $5)
+               ON CONFLICT ((coalesce(owner_id::text, '')), slug) DO """ +
+            ("UPDATE SET name = $2, description = $3, agents = $4, prompt = $5, updated_at = now()" if replace else "NOTHING"),
+            slug, str(t.get("name") or slug)[:40], str(t.get("description") or "")[:200], [str(x) for x in t.get("agents") or []],
+            str(t.get("prompt") or "")[:MAX_TEAM_PROMPT])
     log.info("Shared agents %s from %s (%d agents)", "synced" if replace else "created", config.AGENTS_DIR, len(files))
     return len(files)
 

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#000000">
+<title>Privacy policy · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  .doc-head { max-width: 1100px; margin: 24px auto 40px; }
+  .doc-head .tabs { display: flex; gap: 6px; margin-bottom: 28px; }
+  .doc-head .tabs a { text-decoration: none; }
+  .doc-head h1 { margin: 0 0 12px; font-size: clamp(40px, 6vw, 64px); font-weight: 400; line-height: 1.05; letter-spacing: -0.045em; }
+  .doc-head .updated { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--stone); }
+  .doc-head .who { margin-top: 28px; padding: 20px 24px; border-radius: var(--r-card); box-shadow: var(--ring); background: var(--paper); font-size: 17px; line-height: 1.6; color: var(--graphite); }
+  .doc-head .who p { margin: 0; }
+  .doc-head .who a { color: var(--ink); }
+  .doc-head .unset { margin: 0 0 24px; padding: 14px 18px; border-radius: var(--r); box-shadow: inset 0 0 0 1px var(--danger); color: var(--danger); font-size: 15px; }
+
+  .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 56px; max-width: 1100px; margin: 0 auto; align-items: start; }
+  .toc { position: sticky; top: 92px; display: flex; flex-direction: column; gap: 2px; }
+  .toc p { margin: 0 0 10px; font-family: var(--mono); font-size: 12px; letter-spacing: .03em; color: var(--stone); }
+  .toc a { display: flex; gap: 10px; padding: 8px 12px; border-radius: var(--r); font-size: 14px; line-height: 1.4; color: var(--graphite); text-decoration: none; }
+  .toc a span { font-family: var(--mono); font-size: 12px; color: var(--stone); padding-top: 1px; }
+  .toc a:hover { background: var(--ice); color: var(--ink); }
+  .toc a.on { background: var(--paper); box-shadow: var(--ring); color: var(--ink); }
+
+  .doc section > .legal-part { padding: 32px 0; border-top: 1px solid var(--line); scroll-margin-top: 92px; }
+  .doc section > .legal-part:first-child { border-top: 0; padding-top: 0; }
+  .doc h2 { display: flex; align-items: baseline; gap: 16px; margin: 0 0 16px; font-size: clamp(24px, 2.6vw, 30px); font-weight: 400; letter-spacing: -0.03em; }
+  .doc h2 .n { font-family: var(--mono); font-size: 14px; letter-spacing: 0; color: var(--stone); }
+  .doc p, .doc li { font-size: 17px; line-height: 1.7; color: var(--graphite); }
+  .doc p { margin: 0 0 14px; }
+  .doc ul { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
+  .doc li::marker { color: var(--stone); }
+  .doc b { color: var(--ink); font-weight: 500; }
+  .doc a { color: var(--ink); }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+    .toc { position: static; padding: 16px; border-radius: var(--r-card); box-shadow: var(--ring); background: var(--paper); }
+    .doc p, .doc li { font-size: 16px; }
+  }
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <nav class="links">
+      <a href="/projects" data-show="member"><i data-icon="grid" data-size="16"></i>Projects</a>
+      <a href="/agents" data-show="member"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/teams" data-show="member"><i data-icon="layers" data-size="16"></i>Teams</a>
+    </nav>
+    <div class="hdr-actions">
+      <a class="btn btn-ghost keep" data-show="guest" href="/login">Log in</a>
+      <a class="btn btn-dark keep" data-show="guest" href="/register">Sign up</a>
+    </div>
+  </div>
+</header>
+<main class="wrap page">
+  <header class="doc-head">
+    <div class="tabs"><a class="fchip" id="tab-terms" href="/terms">Terms of use</a><a class="fchip" id="tab-privacy" href="/privacy">Privacy policy</a></div>
+    <p class="unset" id="unset" hidden>The operator of this service hasn't filled in their details yet (LEGAL_NAME in the server settings).</p>
+    <h1 id="doc-title">Privacy policy</h1>
+    <p class="updated">Last updated: <span class="date" data-no-i18n></span></p>
+    <div class="who" id="who"></div>
+  </header>
+  <div class="layout">
+    <nav class="toc" id="toc" aria-label="On this page"><p>On this page</p></nav>
+    <article class="doc" id="doc">
+      <section id="terms" hidden data-who='<p><b data-no-i18n class="legal-name"></b> runs this service. Contact: <a class="legal-email" data-no-i18n></a><span class="legal-address" data-no-i18n></span></p>'>
+        <div class="legal-part" id="terms-1">
+        <h2>What the service does</h2>
+      <p>Agents Atelier lets you describe a website and have AI agents build its front end in HTML, CSS and JavaScript. You can review, change and download the result.</p>
+        </div>
+        <div class="legal-part" id="terms-2">
+        <h2>Your account</h2>
+      <ul>
+        <li>You must give a real email address and keep your password private.</li>
+        <li>You are responsible for what happens in your account.</li>
+        <li>You can delete your account at any time from your profile.</li>
+      </ul>
+        </div>
+        <div class="legal-part" id="terms-3">
+        <h2>Your content</h2>
+      <p>What you write, upload and build stays yours. You give us only the rights we need to store it, show it to you and process it to build your site.</p>
+      <p>Don't use the service for anything illegal, to copy other people's work without permission, to impersonate a real person or company, or to build pages meant to deceive or collect personal data unlawfully.</p>
+        </div>
+        <div class="legal-part" id="terms-4">
+        <h2>AI-generated results</h2>
+      <p>The agents can make mistakes. Check the text, the code and any facts before you publish a site. The result is provided as it is, without a guarantee that it fits a particular purpose.</p>
+        </div>
+        <div class="legal-part" id="terms-5">
+        <h2>Availability and changes</h2>
+      <p>We may change, pause or stop the service, and update these terms. When the changes are significant, we'll tell you before they apply.</p>
+        </div>
+        <div class="legal-part" id="terms-6">
+        <h2>Ending your use</h2>
+      <p>We may suspend accounts that break these terms. You can download your data and delete your account from your profile at any time.</p>
+        </div>
+      </section>
+      <section id="privacy" hidden data-who='<p><b data-no-i18n class="legal-name"></b> is responsible for your data. Contact: <a class="legal-email" data-no-i18n></a><span class="legal-address" data-no-i18n></span></p>'>
+        <div class="legal-part" id="privacy-1">
+        <h2>What we collect</h2>
+      <ul>
+        <li>Your account: name, email address, a hash of your password (never the password itself), your role, and the date you accepted these terms.</li>
+        <li>Optional answers you give: company, what describes you, what you build sites for and how you heard about us.</li>
+        <li>Your settings: language and theme, and your brand kit if you make one.</li>
+        <li>Your work: projects, prompts, uploaded images, the generated files, the chat with the agents, saved versions, and the time and estimated cost of each agent run.</li>
+        <li>Login sessions: a random token in a cookie, and its expiry date.</li>
+      </ul>
+        </div>
+        <div class="legal-part" id="privacy-2">
+        <h2>Why we use it</h2>
+      <ul>
+        <li>To run your account and keep you logged in.</li>
+        <li>To build and store your websites.</li>
+        <li>To send account emails: confirmation codes, password resets and security notices. We don't send marketing emails.</li>
+        <li>To protect the service, for example by limiting sign-ups and logins from one network.</li>
+        <li>To understand how the service is used, in totals only (sign-ups, builds and costs).</li>
+      </ul>
+        </div>
+        <div class="legal-part" id="privacy-3">
+        <h2>Who else processes it</h2>
+      <ul>
+        <li><b>Anthropic</b> (Claude): your prompts, project details, brand kit and project files are sent to Claude so the agents can work on them.</li>
+        <li><b>Google Fonts</b>: the pages load fonts from Google, which receives your IP address.</li>
+        <li>The email provider configured for this service delivers account emails.</li>
+      </ul>
+      <p>We don't sell your data and we don't use advertising or tracking cookies.</p>
+        </div>
+        <div class="legal-part" id="privacy-4">
+        <h2>Cookies and storage</h2>
+      <p>We use one cookie, which keeps you logged in. Your browser also stores your theme, language and a few display choices; this stays on your device.</p>
+        </div>
+        <div class="legal-part" id="privacy-5">
+        <h2>How long we keep it</h2>
+      <p>Your data stays until you delete it or your account. Deleting your account removes your profile, private agents, teams, brand kit, projects and their files. Expired login sessions and codes are removed or stop working.</p>
+        </div>
+        <div class="legal-part" id="privacy-6">
+        <h2>Your rights</h2>
+      <ul>
+        <li>Access and portability: download all your data from your profile.</li>
+        <li>Correction: change your details on your profile.</li>
+        <li>Deletion: delete your account from your profile.</li>
+        <li>For anything else, including objections or complaints, write to the contact above. You can also complain to your data protection authority.</li>
+      </ul>
+        </div>
+      </section>
+    </article>
+  </div>
+</main>
+<script>
+const kind = location.pathname.startsWith("/terms") ? "terms" : "privacy";
+const section = document.getElementById(kind);
+section.hidden = false;
+document.getElementById("doc-title").textContent = kind === "terms" ? "Terms of use" : "Privacy policy";
+document.getElementById("who").innerHTML = section.dataset.who;
+/* number the parts and list them in the contents */
+const toc = document.getElementById("toc");
+section.querySelectorAll(".legal-part").forEach((part, i) => {
+  const h = part.querySelector("h2");
+  const n = String(i + 1).padStart(2, "0");
+  h.insertAdjacentHTML("afterbegin", `<span class="n" data-no-i18n>${n}</span>`);
+  toc.insertAdjacentHTML("beforeend", `<a href="#${part.id}"><span data-no-i18n>${n}</span>${esc(h.lastChild.textContent.trim())}</a>`);
+});
+const links = [...toc.querySelectorAll("a")];
+const spy = new IntersectionObserver((entries) => entries.forEach(e => {
+  if (e.isIntersecting) links.forEach(a => a.classList.toggle("on", a.hash === "#" + e.target.id));
+}), { rootMargin: "-25% 0px -65% 0px" });
+section.querySelectorAll(".legal-part").forEach(p => spy.observe(p));
+links[0]?.classList.add("on");
+document.getElementById(`tab-${kind}`).classList.add("on");
+document.title = `${kind === "terms" ? "Terms of use" : "Privacy policy"} · Agents Atelier`;
+document.querySelectorAll(".date").forEach(el => { el.textContent = "2026-11-09"; });
+api("/api/auth/legal").then(info => {
+  document.getElementById("unset").hidden = !!info.name;
+  document.querySelectorAll(".legal-name").forEach(el => { el.textContent = info.name || "The operator of this service"; });
+  document.querySelectorAll(".legal-email").forEach(el => {
+    if (info.email) { el.textContent = info.email; el.href = `mailto:${info.email}`; }
+    else el.textContent = "not provided yet";
+  });
+  document.querySelectorAll(".legal-address").forEach(el => { el.textContent = info.address ? ` · ${info.address}` : ""; });
+}).catch(() => {});
+</script>
+</body>
+</html>

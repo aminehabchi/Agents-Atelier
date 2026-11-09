@@ -17,7 +17,7 @@ from pathlib import Path
 import config
 
 MAX_VERSIONS = config.MAX_VERSIONS
-SKIP = {"uploads"}          # top-level folders that are not part of the code
+SKIP = {"uploads", ".checks"}          # top-level folders that are not part of the code
 
 
 def _files(folder: Path) -> list[Path]:

@@ -22,7 +22,8 @@ PROMPT_FILE = config.AGENTS_DIR / "_orchestrator.md"
 BRIEF = "brief"                         # always runs whenever any agent runs
 FINISHERS = ("qa", "critic")            # run after any change to the code, when switched on
 READ_ONLY = {"brief", "critic", "qa", "research"}   # agents whose choice alone doesn't count as a code change
-ON_REQUEST = {"research"}   # may be chosen when the user asks for it, even if switched off (never in a fallback)
+# Helpers that may be chosen when the request clearly asks for what they do, even if switched off (never in a fallback).
+ON_REQUEST = {"research", "auditor", "content", "translator", "legal", "dark-theme", "pricing", "gallery", "forms", "conversion", "local", "tidy"}
 INTENTS = {"new_build", "change", "redo_agent", "question", "off_topic", "unclear"}
 TALK = {"question", "off_topic", "unclear"}   # intents where no agent runs: the Orchestrator answers in the chat
 # When an agent's work changes, these agents must adapt to it (only added if switched on).
@@ -80,7 +81,7 @@ def project_state(meta: dict, folder: Path, clean) -> str:
 def build_prompt(meta: dict, request: str, team: list[dict], folder: Path, clean, site_pages: str, brief: str = "") -> str:
     past = "\n".join(f"- {clean(h, 300)}" for h in meta.get("history", [])[-8:]) or "(none)"
     roster = "\n".join(f"- {a['id']}: {a['name']} — {clean(a.get('description') or '', 160)}"
-                       + (" (switched off: choose it only when the user asks for research)" if a["id"] in ON_REQUEST
+                       + (" (switched off: choose it only when the request clearly asks for what it does)" if a["id"] in ON_REQUEST
                           and a["id"] not in (meta.get("agents") or []) else "") for a in team)
     return f"""<project>
 name: {clean(meta.get("name"), 80)}

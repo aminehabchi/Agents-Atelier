@@ -283,7 +283,7 @@ async def teams_with(user: dict, agent_id: str) -> list[dict]:
 def _builtin(agents: list[dict]) -> list[dict]:
     ids = [a["id"] for a in agents]
     pick = lambda wanted: [i for i in ids if i in wanted]
-    base = {"builtin": True, "scope": "builtin", "editable": False}
+    base = {"builtin": True, "scope": "builtin", "editable": False, "prompt": ""}
     return [
         {"id": "default", "name": "Default", "agents": [a["id"] for a in agents if a["default"]], **base,
          "description": "The agents marked “on by default”: a good team for a new page."},
@@ -304,7 +304,7 @@ async def load_presets(user: dict | None) -> list[dict]:
                                user["id"] if user else None)
     for r in rows:
         shared = r["owner_id"] is None
-        out.append({"id": r["slug"], "name": r["name"], "description": r["description"],
+        out.append({"id": r["slug"], "name": r["name"], "description": r["description"], "prompt": r["prompt"],
                     "agents": [i for i in order if i in r["agents"]],   # always in run order, missing agents dropped
                     "builtin": False, "scope": "shared" if shared else "mine",
                     "editable": is_admin(user) if shared else True,
@@ -326,17 +326,21 @@ async def _clean_team(user: dict, data: dict) -> dict:
     description = " ".join(str(data.get("description") or "").split())
     if len(description) > 200:
         raise ValueError("Keep the description under 200 characters.")
+    prompt = "\n".join(line.rstrip() for line in str(data.get("prompt") or "").strip().splitlines())
+    if len(prompt) > db.MAX_TEAM_PROMPT:
+        raise ValueError(f"Keep the starting prompt under {db.MAX_TEAM_PROMPT} characters.")
     wanted = list(data.get("agents") or [])
     ids = [a["id"] for a in await load_agents(user) if a["id"] in wanted]
     if not ids:
         raise ValueError("A team needs at least one agent.")
-    return {"name": name, "description": description, "agents": ids}
+    return {"name": name, "description": description, "agents": ids, "prompt": prompt}
 
 
-async def save_preset(user: dict, name: str, agent_ids: list[str], description: str = "", scope: str | None = None) -> dict:
+async def save_preset(user: dict, name: str, agent_ids: list[str], description: str = "", scope: str | None = None,
+                      prompt: str = "") -> dict:
     """Create a team: shared when an admin makes it (unless scope is "mine"), the user's own otherwise.
     The id comes from the name."""
-    clean = await _clean_team(user, {"name": name, "agents": agent_ids, "description": description})
+    clean = await _clean_team(user, {"name": name, "agents": agent_ids, "description": description, "prompt": prompt})
     shared = is_admin(user) and scope != "mine"
     taken = set(BUILTIN_TEAMS) | {p["id"] for p in await load_presets(user)}
     if shared:   # a shared team's id must also be free for every user
@@ -345,8 +349,8 @@ async def save_preset(user: dict, name: str, agent_ids: list[str], description: 
     pid, n = base, 2
     while pid in taken:
         pid, n = f"{base}-{n}", n + 1
-    await db.pool.execute("INSERT INTO teams (owner_id, slug, name, description, agents) VALUES ($1, $2, $3, $4, $5)",
-                          None if shared else user["id"], pid, clean["name"], clean["description"], clean["agents"])
+    await db.pool.execute("INSERT INTO teams (owner_id, slug, name, description, agents, prompt) VALUES ($1, $2, $3, $4, $5, $6)",
+                          None if shared else user["id"], pid, clean["name"], clean["description"], clean["agents"], clean["prompt"])
     return await get_preset(user, pid)
 
 
@@ -357,10 +361,10 @@ async def update_preset(user: dict, preset_id: str, data: dict) -> dict:
     if not p["editable"]:
         raise PermissionError("Only an admin can change a shared team. Duplicate it to make your own version.")
     clean = await _clean_team(user, data)
-    await db.pool.execute("""UPDATE teams SET name = $3, description = $4, agents = $5, updated_at = now()
+    await db.pool.execute("""UPDATE teams SET name = $3, description = $4, agents = $5, prompt = $6, updated_at = now()
                              WHERE slug = $1 AND owner_id IS NOT DISTINCT FROM $2""",
                           preset_id, None if p["scope"] == "shared" else user["id"],
-                          clean["name"], clean["description"], clean["agents"])
+                          clean["name"], clean["description"], clean["agents"], clean["prompt"])
     return await get_preset(user, preset_id)
 
 
@@ -393,7 +397,8 @@ async def export_team(user: dict, preset_id: str) -> tuple[str, dict]:
     by_id = {a["id"]: a for a in await load_agents(user)}
     agents = [{k: by_id[i][k] for k in AGENT_KEYS} for i in t["agents"] if i in by_id]
     return f"team-{t['id']}.json", {"format": TEAM_FORMAT, "version": 1, "exported": time.time(),
-                                    "team": {"name": t["name"], "description": t.get("description", ""), "agents": t["agents"]},
+                                    "team": {"name": t["name"], "description": t.get("description", ""), "agents": t["agents"],
+                                             "prompt": t.get("prompt", "")},
                                     "agents": agents}
 
 
@@ -472,7 +477,8 @@ async def plan_import(user: dict, items: list[dict], on_conflict: str = "rename"
                 plan.append({"kind": "team", "name": t["name"], "action": "same", "note": "identical to a team you already have"})
             else:
                 plan.append({"kind": "team", "name": t["name"], "action": "add", "note": note,
-                             "data": {"name": t["name"], "description": t.get("description", ""), "agents": known}})
+                             "data": {"name": t["name"], "description": t.get("description", ""), "agents": known,
+                                      "prompt": t.get("prompt", "")}})
         elif it["kind"] == "rules":
             same = it["text"].strip() == load_common().strip()
             if same:
@@ -497,7 +503,7 @@ async def apply_import(user: dict, plan: dict) -> dict:
     for p in plan["items"]:
         if p["kind"] == "team" and p["action"] == "add":
             d = p["data"]
-            t = await save_preset(user, d["name"], d["agents"], d.get("description", ""))
+            t = await save_preset(user, d["name"], d["agents"], d.get("description", ""), prompt=d.get("prompt", ""))
             p["target"] = t["id"]; done.append(p)
         elif p["kind"] == "rules" and p["action"] == "replace" and is_admin(user):
             save_common(p["data"]["text"]); done.append(p)

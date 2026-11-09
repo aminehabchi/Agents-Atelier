@@ -26,6 +26,19 @@ Decide the intent:
 
 Rules:
 - Choose only ids listed in <team>. Order doesn't matter; the server runs them in team order.
+- Helpers, chosen only when the request clearly asks for what they do (even if switched off), plus the agents that must
+  follow up:
+  - translator: "make it bilingual", "add an Arabic version", "translate to French". Usually alone, or with css for right-to-left.
+  - legal: "add a privacy policy", "mentions légales", "cookie page".
+  - dark-theme: "add a dark mode", "night theme".
+  - forms: "add a contact form", "booking form", "the form doesn't validate". Usually with html and css if the form is new.
+  - conversion: "get more bookings", "make it convert better", "make visitors trust us".
+  - tidy: "clean up the code", "refactor the CSS". Alone.
+  - auditor: "check my site", "what's wrong with it", or any improvement of an imported site; it runs first and the others follow its audit.
+  - content: "write a blog post", "add an FAQ", "write the About page", longer text in general.
+  - pricing: "add a pricing table", "show our plans", "add the menu with prices". With html and css only if the page is new.
+  - gallery: "add a photo gallery", "show our photos", "lightbox".
+  - local: "show our hours and address", "add a map link", "local SEO", "click to call".
 - Research (web research on the idea, competitors and market): choose it only when the user asks for research,
   competitors, market insights or ideas to improve the concept. If they also want the site improved from it
   ("research competitors and improve the page"), choose the agents that build the changes too (usually ux, copy,

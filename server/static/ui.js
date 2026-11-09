@@ -54,7 +54,7 @@ window.savePreferences = (prefs) => {
 };
 window.getMe = () => mePromise ||= fetch("/api/auth/me").then(r => r.ok ? r.json() : { user: null }).then(d => rememberAuth(d.user)).catch(() => null);
 const initialsOf = (user) => (user.name || user.email).trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
-const PUBLIC_PAGES = ["/", "/login", "/register", "/forgot", "/confirm"];
+const PUBLIC_PAGES = ["/", "/login", "/register", "/forgot", "/confirm", "/terms", "/privacy"];
 
 /* fetch JSON from the server. Always throws an ApiError with a readable message:
    server down, timeout, HTML error page, validation errors… */
@@ -139,15 +139,13 @@ window.toast = (text, kind = "") => {
   setTimeout(() => el.remove(), 2600);
 };
 
-/* The account button in the header: your initials and first name, opening a menu with your pages,
-   appearance, language and Log out. Esc, a click elsewhere or leaving the menu closes it. */
+/* The account button in the header: your initials and first name, opening a menu with your pages and Log out.
+   Esc, a click elsewhere or leaving the menu closes it. */
 window.accountButton = (user, { compact = false } = {}) => {
   const ROLE = { admin: "Admin", user: "User", unconfirmed: "Not confirmed" };
   const box = document.createElement("div");
   box.className = "acct";
   const item = (href, ic, text) => `<a role="menuitem" href="${href}">${icon(ic, { size: 15 })}<span>${text}</span></a>`;
-  const seg = (attr, label, current, items) => `<div class="acct-row"><span>${label}</span><div class="seg" role="radiogroup" aria-label="${label}">${items.map(([k, text, ic]) =>
-    `<button type="button" role="radio" data-${attr}="${k}" aria-checked="${current === k}" class="${current === k ? "on" : ""}" title="${text}" aria-label="${text}" ${ic ? "" : "data-no-i18n"}>${ic ? icon(ic, { size: 14 }) : text}</button>`).join("")}</div></div>`;
   box.innerHTML = `
     <button class="acct-btn ${compact ? "compact" : ""}" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Account: ${esc(user.email)}" title="${esc(user.name || user.email)}">
       <span class="acct-initials">${esc(initialsOf(user))}</span>
@@ -160,10 +158,6 @@ window.accountButton = (user, { compact = false } = {}) => {
         ${user.confirmed ? item("/profile", "user", "Profile") + item("/guide", "book", "Guide") : item("/confirm", "check", "Confirm your email")}
         ${user.role === "admin" ? item("/users", "users", "Users") : ""}
       </div>
-      ${user.confirmed ? `<div class="acct-prefs">
-        ${seg("menu-theme", "Appearance", getTheme(), [["system", "System", "monitor"], ["light", "Light", "sun"], ["dark", "Dark", "moon"]])}
-        ${seg("menu-lang", "Language", getLang(), [["en", "EN"], ["fr", "FR"]])}
-      </div>` : ""}
       <div class="acct-links"><button type="button" role="menuitem" data-out>${icon("log-out", { size: 15 })}<span>Log out</span></button></div>
     </div>`;
   const btn = box.querySelector(".acct-btn"), menu = box.querySelector(".acct-menu");
@@ -180,12 +174,6 @@ window.accountButton = (user, { compact = false } = {}) => {
     all[(i + (e.key === "ArrowDown" ? 1 : -1) + all.length) % all.length]?.focus();
   });
   menu.addEventListener("click", async (e) => {
-    const theme = e.target.closest("[data-menu-theme]"), lang = e.target.closest("[data-menu-lang]");
-    if (theme) {
-      setTheme(theme.dataset.menuTheme);
-      menu.querySelectorAll("[data-menu-theme]").forEach(x => { x.classList.toggle("on", x === theme); x.setAttribute("aria-checked", x === theme); });
-    }
-    if (lang && lang.dataset.menuLang !== getLang()) { await savePreferences({ language: lang.dataset.menuLang }); setLang(lang.dataset.menuLang); }
     if (e.target.closest("[data-out]")) {
       try { await api("/api/auth/logout", { method: "POST" }); location.href = "/"; }
       catch (err) { toast(err.message, "err"); }
@@ -253,7 +241,7 @@ const briefField = (q, value = "") => q.type === "select"
     : `<label class="pfield"><span>${esc(q.label)}</span><input class="input" name="b_${q.key}" maxlength="${q.max}" placeholder="${esc(q.placeholder)}" value="${esc(value)}"></label>`;
 /* The project form, in a dialog (edit details) or on a page (/projects/new). `d` is the element to fill; onSubmit gets the
    checked answers. Returns the images chosen so far, so the caller can release their previews. */
-window.fillProjectForm = (d, { title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true, allowImport = false, brief = {}, askAssets = false, cancelHref = "", heading = true } = {}, onSubmit) => {
+window.fillProjectForm = (d, { title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true, allowImport = false, brief = {}, askAssets = false, cancelHref = "", heading = true, brand = null } = {}, onSubmit) => {
     d.innerHTML = `
       <form method="dialog" novalidate>
         ${heading ? `<h3>${esc(title)}</h3>
@@ -279,6 +267,11 @@ window.fillProjectForm = (d, { title = "New project", ok = "Create project", nam
           </div>
           <small class="src-summary" data-summary>Leave empty to start from a blank site. Needs an index.html at the top; other files (server code, configs, .git…) are left out.</small>
           <small class="err" data-for="source"></small></div>` : ""}
+        ${brand ? `<label class="pfield brand-use"><span>Brand kit</span>
+          <span class="brand-row"><input type="checkbox" name="use_brand" checked>
+            <span class="brand-sum">${brand.logo ? `<img src="${esc(brand.logo)}" alt="">` : ""}${(brand.colors || []).map(c => `<i style="background:${esc(c)}"></i>`).join("")}
+              <small>${esc([brand.heading_font, brand.body_font].filter(Boolean).join(" / ") || "Use my brand kit")}</small></span></span>
+          <small class="src-summary">Use my logo, colours and fonts in this project. <a href="/profile#brand">Edit</a></small></label>` : ""}
         </div>
         <div class="pf-more">
         <fieldset class="pgroup"><legend>About your site <em>optional · the more you say, the closer the first build</em></legend>
@@ -405,12 +398,12 @@ window.fillProjectForm = (d, { title = "New project", ok = "Create project", nam
       if (!check()) { e.preventDefault(); return; }
       if (mode === "files") {
         if (!source) { e.preventDefault(); srcErr("Choose a folder or a .zip with your site."); return; }
-        onSubmit({ name: f.name.value.trim(), description: f.description.value.trim(), brief: briefOf(), source, assets }, e);
+        onSubmit({ name: f.name.value.trim(), description: f.description.value.trim(), brief: briefOf(), source, assets, use_brand: !!f.use_brand?.checked }, e);
         return;
       }
       const pageList = f.pages.value.split("\n").map(x => x.trim()).filter(Boolean);
       if (pageList.length > 12) { e.preventDefault(); d.querySelector('[data-for="pages"]').textContent = "Up to 12 pages."; return; }
-      onSubmit({ name: f.name.value.trim(), description: f.description.value.trim(), pages: pageList.length ? pageList : ["Home"], brief: briefOf(), assets }, e);
+      onSubmit({ name: f.name.value.trim(), description: f.description.value.trim(), pages: pageList.length ? pageList : ["Home"], brief: briefOf(), assets, use_brand: !!f.use_brand?.checked }, e);
     });
     f.description.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); form.requestSubmit(form.querySelector('[value="ok"]')); }
@@ -451,7 +444,7 @@ window.newProject = async () => {
 
 /* Create the project from the form's answers (a blank site or existing files, plus images) and open it. */
 window.createProject = async (details) => {
-  const { assets = [], ...fields } = details;
+  const { assets = [], use_brand = false, ...fields } = details;
   try {
     let p;
     if (details.source) {
@@ -478,6 +471,10 @@ window.createProject = async (details) => {
     if (failed.length) {
       const prev = sessionStorage.getItem("atelier-import-note");
       sessionStorage.setItem("atelier-import-note", (prev ? prev + " " : "") + `Some images weren't added: ${failed.join(" · ")}`);
+    }
+    if (use_brand) {   // after the uploads, so a logo chosen in the form wins over the kit's
+      try { await api(`/api/projects/${p.id}/brand`, { method: "POST" }); }
+      catch (err) { sessionStorage.setItem("atelier-import-note", `The brand kit wasn't applied: ${err.message}`); }
     }
     location.href = `/p/${p.id}`;
   } catch (err) { toast(err.message, "err"); }
@@ -601,7 +598,8 @@ window.importFlow = () => new Promise((resolve) => {
     ...(authState() === "unconfirmed" ? [
       { open: true, group: "Account", icon: "check", title: "Confirm your email", run: () => location.href = "/confirm" }] : []),
     ...(document.documentElement.dataset.admin ? [
-      { group: "Go to", icon: "user", title: "Users", run: () => location.href = "/users" }] : []),
+      { group: "Go to", icon: "user", title: "Users", run: () => location.href = "/users" },
+      { group: "Go to", icon: "chart", title: "Analytics", run: () => location.href = "/analytics" }] : []),
     { open: true, group: "Go to", icon: "home", title: "Home", run: () => location.href = "/" },
     { group: "Go to", icon: "grid", title: "Projects", run: () => location.href = "/projects" },
     { group: "Go to", icon: "user", title: "Profile and password", run: () => location.href = "/profile" },
@@ -715,7 +713,8 @@ window.importFlow = () => new Promise((resolve) => {
           document.documentElement.dataset.admin = "1";
           const links = document.querySelector("header.top .links");
           if (links && !links.querySelector('[href="/users"]')) links.insertAdjacentHTML("beforeend",
-            `<a href="/users" data-show="member" class="${location.pathname === "/users" ? "on" : ""}">${icon("user", { size: 16 })}Users</a>`);
+            `<a href="/users" data-show="member" class="${location.pathname === "/users" ? "on" : ""}">${icon("user", { size: 16 })}Users</a>
+             <a href="/analytics" data-show="member" class="${location.pathname === "/analytics" ? "on" : ""}">${icon("chart", { size: 16 })}Analytics</a>`);
         }
       });
       return wrap;
@@ -726,15 +725,66 @@ window.importFlow = () => new Promise((resolve) => {
       main.tabIndex = -1;
       document.body.insertAdjacentHTML("afterbegin", `<a class="skip-link" href="#${main.id}">Skip to content</a>`);
     }
+    cookieNotice();
     try {
       const note = sessionStorage.getItem("atelier-toast");
       if (note) { sessionStorage.removeItem("atelier-toast"); toast(note); }
     } catch {}
     if (site) site.insertBefore(make(), site.lastElementChild);
+    // not under the one-screen New project form
+    if (site && location.pathname !== "/projects/new" && !document.querySelector("footer.site-footer")) siteFooter();
     const studio = document.querySelector(".chat .bar");
     if (studio) studio.insertBefore(make(), document.getElementById("menu"));
   });
 })();
+
+/* ---------- the footer, on every page with the top navigation ---------- */
+function siteFooter() {
+  const link = (href, text, show = "") => `<li${show ? ` data-show="${show}"` : ""}><a href="${href}">${text}</a></li>`;
+  const onLanding = location.pathname === "/";
+  const f = document.createElement("footer");
+  f.className = "site-footer";
+  f.innerHTML = `<div class="wrap">
+    <div class="foot-brand">
+      <a class="logo" href="/"><span class="mark">${icon("logo", { size: 18 })}</span>Agents Atelier</a>
+      <p>A team of AI specialists that builds your website in plain HTML, CSS and JavaScript, while you watch.</p>
+      <button class="foot-lang" type="button" data-no-i18n>${getLang() === "fr" ? "English" : "Français"}</button>
+    </div>
+    <nav class="foot-cols" aria-label="Footer">
+      <div><h2>Product</h2><ul>
+        ${link(onLanding ? "#how" : "/#how", "How it works", "guest unconfirmed")}
+        ${link(onLanding ? "#examples" : "/#examples", "Examples", "guest unconfirmed")}
+        ${link(onLanding ? "#faq" : "/#faq", "FAQ", "guest unconfirmed")}
+        ${link("/projects", "Projects", "member")}${link("/agents", "Agents", "member")}${link("/teams", "Teams", "member")}${link("/guide", "Guide", "member")}
+      </ul></div>
+      <div><h2>Account</h2><ul>
+        ${link("/register", "Sign up", "guest")}${link("/login", "Log in", "guest")}${link("/forgot", "Forgot your password?", "guest")}
+        ${link("/confirm", "Confirm your email", "unconfirmed")}
+        ${link("/profile", "Profile", "member")}${link("/profile#brand", "Brand kit", "member")}${link("/profile#data", "Download my data", "member")}
+      </ul></div>
+      <div><h2>Legal</h2><ul>${link("/terms", "Terms of use")}${link("/privacy", "Privacy policy")}
+        <li><button type="button" class="foot-cookies">Cookie notice</button></li></ul></div>
+    </nav>
+  </div>
+  <div class="wrap foot-bottom"><span>© ${new Date().getFullYear()} <span class="foot-owner" data-no-i18n>Agents Atelier</span></span><span>Sites built here belong to the people who made them.</span></div>`;
+  f.querySelector(".foot-lang").onclick = () => { const next = getLang() === "fr" ? "en" : "fr"; Promise.resolve(window.savePreferences?.({ language: next })).finally(() => setLang(next)); };
+  f.querySelector(".foot-cookies").onclick = () => { try { localStorage.removeItem("atelier-cookies-ok"); } catch {} document.querySelector(".cookie-note")?.remove(); cookieNotice(); };
+  document.body.append(f);
+  fetch("/api/auth/legal").then(r => r.ok ? r.json() : null).then(info => { if (info?.name) f.querySelector(".foot-owner").textContent = info.name; }).catch(() => {});
+}
+
+/* ---------- the cookie notice: shown once, until dismissed ---------- */
+function cookieNotice() {
+  try { if (localStorage.getItem("atelier-cookies-ok")) return; } catch { return; }
+  const box = document.createElement("div");
+  box.className = "cookie-note";
+  box.setAttribute("role", "region");
+  box.setAttribute("aria-label", "Cookies");
+  box.innerHTML = `<p>We use one cookie to keep you logged in, and your browser remembers your theme and language. No advertising or tracking cookies.</p>
+    <div><a href="/privacy">Privacy policy</a><button class="btn btn-dark btn-sm" type="button">OK</button></div>`;
+  box.querySelector("button").onclick = () => { try { localStorage.setItem("atelier-cookies-ok", "1"); } catch {} box.remove(); };
+  document.body.append(box);
+}
 
 /* ---------- motion: stagger list items in as they appear, count numbers up ----------
    Anything matching ENTER gets .enter with --i = its position among its siblings, the first time it is added

@@ -64,11 +64,24 @@
     display: grid; place-items: center; color: var(--charcoal); margin-left: -8px; }
   .empty h3 { color: var(--ink); font-weight: 400; font-size: 32px; letter-spacing: 0; line-height: 1.1; margin: 0 0 10px; }
   .chips { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
+  .uc-title { margin: 24px 0 10px; font-family: var(--mono); font-size: 12px; letter-spacing: .03em; color: var(--stone); }
+  .usecases { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; width: 100%; text-align: left; }
+  .uc { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 0; border-radius: 12px; background: var(--paper); box-shadow: var(--ring); color: var(--ink); text-align: left; cursor: pointer; transition: background .15s, transform .15s; }
+  .uc:hover { background: var(--ice); transform: translateY(-2px); }
+  .uc b { font-size: 14px; font-weight: 500; }
+  .uc small { font-size: 12px; line-height: 1.45; color: var(--graphite); }
+  .uc span { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11px; color: var(--stone); }
+  .uc-more { margin-top: 10px; padding: 0; border: 0; background: none; color: var(--graphite); font-size: 13px; text-decoration: underline; cursor: pointer; }
   .chip { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 9px 16px; font-size: 14px; color: var(--graphite);
     display: flex; align-items: center; gap: 8px; text-align: left; transition: border-color .2s, color .2s; }
   .chip:hover { border-color: var(--graphite); color: var(--ink); }
   .chip .ic { color: var(--stone); }
 
+  .msg.bcheck { padding: 12px 14px; border-radius: 12px; box-shadow: var(--ring); background: var(--paper); font-size: 13px; color: var(--graphite); }
+  .msg.bcheck .head { display: flex; gap: 8px; align-items: center; }
+  .msg.bcheck .shots { display: flex; gap: 8px; margin-top: 10px; }
+  .msg.bcheck .shots a { flex: none; border-radius: 8px; overflow: hidden; box-shadow: var(--ring); }
+  .msg.bcheck .shots img { display: block; height: 72px; width: auto; }
   .msg { max-width: 100%; font-size: 14px; line-height: 1.55; animation: pop .25s ease; }
   .replay .msg { animation: none; }
   @keyframes pop { from { opacity: 0; transform: translateY(6px); } }
@@ -492,11 +505,9 @@
 const $ = (id) => document.getElementById(id);
 const TOOL_ICON = { Read: "eye", Write: "file-plus", Edit: "pencil", Glob: "folder", Grep: "search", WebSearch: "search", WebFetch: "external" };
 const TOOL_VERB = { Read: "Reading", Write: "Writing", Edit: "Editing", Glob: "Looking in", Grep: "Searching", WebSearch: "Searching the web for", WebFetch: "Reading" };
-const EXAMPLES = [
-  "A landing page for a cozy neighbourhood coffee shop",
-  "A portfolio for a freelance product designer",
-  "A pricing page for a small SaaS with three plans",
-];
+// Use cases shown first for an imported site; a new project shows the "build" ones first.
+const IMPORT_FIRST = ["improve-imported", "redesign", "multilingual", "boost-conversions", "seo-speed", "accessibility-audit"];
+let showAllUseCases = false;
 const MAX_ACTIONS = 4;
 
 let AGENTS = [], BY_ID = {}, PID = null, project = null, selected = new Set();
@@ -543,7 +554,12 @@ async function boot() {
   replaying = true; $("messages").classList.add("replay");
   (project.events || []).forEach(safeHandle);
   replaying = false; $("messages").classList.remove("replay");
-  if (!project.events.length) showEmpty();
+  if (!project.events.length) {
+    showEmpty();
+    let start = null;          // "New project with this team" on a team's page
+    try { start = sessionStorage.getItem("atelier-start-team"); sessionStorage.removeItem("atelier-start-team"); } catch {}
+    if (start) useTeam(presets.find(p => p.id === start), { fillPrompt: true });
+  }
   if (!project.busy) {
     run = null; markStopped();
     paused = project.run?.resumable ? project.run : null;
@@ -746,6 +762,12 @@ function handle(ev) {
       if (ev.run?.resumable) addResumeCard(ev.run);
       renderTeam();
       break;
+    case "browser_check_start": break;
+    case "browser_check": {
+      const shots = (ev.screenshots || []).map(f => `<a href="/work/${PID}/${encodeURI(f)}" target="_blank" rel="noopener"><img src="/work/${PID}/${encodeURI(f)}?v=${Date.now()}" alt="${esc(f.includes("phone") ? "Phone screenshot" : "Desktop screenshot")}"></a>`).join("");
+      addMsg(`<div class="msg bcheck ${ev.problems ? "warn" : ""}"><div class="head">${icon(ev.problems ? "alert" : "check", { size: 16 })}<span>${esc(ev.text)}</span></div>${shots ? `<div class="shots">${shots}</div>` : ""}</div>`);
+      break;
+    }
     case "security":
       addMsg(`<div class="msg security" role="alert"><div class="head">${icon("alert", { size: 18 })}<span><b>Security check:</b> ${esc(ev.text)}</span></div>
         ${(ev.items || []).length ? `<ul>${ev.items.map(i => `<li>${esc(i)}</li>`).join("")}</ul>` : ""}
@@ -791,12 +813,41 @@ function showEmpty() {
     ${project.imported
       ? `Your site was imported (${project.imported.files} file${project.imported.files === 1 ? "" : "s"}). Describe what to improve and ${team.length} agent${team.length === 1 ? "" : "s"} will work on it, one after another.`
       : `Describe a page and ${team.length} agent${team.length === 1 ? "" : "s"} will build it, one after another.`}
-    <div class="chips">${project.imported ? "" : EXAMPLES.map(t => `<button class="chip" data-example="${esc(t)}">${icon("sparkles", { size: 16 })}${esc(t)}</button>`).join("")}</div>
+    ${useCasesHTML()}
   </div>`;
 }
+function useCasesHTML() {
+  let cases = presets.filter(p => p.prompt);
+  if (!cases.length) return "";
+  if (project.imported) cases = [...cases].sort((a, b) => (IMPORT_FIRST.indexOf(b.id) > -1) - (IMPORT_FIRST.indexOf(a.id) > -1)
+    || IMPORT_FIRST.indexOf(a.id) - IMPORT_FIRST.indexOf(b.id));
+  const shown = showAllUseCases ? cases : cases.slice(0, 6);
+  return `<p class="uc-title">Start from a use case</p>
+    <div class="usecases">${shown.map(p => `<button class="uc" type="button" data-usecase="${esc(p.id)}">
+      <b>${esc(p.name)}</b><small>${esc(p.description || "")}</small><span>${icon("users", { size: 12 })}${p.agents.length} agents</span></button>`).join("")}</div>
+    ${cases.length > 6 ? `<button class="uc-more" type="button" data-usecases-more>${showAllUseCases ? "Show fewer" : `Show all ${cases.length} use cases`}</button>` : ""}`;
+}
+/* Pick a team; its starting prompt goes in the box when the box is empty (or when asked), with the first [part] selected. */
+function useTeam(p, { fillPrompt = false } = {}) {
+  if (!p || busy) return;
+  selected = new Set(p.agents.filter(id => BY_ID[id]));
+  lockRequired();
+  saveSelection();
+  const box = $("input");
+  if (p.prompt && (fillPrompt || !box.value.trim())) {
+    const text = p.prompt.split("\n").map(line => t(line)).join("\n");   // in French when the interface is
+    box.value = text;
+    autosize();
+    box.focus();
+    const at = text.indexOf("[");
+    if (at > -1) box.setSelectionRange(at, text.indexOf("]", at) + 1 || at);
+    toast(`Using the “${p.name}” team. Replace the parts in [brackets].`);
+  } else toast(`Using the “${p.name}” team`);
+}
 $("messages").addEventListener("click", (e) => {
-  const chip = e.target.closest("[data-example]");
-  if (chip) { $("input").value = chip.dataset.example; autosize(); $("input").focus(); }
+  const uc = e.target.closest("[data-usecase]");
+  if (uc) useTeam(presets.find(p => p.id === uc.dataset.usecase), { fillPrompt: true });
+  if (e.target.closest("[data-usecases-more]")) { showAllUseCases = !showAllUseCases; showEmpty(); }
   const more = e.target.closest(".more");
   if (more) { const box = more.parentElement; box.classList.toggle("open"); updateMore(box); }
 });
@@ -1714,7 +1765,7 @@ document.addEventListener("click", async (e) => {
   } else if (pick) {
     const p = presets.find(x => x.id === pick.dataset.preset);
     togglePresets(false);
-    if (p && !busy) { selected = new Set(p.agents); saveSelection(); toast(`Using the “${p.name}” team`); }
+    useTeam(p);
   } else if (save) {
     togglePresets(false);
     const name = await promptDialog({ title: "Save as a team", label: "Team name", placeholder: "e.g. Landing page sprint", ok: "Save team", max: 40,

@@ -86,7 +86,10 @@ def setUpModule():
     env = {**os.environ, "ATELIER_WORK": str(TMP / "work"), "ATELIER_AGENTS": str(TMP / "agents"),
            "CLAUDE_BIN": str(ROOT / "tests" / "fake-claude"), "AGENT_TIMEOUT": str(AGENT_TIMEOUT),
            "FAKE_CLAUDE_LOG": str(LOG), "ATELIER_ENV_FILE": str(TMP / "no.env"),   # ignore your own .env
-           "DATABASE_URL": TEST_DB_URL, "ADMIN_EMAIL": ADMIN_EMAIL, "EMAIL_OUTBOX": str(OUTBOX), "SMTP_HOST": ""}
+           "DATABASE_URL": TEST_DB_URL, "ADMIN_EMAIL": ADMIN_EMAIL, "EMAIL_OUTBOX": str(OUTBOX), "SMTP_HOST": "",
+           # every test comes from 127.0.0.1: limits high enough for the suite, except resets, tested per fake address
+           "TRUST_PROXY": "1", "SIGNUPS_PER_HOUR": "100000", "LOGINS_PER_15_MIN": "100000", "RESETS_PER_HOUR": "5",
+           "LEGAL_NAME": "Test Operator SARL", "LEGAL_EMAIL": "legal@example.com"}
     env.pop("AGENT_MODEL", None)
     global SERVER_LOG
     SERVER_LOG = open(TMP / "server.log", "w")
@@ -117,6 +120,8 @@ def tearDownModule():
 
 def call(method, path, body=None, raw=None, headers=None, cookie=...):
     """Return (status, parsed JSON or text, headers). Acts as the admin unless given another `cookie` (None: logged out)."""
+    if path == "/api/auth/register" and isinstance(body, dict) and "accept_terms" not in body:
+        body = {**body, "accept_terms": True}       # sign-up requires it; tests about it send it explicitly
     data = raw if raw is not None else (json.dumps(body).encode() if body is not None else None)
     h = {"Content-Type": "application/json", **(headers or {})}
     cookie = ADMIN if cookie is ... else cookie
@@ -1492,8 +1497,10 @@ class T13PasswordsAndProfile(unittest.TestCase):
                 await con.close()
         return asyncio.run(go())
 
-    def forgot(self, email):
-        return call("POST", "/api/auth/forgot", {"email": email}, cookie=None)
+    def forgot(self, email, ip=None):
+        """Each test asks from its own fake address, so the per-IP reset limit only applies where it's tested."""
+        ip = ip or f"10.{T13PasswordsAndProfile.n % 250}.{time.time_ns() % 250}.{os.getpid() % 250}"
+        return call("POST", "/api/auth/forgot", {"email": email}, cookie=None, headers={"X-Forwarded-For": ip})
 
     def reset(self, email, code, password="a brand new password"):
         return call("POST", "/api/auth/reset", {"email": email, "code": code, "password": password}, cookie=None)
@@ -1733,6 +1740,225 @@ class T14Preferences(unittest.TestCase):
             html = (static / f"{page}.html").read_text()
             self.assertLess(html.index("/static/i18n.js"), html.index("/static/ui.js"), page)
             self.assertNotIn("—", html, page)
+
+
+class T15SignupProtection(unittest.TestCase):
+    def email(self, domain="example.com"):
+        return f"guard-{time.time_ns()}@{domain}"
+
+    def register(self, **body):
+        return call("POST", "/api/auth/register", {"name": "Ann Lee", "password": "correct horse", **body}, cookie=None)
+
+    def test_terms_must_be_accepted(self):
+        email = self.email()
+        s, r, _ = self.register(email=email, accept_terms=False)
+        self.assertEqual(s, 400)
+        self.assertIn("Terms", r["detail"])
+        s, r, _ = self.register(email=email)
+        self.assertEqual(s, 200, r)
+        self.assertTrue(asyncio.run(_db("SELECT terms_accepted_at FROM users WHERE email = $1", email))[0]["terms_accepted_at"])
+
+    def test_disposable_emails_are_refused(self):
+        for domain in ("mailinator.com", "inbox.yopmail.com", "GUERRILLAMAIL.COM"):
+            s, r, _ = self.register(email=self.email(domain))
+            self.assertEqual(s, 400, domain)
+            self.assertIn("permanent email", r["detail"])
+
+    def test_the_hidden_field_stops_bots(self):
+        email = self.email()
+        self.assertEqual(self.register(email=email, website="http://spam.example")[0], 400)
+        self.assertFalse(asyncio.run(_db("SELECT 1 FROM users WHERE email = $1", email)))
+
+    def test_password_resets_are_limited_per_address(self):
+        ip = f"192.0.2.{time.time_ns() % 250}"
+        codes = [call("POST", "/api/auth/forgot", {"email": self.email()}, cookie=None, headers={"X-Forwarded-For": ip})[0]
+                 for _ in range(6)]
+        self.assertEqual(codes[:5], [200] * 5)
+        self.assertEqual(codes[5], 429)
+        other = call("POST", "/api/auth/forgot", {"email": self.email()}, cookie=None, headers={"X-Forwarded-For": ip + "1"})
+        self.assertEqual(other[0], 200, "another address isn't affected")
+
+    def test_the_limiter(self):
+        sys.path.insert(0, str(ROOT / "server"))
+        try:
+            import limits
+        finally:
+            sys.path.pop(0)
+        lim = limits.Limit(2, 3600)
+        self.assertEqual([lim.wait("a"), lim.wait("a")], [0, 0])
+        self.assertGreater(lim.wait("a"), 0)
+        self.assertEqual(lim.wait("b"), 0)
+        self.assertEqual(limits.Limit(0, 60).wait("a"), 0, "0 means no limit")
+
+
+async def _db(sql, *args):
+    con = await asyncpg.connect(TEST_DB_URL)
+    try:
+        return await con.fetch(sql, *args)
+    finally:
+        await con.close()
+
+
+PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAEBgIApD5fRAAAAABJRU5ErkJggg=="
+
+
+class T16BrandKit(unittest.TestCase):
+    def test_brand_kit_is_checked_saved_and_private(self):
+        cookie = register(f"brand-{time.time_ns()}@example.com")
+        self.assertTrue(call("GET", "/api/brand", cookie=cookie)[1]["empty"])
+        for bad in ({"colors": ["red"]}, {"colors": ["#000000"] * 7}, {"heading_font": "<script>"}):
+            self.assertEqual(call("PUT", "/api/brand", bad, cookie=cookie)[0], 400, bad)
+        s, kit, _ = call("PUT", "/api/brand", {"colors": ["#0E7C66", "#f4f4f5"], "heading_font": "Fraunces", "body_font": "Inter"}, cookie=cookie)
+        self.assertEqual(s, 200, kit)
+        self.assertEqual(kit["colors"], ["#0e7c66", "#f4f4f5"])
+        self.assertEqual(call("POST", "/api/brand/logo", {"data": "data:text/html;base64,PGI+"}, cookie=cookie)[0], 400)
+        self.assertTrue(call("POST", "/api/brand/logo", {"data": PNG}, cookie=cookie)[1]["logo"])
+        self.assertEqual(call("GET", "/api/brand/logo", cookie=cookie)[0], 200)
+        self.assertTrue(call("GET", "/api/brand")[1]["empty"], "the admin doesn't see someone else's kit")
+        self.assertEqual(call("GET", "/api/brand/logo", cookie=None)[0], 401)
+        uid = asyncio.run(_db("SELECT user_id FROM brand_kits WHERE heading_font = 'Fraunces'"))[0]["user_id"]
+        self.assertEqual(call("GET", f"/work/.brand/{uid}/logo.png", cookie=cookie)[0], 404, "never served as a file")
+
+    def test_a_new_project_can_use_the_kit(self):
+        cookie = register(f"brand-{time.time_ns()}@example.com")
+        call("PUT", "/api/brand", {"colors": ["#0e7c66"], "heading_font": "Fraunces", "body_font": "Inter"}, cookie=cookie)
+        call("POST", "/api/brand/logo", {"data": PNG}, cookie=cookie)
+        pid = call("POST", "/api/projects", {"name": "Brand", "description": "x"}, cookie=cookie)[1]["id"]
+        s, r, _ = call("POST", f"/api/projects/{pid}/brand", cookie=cookie)
+        self.assertEqual(s, 200, r)
+        self.assertEqual(r["brief"]["colors"], "#0e7c66")
+        self.assertIn("Fraunces", r["brief"]["fonts"])
+        self.assertEqual([a["kind"] for a in r["assets"]], ["logo"])
+        self.assertTrue((TMP / "work" / pid / "assets" / "logo.png").is_file())
+        self.assertEqual(len(call("POST", f"/api/projects/{pid}/brand", cookie=cookie)[1]["assets"]), 1, "applying again adds no second logo")
+        self.assertEqual(call("POST", f"/api/projects/{pid}/brand")[0], 403, "only the owner, not even an admin")
+
+
+class T17AdminAndData(unittest.TestCase):
+    def test_analytics_is_for_admins(self):
+        s, d, _ = call("GET", "/api/admin/analytics?days=7")
+        self.assertEqual(s, 200, d)
+        self.assertEqual(len(d["series"]["signups"]), 7)
+        self.assertGreaterEqual(d["users"]["total"], d["users"]["confirmed"])
+        for key in ("job_role", "use_case", "referral", "language"):
+            self.assertIn(key, d["breakdown"])
+        user = register(f"plain-{time.time_ns()}@example.com")
+        self.assertEqual(call("GET", "/api/admin/analytics", cookie=user)[0], 403)
+        self.assertEqual(page_redirect("/analytics", cookie=user), (303, "/"))
+        self.assertEqual(page_redirect("/analytics", cookie=ADMIN)[0], 200)
+
+    def test_legal_pages_are_public(self):
+        for path in ("/terms", "/privacy"):
+            self.assertEqual(page_redirect(path)[0], 200, path)
+        info = call("GET", "/api/auth/legal", cookie=None)[1]
+        self.assertEqual((info["name"], info["email"]), ("Test Operator SARL", "legal@example.com"))
+
+    def test_download_my_data_has_only_your_things(self):
+        email = f"export-{time.time_ns()}@example.com"
+        cookie = register(email)
+        pid = call("POST", "/api/projects", {"name": "My export", "description": "x"}, cookie=cookie)[1]["id"]
+        call("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": "<h1>hi</h1>"}, cookie=cookie)
+        (TMP / "work" / pid / ".checks").mkdir(exist_ok=True)
+        (TMP / "work" / pid / ".checks" / "index-phone.png").write_bytes(b"x")
+        call("POST", "/api/agents", {"id": "mine-export", "name": "Mine", "role": "You help with everything on this website, carefully and in plain words."}, cookie=cookie)
+        other = call("POST", "/api/projects", {"name": "Not mine", "description": "x"})[1]["id"]
+        req = urllib.request.Request(BASE + "/api/auth/export", headers={"Cookie": cookie})
+        with urllib.request.urlopen(req) as r:
+            z = zipfile.ZipFile(io.BytesIO(r.read()))
+        names = z.namelist()
+        account = json.loads(z.read("account.json"))
+        self.assertEqual(account["email"], email)
+        self.assertNotIn("password_hash", json.dumps(account))
+        self.assertTrue(account["terms_accepted_at"])
+        self.assertIn("agents/mine-export.md", names)
+        self.assertTrue(any(n.endswith("/site/index.html") and pid[:8] in n for n in names))
+        self.assertFalse(any(other[:8] in n for n in names), "other people's projects aren't included")
+        self.assertFalse(any(".checks" in n for n in names), "the server's screenshots aren't the user's data")
+        self.assertEqual(call("GET", "/api/auth/export", cookie=None)[0], 401)
+
+
+@unittest.skipUnless(shutil.which("google-chrome") or shutil.which("chromium"), "needs Chrome")
+class T18BrowserCheck(unittest.TestCase):
+    def test_qa_and_critic_see_the_page_in_a_browser(self):
+        pid = call("POST", "/api/projects", {"name": "Checked", "description": "x"})[1]["id"]
+        before = len(log_calls())
+        events = T06Runs.run_prompt(self, pid, "Make a page", agents=("html", "qa"))
+        prompts = {c["argv"][c["argv"].index("--append-system-prompt") + 1].split("\n")[0][:40]: c["argv"][c["argv"].index("-p") + 1]
+                   for c in log_calls()[before:] if "-p" in c["argv"] and "--append-system-prompt" in c["argv"]}
+        qa = next(p for p in prompts.values() if "<browser_check>" in p)
+        self.assertIn(".checks/index-phone.png", qa)
+        self.assertIn("not instructions", qa)
+        self.assertEqual(sum("<browser_check>" in p for p in prompts.values()), 1, "only the QA agent gets it, not HTML")
+        self.assertTrue((TMP / "work" / pid / ".checks" / "index-desktop.png").is_file())
+        self.assertTrue(any(e.get("type") == "browser_check" for e in events))
+        req = urllib.request.Request(BASE + f"/api/projects/{pid}/download", headers={"Cookie": ADMIN})
+        with urllib.request.urlopen(req) as r:
+            self.assertFalse(any(".checks" in n for n in zipfile.ZipFile(io.BytesIO(r.read())).namelist()))
+
+
+class T19HelperAgents(unittest.TestCase):
+    HELPERS = {"auditor", "content", "translator", "legal", "dark-theme", "pricing", "gallery", "forms", "conversion", "local", "tidy"}
+
+    def test_helpers_are_shared_optional_and_in_order(self):
+        agents = call("GET", "/api/agents?full=1")[1]
+        ids = [a["id"] for a in agents]
+        self.assertTrue(self.HELPERS <= set(ids), set(ids))
+        for a in agents:
+            if a["id"] in self.HELPERS:
+                self.assertFalse(a["default"], a["id"])
+                self.assertEqual(a["scope"], "shared")
+                self.assertGreater(len(a["role"]), 400, a["id"])
+        self.assertLess(ids.index("html"), ids.index("translator"))
+        self.assertLess(ids.index("css"), ids.index("dark-theme"))
+        self.assertLess(ids.index("js"), ids.index("forms"))
+        self.assertLess(ids.index("tidy"), ids.index("qa"))
+
+    def test_helpers_never_invent_facts_or_use_long_dashes(self):
+        for path in (ROOT / "agents").glob("*.md"):
+            text = path.read_text()
+            if any(f"id: {h}\n" in text for h in self.HELPERS):
+                self.assertNotIn("—", text, path.name)
+        conversion = (ROOT / "agents" / "11b-conversion.md").read_text()
+        self.assertIn("Never invent reviews", conversion)
+        self.assertIn("Never invent a company name", (ROOT / "agents" / "06c-legal.md").read_text())
+
+
+class T20UseCaseTeams(unittest.TestCase):
+    def test_the_use_case_teams_file_is_valid(self):
+        """The suite starts with no saved teams (other tests count them), so this checks the file the real server seeds."""
+        sys.path.insert(0, str(ROOT / "server"))
+        try:
+            import agents as store
+        finally:
+            sys.path.pop(0)
+        teams = json.loads((ROOT / "agents" / "_presets.json").read_text())
+        ids = {a["id"] for a in store.read_agent_files()}
+        self.assertGreaterEqual(len(teams), 18)
+        self.assertEqual(len({t["id"] for t in teams}), len(teams), "unique ids")
+        for t in teams:
+            self.assertTrue(set(t["agents"]) <= ids, (t["id"], set(t["agents"]) - ids))
+            self.assertLessEqual(len(t["name"]), 40, t["id"])
+            self.assertLessEqual(len(t["description"]), 200, t["id"])
+            self.assertTrue(t["prompt"].strip(), t["id"])
+            self.assertLessEqual(len(t["prompt"]), 2000, t["id"])
+            self.assertNotIn("—", json.dumps(t, ensure_ascii=False), t["id"])
+            self.assertNotIn(t["id"], ("default", "quick", "polish", "full"))
+        self.assertGreaterEqual(sum("[" in t["prompt"] for t in teams), len(teams) - 4, "most prompts have parts to fill in")
+        by = {t["id"]: t for t in teams}
+        self.assertEqual(by["improve-imported"]["agents"][0], "auditor")
+        self.assertIn("local", by["restaurant-cafe"]["agents"])
+
+    def test_a_team_keeps_its_prompt(self):
+        cookie = register(f"teams-{time.time_ns()}@example.com")
+        body = {"name": "My shop pages", "agents": ["html", "css"], "prompt": "Build a page for [shop].\nKeep it short."}
+        s, team, _ = call("POST", "/api/presets", body, cookie=cookie)
+        self.assertEqual(s, 200, team)
+        self.assertEqual(team["prompt"], "Build a page for [shop].\nKeep it short.")
+        s, team, _ = call("PUT", f"/api/presets/{team['id']}", {**body, "prompt": "Changed [x]"}, cookie=cookie)
+        self.assertEqual(team["prompt"], "Changed [x]")
+        self.assertEqual(call("PUT", f"/api/presets/{team['id']}", {**body, "prompt": "x" * 2001}, cookie=cookie)[0], 400)
+        s, data, _ = call("GET", f"/api/presets/{team['id']}/export", cookie=cookie)
+        self.assertEqual(json.loads(data)["team"]["prompt"] if isinstance(data, str) else data["team"]["prompt"], "Changed [x]")
 
 
 class T12Database(unittest.TestCase):
