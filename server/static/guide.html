@@ -4,19 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#f4efea">
+<meta name="theme-color" content="#000000">
 <title>Guide · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
 <script src="/static/icons.js"></script>
 <script src="/static/ui.js"></script>
 <style>
   .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; margin-top: 0; align-items: start; }
   .toc { position: sticky; top: 92px; display: flex; flex-direction: column; gap: 2px; }
-  .toc p { font-size: 12px; color: var(--stone); margin: 0 0 8px 12px; text-transform: uppercase; letter-spacing: .08em; }
-  .toc a { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 2px; text-decoration: none; font-size: 14px; color: var(--graphite); line-height: 1; }
+  .toc p { font-size: 12px; color: var(--stone); margin: 0 0 8px 12px; letter-spacing: .08em; }
+  .toc a { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: var(--r); text-decoration: none; font-size: 14px; color: var(--graphite); line-height: 1; }
   .toc a i[data-icon] { color: var(--stone); }
   .toc a:hover { background: var(--paper); color: var(--ink); }
   .toc a.on { background: var(--paper); box-shadow: var(--ring); color: var(--ink); }
@@ -25,21 +26,21 @@
   article section { padding-bottom: 72px; scroll-margin-top: 96px; }
   article h2 { font-weight: 400; font-size: 44px; line-height: 1.1; letter-spacing: 0; margin: 0 0 16px; display: flex; align-items: center; gap: 14px; }
   article h2 .num { font: 13px ui-monospace, monospace; color: var(--stone); letter-spacing: 0; background: var(--paper); box-shadow: var(--ring);
-    width: 36px; height: 36px; border-radius: 2px; display: inline-grid; place-items: center; flex: none; }
+    width: 36px; height: 36px; border-radius: var(--r); display: inline-grid; place-items: center; flex: none; }
   article h3 { font-weight: 500; font-size: 20px; letter-spacing: 0; line-height: 1.3; margin: 0 0 6px; }
   article > section > p { color: var(--graphite); font-size: 17px; margin: 0 0 16px; }
   code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
-  p code, li code, td code { background: var(--paper); box-shadow: var(--ring); padding: 1px 6px; border-radius: 2px; }
+  p code, li code, td code { background: var(--paper); box-shadow: var(--ring); padding: 1px 6px; border-radius: var(--r); }
 
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 28px; }
-  .stepc { background: var(--paper); border-radius: 2px; padding: 24px; display: flex; flex-direction: column; gap: 10px; }
+  .stepc { background: var(--paper); border-radius: var(--r); padding: 24px; display: flex; flex-direction: column; gap: 10px; }
   .stepc .top { display: flex; align-items: center; justify-content: space-between; }
-  .ico { width: 44px; height: 44px; border-radius: 2px; background: var(--linen); display: grid; place-items: center; color: var(--charcoal); flex: none; }
+  .ico { width: 44px; height: 44px; border-radius: var(--r); background: var(--linen); display: grid; place-items: center; color: var(--charcoal); flex: none; }
   .stepc .n { font: 12px ui-monospace, monospace; color: var(--stone); }
   .stepc p { margin: 0; font-size: 15px; color: var(--graphite); line-height: 1.55; }
 
   .anatomy { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; }
-  .part { background: var(--paper); border-radius: 2px; padding: 24px; display: grid; grid-template-columns: 44px 1fr; grid-template-rows: 44px auto; column-gap: 16px; row-gap: 8px; align-content: start; }
+  .part { background: var(--paper); border-radius: var(--r); padding: 24px; display: grid; grid-template-columns: 44px 1fr; grid-template-rows: 44px auto; column-gap: 16px; row-gap: 8px; align-content: start; }
   .part .ico { grid-row: 1; }
   .part h3 { margin: 0; align-self: center; display: flex; align-items: center; }
   .part ul { grid-column: 1 / -1; }
@@ -49,38 +50,38 @@
 
   .tips { display: grid; gap: 10px; margin-top: 24px; }
   .tip { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .tip > div { background: var(--paper); border-radius: 2px; padding: 18px 20px; font-size: 15px; line-height: 1.55; color: var(--graphite); }
+  .tip > div { background: var(--paper); border-radius: var(--r); padding: 18px 20px; font-size: 15px; line-height: 1.55; color: var(--graphite); }
   .tip .lbl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--stone); margin-bottom: 6px; line-height: 1; }
   .tip .good { box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink); }
 
-  pre.code { background: var(--paper); border-radius: 2px; padding: 24px; margin: 20px 0; overflow-x: auto; font: 13.5px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+  pre.code { background: var(--paper); border-radius: var(--r); padding: 24px; margin: 20px 0; overflow-x: auto; font: 13.5px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
     color: var(--charcoal); box-shadow: var(--ring); }
   pre.code .c { color: var(--stone); }
 
-  table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--paper); border-radius: 2px; overflow: hidden; margin-top: 20px; font-size: 15px; }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--paper); border-radius: var(--r); overflow: hidden; margin-top: 20px; font-size: 15px; }
   th, td { text-align: left; padding: 14px 20px; vertical-align: middle; border-bottom: 1px solid var(--line); }
   th { font-weight: 500; font-size: 13px; color: var(--stone); background: var(--linen); }
   tr:last-child td { border-bottom: 0; }
   td:first-child { white-space: nowrap; width: 1%; }
-  kbd { font: 12px ui-monospace, monospace; background: var(--linen); border-radius: 2px; padding: 3px 8px; box-shadow: var(--ring); display: inline-block; line-height: 1.2; }
+  kbd { font: 12px ui-monospace, monospace; background: var(--linen); border-radius: var(--r); padding: 3px 8px; box-shadow: var(--ring); display: inline-block; line-height: 1.2; }
 
   .team-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; margin-top: 24px; }
-  .tm { display: flex; align-items: center; gap: 12px; background: var(--paper); border-radius: 2px; padding: 12px 14px; text-decoration: none; transition: background .2s; }
+  .tm { display: flex; align-items: center; gap: 12px; background: var(--paper); border-radius: var(--r); padding: 12px 14px; text-decoration: none; transition: background .2s; }
   .tm:hover { background: var(--bone); }
-  .tm .tile { width: 36px; height: 36px; border-radius: 2px; display: grid; place-items: center; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); flex: none; }
+  .tm .tile { width: 36px; height: 36px; border-radius: var(--r); display: grid; place-items: center; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); flex: none; }
   .tm .nm { font-size: 14px; font-weight: 500; flex: 1; line-height: 1.2; }
   .tm .nm small { display: block; font-weight: 400; color: var(--stone); font-size: 12px; margin-top: 2px; }
   .tm { align-items: flex-start; }
   .tm .nm p { margin: 6px 0 0; font-weight: 400; font-size: 13px; line-height: 1.5; color: var(--graphite); }
 
-  details { background: var(--paper); border-radius: 2px; margin-top: 8px; }
+  details { background: var(--paper); border-radius: var(--r); margin-top: 8px; }
   summary { list-style: none; cursor: pointer; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 16px; font-weight: 500; line-height: 1.3; }
   summary::-webkit-details-marker { display: none; }
   summary i[data-icon] { color: var(--stone); transition: transform .2s; }
   details[open] summary i[data-icon] { transform: rotate(180deg); }
   details > div { padding: 0 20px 20px; color: var(--graphite); font-size: 15px; line-height: 1.6; }
 
-  .cta { background: var(--paper); border-radius: 2px; padding: 40px; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  .cta { background: var(--paper); border-radius: var(--r); padding: 40px; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
   .cta h2 { margin: 0; }
 
   @media (max-width: 960px) {
@@ -91,6 +92,7 @@
     article h2 { font-size: 34px; }
   }
 </style>
+<link rel="stylesheet" href="/static/theme.css">
 </head>
 <body>
 
@@ -101,7 +103,6 @@
       <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
       <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
       <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
-      <a href="/guide" class="on"><i data-icon="book" data-size="16"></i>Guide</a>
     </nav>
     <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
   </div>
@@ -129,9 +130,9 @@
         <p>Agents Atelier builds <b>front ends only</b>: static websites in plain HTML, CSS and JavaScript. It runs on your machine and uses your own Claude Code login, so there's no API key to set up.</p>
         <div class="steps">
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="code" data-size="20"></i></span><span class="n">STEP 1</span></div>
-            <h3>Start the server</h3><p>Run <code>./run.sh</code> in the project folder, then open <code>localhost:8001</code>.</p></div>
+            <h3>Pick your team</h3><p>The shared agents are ready to use. Duplicate any of them on the <a href="/agents">Agents page</a> to make your own version, or save a team for a kind of job.</p></div>
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="message" data-size="20"></i></span><span class="n">STEP 2</span></div>
-            <h3>Create a project</h3><p>Click <b>New project</b>, give it a name and a description, then describe the page you want. To improve a site you already have, choose <b>Existing files</b> and pick its folder or a .zip (HTML, CSS, JS, Markdown and assets only).</p></div>
+            <h3>Create a project</h3><p>Click <b>New project</b>, give it a name and a description, then describe the page you want. To improve a site you already have, use <b>Existing site</b> and pick its folder or a .zip (HTML, CSS, JS, Markdown and assets only).</p></div>
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="eye" data-size="20"></i></span><span class="n">STEP 3</span></div>
             <h3>Watch &amp; refine</h3><p>Agents build it one after another. Ask for changes anytime, then download the .zip.</p></div>
         </div>
@@ -211,7 +212,7 @@
 
       <section id="custom">
         <h2><span class="num">05</span>Custom agents</h2>
-        <p>Every agent is a Markdown file in <code>agents/</code>. Edit them on the <a href="/agents">Agents page</a> or in your editor. Changes apply to the next run, with no restart needed.</p>
+        <p>Shared agents are the same for everyone, and only an admin can change them. Duplicate one on the <a href="/agents">Agents page</a> to make your own version, or create a new one. Only you see your agents, and changes apply to the next run. The format below is what export and import use.</p>
 <pre class="code"><span class="c"># agents/16-dark-mode.md   ← the number sets the run order</span>
 ---
 id: dark-mode
@@ -265,11 +266,15 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
         <details><summary>What happens when I stop the agents?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>Nothing is lost. Agents that finished keep their work, and the run is saved. The chat and the Team panel then offer <b>Continue</b>, which picks up at the agent that was stopped and skips the ones already done, or <b>Start again</b>, which runs the whole team again on the same request. The same choice appears if an agent fails or the server restarts mid-run.</div></details>
         <details><summary>Can the team build a site with several pages?<i data-icon="chevron-down" data-size="18"></i></summary>
-          <div>Yes. List the pages when you create the project (or later, in its details), one per line — for example Home, About, Contact. The agents build every page with the same header, navigation and footer, and the switcher above the preview shows each one.</div></details>
+          <div>Yes. List the pages when you create the project (or later, in its details), one per line, for example Home, About, Contact. The agents build every page with the same header, navigation and footer, and the switcher above the preview shows each one.</div></details>
         <details><summary>Can the team build a back end, a database or logins?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>No. Agents Atelier is for front ends only: the agents write static HTML, CSS and JavaScript that runs in the browser. Forms and login screens look and behave right on the page, but nothing is sent or stored; connect them to your own back end afterwards.</div></details>
         <details><summary>Why is the download button locked?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>While agents are working, files change every few seconds, so a download could catch a half-finished page. The button unlocks as soon as the run finishes or you stop it.</div></details>
+        <details><summary>Who can see my projects, agents and teams?<i data-icon="chevron-down" data-size="18"></i></summary>
+          <div>Your projects and the agents and teams you make are private to you, though admins can open every project. A site's preview link works for anyone you send it to.</div></details>
+        <details><summary>Why can't I edit a shared agent?<i data-icon="chevron-down" data-size="18"></i></summary>
+          <div>Shared agents and teams are the same for everyone, so only an admin can change them. Duplicate one to get your own copy, then change anything you like.</div></details>
         <details><summary>Can I edit the generated code myself?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>Yes. The files live in <code>work/&lt;uuid&gt;/</code>. Edit them in any editor; the next prompt's agents read the current files first.</div></details>
       </section>
@@ -283,9 +288,9 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
 </main>
 
 <script>
-api("/api/agents?full=1").then(agents => {
+api("/api/agents").then(agents => {
   document.getElementById("teamList").innerHTML = agents.map((a, i) => `
-    <a class="tm" href="/agents/${encodeURIComponent(a.id)}" style="--c:${a.color};${a.default ? "" : "opacity:.55"}" title="Edit ${esc(a.name)}">
+    <a class="tm" href="/agents/${encodeURIComponent(a.id)}" title="Open ${esc(a.name)}" style="--c:${a.color};${a.default ? "" : "opacity:.55"}">
       <span class="tile">${icon(a.icon, { size: 17 })}</span>
       <span class="nm">${esc(a.name)}<small>${String(i + 1).padStart(2, "0")} · ${a.default ? "on by default" : "optional"}</small>
         ${a.description ? `<p>${esc(a.description)}</p>` : ""}</span>

@@ -4,7 +4,7 @@ name: SEO
 icon: search
 color: "#84cc16"
 default: false
-description: Optimises for search and sharing — title, meta description, Open Graph tags and structured data.
+description: Optimises for search and sharing: title, meta description, Open Graph tags and structured data.
 model: claude-haiku-5-5
 ---
 You are the SEO agent. You make the page easy for search engines and social apps to understand.

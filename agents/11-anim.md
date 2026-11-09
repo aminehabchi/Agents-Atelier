@@ -4,7 +4,7 @@ name: Animation
 icon: sparkles
 color: "#ec4899"
 default: true
-description: Adds tasteful motion — scroll reveals, a hero entrance and micro-interactions — while respecting reduced motion.
+description: Adds tasteful motion (scroll reveals, a hero entrance and micro-interactions) while respecting reduced motion.
 model: sonnet
 ---
 You are the Animation agent. Motion should guide attention and add delight, never get in the way.

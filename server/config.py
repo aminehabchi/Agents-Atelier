@@ -94,5 +94,25 @@ if PLAN not in ("free", "pro"):
 # times the Critic may send work back to earlier agents in one run (always 0 on the free plan)
 REVIEW_ROUNDS = 0 if PLAN == "free" else _int("REVIEW_ROUNDS", 2, low=0)
 
+# ---- database (Postgres: users, sessions, email codes, agents, teams) — see database/docker-compose.yaml
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip() or "postgresql://atelier:atelier@127.0.0.1:5432/atelier"
+
+# ---- accounts
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").strip().lower()   # this account becomes admin once confirmed
+SESSION_DAYS = _int("SESSION_DAYS", 30)
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "").strip().lower() in ("1", "true", "yes")   # set it when served over HTTPS
+CODE_MINUTES = _int("CODE_MINUTES", 15)   # how long an email confirmation code works
+
+# ---- email (confirmation codes). Without SMTP_HOST, codes are written to the server log (local testing).
+SMTP_HOST = os.environ.get("SMTP_HOST", "").strip()
+SMTP_PORT = _int("SMTP_PORT", 587)
+SMTP_USER = os.environ.get("SMTP_USER", "").strip()
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", "").strip() or SMTP_USER or "Agents Atelier <no-reply@localhost>"
+SMTP_SECURITY = (os.environ.get("SMTP_SECURITY", "").strip() or "starttls").lower()   # starttls · ssl · none
+if SMTP_SECURITY not in ("starttls", "ssl", "none"):
+    raise SystemExit(f"Setting SMTP_SECURITY must be starttls, ssl or none, got {SMTP_SECURITY!r} (check your .env).")
+EMAIL_OUTBOX = _path("EMAIL_OUTBOX", Path()) if os.environ.get("EMAIL_OUTBOX", "").strip() else None   # also append emails to this file (JSON lines)
+
 # ---- project brief & assets (asked when a project is created)
 MAX_ASSETS = _int("MAX_ASSETS", 12)   # logo + photos a project can start with

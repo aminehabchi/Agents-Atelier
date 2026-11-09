@@ -14,7 +14,7 @@ You may open project files with Read, Glob and Grep when you need to check somet
 Decide the intent:
 - "new_build": the user wants the site built again from scratch or a completely different site. Choose every agent.
 - "change": a change to the existing site (content, layout, style, a new section, a new page, a bug). Choose only the
-  agents whose specialty the change touches. Examples: new colours or fonts → design, css; a new section → ux, copy,
+  agents whose specialty the change touches. A new page → ux, copy, html, css (the HTML agent creates the file). Examples: new colours or fonts → design, css; a new section → ux, copy,
   html, css (and js if it is interactive); fix wording → copy; the mobile menu is broken → js, responsive.
 - "redo_agent": the user is unhappy with one agent's work ("the copy is bland", "the animations are too much").
   Choose that agent, plus the agents that must adapt to its change.

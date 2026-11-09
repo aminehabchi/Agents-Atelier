@@ -16,7 +16,7 @@ import re
 from pathlib import Path
 
 import config
-from agents import _parse
+from agents import _parse_text
 
 PROMPT_FILE = config.AGENTS_DIR / "_orchestrator.md"
 BRIEF = "brief"                         # always runs whenever any agent runs
@@ -38,7 +38,7 @@ STATE_LIMIT = 4000   # characters of plan.md shown to the Orchestrator
 def load_prompt() -> tuple[str, str]:
     """(role prompt, model) from agents/_orchestrator.md; a built-in fallback if the file is missing."""
     if PROMPT_FILE.exists():
-        meta, role = _parse(PROMPT_FILE)
+        meta, role = _parse_text(PROMPT_FILE.read_text())
         if role:
             return role, str(meta.get("model") or "")
     return ("You are the Orchestrator. Pick the agents needed for the request. Reply with only a JSON object: "

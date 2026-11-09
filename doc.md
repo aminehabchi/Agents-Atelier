@@ -68,9 +68,13 @@ time when you scroll up (`foldHistory` / `showEarlier`).
 
 ---
 
-## 2. Data on disk
+## 2. Data
 
-Nothing is stored in a database. Everything is a file, so it can be inspected, backed up or edited by hand.
+Postgres (`server/db.py`, `database/docker-compose.yaml`) holds `users`, `sessions`, `email_codes`, `agents` and `teams`.
+An agent or team with `owner_id` NULL is shared; otherwise it belongs to that user. The tables are created on startup.
+The first time there's no shared agent, they are filled from `agents/*.md` and `agents/_presets.json`
+(`server/manage.py sync-agents` copies the files again). Everything else is a file, including project metadata, whose
+`owner` field holds the owner's user id:
 
 ```
 work/
@@ -259,7 +263,11 @@ All responses are JSON. Errors are always `{"detail": "<readable message>"}`, pl
 | GET    | `/p/<uuid>`   | the studio for a project (404 page if unknown)                      |
 | GET    | `/agents`, `/agents/new`, `/agents/<id>`, `/agents/<id>/edit`, `/agents/rules` | agent pages (one file, `agents.html`, routes on the path) |
 | GET    | `/teams`, `/teams/new`, `/teams/<id>`, `/teams/<id>/edit` | team pages (`teams.html`)  |
-| GET    | `/guide`      | guide                                                               |
+| GET    | `/`           | the landing page, or `dashboard.html` for a confirmed account       |
+| GET    | `/projects/new` | the form that creates a project (`new-project.html`)              |
+| GET    | `/profile`    | your details, password, other devices, delete account (`profile.html`) |
+| GET    | `/forgot`     | reset a forgotten password with an emailed code (`auth.html`)       |
+| GET    | `/guide`      | guide (needs a confirmed account)                                   |
 | GET    | `/studio`     | redirect to `/projects` (the studio is only opened from a project)  |
 | GET    | `/work/<uuid>/…` | the generated site (no-store caching), also `/work/.versions/<uuid>/<NNNN>/…` |
 
@@ -438,7 +446,26 @@ A failed run is saved as `error`, so it can be continued.
 
 ## 9. Security model and prompt injection
 
-Agents Atelier is a **single-user, local tool**. The main risk isn't the user. It's **prompt injection**: text the agents
+### Accounts and access
+
+- **Sessions:** an HttpOnly, SameSite=Lax cookie with a random token; only its SHA-256 is stored. Set `COOKIE_SECURE=true`
+  behind HTTPS. Passwords are hashed with scrypt.
+- **Email codes:** 6 digits, stored hashed, valid `CODE_MINUTES`, 5 tries, one new code a minute. 10 failed logins lock an
+  account for 15 minutes.
+- **Password resets:** anyone can ask for one, so `/api/auth/forgot` answers the same whether or not the account exists and
+  sends in the background. Beyond 5 tries a code, an account gets 5 codes and 15 wrong tries per 24 hours. A reset also confirms
+  the address and ends every session; a change from `/profile` ends every session but the current one. Both email a notice.
+- **Access checks:** one middleware (`_check_access` in `main.py`) guards every route: everything is private unless listed
+  as public. Another user's project answers 404, as if it didn't exist. The WebSocket checks the session and the owner when
+  it connects and again on every message.
+- **`/work/<uuid>/` is reached by its unguessable project id, not by session.** Generated pages run in a sandbox with no
+  origin, so browsers don't send the session cookie for their CSS, scripts and images. Anyone given such a link can see that
+  site's files, including `plan.md`. `/work/.projects/` is never served.
+- **Runs** always use the project owner's agents, even when an admin starts them.
+
+### Prompt injection
+
+The main risk isn't the user. It's **prompt injection**: text the agents
 read but the user didn't write (another agent's note, `plan.md`, page content, text inside an uploaded image) trying
 to make an agent do something else. The defences are layered.
 

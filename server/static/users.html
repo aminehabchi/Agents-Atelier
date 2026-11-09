@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#000000">
+<title>Users · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  .table-wrap { margin-top: 20px; overflow-x: auto; background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); }
+  .utable { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 14px; }
+  .utable th { padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 500; letter-spacing: .04em; color: var(--graphite); background: var(--mist); border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+  .utable td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; overflow-wrap: anywhere; }
+  .utable tbody tr:last-child td { border-bottom: 0; }
+  .utable tbody tr:hover td { background: var(--ice); }
+  .utable .who b { font-weight: 500; }
+  .utable .muted { color: var(--stone); white-space: nowrap; }
+  .utable select { height: 36px; min-width: 150px; padding: 0 10px; font-size: 13px; }
+  #pager { margin-top: 12px; }
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <nav class="links">
+      <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
+    </nav>
+    <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
+  </div>
+</header>
+<main class="wrap page">
+  <h1 class="page-title">Users</h1>
+  <p class="lead" id="summary">Admins can change the shared agents, teams and rules, and open every project.</p>
+  <div id="list"><p>Loading…</p></div>
+  <nav class="pager" id="pager" aria-label="Pages of users"></nav>
+</main>
+<script>
+document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
+const list = document.getElementById("list");
+const LABEL = { admin: "Admin", user: "User", unconfirmed: "Not confirmed" };
+let users = [], me = null, page = 1, perPage = perPagePref("users", 10);
+const cell = (v) => (v ? esc(v) : `<span class="muted">-</span>`);
+function draw() {
+  const pg = paginate(users, page, perPage);
+  page = pg.page;
+  list.innerHTML = `<div class="table-wrap"><table class="utable">
+    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Company</th><th scope="col">Occupation</th><th scope="col">Builds for</th><th scope="col">Heard from</th><th scope="col">Joined</th><th scope="col">Role</th></tr></thead>
+    <tbody>${pg.items.map(u => `<tr>
+      <td class="who"><b data-no-i18n>${esc(u.name || "-")}</b>${u.id === me.id ? ` <span class="badge">you</span>` : ""}</td>
+      <td data-no-i18n>${esc(u.email)}</td>
+      <td data-no-i18n>${cell(u.company)}</td>
+      <td>${cell(u.job_role)}</td><td>${cell(u.use_case)}</td><td>${cell(u.referral)}</td>
+      <td class="muted">${ago(u.created)}</td>
+      <td><select class="input" data-id="${esc(u.id)}" aria-label="Role of ${esc(u.email)}" ${u.id === me.id ? 'disabled title="You can\'t change your own role"' : ""}>
+        ${Object.keys(LABEL).map(r => `<option value="${r}" ${r === u.role ? "selected" : ""}>${LABEL[r]}</option>`).join("")}
+      </select></td></tr>`).join("")}</tbody></table></div>`;
+  $pager.innerHTML = pagerHTML(pg, { noun: "users" });
+}
+const $pager = document.getElementById("pager");
+async function load() {
+  try { [users, me] = await Promise.all([api("/api/users"), getMe()]); }
+  catch (err) { return showError(list, err, load, "Couldn't load the users"); }
+  const waiting = users.filter(u => u.role === "unconfirmed").length;
+  document.getElementById("summary").textContent = `${users.length} account${users.length === 1 ? "" : "s"}${waiting ? `, ${waiting} not confirmed yet` : ""}. Admins can change the shared agents, teams and rules, and open every project.`;
+  draw();
+}
+bindPager($pager, (p) => { page = p; draw(); list.scrollIntoView({ block: "nearest", behavior: "smooth" }); },
+  (n) => { perPage = n; savePerPage("users", n); page = 1; draw(); });
+list.addEventListener("change", async (e) => {
+  const sel = e.target.closest("select[data-id]");
+  if (!sel) return;
+  try { const u = await api(`/api/users/${sel.dataset.id}`, { method: "PATCH", body: JSON.stringify({ role: sel.value }) }); Object.assign(users.find(x => x.id === u.id), u); toast(`${u.email} is now: ${LABEL[u.role]}`); }
+  catch (err) { toast(err.message, "err"); load(); }
+});
+load();
+</script>
+</body>
+</html>

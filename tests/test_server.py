@@ -11,6 +11,7 @@ import base64
 import io
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -23,6 +24,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+import asyncpg
 import websockets
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -33,6 +35,31 @@ SERVER = None
 BASE = None
 LOG = TMP / "fake-claude.log"
 AGENT_TIMEOUT = 6
+OUTBOX = TMP / "outbox.jsonl"
+ADMIN_EMAIL = "admin@example.com"
+ADMIN = None            # the admin's session cookie: what every request uses unless a test says otherwise
+# The server under test gets its own throwaway database on the Postgres of database/docker-compose.yaml.
+PG_URL = os.environ.get("TEST_DATABASE_URL") or "postgresql://atelier:atelier@127.0.0.1:5432/atelier"
+TEST_DB = f"atelier_test_{os.getpid()}_{int(time.time())}"
+TEST_DB_URL = PG_URL.rsplit("/", 1)[0] + "/" + TEST_DB
+
+
+async def _pg_admin(sql):
+    con = await asyncpg.connect(PG_URL)
+    try:
+        await con.execute(sql)
+    finally:
+        await con.close()
+
+
+def db_exec(sql, *args):
+    async def go():
+        con = await asyncpg.connect(TEST_DB_URL)
+        try:
+            return await con.execute(sql, *args)
+        finally:
+            await con.close()
+    return asyncio.run(go())
 
 
 def free_port() -> int:
@@ -42,7 +69,11 @@ def free_port() -> int:
 
 
 def setUpModule():
-    global PORT, SERVER, BASE
+    global PORT, SERVER, BASE, ADMIN
+    try:
+        asyncio.run(_pg_admin(f"CREATE DATABASE {TEST_DB}"))
+    except OSError as e:
+        raise RuntimeError(f"The tests need Postgres ({e}). Start it: docker compose -f database/docker-compose.yaml up -d")
     shutil.copytree(ROOT / "agents", TMP / "agents", ignore=shutil.ignore_patterns("_models.json"))
     # every test agent uses a model the fake CLI knows, and _presets.json starts empty
     for f in (TMP / "agents").glob("[0-9]*.md"):
@@ -54,7 +85,8 @@ def setUpModule():
     BASE = f"http://127.0.0.1:{PORT}"
     env = {**os.environ, "ATELIER_WORK": str(TMP / "work"), "ATELIER_AGENTS": str(TMP / "agents"),
            "CLAUDE_BIN": str(ROOT / "tests" / "fake-claude"), "AGENT_TIMEOUT": str(AGENT_TIMEOUT),
-           "FAKE_CLAUDE_LOG": str(LOG), "ATELIER_ENV_FILE": str(TMP / "no.env")}   # ignore your own .env
+           "FAKE_CLAUDE_LOG": str(LOG), "ATELIER_ENV_FILE": str(TMP / "no.env"),   # ignore your own .env
+           "DATABASE_URL": TEST_DB_URL, "ADMIN_EMAIL": ADMIN_EMAIL, "EMAIL_OUTBOX": str(OUTBOX), "SMTP_HOST": ""}
     env.pop("AGENT_MODEL", None)
     global SERVER_LOG
     SERVER_LOG = open(TMP / "server.log", "w")
@@ -63,8 +95,9 @@ def setUpModule():
     for _ in range(100):
         try:
             urllib.request.urlopen(BASE + "/api/agents", timeout=1)
+            ADMIN = register(ADMIN_EMAIL)
             return
-        except Exception:
+        except urllib.error.URLError:
             time.sleep(0.1)
     raise RuntimeError("The test server didn't start:\n" + (TMP / "server.log").read_text())
 
@@ -77,14 +110,18 @@ def tearDownModule():
         print(f"\ntest files kept in {TMP}")
     else:
         shutil.rmtree(TMP, ignore_errors=True)
+    asyncio.run(_pg_admin(f"DROP DATABASE IF EXISTS {TEST_DB} WITH (FORCE)"))
 
 
 # ---------------------------------------------------------------- helpers
 
-def call(method, path, body=None, raw=None, headers=None):
-    """Return (status, parsed JSON or text, headers)."""
+def call(method, path, body=None, raw=None, headers=None, cookie=...):
+    """Return (status, parsed JSON or text, headers). Acts as the admin unless given another `cookie` (None: logged out)."""
     data = raw if raw is not None else (json.dumps(body).encode() if body is not None else None)
     h = {"Content-Type": "application/json", **(headers or {})}
+    cookie = ADMIN if cookie is ... else cookie
+    if cookie:
+        h["Cookie"] = cookie
     req = urllib.request.Request(BASE + path, data=data, method=method, headers=h)
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
@@ -98,15 +135,53 @@ def call(method, path, body=None, raw=None, headers=None):
         return status, text.decode(errors="replace"), hdrs
 
 
-def new_project(name="Test project", description="A page used by the automated tests."):
-    status, p, _ = call("POST", "/api/projects", {"name": name, "description": description})
+def new_project(name="Test project", description="A page used by the automated tests.", cookie=...):
+    status, p, _ = call("POST", "/api/projects", {"name": name, "description": description}, cookie=cookie)
     assert status == 200, p
     return p["id"]
 
 
-async def _ws(pid, script, origin=None):
+def session_cookie(headers) -> str:
+    return next(c.split(";", 1)[0] for c in headers.get_all("set-cookie") if c.startswith("atelier_session="))
+
+
+def last_code(email) -> str:
+    return [json.loads(l) for l in OUTBOX.read_text().splitlines() if json.loads(l)["to"] == email][-1]["code"]
+
+
+def register(email, password="correct horse", confirm=True) -> str:
+    """Create an account and return its session cookie, confirmed unless told otherwise."""
+    status, r, h = call("POST", "/api/auth/register", {"name": "Test Person", "email": email, "password": password}, cookie=None)
+    assert status == 200, r
+    cookie = session_cookie(h)
+    if confirm:
+        status, r, _ = call("POST", "/api/auth/confirm", {"code": last_code(email)}, cookie=cookie)
+        assert status == 200, r
+    return cookie
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def page_redirect(path, cookie=None):
+    """Where a page sends the browser: (status, Location)."""
+    req = urllib.request.Request(BASE + path, headers={"Cookie": cookie} if cookie else {})
+    try:
+        with urllib.request.build_opener(NoRedirect).open(req, timeout=10) as r:
+            return r.status, None
+    except urllib.error.HTTPError as e:
+        with e:
+            return e.code, e.headers.get("location")
+
+
+async def _ws(pid, script, origin=None, cookie=...):
     """Run a conversation: `script` is an async function(ws, recv) that returns a value."""
     headers = {"Origin": origin} if origin else {}
+    cookie = ADMIN if cookie is ... else cookie
+    if cookie:
+        headers["Cookie"] = cookie
     async with websockets.connect(f"ws://127.0.0.1:{PORT}/ws/{pid}", additional_headers=headers, max_size=None) as ws:
         hello = json.loads(await asyncio.wait_for(ws.recv(), 5))
         assert hello["type"] == "hello", hello
@@ -121,8 +196,8 @@ async def _ws(pid, script, origin=None):
         return await script(ws, recv)
 
 
-def ws(pid, script, origin=None):
-    return asyncio.run(_ws(pid, script, origin))
+def ws(pid, script, origin=None, cookie=...):
+    return asyncio.run(_ws(pid, script, origin, cookie))
 
 
 def send(msg):
@@ -139,9 +214,13 @@ def log_calls():
 
 # ---------------------------------------------------------------- pages, routing, request guards
 
+def make_project_for_language():
+    return call("POST", "/api/projects", {"name": "Language test", "description": "A page."})[1]["id"]
+
+
 class T01Pages(unittest.TestCase):
     def test_pages_load(self):
-        for path in ["/", "/projects", "/agents", "/agents/css", "/agents/new", "/agents/rules", "/teams", "/teams/quick", "/guide"]:
+        for path in ["/", "/projects", "/agents", "/agents/css", "/agents/new", "/agents/rules", "/teams", "/teams/quick", "/guide", "/profile", "/projects/new"]:
             s, body, h = call("GET", path)
             self.assertEqual(s, 200, path)
             self.assertIn("text/html", h["content-type"], path)
@@ -157,7 +236,7 @@ class T01Pages(unittest.TestCase):
         self.assertIn("detail", body)
 
     def test_old_studio_link_redirects(self):
-        req = urllib.request.Request(BASE + "/studio")
+        req = urllib.request.Request(BASE + "/studio", headers={"Cookie": ADMIN})
         opener = urllib.request.build_opener(type("NoRedirect", (urllib.request.HTTPRedirectHandler,), {"redirect_request": lambda *a: None}))
         try:
             opener.open(req)
@@ -391,8 +470,7 @@ class T04AgentsModelsTeams(unittest.TestCase):
 
     def test_hand_edited_unknown_model_is_flagged(self):
         call("POST", "/api/agents", self.AGENT)
-        f = next((TMP / "agents").glob("*-tmp-agent.md"))
-        f.write_text(f.read_text().replace("---\nYou are", "model: nnet\n---\nYou are", 1))
+        db_exec("UPDATE agents SET model = 'nnet' WHERE slug = 'tmp-agent'")
         s, a, _ = call("GET", "/api/agents/tmp-agent")
         self.assertEqual(a["model"], "nnet")
         self.assertFalse(a["model_ok"])
@@ -448,6 +526,24 @@ class T05WebSocket(unittest.TestCase):
 
 
 class T06Runs(unittest.TestCase):
+    def test_agents_write_to_a_french_owner_in_french_with_the_security_rules_last(self):
+        call("PATCH", "/api/auth/preferences", {"language": "fr"})
+        try:
+            before = len(log_calls())
+            self.run_prompt(make_project_for_language(), "Make a page")
+            prompts = [c["argv"][c["argv"].index("--append-system-prompt") + 1] for c in log_calls()[before:] if "--append-system-prompt" in c["argv"]]
+            self.assertTrue(prompts)
+            for system in prompts:
+                self.assertTrue(system.startswith("Write every message to the user in French."), system[:80])
+                self.assertLess(system.index("in French"), system.index("SECURITY") if "SECURITY" in system else len(system))
+        finally:
+            call("PATCH", "/api/auth/preferences", {"language": "en"})
+        before = len(log_calls())
+        self.run_prompt(make_project_for_language(), "Make a page")
+        for c in log_calls()[before:]:
+            if "--append-system-prompt" in c["argv"]:
+                self.assertNotIn("in French", c["argv"][c["argv"].index("--append-system-prompt") + 1])
+
     def run_prompt(self, pid, text, agents=("ux", "html"), until=("run_done", "error", "run_stopped")):
         async def script(sock, recv):
             await sock.send(send({"type": "prompt", "text": text, "agents": list(agents)}))
@@ -538,8 +634,7 @@ class T06Runs(unittest.TestCase):
 
     def test_unknown_model_fails_fast_with_a_clear_message(self):
         call("POST", "/api/agents", {"id": "odd-model", "name": "Odd", "role": "You are the Odd agent. Do a step.", "icon": "bot", "color": "#334455"})
-        f = next((TMP / "agents").glob("*-odd-model.md"))
-        f.write_text(f.read_text().replace("---\nYou are", "model: nnet\n---\nYou are", 1))
+        db_exec("UPDATE agents SET model = 'nnet' WHERE slug = 'odd-model'")
         try:
             err = self.run_prompt(new_project(), "go", agents=["odd-model"])[-1]
             self.assertEqual(err["type"], "error")
@@ -790,6 +885,36 @@ def imp(name, data, on_conflict="rename", apply=False):
     return call("POST", "/api/import", {"name": name, "data": b64(data), "on_conflict": on_conflict, "apply": apply})
 
 
+class T07bNewPages(unittest.TestCase):
+    """Pages an agent creates are added to the project's page list and announced to the studio."""
+    def test_html_agent_can_add_a_page(self):
+        pid = new_project()
+
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": "add an about page [[new-page]]", "agents": ["html"]}))
+            return await recv(("run_done", "error", "run_stopped"))
+        events = ws(pid, script)
+        self.assertEqual(events[-1]["type"], "run_done", events[-3:])
+        ev = next(e for e in events if e["type"] == "pages")
+        self.assertEqual(ev["pages"], [{"title": "Home", "file": "index.html"}, {"title": "About us", "file": "about.html"}])
+        meta = call("GET", f"/api/projects/{pid}")[1]
+        self.assertEqual([p["file"] for p in meta["pages"]], ["index.html", "about.html"])   # bad file names are not pages
+        self.assertEqual(len([e for e in events if e["type"] == "pages"]), 1)                 # only when something was added
+
+    def test_agents_are_told_they_may_add_pages(self):
+        pid = new_project()
+        LOG.write_text("")
+
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": "go", "agents": ["html"]}))
+            return await recv(("run_done", "error", "run_stopped"))
+        ws(pid, script)
+        argv = next(c["argv"] for c in log_calls() if "-p" in c["argv"])
+        prompt = argv[argv.index("-p") + 1]
+        self.assertIn("Currently a single page: index.html.", prompt)
+        self.assertIn("More pages may be added (up to 11 more)", prompt)
+
+
 class T08ExportImport(unittest.TestCase):
     AGENT_MD = """---
 id: dark-mode
@@ -818,7 +943,7 @@ You are the Dark mode agent. Add a dark theme with prefers-color-scheme.
         self.assertEqual((bundle["format"], [a["id"] for a in bundle["agents"]]), ("agents-atelier-team", ["html", "css"]))
         self.assertEqual(call("GET", "/api/agents/nope/export")[0], 404)
         self.assertEqual(call("GET", "/api/presets/nope/export")[0], 404)
-        req = urllib.request.urlopen(BASE + "/api/export")
+        req = urllib.request.urlopen(urllib.request.Request(BASE + "/api/export", headers={"Cookie": ADMIN}))
         import io, zipfile
         names = zipfile.ZipFile(io.BytesIO(req.read())).namelist()
         self.assertIn("agents/_common.md", names)
@@ -863,7 +988,7 @@ You are the Dark mode agent. Add a dark theme with prefers-color-scheme.
         self.assertEqual(sorted(team["agents"]), ["css", "dark-mode-2"])      # the renamed copy is used
 
     def test_zip_round_trip(self):
-        req = urllib.request.urlopen(BASE + "/api/export")
+        req = urllib.request.urlopen(urllib.request.Request(BASE + "/api/export", headers={"Cookie": ADMIN}))
         s, plan, _ = imp("all.zip", req.read())
         self.assertEqual(s, 200)
         self.assertEqual(plan["summary"]["error"], 0)
@@ -980,6 +1105,647 @@ class T03bBriefAndAssets(unittest.TestCase):
         prompt = prompt[prompt.index("-p") + 1]
         self.assertIn("<project_brief>\nMain goal / call to action: Order a cake\nLanguage(s) of the site: French\n</project_brief>", prompt)
         self.assertIn("- assets/logo.png — the brand logo", prompt)
+
+
+class T10Accounts(unittest.TestCase):
+    """Register, confirm by email code, log in, sessions and what each role may reach."""
+    n = 0
+
+    def email(self):
+        T10Accounts.n += 1
+        return f"person{T10Accounts.n}-{time.time_ns()}@example.com"
+
+    def test_logged_out_visitors_only_reach_public_pages(self):
+        for path in ["/", "/login", "/register", "/forgot"]:
+            self.assertEqual(page_redirect(path)[0], 200, path)
+        for path in ["/guide", "/profile", "/projects/new", "/projects", "/agents", "/teams", "/users"]:
+            status, where = page_redirect(path)
+            self.assertEqual(status, 303, path)
+            self.assertTrue(where.startswith("/login?next="), where)
+        self.assertEqual(page_redirect("/confirm"), (303, "/login"))
+        for path in ["/api/projects", "/api/presets", "/api/stats", "/api/models", "/api/users", "/api/agents/css",
+                     "/api/export", "/api/agents/common", "/api/agents?full=1"]:
+            self.assertEqual(call("GET", path, cookie=None)[0], 401, path)
+        self.assertEqual(call("POST", "/api/projects", {"name": "a", "description": "b"}, cookie=None)[0], 401)
+
+    def test_landing_page_data_never_includes_instructions(self):
+        s, agents, _ = call("GET", "/api/agents", cookie=None)
+        self.assertEqual(s, 200)
+        self.assertTrue(agents)
+        self.assertNotIn("role", agents[0])
+
+    def test_public_pages_only_offer_guests_what_they_can_use(self):
+        """The landing page is public: anything that needs an account must be marked as members-only."""
+        html = (Path(__file__).resolve().parent.parent / "server" / "static" / "landing.html").read_text()
+        html = html[:html.index("<script>")]                                            # the script only draws members' projects
+        html = re.sub(r'<span data-show="member">.*?</span>', "", html, flags=re.S)     # those links are already hidden as a group
+        for tag in re.findall(r"<(?:a|button)\b[^>]*>", html):
+            if re.search(r'href="/(guide|projects|agents|teams)"', tag) or ("data-new" in tag and "guest" not in tag):
+                self.assertIn('data-show="member"', tag, tag)
+        self.assertIn('data-show="guest" href="/login"', html)
+        self.assertIn('data-show="guest" href="/register"', html)
+
+    def test_the_guide_needs_a_confirmed_account(self):
+        self.assertEqual(page_redirect("/guide", cookie=None)[0], 303)
+        self.assertTrue(page_redirect("/guide", cookie=None)[1].startswith("/login?next="))
+        email = self.email()
+        unconfirmed = register(email, confirm=False)
+        self.assertEqual(page_redirect("/guide", cookie=unconfirmed), (303, "/confirm"))
+        self.assertEqual(page_redirect("/guide", cookie=register(self.email()))[0], 200)
+
+    def test_register_validates_and_never_stores_the_password(self):
+        for body in [{"name": "Ann Lee", "email": "nope", "password": "correct horse"},
+                     {"name": "Ann Lee", "email": self.email(), "password": "short"}]:
+            self.assertEqual(call("POST", "/api/auth/register", body, cookie=None)[0], 400, body)
+        email = self.email()
+        cookie = register(email, "my secret password", confirm=False)
+        self.assertEqual(call("POST", "/api/auth/register", {"name": "Ann Lee", "email": email.upper(), "password": "correct horse"}, cookie=None)[0], 409)
+        rows = asyncio.run(self._fetch("SELECT password_hash FROM users WHERE email = $1", email))
+        self.assertNotIn("my secret password", rows[0]["password_hash"])
+        self.assertTrue(cookie)
+
+    def test_register_checks_the_profile_answers(self):
+        good = {"name": "Ann Lee", "password": "correct horse"}
+        bad = [{"name": ""}, {"name": "   "}, {"name": "A"}, {"name": "x" * 81}, {"company": "x" * 81},
+               {"job_role": "Astronaut"}, {"use_case": "<script>"}, {"referral": "nope"}]
+        for change in bad:
+            body = {**good, "email": self.email(), **change}
+            self.assertEqual(call("POST", "/api/auth/register", body, cookie=None)[0], 400, change)
+            self.assertFalse(asyncio.run(self._fetch("SELECT 1 FROM users WHERE email = $1", body["email"])), change)
+
+    def test_register_saves_the_profile(self):
+        s, opts, _ = call("GET", "/api/auth/options", cookie=None)
+        self.assertEqual(s, 200)
+        email = self.email()
+        answers = {"company": " Acme\n  Inc ", "job_role": opts["job_role"][0], "use_case": opts["use_case"][0], "referral": opts["referral"][0]}
+        s, r, h = call("POST", "/api/auth/register", {"name": "  Ann \t Lee ", "email": email, "password": "correct horse", **answers}, cookie=None)
+        self.assertEqual(s, 200, r)
+        me = call("GET", "/api/auth/me", cookie=session_cookie(h))[1]["user"]
+        self.assertEqual((me["name"], me["company"]), ("Ann Lee", "Acme Inc"))
+        self.assertEqual(me["job_role"], opts["job_role"][0])
+        listed = next(u for u in call("GET", "/api/users")[1] if u["email"] == email)
+        self.assertEqual((listed["name"], listed["use_case"], listed["referral"]), ("Ann Lee", opts["use_case"][0], opts["referral"][0]))
+
+    def test_only_a_name_is_required(self):
+        email = self.email()
+        s, r, _ = call("POST", "/api/auth/register", {"name": "Ann Lee", "email": email, "password": "correct horse"}, cookie=None)
+        self.assertEqual(s, 200, r)
+        self.assertEqual(r["user"]["company"], "")
+
+    def test_the_confirmation_email_never_repeats_what_someone_typed(self):
+        """Anyone can register with someone else's address, so a name must not become text we email to that person."""
+        email = self.email()
+        name = "Visit evil.example now"
+        call("POST", "/api/auth/register", {"name": name, "email": email, "password": "correct horse"}, cookie=None)
+        sent = [json.loads(l) for l in OUTBOX.read_text().splitlines() if json.loads(l)["to"] == email][-1]
+        self.assertNotIn(name, sent["subject"] + sent["text"])
+
+    async def _fetch(self, sql, *args):
+        con = await asyncpg.connect(TEST_DB_URL)
+        try:
+            return await con.fetch(sql, *args)
+        finally:
+            await con.close()
+
+    def test_unconfirmed_account_can_only_confirm(self):
+        email = self.email()
+        cookie = register(email, confirm=False)
+        self.assertEqual(call("GET", "/api/auth/me", cookie=cookie)[1]["user"]["role"], "unconfirmed")
+        for path in ["/api/projects", "/api/presets", "/api/agents/css"]:
+            s, r, _ = call("GET", path, cookie=cookie)
+            self.assertEqual((s, r["detail"]), (403, "Confirm your email first."), path)
+        self.assertEqual(page_redirect("/projects", cookie), (303, "/confirm"))
+        self.assertEqual(page_redirect("/login", cookie), (303, "/confirm"))
+        self.assertEqual(page_redirect("/confirm", cookie)[0], 200)
+        s, r, _ = call("POST", "/api/auth/confirm", {"code": last_code(email)}, cookie=cookie)
+        self.assertEqual((s, r["user"]["role"]), (200, "user"))
+        self.assertEqual(call("GET", "/api/projects", cookie=cookie)[0], 200)
+        self.assertEqual(page_redirect("/confirm", cookie), (303, "/projects"))
+
+    def test_wrong_codes_run_out_and_a_new_code_is_rate_limited(self):
+        email = self.email()
+        cookie = register(email, confirm=False)
+        good = last_code(email)
+        wrong = "000000" if good != "000000" else "111111"
+        self.assertEqual(call("POST", "/api/auth/resend", cookie=cookie)[0], 429)     # one code a minute
+        for _ in range(5):
+            self.assertEqual(call("POST", "/api/auth/confirm", {"code": wrong}, cookie=cookie)[0], 400)
+        self.assertEqual(call("POST", "/api/auth/confirm", {"code": good}, cookie=cookie)[0], 429)   # even the right one
+        db_exec("UPDATE email_codes SET sent_at = now() - interval '2 minutes'")
+        self.assertEqual(call("POST", "/api/auth/resend", cookie=cookie)[0], 200)
+        self.assertEqual(call("POST", "/api/auth/confirm", {"code": last_code(email)}, cookie=cookie)[0], 200)
+
+    def test_expired_code_is_refused(self):
+        email = self.email()
+        cookie = register(email, confirm=False)
+        db_exec("UPDATE email_codes SET expires_at = now() - interval '1 minute'")
+        self.assertEqual(call("POST", "/api/auth/confirm", {"code": last_code(email)}, cookie=cookie)[0], 410)
+
+    def test_login_logout_and_lockout(self):
+        email = self.email()
+        register(email, "correct horse")
+        s, r, h = call("POST", "/api/auth/login", {"email": email, "password": "correct horse"}, cookie=None)
+        self.assertEqual((s, r["user"]["role"]), (200, "user"))
+        self.assertIn("HttpOnly", h.get("set-cookie"))
+        cookie = session_cookie(h)
+        self.assertEqual(call("GET", "/api/projects", cookie=cookie)[0], 200)
+        self.assertEqual(call("POST", "/api/auth/logout", cookie=cookie)[0], 200)
+        self.assertEqual(call("GET", "/api/projects", cookie=cookie)[0], 401)          # the session is gone on the server
+        unknown = call("POST", "/api/auth/login", {"email": "nobody@example.com", "password": "x"}, cookie=None)
+        wrong = call("POST", "/api/auth/login", {"email": email, "password": "wrong"}, cookie=None)
+        self.assertEqual((unknown[0], unknown[1]), (wrong[0], wrong[1]))               # same answer: no account probing
+        for _ in range(9):
+            self.assertEqual(call("POST", "/api/auth/login", {"email": email, "password": "wrong"}, cookie=None)[0], 401)
+        self.assertEqual(call("POST", "/api/auth/login", {"email": email, "password": "correct horse"}, cookie=None)[0], 429)
+
+    def test_login_of_an_unconfirmed_account_sends_a_fresh_code(self):
+        email = self.email()
+        register(email, "correct horse", confirm=False)
+        db_exec("UPDATE email_codes SET sent_at = now() - interval '2 minutes'")
+        before = OUTBOX.read_text().count(email)
+        s, r, h = call("POST", "/api/auth/login", {"email": email, "password": "correct horse"}, cookie=None)
+        self.assertEqual((s, r["user"]["confirmed"]), (200, False))
+        self.assertEqual(OUTBOX.read_text().count(email), before + 1)
+
+    def test_the_admin_email_becomes_admin_and_others_dont(self):
+        self.assertEqual(call("GET", "/api/auth/me")[1]["user"]["role"], "admin")
+        self.assertEqual(call("GET", "/api/auth/me", cookie=register(self.email()))[1]["user"]["role"], "user")
+
+    def test_only_admins_manage_users(self):
+        email = self.email()
+        cookie = register(email)
+        self.assertEqual(call("GET", "/api/users", cookie=cookie)[0], 403)
+        self.assertEqual(page_redirect("/users", cookie), (303, "/projects"))
+        s, users, _ = call("GET", "/api/users")
+        self.assertEqual(s, 200)
+        target = next(u for u in users if u["email"] == email)
+        self.assertNotIn("password_hash", target)
+        self.assertEqual(call("PATCH", f"/api/users/{target['id']}", {"role": "admin"}, cookie=cookie)[0], 403)
+        self.assertEqual(call("PATCH", f"/api/users/{target['id']}", {"role": "king"})[0], 400)
+        me = call("GET", "/api/auth/me")[1]["user"]
+        self.assertEqual(call("PATCH", f"/api/users/{me['id']}", {"role": "user"})[0], 400)     # can't lock yourself out
+        self.assertEqual(call("PATCH", f"/api/users/{target['id']}", {"role": "admin"})[1]["role"], "admin")
+        self.assertEqual(call("GET", "/api/users", cookie=cookie)[0], 200)                       # applies at once
+
+
+class T11Ownership(unittest.TestCase):
+    """Shared agents and teams are read-only for users; their own are private. Projects belong to their owner."""
+    @classmethod
+    def setUpClass(cls):
+        stamp = time.time_ns()
+        cls.alice = register(f"alice-{stamp}@example.com")
+        cls.bob = register(f"bob-{stamp}@example.com")
+
+    AGENT = {"name": "My CSS", "role": "You are the My CSS agent. Do a step.", "icon": "bot", "color": "#334455"}
+
+    def ids(self, cookie):
+        return [a["id"] for a in call("GET", "/api/agents", cookie=cookie)[1]]
+
+    def test_users_cant_change_shared_agents_or_rules(self):
+        s, css, _ = call("GET", "/api/agents/css", cookie=self.alice)
+        self.assertEqual((s, css["scope"], css["editable"]), (200, "shared", False))
+        self.assertIn("Duplicate", call("PUT", "/api/agents/css", {**self.AGENT}, cookie=self.alice)[1]["detail"])
+        self.assertEqual(call("PUT", "/api/agents/css", {**self.AGENT}, cookie=self.alice)[0], 403)
+        self.assertEqual(call("DELETE", "/api/agents/css", cookie=self.alice)[0], 403)
+        self.assertEqual(call("PUT", "/api/agents/common", {"text": "new rules for everyone"}, cookie=self.alice)[0], 403)
+        self.assertEqual(call("GET", "/api/agents/common", cookie=self.alice)[0], 200)
+        self.assertEqual(call("GET", "/api/agents/css")[1]["editable"], True)        # the admin can
+
+    def test_duplicate_is_private_and_editable(self):
+        source = call("GET", "/api/agents/css", cookie=self.alice)[1]
+        body = {k: source[k] for k in ("name", "icon", "color", "description", "role")}
+        self.assertEqual(call("POST", "/api/agents", {**body, "id": "css"}, cookie=self.alice)[0], 400)     # a shared agent's id
+        s, copy, _ = call("POST", "/api/agents", {**body, "id": "alice-css", "name": "CSS copy"}, cookie=self.alice)
+        self.assertEqual((s, copy["scope"], copy["editable"]), (200, "mine", True))
+        s, edited, _ = call("PUT", "/api/agents/alice-css", {**body, "name": "Alice CSS", "role": "You are the Alice CSS agent."}, cookie=self.alice)
+        self.assertEqual((s, edited["name"]), (200, "Alice CSS"))
+        self.assertEqual(call("GET", "/api/agents/css", cookie=self.alice)[1]["role"], source["role"])      # the original is untouched
+        self.assertNotIn("alice-css", self.ids(self.bob))
+        self.assertNotIn("alice-css", self.ids(ADMIN))
+        self.assertEqual(call("GET", "/api/agents/alice-css", cookie=self.bob)[0], 404)
+        self.assertEqual(call("PUT", "/api/agents/alice-css", {**body}, cookie=self.bob)[0], 404)
+        self.assertEqual(call("DELETE", "/api/agents/alice-css", cookie=self.bob)[0], 404)
+        s, bob_copy, _ = call("POST", "/api/agents", {**body, "id": "alice-css"}, cookie=self.bob)           # Bob may use the same id
+        self.assertEqual(s, 200, bob_copy)
+        self.assertEqual(call("POST", "/api/agents", {**body, "id": "alice-css"})[0], 400)                   # a new shared one may not
+        self.assertEqual(call("DELETE", "/api/agents/alice-css", cookie=self.alice)[0], 200)
+        self.assertEqual(call("GET", "/api/agents/alice-css", cookie=self.bob)[0], 200)
+
+    def test_admin_changes_to_shared_agents_reach_everyone(self):
+        s, a, _ = call("POST", "/api/agents", {**self.AGENT, "id": "shared-new", "name": "Shared new"})
+        self.assertEqual((s, a["scope"]), (200, "shared"))
+        self.assertIn("shared-new", self.ids(self.alice))
+        s, a, _ = call("POST", "/api/agents", {**self.AGENT, "id": "admin-only", "scope": "mine"})
+        self.assertEqual((s, a["scope"]), (200, "mine"))
+        self.assertNotIn("admin-only", self.ids(self.alice))
+        call("DELETE", "/api/agents/shared-new")
+        call("DELETE", "/api/agents/admin-only")
+        self.assertNotIn("shared-new", self.ids(self.alice))
+
+    def test_a_users_run_order_is_their_own(self):
+        before = self.ids(self.bob)
+        order = list(reversed(self.ids(self.alice)))
+        s, r, _ = call("POST", "/api/agents/order", {"ids": order}, cookie=self.alice)
+        self.assertEqual((s, [a["id"] for a in r]), (200, order))
+        self.assertEqual(self.ids(self.bob), before)
+        self.assertEqual(call("POST", "/api/agents/order", {"ids": []}, cookie=self.alice)[0], 400)
+        call("POST", "/api/agents/order", {"ids": list(reversed(order))}, cookie=self.alice)
+
+    def test_teams_follow_the_same_rules(self):
+        s, shared, _ = call("POST", "/api/presets", {"name": "Shared crew", "agents": ["html", "css"]})
+        self.assertEqual((s, shared["scope"]), (200, "shared"))
+        seen = call("GET", f"/api/presets/{shared['id']}", cookie=self.alice)[1]
+        self.assertEqual((seen["scope"], seen["editable"]), ("shared", False))
+        self.assertEqual(call("PUT", f"/api/presets/{shared['id']}", {"name": "Mine", "agents": ["css"]}, cookie=self.alice)[0], 403)
+        self.assertEqual(call("DELETE", f"/api/presets/{shared['id']}", cookie=self.alice)[0], 403)
+        s, copy, _ = call("POST", "/api/presets", {"name": "Shared crew", "agents": seen["agents"]}, cookie=self.alice)   # duplicate
+        self.assertEqual((s, copy["scope"], copy["editable"]), (200, "mine", True))
+        self.assertNotEqual(copy["id"], shared["id"])
+        self.assertEqual(call("PUT", f"/api/presets/{copy['id']}", {"name": "Alice crew", "agents": ["css"]}, cookie=self.alice)[1]["agents"], ["css"])
+        self.assertEqual(call("GET", f"/api/presets/{copy['id']}", cookie=self.bob)[0], 404)
+        self.assertNotIn(copy["id"], [t["id"] for t in call("GET", "/api/presets", cookie=self.bob)[1]])
+        self.assertEqual(call("PUT", "/api/presets/quick", {"name": "x", "agents": ["css"]}, cookie=self.alice)[0], 400)   # built-in
+        call("DELETE", f"/api/presets/{shared['id']}")
+        self.assertEqual(call("GET", f"/api/presets/{shared['id']}", cookie=self.alice)[0], 404)
+
+    def test_users_import_as_their_own_never_over_shared(self):
+        role = "---\nid: css\nname: Imported\nicon: bot\ncolor: \"#334455\"\n---\nYou are the Imported agent. Do a step.\n"
+        body = {"name": "css.md", "data": base64.b64encode(role.encode()).decode(), "on_conflict": "replace", "apply": True}
+        before = call("GET", "/api/agents/css", cookie=self.alice)[1]["role"]
+        s, r, _ = call("POST", "/api/import", body, cookie=self.alice)
+        self.assertEqual((s, r["items"][0]["action"]), (200, "rename"), r)
+        self.assertEqual(call("GET", "/api/agents/css", cookie=self.alice)[1]["role"], before)
+        target = r["items"][0]["target"]
+        self.assertEqual(call("GET", f"/api/agents/{target}", cookie=self.alice)[1]["scope"], "mine")
+        self.assertEqual(call("GET", f"/api/agents/{target}", cookie=self.bob)[0], 404)
+        call("DELETE", f"/api/agents/{target}", cookie=self.alice)
+
+    def test_projects_are_private_to_their_owner(self):
+        pid = new_project(name="Alice's", cookie=self.alice)
+        self.assertIn(pid, [p["id"] for p in call("GET", "/api/projects", cookie=self.alice)[1]])
+        self.assertNotIn(pid, [p["id"] for p in call("GET", "/api/projects", cookie=self.bob)[1]])
+        self.assertEqual(call("GET", "/api/projects?page=1", cookie=self.bob)[1]["counts"]["all"],
+                         len(call("GET", "/api/projects", cookie=self.bob)[1]))
+        for method, path, body in [("GET", f"/api/projects/{pid}", None), ("PATCH", f"/api/projects/{pid}", {"name": "Hacked"}),
+                                   ("GET", f"/api/projects/{pid}/files", None), ("GET", f"/api/projects/{pid}/download", None),
+                                   ("GET", f"/api/projects/{pid}/versions", None), ("GET", f"/api/stats?project={pid}", None),
+                                   ("GET", f"/api/agents?project={pid}", None), ("DELETE", f"/api/projects/{pid}", None),
+                                   ("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": "x"}),
+                                   ("GET", f"/api/projects/{pid.upper()}", None), ("GET", f"/api/projects/{pid.replace('-', '')}", None)]:
+            self.assertEqual(call(method, path, body, cookie=self.bob)[0], 404, path)
+        self.assertEqual(page_redirect(f"/p/{pid}", self.bob)[0], 404)
+        self.assertEqual(page_redirect(f"/p/{pid}", self.alice)[0], 200)
+        self.assertEqual(call("GET", f"/api/projects/{pid}", cookie=self.alice)[1]["name"], "Alice's")
+        self.assertEqual(call("GET", f"/api/projects/{pid}")[0], 200)                                   # the admin can open it
+        listed = next(p for p in call("GET", "/api/projects")[1] if p["id"] == pid)
+        self.assertTrue(listed["owner_email"].startswith("alice-"))
+        self.assertEqual(call("GET", f"/work/.projects/{pid}.json", cookie=self.alice)[0], 404)         # never served as a file
+
+    def test_websocket_needs_the_owner(self):
+        pid = new_project(cookie=self.alice)
+
+        def code(cookie):
+            async def go():
+                headers = {"Cookie": cookie} if cookie else {}
+                async with websockets.connect(f"ws://127.0.0.1:{PORT}/ws/{pid}", additional_headers=headers) as sock:
+                    try:
+                        while True:
+                            msg = json.loads(await asyncio.wait_for(sock.recv(), 5))
+                            if msg["type"] == "hello":
+                                return "open"
+                    except websockets.ConnectionClosed as e:
+                        return e.code
+            return asyncio.run(go())
+        self.assertEqual(code(self.alice), "open")
+        self.assertEqual(code(ADMIN), "open")
+        self.assertEqual(code(self.bob), 4404)
+        self.assertEqual(code(None), 4401)
+        self.assertEqual(code(register(f"pending-{time.time_ns()}@example.com", confirm=False)), 4401)
+
+    def test_a_logged_out_session_cant_drive_an_open_websocket(self):
+        email = f"carol-{time.time_ns()}@example.com"
+        cookie = register(email)
+        pid = new_project(cookie=cookie)
+
+        async def script(sock, recv):
+            call("POST", "/api/auth/logout", cookie=cookie)
+            await sock.send(send({"type": "prompt", "text": "go", "agents": ["html"]}))
+            try:
+                await asyncio.wait_for(sock.recv(), 5)
+            except websockets.ConnectionClosed as e:
+                return e.code
+        self.assertEqual(ws(pid, script, cookie=cookie), 4401)
+
+    def test_a_run_uses_the_owners_agents(self):
+        s, a, _ = call("POST", "/api/agents", {**self.AGENT, "id": "bob-step", "name": "Bob step", "role": "You are the BobStep agent. Do a step."}, cookie=self.bob)
+        self.assertEqual(s, 200, a)
+        pid = new_project(cookie=self.bob)
+        LOG.write_text("")
+
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": "go", "agents": ["bob-step"]}))
+            return await recv(("run_done", "error", "run_stopped"))
+        events = ws(pid, script, cookie=self.bob)
+        self.assertEqual(events[-1]["type"], "run_done", events[-3:])
+        self.assertEqual([e["agent"] for e in events if e["type"] == "agent_done"], ["brief", "bob-step"])
+        self.assertTrue(any("You are the BobStep agent" in c["argv"][c["argv"].index("--append-system-prompt") + 1]
+                            for c in log_calls() if "--append-system-prompt" in c["argv"]))
+        # another user naming Bob's agent gets the default team, not Bob's agent
+        other = new_project(cookie=self.alice)
+
+        async def script2(sock, recv):
+            await sock.send(send({"type": "prompt", "text": "go", "agents": ["bob-step", "html"]}))
+            return await recv(("run_done", "error", "run_stopped"))
+        events = ws(other, script2, cookie=self.alice)
+        self.assertNotIn("bob-step", [e["agent"] for e in events if e["type"] == "agent_done"])
+        # the admin opening Bob's project sees and can run Bob's agents
+        self.assertIn("bob-step", [a["id"] for a in call("GET", f"/api/agents?project={pid}")[1]])
+
+
+class T13PasswordsAndProfile(unittest.TestCase):
+    n = 0
+
+    def email(self):
+        T13PasswordsAndProfile.n += 1
+        return f"reset{self.n}-{time.time_ns()}@example.com"
+
+    def mails(self, email):
+        if not OUTBOX.exists():
+            return []
+        return [m for m in map(json.loads, OUTBOX.read_text().splitlines()) if m["to"] == email]
+
+    def wait_mail(self, email, words, count=1):
+        """Reset emails are sent in the background."""
+        for _ in range(100):
+            found = [m for m in self.mails(email) if words in m["subject"]]
+            if len(found) >= count:
+                return found[-1]
+            time.sleep(.03)
+        self.fail(f"no email with {words!r} to {email}")
+
+    def db(self, sql, *args):
+        async def go():
+            con = await asyncpg.connect(TEST_DB_URL)
+            try:
+                return await con.fetch(sql, *args)
+            finally:
+                await con.close()
+        return asyncio.run(go())
+
+    def forgot(self, email):
+        return call("POST", "/api/auth/forgot", {"email": email}, cookie=None)
+
+    def reset(self, email, code, password="a brand new password"):
+        return call("POST", "/api/auth/reset", {"email": email, "code": code, "password": password}, cookie=None)
+
+    def login(self, email, password):
+        return call("POST", "/api/auth/login", {"email": email, "password": password}, cookie=None)
+
+    def test_forgot_answers_the_same_for_unknown_accounts(self):
+        known = self.email()
+        register(known)
+        a, b = self.forgot(known), self.forgot(self.email())
+        self.assertEqual((a[0], a[1]), (b[0], b[1]))
+        self.assertEqual(a[0], 200)
+        self.assertEqual(self.forgot("not an email")[0], 400)
+
+    def test_reset_changes_the_password_and_ends_every_session(self):
+        email = self.email()
+        cookie = register(email, "the old password")
+        self.forgot(email)
+        code = self.wait_mail(email, "password reset")["code"]
+        self.assertEqual(self.reset(email, code, "short")[0], 400)
+        self.assertEqual(self.reset(email, code)[0], 200)
+        self.assertEqual(call("GET", "/api/projects", cookie=cookie)[0], 401)
+        self.assertEqual(self.login(email, "the old password")[0], 401)
+        self.assertEqual(self.login(email, "a brand new password")[0], 200)
+        self.wait_mail(email, "password was changed")
+        self.assertEqual(self.reset(email, code, "yet another password")[0], 400, "a code works once")
+
+    def test_reset_code_is_not_the_confirmation_code_and_unknown_emails_look_the_same(self):
+        email = self.email()
+        register(email, confirm=False)
+        confirmation = last_code(email)
+        self.forgot(email)
+        code = self.wait_mail(email, "password reset")["code"]
+        if confirmation != code:
+            self.assertEqual(self.reset(email, confirmation)[0], 400)
+        wrong = "000000" if code != "000000" else "111111"
+        unknown, bad = self.reset(self.email(), wrong), self.reset(email, wrong)
+        self.assertEqual((unknown[0], unknown[1]), (bad[0], bad[1]))
+
+    def test_a_reset_confirms_an_unconfirmed_account(self):
+        email = self.email()
+        register(email, confirm=False)
+        self.forgot(email)
+        self.assertEqual(self.reset(email, self.wait_mail(email, "password reset")["code"])[0], 200)
+        s, r, _ = self.login(email, "a brand new password")
+        self.assertEqual(r["user"]["role"], "user")
+        self.assertFalse(self.db("SELECT 1 FROM email_codes c JOIN users u ON u.id = c.user_id WHERE u.email = $1", email))
+
+    def test_reset_limits(self):
+        email = self.email()
+        register(email)
+        self.forgot(email)
+        code = self.wait_mail(email, "password reset")["code"]
+        self.forgot(email)      # within the minute: no second email
+        time.sleep(.2)
+        self.assertEqual(len([m for m in self.mails(email) if "password reset" in m["subject"]]), 1)
+        wrong = "000000" if code != "000000" else "111111"
+        for _ in range(5):
+            self.assertEqual(self.reset(email, wrong)[0], 400)
+        self.assertEqual(self.reset(email, code)[0], 400, "five wrong tries burn the code")
+        # a new code a minute later works, until the daily limits
+        uid = self.db("SELECT id FROM users WHERE email = $1", email)[0]["id"]
+        self.db("UPDATE reset_codes SET sent_at = now() - interval '2 minutes' WHERE user_id = $1", uid)
+        self.forgot(email)
+        code = self.wait_mail(email, "password reset", 2)["code"]
+        self.db("UPDATE reset_codes SET fails = 15 WHERE user_id = $1", uid)
+        self.assertEqual(self.reset(email, code)[0], 400, "too many wrong tries today")
+        self.db("UPDATE reset_codes SET fails = 0, expires_at = now() - interval '1 minute' WHERE user_id = $1", uid)
+        self.assertEqual(self.reset(email, code)[0], 400, "expired")
+        self.db("UPDATE reset_codes SET sends = 5, sent_at = now() - interval '2 minutes' WHERE user_id = $1", uid)
+        self.forgot(email)
+        time.sleep(.2)
+        self.assertEqual(len([m for m in self.mails(email) if "password reset" in m["subject"]]), 2, "too many emails today")
+        self.db("UPDATE reset_codes SET window_start = now() - interval '25 hours' WHERE user_id = $1", uid)
+        self.forgot(email)
+        self.assertEqual(self.reset(email, self.wait_mail(email, "password reset", 3)["code"])[0], 200, "the next day it works again")
+
+    def test_change_password(self):
+        email = self.email()
+        cookie = register(email, "the old password")
+        other = session_cookie(self.login(email, "the old password")[2])
+        change = lambda cur, new: call("POST", "/api/auth/password", {"current": cur, "password": new}, cookie=cookie)
+        self.assertEqual(change("wrong password", "a brand new password")[0], 400)
+        self.assertEqual(change("the old password", "short")[0], 400)
+        self.assertEqual(change("the old password", "the old password")[0], 400)
+        self.assertEqual(self.login(email, "a brand new password")[0], 401)
+        self.assertEqual(change("the old password", "a brand new password")[0], 200)
+        self.assertEqual(call("GET", "/api/projects", cookie=cookie)[0], 200, "this device stays logged in")
+        self.assertEqual(call("GET", "/api/projects", cookie=other)[0], 401, "the other device doesn't")
+        self.assertEqual(self.login(email, "the old password")[0], 401)
+        self.wait_mail(email, "password was changed")
+
+    def test_wrong_current_passwords_lock_the_account(self):
+        email = self.email()
+        cookie = register(email, "the old password")
+        for _ in range(10):
+            call("POST", "/api/auth/password", {"current": "guess guess", "password": "a brand new password"}, cookie=cookie)
+        s, _, _ = call("POST", "/api/auth/password", {"current": "the old password", "password": "a brand new password"}, cookie=cookie)
+        self.assertEqual(s, 429)
+
+    def test_account_routes_need_a_confirmed_login(self):
+        unconfirmed = register(self.email(), confirm=False)
+        for method, path in [("PATCH", "/api/auth/me"), ("POST", "/api/auth/password"), ("GET", "/api/auth/sessions"),
+                             ("DELETE", "/api/auth/sessions"), ("POST", "/api/auth/delete")]:
+            body = None if method in ("GET", "DELETE") else {}
+            self.assertEqual(call(method, path, body, cookie=None)[0], 401, path)
+            self.assertEqual(call(method, path, body, cookie=unconfirmed)[0], 403, path)
+
+    def test_profile_can_change_details_but_never_the_role_or_email(self):
+        email = self.email()
+        cookie = register(email)
+        update = lambda **f: call("PATCH", "/api/auth/me", {"name": "Ann Lee", **f}, cookie=cookie)
+        self.assertEqual(update(name="")[0], 400)
+        self.assertEqual(update(job_role="Astronaut")[0], 400)
+        s, r, _ = update(company="Acme", job_role="Designer", role="admin", email="evil@example.com")
+        self.assertEqual(s, 200, r)
+        self.assertEqual((r["user"]["name"], r["user"]["company"], r["user"]["job_role"]), ("Ann Lee", "Acme", "Designer"))
+        self.assertEqual((r["user"]["role"], r["user"]["email"]), ("user", email))
+
+    def test_log_out_other_devices(self):
+        email = self.email()
+        cookie = register(email, "the old password")
+        other = session_cookie(self.login(email, "the old password")[2])
+        self.assertEqual(call("GET", "/api/auth/sessions", cookie=cookie)[1]["others"], 1)
+        self.assertEqual(call("DELETE", "/api/auth/sessions", cookie=cookie)[1]["ended"], 1)
+        self.assertEqual(call("GET", "/api/projects", cookie=other)[0], 401)
+        self.assertEqual(call("GET", "/api/projects", cookie=cookie)[0], 200)
+
+    def test_delete_account_removes_only_your_things(self):
+        email = self.email()
+        cookie = register(email, "the old password")
+        s, p, _ = call("POST", "/api/projects", {"name": "Mine", "description": "x"}, cookie=cookie)
+        self.assertEqual(s, 200, p)
+        kept = call("POST", "/api/projects", {"name": "Admin's", "description": "x"})[1]["id"]
+        s, a, _ = call("POST", "/api/agents", {"id": "my-own", "name": "My own", "role": "You help with everything on this website, carefully and in plain words."}, cookie=cookie)
+        self.assertEqual(s, 200, a)
+        self.assertEqual(call("POST", "/api/auth/delete", {"password": "wrong password"}, cookie=cookie)[0], 400)
+        self.assertEqual(call("GET", "/api/projects", cookie=cookie)[0], 200)
+        self.assertEqual(call("POST", "/api/auth/delete", {"password": "the old password"}, cookie=cookie)[0], 200)
+        self.assertEqual(call("GET", "/api/projects", cookie=cookie)[0], 401)
+        self.assertEqual(self.login(email, "the old password")[0], 401)
+        self.assertEqual(call("GET", f"/api/projects/{p['id']}")[0], 404)
+        self.assertEqual(call("GET", f"/api/projects/{kept}")[0], 200)
+        self.assertFalse(self.db("SELECT 1 FROM agents WHERE slug = 'my-own'"))
+        self.assertFalse(self.db("SELECT 1 FROM users WHERE email = $1", email))
+
+    def test_the_only_admin_cant_delete_their_account(self):
+        admins = self.db("SELECT count(*) AS n FROM users WHERE role = 'admin'")[0]["n"]
+        if admins != 1:
+            self.skipTest("another test made a second admin")
+        s, r, _ = call("POST", "/api/auth/delete", {"password": "correct horse"})
+        self.assertEqual(s, 400, r)
+        self.assertIn("only admin", r["detail"])
+
+
+class T14Preferences(unittest.TestCase):
+    def email(self):
+        return f"pref-{time.time_ns()}@example.com"
+
+    def test_preferences_are_checked_and_saved(self):
+        cookie = register(self.email())
+        set_ = lambda **b: call("PATCH", "/api/auth/preferences", b, cookie=cookie)
+        self.assertEqual(set_(language="de")[0], 400)
+        self.assertEqual(set_(theme="pink")[0], 400)
+        self.assertEqual(set_(language="fr")[0], 200)
+        s, r, _ = set_(theme="dark")
+        self.assertEqual(s, 200, r)
+        me = call("GET", "/api/auth/me", cookie=cookie)[1]["user"]
+        self.assertEqual((me["language"], me["theme"]), ("fr", "dark"), "saving one keeps the other")
+
+    def test_preferences_need_a_confirmed_login(self):
+        self.assertEqual(call("PATCH", "/api/auth/preferences", {"language": "fr"}, cookie=None)[0], 401)
+        self.assertEqual(call("PATCH", "/api/auth/preferences", {"language": "fr"}, cookie=register(self.email(), confirm=False))[0], 403)
+
+    def test_emails_follow_the_language(self):
+        email = self.email()
+        s, r, _ = call("POST", "/api/auth/register", {"name": "Ann Lee", "email": email, "password": "correct horse", "language": "fr"}, cookie=None)
+        self.assertEqual(s, 200, r)
+        mail = [m for m in map(json.loads, OUTBOX.read_text().splitlines()) if m["to"] == email][-1]
+        self.assertIn("Bonjour", mail["text"])
+        self.assertIn(mail["code"], mail["subject"])
+        other = self.email()
+        call("POST", "/api/auth/register", {"name": "Ann Lee", "email": other, "password": "correct horse", "language": "klingon"}, cookie=None)
+        self.assertIn("Hello", [m for m in map(json.loads, OUTBOX.read_text().splitlines()) if m["to"] == other][-1]["text"])
+
+    def test_home_is_a_dashboard_only_for_confirmed_accounts(self):
+        page = lambda cookie: call("GET", "/", cookie=cookie)[1]
+        self.assertIn("Describe a page", page(None))
+        self.assertIn("Describe a page", page(register(self.email(), confirm=False)))
+        self.assertIn("<title>Dashboard", page(register(self.email())))
+        for cookie in (None, register(self.email())):      # it changes on login, so a browser must not reuse a copy
+            self.assertEqual(call("GET", "/", cookie=cookie)[2]["cache-control"], "no-store")
+
+    def test_dashboard_stats_are_your_own(self):
+        other = register(self.email())
+        call("POST", "/api/projects", {"name": "Theirs", "description": "x"}, cookie=other)
+        data = call("GET", "/api/stats?mine=true", cookie=other)[1]
+        self.assertEqual((data["totals"]["runs"], data["run_times"]), (0, []))
+        admin_all, admin_mine = call("GET", "/api/stats")[1], call("GET", "/api/stats?mine=true")[1]
+        self.assertLessEqual(admin_mine["totals"]["runs"], admin_all["totals"]["runs"])
+        self.assertTrue(all(isinstance(t, (int, float)) for t in admin_all["run_times"]))
+
+    def test_every_page_loads_the_style_last_and_dark_is_the_default(self):
+        static = Path(__file__).resolve().parent.parent / "server" / "static"
+        for page in ("landing", "dashboard", "guide", "projects", "agents", "teams", "studio", "users", "profile", "new-project", "auth"):
+            html = (static / f"{page}.html").read_text()
+            self.assertGreater(html.index("/static/theme.css"), html.index("</style>"), page)
+        self.assertIn('localStorage.getItem("theme") || "dark"', (static / "ui.js").read_text())
+
+    def test_landing_copy_follows_the_copywriter_rules(self):
+        html = (Path(__file__).resolve().parent.parent / "server" / "static" / "landing.html").read_text()
+        title = re.search(r"<title>(.*?)</title>", html).group(1)
+        description = re.search(r'name="description" content="(.*?)"', html).group(1)
+        self.assertLess(len(title), 60)
+        self.assertLess(len(description), 155)
+        body = html[html.index("<body>"):html.index("<script>")]
+        for symbol in "✓★→●✎✦—":
+            self.assertNotIn(symbol, body, symbol)
+        for cliche in ("Welcome to our", "unlock", "elevate", "seamless", "lorem"):
+            self.assertNotIn(cliche, body.lower() if cliche.islower() else body, cliche)
+
+    def test_mine_leaves_out_other_peoples_projects(self):
+        other = register(self.email())
+        call("POST", "/api/projects", {"name": "Theirs", "description": "x"}, cookie=other)
+        everyone = call("GET", "/api/projects?page=1&per_page=1")[1]["total"]
+        mine = call("GET", "/api/projects?page=1&per_page=1&mine=true")[1]["total"]
+        self.assertLess(mine, everyone)
+        self.assertEqual(call("GET", "/api/projects?page=1&per_page=1&mine=true", cookie=other)[1]["total"], 1)
+
+    def test_french_translations_load_and_avoid_long_dashes(self):
+        static = Path(__file__).resolve().parent.parent / "server" / "static"
+        fr = (static / "i18n-fr.js").read_text()
+        self.assertNotIn("—", fr)
+        self.assertIn('"Log in": "Se connecter"', fr)
+        for page in ("landing", "dashboard", "guide", "projects", "agents", "teams", "studio", "users", "profile", "new-project", "auth"):
+            html = (static / f"{page}.html").read_text()
+            self.assertLess(html.index("/static/i18n.js"), html.index("/static/ui.js"), page)
+            self.assertNotIn("—", html, page)
+
+
+class T12Database(unittest.TestCase):
+    def test_shared_agents_were_filled_from_the_files(self):
+        files = sorted(f.stem.split("-", 1)[1] for f in (TMP / "agents").glob("[0-9]*.md"))
+        ids = [a["id"] for a in call("GET", "/api/agents")[1]]
+        for agent in files:
+            self.assertIn(agent, ids)
+
+    def test_compose_file_keeps_postgres_on_this_machine(self):
+        text = (ROOT / "database" / "docker-compose.yaml").read_text()
+        self.assertIn("postgres:", text)
+        self.assertIn("127.0.0.1:", text)
 
 
 class T09Settings(unittest.TestCase):

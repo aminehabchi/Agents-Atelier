@@ -4,7 +4,7 @@ name: Research
 icon: search
 color: "#0e7490"
 default: false
-description: Researches the idea on the web — competitors, reviews, trends — and writes a sourced report with an improved idea.
+description: Researches the idea on the web (competitors, reviews, trends) and writes a sourced report with an improved idea.
 tools: web
 model: sonnet
 ---

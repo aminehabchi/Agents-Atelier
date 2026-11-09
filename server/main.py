@@ -10,6 +10,10 @@ Its metadata and chat log live in work/.projects/<uuid>.json and <uuid>.events.j
 - GET    /agents, /agents/new, /agents/<id>, /agents/<id>/edit, /agents/rules   agent pages
 - GET    /teams, /teams/new, /teams/<id>, /teams/<id>/edit                      team pages
 - GET    /guide                      how to use Agents Atelier
+- GET    /login, /register, /confirm account pages · /users (admins)
+- POST   /api/auth/register, /login, /confirm, /resend, /logout, /forgot, /reset · GET /api/auth/me, /options   accounts (see auth.py)
+- PATCH  /api/auth/me, /preferences · POST /api/auth/password · GET,DELETE /api/auth/sessions · POST /api/auth/delete   your own account
+- GET    /api/users · PATCH /api/users/<id> {role}   manage users (admins)
 - GET    /work/<uuid>/...            the project's site, served live
 - GET    /api/projects               list projects (newest activity first)
 - POST   /api/projects               create a project -> {id}
@@ -38,6 +42,7 @@ Run state is saved in the project's meta as "run": request, agents, done, notes,
 
 import asyncio
 import base64
+import contextlib
 import errno
 import io
 import json
@@ -48,6 +53,7 @@ import zipfile
 import os
 import shutil
 import time
+import urllib.parse
 import uuid
 from pathlib import Path
 
@@ -58,6 +64,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 
 import config
+import auth
+import db
 import agents as team_files
 from agents import default_ids, load_agents, load_common
 import orchestrator as orch
@@ -89,7 +97,14 @@ TEXT_EXT = {".html", ".css", ".js", ".md", ".svg", ".json", ".txt", ".xml", ".we
 CLAUDE = config.CLAUDE_BIN
 MODEL = config.AGENT_MODEL  # e.g. "sonnet" for faster runs; default = your Claude Code default
 
-app = FastAPI()
+@contextlib.asynccontextmanager
+async def lifespan(_app):
+    await db.init()
+    yield
+    await db.close()
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 def human_size(n: int) -> str:
@@ -140,6 +155,11 @@ async def http_error(request: Request, exc: StarletteHTTPException):
     if _wants_json(request):
         return JSONResponse({"detail": detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None))
     return _error_page(exc.status_code, "Not found" if exc.status_code == 404 else "Something's not right", detail)
+
+
+@app.exception_handler(auth.AuthError)
+async def auth_error(request: Request, exc: auth.AuthError):
+    return JSONResponse({"detail": str(exc)}, status_code=exc.status)
 
 
 @app.exception_handler(RequestValidationError)
@@ -319,12 +339,12 @@ def clean_pages(raw, keep: list[dict] | None = None) -> list[dict]:
     return pages
 
 
-def create_project(name: str, description: str, pages=None, brief=None) -> dict:
+def create_project(name: str, description: str, pages=None, brief=None, owner: str | None = None, agents: list[str] | None = None) -> dict:
     pid = str(uuid.uuid4())
     (WORK / pid).mkdir(parents=True)
     now = time.time()
     meta = {"id": pid, "name": name, "description": description, "created": now, "updated": now,
-            "history": [], "agents": default_ids(), "pages": clean_pages(pages), "brief": clean_brief(brief), "assets": []}
+            "owner": owner, "history": [], "agents": agents or [], "pages": clean_pages(pages), "brief": clean_brief(brief), "assets": []}
     save_meta(meta)
     return meta
 
@@ -416,6 +436,97 @@ def _origin_ok(request_host: str, origin: str | None) -> bool:
     return origin.split("://", 1)[-1].lower() == (request_host or "").lower()
 
 
+# ---- who may do what. Everything is private unless listed here.
+PUBLIC_PAGES = {"/", "/login", "/register", "/forgot", "/confirm", "/favicon.ico"}
+PROJECT_PATH = re.compile(r"^/(?:api/projects|p)/([^/]+)")
+
+
+def is_public(path: str, method: str = "GET") -> bool:
+    if path == "/api/agents" and method == "GET":   # names and descriptions for the landing page; list_agents checks the rest
+        return True
+    # /work/<uuid>/… is reached by its unguessable project id: generated pages run in a sandbox with no origin,
+    # so browsers don't send the session cookie for their CSS, scripts and images.
+    return path in PUBLIC_PAGES or path.startswith(("/static/", "/work/", "/api/auth/"))
+
+
+def can_access(user: dict | None, meta: dict) -> bool:
+    """A project belongs to its owner; admins can open every project (projects with no owner are admins' only)."""
+    return bool(user) and (user["role"] == "admin" or meta.get("owner") == str(user["id"]))
+
+
+def _project_of_path(path: str) -> dict | None:
+    """The project a URL points at, or None when it points at none (the route then answers by itself)."""
+    m = PROJECT_PATH.match(path)
+    if not m:
+        return None
+    try:
+        return json.loads(meta_path(str(uuid.UUID(m.group(1)))).read_text())
+    except (ValueError, OSError):
+        return None
+
+
+def _denied(request, status: int, detail: str, page: str):
+    if request.scope["path"].startswith("/api/"):
+        return JSONResponse({"detail": detail}, status_code=status)
+    return RedirectResponse(page, status_code=303)
+
+
+async def _check_access(request):
+    """Returns a response when this request isn't allowed, else None. Sets request.state.user."""
+    path = request.scope["path"]
+    request.state.user = None
+    if path.startswith("/work/.projects"):     # project data and chat logs are never served as files
+        return JSONResponse({"detail": "This page or file doesn't exist."}, status_code=404)
+    if path.startswith(("/static/", "/work/")):
+        return None
+    user = request.state.user = await auth.user_for_token(request.cookies.get(auth.COOKIE))
+    if is_public(path, request.method):
+        return None
+    if not user:
+        next_url = urllib.parse.quote(path + (f"?{request.url.query}" if request.url.query else ""), safe="")
+        return _denied(request, 401, "Log in first.", f"/login?next={next_url}")
+    if user["role"] == "unconfirmed":
+        return _denied(request, 403, "Confirm your email first.", "/confirm")
+    meta = _project_of_path(path)
+    if meta is not None and not can_access(user, meta):
+        if path.startswith("/api/"):
+            return JSONResponse({"detail": "This project doesn't exist (it may have been deleted)."}, status_code=404)
+        return _error_page(404, "Not found", "This project doesn't exist (it may have been deleted).")
+    return None
+
+
+def current_user(request: Request) -> dict:
+    return request.state.user
+
+
+def require_admin(request: Request) -> dict:
+    user = request.state.user
+    if not user or user["role"] != "admin":
+        raise HTTPException(403, "Only an admin can do this.")
+    return user
+
+
+async def language_rule(meta: dict) -> str:
+    """Agents talk to the project owner in the owner's language. It goes first: the security rules stay last."""
+    owner = await owner_of(meta)
+    if not owner or owner.get("language") != "fr":
+        return ""
+    return ("Write every message to the user in French. The website's own text keeps following the brief and the "
+            "user's request, so don't translate the site unless they ask.\n\n")
+
+
+async def owner_of(meta: dict) -> dict | None:
+    """The account whose agents a project uses (None for old projects with no owner: the shared agents)."""
+    if not meta.get("owner"):
+        return None
+    row = await db.pool.fetchrow("SELECT id, role, email, language FROM users WHERE id = $1", uuid.UUID(meta["owner"]))
+    return dict(row) if row else None
+
+
+async def project_agents(meta: dict) -> list[dict]:
+    return await load_agents(await owner_of(meta))
+
+
 @app.middleware("http")
 async def no_cache(request, call_next):
     # DNS-rebinding guard: only answer requests addressed to this machine.
@@ -428,6 +539,9 @@ async def no_cache(request, call_next):
     limit = MAX_SITE_IMPORT * 4 // 3 + 65536 if request.url.path == "/api/projects/import" else MAX_BODY   # base64 adds a third
     if size and size.isdigit() and int(size) > limit:
         return JSONResponse({"detail": f"That request is {human_size(int(size))}; the limit is {human_size(limit)}."}, status_code=413)
+    denied = await _check_access(request)
+    if denied:
+        return denied
     response = await call_next(request)
     if request.url.path.startswith("/work"):
         response.headers["Cache-Control"] = "no-store"
@@ -444,8 +558,12 @@ async def no_cache(request, call_next):
 
 
 @app.get("/")
-async def landing():
-    return FileResponse(STATIC / "landing.html")
+async def home(request: Request):
+    """A confirmed account gets its dashboard; everyone else gets the landing page."""
+    user = request.state.user
+    page = "dashboard.html" if user and user["role"] != "unconfirmed" else "landing.html"
+    # The same address answers differently once you log in or out, so a browser must never reuse a saved copy.
+    return FileResponse(STATIC / page, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/studio")
@@ -457,6 +575,11 @@ async def studio():
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     return FileResponse(STATIC / "logo.svg", media_type="image/svg+xml")
+
+
+@app.get("/projects/new")
+async def new_project_page():
+    return FileResponse(STATIC / "new-project.html")
 
 
 @app.get("/projects")
@@ -481,6 +604,175 @@ async def guide_page():
     return FileResponse(STATIC / "guide.html")
 
 
+@app.get("/profile")
+async def profile_page():
+    return FileResponse(STATIC / "profile.html")
+
+
+@app.get("/login")
+@app.get("/register")
+@app.get("/forgot")
+async def auth_pages(request: Request):
+    user = request.state.user
+    if user:
+        return RedirectResponse("/confirm" if user["role"] == "unconfirmed" else "/projects", status_code=303)
+    return FileResponse(STATIC / "auth.html")
+
+
+@app.get("/confirm")
+async def confirm_page(request: Request):
+    user = request.state.user
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    if user["role"] != "unconfirmed":
+        return RedirectResponse("/projects", status_code=303)
+    return FileResponse(STATIC / "auth.html")
+
+
+@app.get("/users")
+async def users_page(request: Request):
+    if request.state.user["role"] != "admin":
+        return RedirectResponse("/projects", status_code=303)
+    return FileResponse(STATIC / "users.html")
+
+
+# ---------------------------------------------------------------- accounts
+
+def _with_session(user: dict, token: str | None = None) -> JSONResponse:
+    res = JSONResponse({"user": auth.public(user)})
+    if token:
+        res.set_cookie(auth.COOKIE, token, max_age=config.SESSION_DAYS * 86400, httponly=True, samesite="lax",
+                       secure=config.COOKIE_SECURE, path="/")
+    return res
+
+
+@app.get("/api/auth/options")
+async def auth_options():
+    return {**auth.PROFILE_OPTIONS, "email_enabled": bool(config.SMTP_HOST)}
+
+
+@app.post("/api/auth/register")
+async def register(body: dict):
+    user = await auth.register(body)
+    return _with_session(user, await auth.create_session(user["id"]))
+
+
+@app.post("/api/auth/login")
+async def login(body: dict):
+    user = await auth.login(body.get("email"), body.get("password"))
+    return _with_session(user, await auth.create_session(user["id"]))
+
+
+@app.post("/api/auth/confirm")
+async def confirm_email(request: Request, body: dict):
+    if not request.state.user:
+        raise HTTPException(401, "Log in first.")
+    return _with_session(await auth.confirm(request.state.user, body.get("code")))
+
+
+@app.post("/api/auth/resend")
+async def resend_code(request: Request):
+    user = request.state.user
+    if not user:
+        raise HTTPException(401, "Log in first.")
+    if user["role"] != "unconfirmed":
+        raise HTTPException(400, "Your email is already confirmed.")
+    await auth.send_code(user)
+    return {"ok": True}
+
+
+@app.post("/api/auth/forgot")
+async def forgot_password(body: dict):
+    await auth.request_reset(body.get("email"))
+    return {"ok": True}          # the same answer whether or not the account exists
+
+
+@app.post("/api/auth/reset")
+async def reset_password(body: dict):
+    await auth.reset_password(body.get("email"), body.get("code"), body.get("password"))
+    res = JSONResponse({"ok": True})
+    res.delete_cookie(auth.COOKIE, path="/")
+    return res
+
+
+def _confirmed_user(request: Request) -> dict:
+    """/api/auth/ is public in _check_access, so the routes about your own account check here."""
+    user = request.state.user
+    if not user:
+        raise HTTPException(401, "Log in first.")
+    if user["role"] == "unconfirmed":
+        raise HTTPException(403, "Confirm your email first.")
+    return user
+
+
+@app.patch("/api/auth/me")
+async def update_me(request: Request, body: dict):
+    return {"user": auth.public(await auth.update_profile(_confirmed_user(request), body))}
+
+
+@app.patch("/api/auth/preferences")
+async def update_preferences(request: Request, body: dict):
+    return {"user": auth.public(await auth.set_preferences(_confirmed_user(request), body))}
+
+
+@app.post("/api/auth/password")
+async def change_password(request: Request, body: dict):
+    await auth.change_password(_confirmed_user(request), body.get("current"), body.get("password"), request.cookies.get(auth.COOKIE))
+    return {"ok": True}
+
+
+@app.get("/api/auth/sessions")
+async def other_sessions(request: Request):
+    return {"others": await auth.count_other_sessions(_confirmed_user(request), request.cookies.get(auth.COOKIE))}
+
+
+@app.delete("/api/auth/sessions")
+async def end_other_sessions(request: Request):
+    return {"ended": await auth.end_other_sessions(_confirmed_user(request), request.cookies.get(auth.COOKIE))}
+
+
+@app.post("/api/auth/delete")
+async def delete_account(request: Request, body: dict):
+    """Your account, your private agents and teams, and your projects with their files. It can't be undone."""
+    user = _confirmed_user(request)
+    await auth.check_can_delete(user, body.get("password"))
+    owned = [p.stem for p in META.glob("*.json") if _owner_of_meta_file(p) == str(user["id"])]
+    if any(is_busy(pid) for pid in owned):
+        raise HTTPException(409, "Agents are working on one of your projects. Stop them first.")
+    await auth.delete_user(user)
+    for pid in owned:
+        _remove_project_files(pid)
+    res = JSONResponse({"ok": True})
+    res.delete_cookie(auth.COOKIE, path="/")
+    return res
+
+
+@app.post("/api/auth/logout")
+async def logout(request: Request):
+    await auth.end_session(request.cookies.get(auth.COOKIE))
+    res = JSONResponse({"ok": True})
+    res.delete_cookie(auth.COOKIE, path="/")
+    return res
+
+
+@app.get("/api/auth/me")
+async def me(request: Request):
+    if not request.state.user:
+        raise HTTPException(401, "Log in first.")
+    return {"user": auth.public(request.state.user)}
+
+
+@app.get("/api/users")
+async def users_list(request: Request):
+    require_admin(request)
+    return await auth.list_users()
+
+
+@app.patch("/api/users/{user_id}")
+async def users_set_role(request: Request, user_id: str, body: dict):
+    return await auth.set_role(require_admin(request), user_id, str(body.get("role") or ""))
+
+
 @app.get("/p/{pid}")
 async def project_page(pid: str):
     load_meta(pid)
@@ -488,16 +780,29 @@ async def project_page(pid: str):
 
 
 @app.get("/api/agents")
-async def list_agents(full: bool = False):
-    keys = ("id", "name", "icon", "color", "default", "description", "model", "tools") + (("role", "file") if full else ())
-    return [{**{k: a[k] for k in keys}, "model_ok": model_catalog.allowed(a["model"])} for a in load_agents()]
+async def list_agents(request: Request, full: bool = False, project: str | None = None):
+    """The agents you can see; with `project`, the agents that project runs on (those of its owner)."""
+    who = current_user(request)
+    if who and who["role"] == "unconfirmed":
+        who = None
+    if not who and (full or project):
+        raise HTTPException(401, "Log in first.")
+    if project:
+        meta = load_meta(project)
+        if not can_access(who, meta):
+            raise HTTPException(404, "This project doesn't exist (it may have been deleted).")
+        who = await owner_of(meta)
+    keys = ("id", "name", "icon", "color", "default", "description", "model", "tools", "scope", "editable") + (("role", "file") if full else ())
+    return [{**{k: a[k] for k in keys}, "model_ok": model_catalog.allowed(a["model"])} for a in await load_agents(who)]
 
 
-def _agent_call(fn, *args):
+async def _agent_call(call):
     try:
-        return fn(*args)
+        return await call
     except KeyError:
-        raise HTTPException(404, "Not found — it may have been deleted.")
+        raise HTTPException(404, "Not found. It may have been deleted.")
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -521,7 +826,8 @@ async def get_common():
 
 
 @app.put("/api/agents/common")
-async def put_common(body: dict):
+async def put_common(request: Request, body: dict):
+    require_admin(request)
     text = str(body.get("text", "")).strip()
     if len(text) < 10:
         raise HTTPException(400, "The shared rules are too short.")
@@ -530,44 +836,54 @@ async def put_common(body: dict):
 
 
 @app.post("/api/agents/order")
-async def order_agents(body: dict):
-    _agent_call(team_files.reorder_agents, list(body.get("ids") or []))
-    return await list_agents(full=True)
+async def order_agents(request: Request, body: dict):
+    await _agent_call(team_files.reorder_agents(current_user(request), list(body.get("ids") or [])))
+    return await list_agents(request, full=True)
 
 
 @app.post("/api/agents")
-async def add_agent(body: dict):
-    return _agent_call(team_files.create_agent, body, body.get("position"))
+async def add_agent(request: Request, body: dict):
+    return await _agent_call(team_files.create_agent(current_user(request), body, body.get("position")))
 
 
 @app.get("/api/agents/{agent_id}")
-async def get_agent(agent_id: str):
-    agents = load_agents()
+async def get_agent(request: Request, agent_id: str):
+    user = current_user(request)
+    agents = await load_agents(user)
     i = next((i for i, a in enumerate(agents) if a["id"] == agent_id), None)
     if i is None:
         raise HTTPException(404, f"There's no agent called “{agent_id}”.")
-    stats = next((b for b in (await get_stats())["agents"] if b["agent"] == agent_id), None)
+    stats = next((b for b in (await get_stats(request))["agents"] if b["agent"] == agent_id), None)
     return {**agents[i], "model_ok": model_catalog.allowed(agents[i]["model"]), "position": i + 1, "total": len(agents),
             "prev": agents[i - 1]["id"] if i > 0 else None, "next": agents[i + 1]["id"] if i + 1 < len(agents) else None,
-            "teams": team_files.teams_with(agent_id), "stats": stats}
+            "teams": await team_files.teams_with(user, agent_id), "stats": stats}
 
 
 @app.put("/api/agents/{agent_id}")
-async def edit_agent(agent_id: str, body: dict):
-    return _agent_call(team_files.update_agent, agent_id, body)
+async def edit_agent(request: Request, agent_id: str, body: dict):
+    return await _agent_call(team_files.update_agent(current_user(request), agent_id, body))
 
 
 @app.delete("/api/agents/{agent_id}")
-async def remove_agent(agent_id: str):
-    _agent_call(team_files.delete_agent, agent_id)
+async def remove_agent(request: Request, agent_id: str):
+    await _agent_call(team_files.delete_agent(current_user(request), agent_id))
     return {"ok": True}
 
 
 @app.get("/api/projects")
-async def list_projects(page: int | None = None, per_page: int = 12, q: str = "", sort: str = "updated", status: str = "all"):
+async def list_projects(request: Request, page: int | None = None, per_page: int = 12, q: str = "", sort: str = "updated", status: str = "all", mine: bool = False):
     """Without `page`: every project (newest activity first), as a list.
-    With `page`: one page of results plus totals, after search (`q`), `status` filter and `sort`."""
-    projects = all_projects()
+    With `page`: one page of results plus totals, after search (`q`), `status` filter and `sort`.
+    `mine` leaves out other people's projects, which only admins can see."""
+    user = current_user(request)
+    projects = all_projects(user, len(await default_ids(user)))
+    if mine:
+        projects = [p for p in projects if p["owner"] == str(user["id"])]
+    if user["role"] == "admin":   # admins see everyone's projects, so show whose each one is
+        emails = {str(r["id"]): r["email"] for r in await db.pool.fetch("SELECT id, email FROM users")}
+        for p in projects:
+            p["owner_email"] = emails.get(p["owner"] or "", "")
+    all_prompts = sum(p["prompts"] for p in projects)
     if page is None:
         return projects
 
@@ -594,10 +910,11 @@ async def list_projects(page: int | None = None, per_page: int = 12, q: str = ""
     start = (page - 1) * per_page
     return {"items": projects[start:start + per_page], "page": page, "per_page": per_page,
             "pages": pages, "total": total, "counts": counts,
-            "prompts": sum(p["prompts"] for p in all_projects())}
+            "prompts": all_prompts}
 
 
-def all_projects() -> list[dict]:
+def all_projects(user: dict, default_count: int) -> list[dict]:
+    """The projects `user` can open."""
     projects = []
     for p in META.glob("*.json"):
         try:
@@ -606,11 +923,13 @@ def all_projects() -> list[dict]:
         except (ValueError, KeyError, TypeError):
             log.warning("Skipping damaged project file %s", p)
             continue
+        if not can_access(user, m):
+            continue
         folder = WORK / m["id"]
         files = [f for f in folder.rglob("*") if f.is_file()] if folder.exists() else []
-        projects.append({"id": m["id"], "name": m["name"], "description": m.get("description", ""), "created": m["created"],
+        projects.append({"id": m["id"], "owner": m.get("owner"), "name": m["name"], "description": m.get("description", ""), "created": m["created"],
                          "updated": m["updated"], "busy": is_busy(m["id"]),
-                         "prompts": len(m.get("history", [])), "agents": len(m.get("agents") or default_ids()),
+                         "prompts": len(m.get("history", [])), "agents": len(m.get("agents") or []) or default_count,
                          "files": len(files), "size": sum(f.stat().st_size for f in files),
                          "pages": [p["title"] for p in m.get("pages") or DEFAULT_PAGES],
                          "brief": m.get("brief") or {},
@@ -620,8 +939,10 @@ def all_projects() -> list[dict]:
 
 
 @app.post("/api/projects")
-async def new_project(body: dict):
-    return create_project(**clean_details(body), pages=body.get("pages"), brief=body.get("brief"))
+async def new_project(request: Request, body: dict):
+    user = current_user(request)
+    return create_project(**clean_details(body), pages=body.get("pages"), brief=body.get("brief"),
+                          owner=str(user["id"]), agents=await default_ids(user))
 
 
 # Starting a project from an existing site: only web pages, styles, scripts, Markdown and assets are kept.
@@ -699,7 +1020,7 @@ def _page_title(html: bytes, path: str) -> str:
 
 
 @app.post("/api/projects/import")
-async def import_project(body: dict):
+async def import_project(request: Request, body: dict):
     """Create a project that starts from an existing site (HTML, CSS, JS, Markdown and assets only)."""
     details = clean_details(body)
     brief = clean_brief(body.get("brief"))
@@ -714,7 +1035,8 @@ async def import_project(body: dict):
             title, n = f"{base} {n}"[:40], n + 1
         titles.add(title)
         pages.append({"title": title, "file": p})
-    meta = create_project(**details, brief=brief)
+    user = current_user(request)
+    meta = create_project(**details, brief=brief, owner=str(user["id"]), agents=await default_ids(user))
     folder = WORK / meta["id"]
     try:
         for path, data in files:
@@ -744,7 +1066,8 @@ async def get_project(pid: str):
             events.append(json.loads(line))
         except ValueError:
             log.warning("Skipping a damaged chat line in %s", f)
-    meta.setdefault("agents", default_ids())
+    if not meta.get("agents"):
+        meta["agents"] = await default_ids(await owner_of(meta))
     meta.setdefault("description", "")
     meta.setdefault("pages", list(DEFAULT_PAGES))
     return {**meta, "busy": is_busy(meta["id"]), "events": events, "run": run_summary(meta.get("run"))}
@@ -759,9 +1082,24 @@ async def update_project(pid: str, body: dict):
     if "brief" in body:
         meta["brief"] = clean_brief(body["brief"])
     if isinstance(body.get("agents"), list):
-        meta["agents"] = [a["id"] for a in load_agents() if a["id"] in body["agents"]]
+        meta["agents"] = [a["id"] for a in await project_agents(meta) if a["id"] in body["agents"]]
     save_meta(meta)
     return meta
+
+
+def _remove_project_files(pid: str):
+    shutil.rmtree(WORK / pid, ignore_errors=True)
+    meta_path(pid).unlink(missing_ok=True)
+    events_file(pid).unlink(missing_ok=True)
+    VERS.delete_all(pid)
+    runs.pop(pid, None)
+
+
+def _owner_of_meta_file(path: Path) -> str | None:
+    try:
+        return json.loads(path.read_text()).get("owner")
+    except (OSError, ValueError):
+        return None
 
 
 @app.delete("/api/projects/{pid}")
@@ -769,11 +1107,7 @@ async def delete_project(pid: str):
     meta = load_meta(pid)
     if is_busy(meta["id"]):
         raise HTTPException(409, "Agents are working on this project. Stop them first.")
-    shutil.rmtree(WORK / meta["id"], ignore_errors=True)
-    meta_path(meta["id"]).unlink(missing_ok=True)
-    events_file(meta["id"]).unlink(missing_ok=True)
-    VERS.delete_all(meta["id"])
-    runs.pop(meta["id"], None)
+    _remove_project_files(meta["id"])
     return {"ok": True}
 
 
@@ -822,8 +1156,8 @@ async def download(pid: str):
 # ---------------------------------------------------------------- presets
 
 @app.get("/api/presets")
-async def get_presets():
-    return team_files.load_presets()
+async def get_presets(request: Request):
+    return await team_files.load_presets(current_user(request))
 
 
 # ---------------------------------------------------------------- export & import of agents and teams
@@ -838,34 +1172,36 @@ def _download(name: str, content: bytes, media: str):
 
 
 @app.get("/api/agents/{agent_id}/export")
-async def export_agent(agent_id: str):
+async def export_agent(request: Request, agent_id: str):
     try:
-        name, text = team_files.export_agent(agent_id)
+        name, text = await team_files.export_agent(current_user(request), agent_id)
     except KeyError:
         raise HTTPException(404, f"There's no agent called “{agent_id}”.")
     return _download(name, text.encode(), "text/markdown; charset=utf-8")
 
 
 @app.get("/api/presets/{preset_id}/export")
-async def export_team(preset_id: str):
+async def export_team(request: Request, preset_id: str):
     try:
-        name, bundle = team_files.export_team(preset_id)
+        name, bundle = await team_files.export_team(current_user(request), preset_id)
     except KeyError:
         raise HTTPException(404, "This team doesn't exist (it may have been deleted).")
     return _download(name, json.dumps(bundle, indent=2).encode(), "application/json")
 
 
 @app.get("/api/export")
-async def export_everything():
-    """All agents, the shared rules and your saved teams, as a .zip that /api/import understands."""
+async def export_everything(request: Request):
+    """The agents you can see, the shared rules and your saved teams, as a .zip that /api/import understands."""
     buf = io.BytesIO()
-    agents = load_agents()
+    user = current_user(request)
+    agents = await load_agents(user)
+    teams = await team_files.load_presets(user)
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for a in agents:
             z.writestr(f"agents/{a['file']}", team_files._render(a))
         z.writestr("agents/_common.md", (team_files.COMMON_FILE.read_text() if team_files.COMMON_FILE.exists() else ""))
         z.writestr("agents/_presets.json", json.dumps([{k: p[k] for k in ("name", "description", "agents")}
-                                                       for p in team_files.load_presets() if not p["builtin"]], indent=2))
+                                                       for p in teams if not p["builtin"]], indent=2))
         z.writestr("manifest.json", json.dumps({"format": "agents-atelier-export", "version": 1, "exported": time.time(),
                                                 "agents": len(agents)}, indent=2))
     return _download(f"agents-atelier-{time.strftime('%Y-%m-%d')}.zip", buf.getvalue(), "application/zip")
@@ -926,7 +1262,7 @@ def _import_items(name: str, raw: bytes) -> list[dict]:
 
 
 @app.post("/api/import")
-async def import_bundle(body: dict):
+async def import_bundle(request: Request, body: dict):
     """Body: {name, data (base64), on_conflict: rename|replace|skip, apply: bool}.
     Without apply (or apply=false) it only returns the plan."""
     name = str(body.get("name") or "")
@@ -938,38 +1274,38 @@ async def import_bundle(body: dict):
         raise HTTPException(400, "That file is empty.")
     items = [i for i in _import_items(name, raw) if i["kind"] != "skip"]
     try:
-        plan = team_files.plan_import(items, str(body.get("on_conflict") or "rename"))
+        plan = await team_files.plan_import(current_user(request), items, str(body.get("on_conflict") or "rename"))
     except ValueError as e:
         raise HTTPException(400, str(e))
     if not body.get("apply"):
         return {"applied": 0, "items": [{k: v for k, v in p.items() if k != "data"} for p in plan["items"]], "summary": plan["summary"]}
     if any(p["kind"] == "agent" for p in plan["items"]) and any(is_busy(pid) for pid in list(runs)):
         raise HTTPException(409, "Agents are working in a project. Import when they finish.")
-    return {**team_files.apply_import(plan), "summary": plan["summary"]}
+    return {**await team_files.apply_import(current_user(request), plan), "summary": plan["summary"]}
 
 
 @app.get("/api/presets/{preset_id}")
-async def get_preset(preset_id: str):
+async def get_preset(request: Request, preset_id: str):
     try:
-        return team_files.get_preset(preset_id)
+        return await team_files.get_preset(current_user(request), preset_id)
     except KeyError:
         raise HTTPException(404, "This team doesn't exist (it may have been deleted).")
 
 
 @app.post("/api/presets")
-async def add_preset(body: dict):
-    return _agent_call(team_files.save_preset, body.get("name", ""), list(body.get("agents") or []),
-                       str(body.get("description") or ""))
+async def add_preset(request: Request, body: dict):
+    return await _agent_call(team_files.save_preset(current_user(request), body.get("name", ""), list(body.get("agents") or []),
+                                                    str(body.get("description") or ""), body.get("scope")))
 
 
 @app.put("/api/presets/{preset_id}")
-async def edit_preset(preset_id: str, body: dict):
-    return _agent_call(team_files.update_preset, preset_id, body)
+async def edit_preset(request: Request, preset_id: str, body: dict):
+    return await _agent_call(team_files.update_preset(current_user(request), preset_id, body))
 
 
 @app.delete("/api/presets/{preset_id}")
-async def remove_preset(preset_id: str):
-    _agent_call(team_files.delete_preset, preset_id)
+async def remove_preset(request: Request, preset_id: str):
+    await _agent_call(team_files.delete_preset(current_user(request), preset_id))
     return {"ok": True}
 
 
@@ -1165,19 +1501,25 @@ def record_stat(pid: str, entry: dict):
 
 
 @app.get("/api/stats")
-async def get_stats(project: str | None = None, page: int | None = None, per_page: int = 10):
+async def get_stats(request: Request, project: str | None = None, page: int | None = None, per_page: int = 10, mine: bool = False):
+    user = current_user(request)
     if project:
         metas = [load_meta(project)]
+        if not can_access(user, metas[0]):
+            raise HTTPException(404, "This project doesn't exist (it may have been deleted).")
     else:
         metas = []
         for p in META.glob("*.json"):
             try:
-                metas.append(json.loads(p.read_text()))
+                m = json.loads(p.read_text())
+                if can_access(user, m) and (not mine or m.get("owner") == str(user["id"])):
+                    metas.append(m)
             except ValueError:
                 log.warning("Skipping damaged project file %s", p)
     entries = [dict(e, project=m["id"], project_name=m["name"]) for m in metas for e in m.get("stats", [])]
     entries.sort(key=lambda e: e["ts"])
-    names = {a["id"]: a for a in load_agents()}
+    visible = await load_agents(user)
+    names = {a["id"]: a for a in visible}
     names.setdefault("orchestrator", {"name": "Orchestrator", "icon": "cpu", "color": "#475569"})
     by_agent = {}
     for e in entries:
@@ -1193,7 +1535,7 @@ async def get_stats(project: str | None = None, page: int | None = None, per_pag
         b["tokens_out"] += e.get("tokens_out") or 0
         if e.get("model"):
             b["models"].add(e["model"])
-    order = [a["id"] for a in load_agents()]
+    order = [a["id"] for a in visible]
     agents = sorted(by_agent.values(), key=lambda b: order.index(b["agent"]) if b["agent"] in order else 99)
     for b in agents:
         b["models"] = sorted(b["models"])
@@ -1205,7 +1547,9 @@ async def get_stats(project: str | None = None, page: int | None = None, per_pag
               "tokens_out": sum(e.get("tokens_out") or 0 for e in entries),
               "failed": sum(e["status"] != "done" for e in entries)}
     if page is None:
-        return {"totals": totals, "agents": agents, "recent": entries[-30:][::-1]}
+        month_ago = time.time() - 30 * 86400        # the dashboard groups these into days in the viewer's time zone
+        return {"totals": totals, "agents": agents, "recent": entries[-30:][::-1],
+                "run_times": [e["ts"] for e in entries if e["ts"] >= month_ago]}
     recent = page_of(entries[::-1], page, per_page)   # every run, newest first, one page at a time
     return {"totals": totals, "agents": agents, "recent": recent.pop("items"), "recent_pager": recent}
 
@@ -1281,12 +1625,45 @@ def site_pages(meta: dict) -> str:
         return (f"This project started from an existing site that the user imported. Its pages:\n{lines}\n"
                 "Read the existing files before you change anything. Keep the site's file names, folder structure, "
                 "stylesheets and scripts, and its look, unless the request asks to change them.")
+    room = MAX_PAGES - len(pages)
+    grow = (f"\nMore pages may be added (up to {room} more) when the user's request, <project_brief> or ## Structure in "
+            "plan.md asks for them: top-level files with short lowercase-dash names (about.html, menu.html), never in "
+            "folders. The server adds every new page to this list after your step." if room > 0 else "")
     if len(pages) == 1:
-        return "A single page: index.html."
+        return "Currently a single page: index.html." + grow
     lines = "\n".join(f"- {p['file']} — {clean_text(p['title'], 40)}" for p in pages)
     return (f"A site with {len(pages)} pages (the first is the home page):\n{lines}\n"
             "All pages share style.css and script.js, the same header with a navigation linking every page "
-            "(the current page marked with aria-current=\"page\"), and the same footer.")
+            "(the current page marked with aria-current=\"page\"), and the same footer." + grow)
+
+
+PAGE_FILE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}\.html$")
+
+
+def sync_pages(pid: str) -> list[dict] | None:
+    """Add the top-level pages the agents created to the project's page list. Returns the new list, or None."""
+    meta = load_meta(pid)
+    pages = list(meta.get("pages") or DEFAULT_PAGES)
+    known = {p["file"] for p in pages}
+    titles = {p["title"] for p in pages}
+    added = False
+    for f in sorted((WORK / pid).glob("*.html")):
+        if len(pages) >= MAX_PAGES:
+            break
+        if f.name in known or not PAGE_FILE.match(f.name) or not f.is_file():
+            continue
+        title, n = _page_title(f.read_bytes(), f.name), 2
+        base = title
+        while title in titles:
+            title, n = f"{base} {n}"[:40], n + 1
+        titles.add(title)
+        pages.append({"title": title, "file": f.name})
+        added = True
+    if not added:
+        return None
+    meta["pages"] = pages
+    save_meta(meta)
+    return pages
 
 
 def build_prompt(meta: dict, request: str, notes: list[str], images=(), extra: str = "") -> str:
@@ -1380,6 +1757,7 @@ async def run_agent(pid: str, agent: dict, common: str, request: str, notes: lis
     folder = WORK / pid
     prompt = build_prompt(meta, request, notes, images, extra)
     web = agent.get("tools") == "web"
+    language = await language_rule(meta)
     tools = ["Read", "Write", "Edit", "Glob", "Grep"] + (["WebSearch", "WebFetch"] if web else [])
     cmd = [
         CLAUDE, "-p", prompt,
@@ -1395,7 +1773,7 @@ async def run_agent(pid: str, agent: dict, common: str, request: str, notes: lis
         # in it), and this flag moves per-machine parts (cwd, env, git status) out of it, so its cache is reused
         # across projects. The server's rules stay last so they override everything before them.
         "--exclude-dynamic-system-prompt-sections",
-        "--append-system-prompt", common + "\n\n" + agent["role"] + "\n\n" + SECURITY_RULES + ("\n\n" + WEB_RULES if web else ""),
+        "--append-system-prompt", language + common + "\n\n" + agent["role"] + "\n\n" + SECURITY_RULES + ("\n\n" + WEB_RULES if web else ""),
     ]
     model = agent.get("model") or MODEL
     if agent.get("model") and not model_catalog.allowed(agent["model"]):
@@ -1466,7 +1844,7 @@ def explain_failure(text: str) -> str:
     if "usage limit" in low or "rate limit" in low or "429" in low or "overloaded" in low:
         return "Claude is rate-limited or overloaded right now. Wait a little, then press Continue."
     if "unrecognized_model" in low or ("model" in low and ("not found" in low or "invalid" in low or "not available" in low)):
-        return f"The model for this agent isn't available: {text.strip()[-200:]} — change it on the Agents page."
+        return f"The model for this agent isn't available: {text.strip()[-200:]}. Change it on the Agents page."
     return text.strip()[-500:] or "The agent stopped unexpectedly."
 
 
@@ -1582,7 +1960,7 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
     and give the rest the notes those agents left. `plan` is the Orchestrator's decision (reason and notes per agent)."""
     st = live(pid)
     meta = load_meta(pid)
-    team = [a for a in load_agents() if a["id"] in agent_ids]  # snapshot of agents/ at run start
+    team = [a for a in await project_agents(meta) if a["id"] in agent_ids]  # snapshot of the owner's agents at run start
     common = load_common()
     prev = meta.get("run") or {}
     done = [i for i in prev.get("done", []) if i in agent_ids] if resume else []
@@ -1628,6 +2006,9 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
             await broadcast(pid, {"type": "agent_done", "agent": agent["id"], "text": summary,
                                   "stat": last_stat(pid), "version": v["n"] if v else None})
             await report_scan(pid, agent, seen_findings)
+            new_pages = safely("Pages", sync_pages, pid)
+            if new_pages:
+                await broadcast(pid, {"type": "pages", "pages": new_pages})
             if items:
                 # Send the work back: those agents (and the Critic after them) run again, in team order.
                 review_round += 1
@@ -1668,7 +2049,7 @@ async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict)
            "--tools", "Read,Glob,Grep", "--allowedTools", "Read", "Glob", "Grep",
            "--disallowedTools", "Write", "Edit", "Bash", "WebFetch", "WebSearch", "Task",
            "--max-turns", "8", "--exclude-dynamic-system-prompt-sections",
-           "--append-system-prompt", role + "\n\n" + SECURITY_RULES]
+           "--append-system-prompt", await language_rule(meta) + role + "\n\n" + SECURITY_RULES]
     if model:
         cmd += ["--model", model]
     folder.mkdir(parents=True, exist_ok=True)
@@ -1730,7 +2111,7 @@ async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict)
 async def run_prompt(pid: str, request: str, pool: list[str], images: list[str]):
     """A new prompt: decide who works (Orchestrator), then run them. The Brief agent always runs when anyone does."""
     meta = load_meta(pid)
-    agents = load_agents()
+    agents = await project_agents(meta)
     order = [a["id"] for a in agents]
     if orch.is_fresh(meta, WORK / pid):
         everyone = [i for i in order if i in set(pool) | {orch.BRIEF}]
@@ -1768,7 +2149,7 @@ async def report_scan(pid: str, agent: dict, seen: set):
     if new:
         await broadcast(pid, {"type": "security", "agent": agent["id"],
                               "text": f"After the {agent['name']} agent, the page contains things the agents' rules forbid. "
-                                      "Check them — they can be a sign of a prompt injection.", "items": new[:8]})
+                                      "Check them: they can be a sign of a prompt injection.", "items": new[:8]})
 
 
 def last_stat(pid: str) -> dict:
@@ -1824,6 +2205,22 @@ async def ws_endpoint(ws: WebSocket, pid: str):
     if not _host_ok(ws.headers.get("host", "")) or not _origin_ok(ws.headers.get("host", ""), ws.headers.get("origin")):
         await ws.close(code=4403)
         return
+    token = ws.cookies.get(auth.COOKIE)
+
+    async def allowed() -> bool:
+        user = await auth.user_for_token(token)     # checked again on every message: logout and role changes apply at once
+        try:
+            return bool(user) and user["role"] != "unconfirmed" and can_access(user, load_meta(pid))
+        except HTTPException:                       # the project was deleted meanwhile
+            return False
+
+    user = await auth.user_for_token(token)
+    if not user or user["role"] == "unconfirmed":
+        await ws.close(code=4401)
+        return
+    if not can_access(user, load_meta(pid)):
+        await ws.close(code=4404)                   # the same answer as a project that doesn't exist
+        return
     st = live(pid)
     st["clients"].add(ws)
     await ws.send_json({"type": "hello", "busy": is_busy(pid)})
@@ -1839,6 +2236,10 @@ async def ws_endpoint(ws: WebSocket, pid: str):
             if not isinstance(msg, dict):
                 await ws.send_json({"type": "error", "text": "The server couldn't read that message."})
                 continue
+            if not await allowed():
+                st["clients"].discard(ws)
+                await ws.close(code=4401)
+                return
             try:
                 await handle_ws_message(ws, pid, st, msg)
             except HTTPException as e:
@@ -1876,8 +2277,9 @@ async def handle_ws_message(ws: WebSocket, pid: str, st: dict, msg: dict):
                                 "text": "Give this project a name and a description before the agents start."})
             return
         text = msg["text"].strip()
-        valid = {a["id"] for a in load_agents()}
-        agent_ids = [i for i in msg.get("agents") or [] if i in valid] or default_ids()
+        owner = await owner_of(details)
+        valid = {a["id"] for a in await load_agents(owner)}
+        agent_ids = [i for i in msg.get("agents") or [] if i in valid] or await default_ids(owner)
         images = [i for i in (msg.get("images") or [])[:6]
                   if isinstance(i, str) and i.startswith("uploads/") and (WORK / pid / i).is_file()
                   and (WORK / pid).resolve() in (WORK / pid / i).resolve().parents]
@@ -1904,7 +2306,7 @@ async def handle_ws_message(ws: WebSocket, pid: str, st: dict, msg: dict):
             await ws.send_json({"type": "needs_details",
                                 "text": "Give this project a name and a description before the agents start."})
             return
-        valid = {a["id"] for a in load_agents()}
+        valid = {a["id"] for a in await project_agents(details)}
         agent_ids = [i for i in run.get("agents", []) if i in valid]
         if not agent_ids:
             await ws.send_json({"type": "error", "text": "None of this run's agents exist any more."})
@@ -1918,10 +2320,10 @@ async def handle_ws_message(ws: WebSocket, pid: str, st: dict, msg: dict):
             await ws.send_json({"type": "error", "text": "Agents are already working."})
             return
         details = load_meta(pid)
-        agent = next((a for a in load_agents() if a["id"] == msg.get("agent")), None)
+        agent = next((a for a in await project_agents(details) if a["id"] == msg.get("agent")), None)
         request = (details.get("run") or {}).get("request") or (details.get("history") or [None])[-1]
         if not agent or not request:
-            await ws.send_json({"type": "error", "text": "Nothing to retry yet — send a prompt first."})
+            await ws.send_json({"type": "error", "text": "Nothing to retry yet. Send a prompt first."})
             return
         note = " ".join(str(msg.get("note") or "").split())[:500]
         st["task"] = asyncio.create_task(run_retry(pid, agent, request, note))

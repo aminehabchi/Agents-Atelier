@@ -16,8 +16,8 @@ HTML, CSS and JavaScript files that are yours.
 > payments or APIs. Forms, logins and data in the result are front-end mock-ups; connect them to a real back end
 > yourself if you need one.
 
-Every agent is your own **Claude Code** running with a different role, so there's no API key and no account to
-create. Everything runs on your machine.
+Every agent is your own **Claude Code** running with a different role, so there's no API key. People log in with an
+email and a password, and everything runs on your machine, with accounts, agents and teams in a local Postgres.
 
 ![The Agents Atelier studio: chat with the agents on the left, live preview of the page being built on the right, and the agent team below](docs/screenshots/studio.png)
 
@@ -137,6 +137,7 @@ browse the web or start other agents.
 ### Requirements
 
 - **Python 3.10+**
+- **Docker** (for Postgres), or any Postgres 14+ you point `DATABASE_URL` at
 - **[Claude Code](https://claude.com/claude-code)**, installed and logged in: running `claude` in a terminal should work.
 - A modern browser (Chrome, Firefox, Safari, Edge).
 
@@ -148,8 +149,35 @@ browse the web or start other agents.
 
 Then open **<http://localhost:8001>**.
 
-The first start creates a Python virtual environment in `.venv/` and installs FastAPI and Uvicorn. After that it
-starts in a second. Stop the server with `Ctrl+C`.
+The first start creates a Python virtual environment in `.venv/`, installs FastAPI, Uvicorn and asyncpg, and starts
+Postgres with Docker (`database/docker-compose.yaml`). After that it starts in a second. Stop the server with `Ctrl+C`;
+Postgres keeps running until you run `docker compose -f database/docker-compose.yaml down`.
+
+### Accounts
+
+1. In `.env`, set `ADMIN_EMAIL` to your email, then start the server.
+2. Open **/register** and create your account with that email. Sign-up asks for a full name; company, what best describes
+   you, what you'll build sites for and how you heard about the app are optional. Admins see the answers on **/users**.
+3. Enter the 6-digit code from the email. **Without `SMTP_HOST` no email is sent: the code is in the server log.**
+4. You're the admin. Projects from before accounts existed have no owner, so only admins see them.
+
+| Role          | Can do                                                                                                   |
+|---------------|----------------------------------------------------------------------------------------------------------|
+| Not confirmed | Only enter the code from the email (or ask for a new one) and log out                                    |
+| User          | Their own projects; sees the shared agents and teams, duplicates them, and creates, edits and deletes their own |
+| Admin         | Everything a user can, plus: changes the shared agents, teams and rules, opens every project, manages users on **/users** |
+
+A user's agents and teams are private to them. Their run order is their own too; an admin's order is the shared order.
+
+The account menu (your name, top right) and **/profile** set the language (English or French) and the theme. Both are saved
+on the account. With French chosen, the interface and emails are in French and the agents write their chat messages in French;
+the generated site keeps following the brief. Translations are in `server/static/i18n-fr.js`, keyed by the English text.
+
+**Forgot your password?** on the login page emails a 6-digit reset code. **/profile** (the initials button, top right) changes
+your details and password, logs out other devices, and deletes the account along with its private agents, teams and projects.
+
+To send real email, set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` and `SMTP_SECURITY` in
+`.env` (see `.env.example`).
 
 ### Settings
 
@@ -209,7 +237,8 @@ Relative folder paths start at the project root. Restart the server after changi
 | Studio   | `/p/<id>`   | One project: chat, live preview, code editor, team (opened from a project)    |
 | Agents   | `/agents`   | List and reorder agents; `/agents/<id>` to view one, `/agents/new` to create, `/agents/<id>/edit`, `/agents/rules` |
 | Teams    | `/teams`    | List teams; `/teams/<id>` to view one, `/teams/new` to create, `/teams/<id>/edit` |
-| Guide    | `/guide`    | A full tour, tips for prompts, shortcuts and an FAQ                           |
+| Dashboard | `/`        | Once logged in: your projects, runs, cost and time, and recent work           |
+| Guide    | `/guide`    | After logging in: a full tour, tips for prompts, shortcuts and an FAQ         |
 
 ### Inside the studio
 
@@ -298,7 +327,12 @@ In the studio, choose a team from the Team panel, or save your current selection
 
 ## Customising the agents
 
-Every agent is a Markdown file in `agents/`: a short header, then its instructions.
+Agents are stored in Postgres and edited on the **Agents** page. The files in `agents/` fill the shared agents the
+first time the server starts; after that, editing a file changes nothing until an admin copies the files over the
+shared agents with `.venv/bin/python server/manage.py sync-agents`. `agents/_common.md` (the shared rules) and
+`agents/_orchestrator.md` stay files and apply on the next run.
+
+The format, used by those files and by export and import, is a short header, then the instructions.
 
 ```markdown
 ---
@@ -410,8 +444,9 @@ The app does, but the agents need Claude Code to reach Claude.
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-The suite (`tests/test_server.py`, about 40 tests in roughly 15 seconds) starts its own server on a free port, with a
-temporary copy of `agents/` and an empty `work/` folder, so your data is never touched. It uses a **fake Claude CLI**
+The suite (`tests/test_server.py`, about 90 tests in roughly 20 seconds) needs Postgres running
+(`docker compose -f database/docker-compose.yaml up -d`, or set `TEST_DATABASE_URL`). It starts its own server on a free
+port, with a throwaway database, a temporary copy of `agents/` and an empty `work/` folder, so your data is never touched. It uses a **fake Claude CLI**
 (`tests/fake-claude`), so no model is called and nothing is spent. It covers:
 - every page and API error path
 - request guards (foreign Host, cross-site writes, body size)
@@ -446,7 +481,8 @@ Set `KEEP_TEST_FILES=1` to keep the temporary folder for inspection.
 ├── run.sh           start the server
 ├── .env.example     every setting, documented (copy it to .env)
 ├── docs/            screenshots used in this README
-├── agents/          the agent team: one Markdown file per agent, shared rules, saved presets
+├── agents/          first fill of the shared agents, plus the shared rules and the Orchestrator's instructions
+├── database/        docker-compose.yaml for Postgres (accounts, agents, teams)
 ├── server/          the Python server (FastAPI) and the web pages
 ├── tests/           automated tests and a fake Claude CLI
 └── work/            your projects, chat history and versions (created at first run, not in git)

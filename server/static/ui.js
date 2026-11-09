@@ -1,7 +1,7 @@
 /* ---------- theme: light · dark · system (applied before the page paints) ---------- */
 (function () {
   const media = window.matchMedia("(prefers-color-scheme: dark)");
-  const pref = () => { try { return localStorage.getItem("theme") || "system"; } catch { return "system"; } };
+  const pref = () => { try { return localStorage.getItem("theme") || "dark"; } catch { return "dark"; } };
   const apply = () => {
     const p = pref();
     document.documentElement.dataset.theme = p === "system" ? (media.matches ? "dark" : "light") : p;
@@ -9,9 +9,9 @@
     document.querySelectorAll("[data-theme-btn]").forEach(b => { b.innerHTML = icon(themeIcon(), { size: 17 }); b.title = themeTitle(); });
   };
   const themeIcon = () => ({ light: "sun", dark: "moon", system: "monitor" })[pref()];
-  const themeTitle = () => `Theme: ${pref()} — click to change`;
+  const themeTitle = () => `Theme: ${pref()}. Click to change`;
   window.getTheme = pref;
-  window.setTheme = (p) => { try { localStorage.setItem("theme", p); } catch {} apply(); };
+  window.setTheme = (p, save = true) => { try { localStorage.setItem("theme", p); } catch {} apply(); if (save) window.savePreferences?.({ theme: p }); };
   window.cycleTheme = () => { const order = ["system", "light", "dark"]; setTheme(order[(order.indexOf(pref()) + 1) % 3]); toast(`Theme: ${pref()}`); };
   window.themeIcon = themeIcon; window.themeTitle = themeTitle;
   media.addEventListener?.("change", () => pref() === "system" && apply());
@@ -27,6 +27,34 @@ class ApiError extends Error {
   constructor(message, status = 0) { super(message); this.name = "ApiError"; this.status = status; }
 }
 window.ApiError = ApiError;
+
+/* The logged-in user ({ id, email, name, role, confirmed, … }), or null. Asked once per page. */
+let mePromise = null;
+/* <html data-auth="guest|unconfirmed|member">: elements with data-show="…" appear only for those visitors (base.css).
+   The last known state is remembered so a logged-in page doesn't flash the guest header. It only changes what is
+   shown: the server checks every request. */
+const authStateOf = (user) => !user ? "guest" : user.confirmed ? "member" : "unconfirmed";
+const authState = () => document.documentElement.dataset.auth;
+try { document.documentElement.dataset.auth = localStorage.getItem("atelier-auth") || "guest"; }
+catch { document.documentElement.dataset.auth = "guest"; }
+function rememberAuth(user) {
+  document.documentElement.dataset.auth = authStateOf(user);
+  try { localStorage.setItem("atelier-auth", authStateOf(user)); } catch {}
+  if (user?.confirmed) {       // the account's choices follow you to any device
+    if (user.theme && user.theme !== getTheme()) setTheme(user.theme, false);
+    if (user.language && user.language !== getLang()) setLang(user.language);
+    else if (!user.language) savePreferences({ language: getLang() });
+  }
+  return user;
+}
+/* Saves language or theme on the account. Without a confirmed account they only stay in this browser. */
+window.savePreferences = (prefs) => {
+  if (document.documentElement.dataset.auth !== "member") return Promise.resolve();
+  return fetch("/api/auth/preferences", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(prefs) }).catch(() => {});
+};
+window.getMe = () => mePromise ||= fetch("/api/auth/me").then(r => r.ok ? r.json() : { user: null }).then(d => rememberAuth(d.user)).catch(() => null);
+const initialsOf = (user) => (user.name || user.email).trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+const PUBLIC_PAGES = ["/", "/login", "/register", "/forgot", "/confirm"];
 
 /* fetch JSON from the server. Always throws an ApiError with a readable message:
    server down, timeout, HTML error page, validation errors… */
@@ -46,6 +74,11 @@ window.api = async (path, opts = {}) => {
   let data = null;
   try { data = text ? JSON.parse(text) : {}; } catch { data = null; }
   if (!res.ok) {
+    // Private pages go to the right account page; public pages and the account forms show the message instead.
+    if (!PUBLIC_PAGES.includes(location.pathname) && !path.startsWith("/api/auth/")) {
+      if (res.status === 401) location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
+      if (res.status === 403 && data?.detail === "Confirm your email first.") location.href = "/confirm";
+    }
     let msg = data?.detail;
     if (Array.isArray(msg)) msg = msg.map(d => d.msg || JSON.stringify(d)).join("; ");
     else if (msg && typeof msg !== "string") msg = JSON.stringify(msg);
@@ -106,6 +139,70 @@ window.toast = (text, kind = "") => {
   setTimeout(() => el.remove(), 2600);
 };
 
+/* The account button in the header: your initials and first name, opening a menu with your pages,
+   appearance, language and Log out. Esc, a click elsewhere or leaving the menu closes it. */
+window.accountButton = (user, { compact = false } = {}) => {
+  const ROLE = { admin: "Admin", user: "User", unconfirmed: "Not confirmed" };
+  const box = document.createElement("div");
+  box.className = "acct";
+  const item = (href, ic, text) => `<a role="menuitem" href="${href}">${icon(ic, { size: 15 })}<span>${text}</span></a>`;
+  const seg = (attr, label, current, items) => `<div class="acct-row"><span>${label}</span><div class="seg" role="radiogroup" aria-label="${label}">${items.map(([k, text, ic]) =>
+    `<button type="button" role="radio" data-${attr}="${k}" aria-checked="${current === k}" class="${current === k ? "on" : ""}" title="${text}" aria-label="${text}" ${ic ? "" : "data-no-i18n"}>${ic ? icon(ic, { size: 14 }) : text}</button>`).join("")}</div></div>`;
+  box.innerHTML = `
+    <button class="acct-btn ${compact ? "compact" : ""}" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Account: ${esc(user.email)}" title="${esc(user.name || user.email)}">
+      <span class="acct-initials">${esc(initialsOf(user))}</span>
+      ${compact ? "" : `<span class="acct-name" data-no-i18n>${esc((user.name || user.email).split(/[\s@]/)[0])}</span>`}
+      ${compact ? "" : icon("chevron-down", { size: 14 })}
+    </button>
+    <div class="acct-menu" role="menu" hidden>
+      <div class="acct-head"><b data-no-i18n>${esc(user.name || user.email)}</b>${user.name ? `<small data-no-i18n>${esc(user.email)}</small>` : ""}<span class="badge">${esc(ROLE[user.role] || user.role)}</span></div>
+      <div class="acct-links">
+        ${user.confirmed ? item("/profile", "user", "Profile") + item("/guide", "book", "Guide") : item("/confirm", "check", "Confirm your email")}
+        ${user.role === "admin" ? item("/users", "users", "Users") : ""}
+      </div>
+      ${user.confirmed ? `<div class="acct-prefs">
+        ${seg("menu-theme", "Appearance", getTheme(), [["system", "System", "monitor"], ["light", "Light", "sun"], ["dark", "Dark", "moon"]])}
+        ${seg("menu-lang", "Language", getLang(), [["en", "EN"], ["fr", "FR"]])}
+      </div>` : ""}
+      <div class="acct-links"><button type="button" role="menuitem" data-out>${icon("log-out", { size: 15 })}<span>Log out</span></button></div>
+    </div>`;
+  const btn = box.querySelector(".acct-btn"), menu = box.querySelector(".acct-menu");
+  const close = (focus) => { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); if (focus) btn.focus(); };
+  const open = () => { menu.hidden = false; btn.setAttribute("aria-expanded", "true"); menu.querySelector("a, button")?.focus(); };
+  btn.onclick = () => (menu.hidden ? open() : close(true));
+  document.addEventListener("click", (e) => { if (!box.contains(e.target)) close(); });
+  box.addEventListener("focusout", (e) => { if (e.relatedTarget && !box.contains(e.relatedTarget)) close(); });
+  box.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !menu.hidden) { e.stopPropagation(); close(true); }
+    if (!["ArrowDown", "ArrowUp"].includes(e.key) || menu.hidden) return;
+    e.preventDefault();
+    const all = [...menu.querySelectorAll("a, .acct-links button")], i = all.indexOf(document.activeElement);
+    all[(i + (e.key === "ArrowDown" ? 1 : -1) + all.length) % all.length]?.focus();
+  });
+  menu.addEventListener("click", async (e) => {
+    const theme = e.target.closest("[data-menu-theme]"), lang = e.target.closest("[data-menu-lang]");
+    if (theme) {
+      setTheme(theme.dataset.menuTheme);
+      menu.querySelectorAll("[data-menu-theme]").forEach(x => { x.classList.toggle("on", x === theme); x.setAttribute("aria-checked", x === theme); });
+    }
+    if (lang && lang.dataset.menuLang !== getLang()) { await savePreferences({ language: lang.dataset.menuLang }); setLang(lang.dataset.menuLang); }
+    if (e.target.closest("[data-out]")) {
+      try { await api("/api/auth/logout", { method: "POST" }); location.href = "/"; }
+      catch (err) { toast(err.message, "err"); }
+    }
+  });
+  return box;
+};
+window.updateAccountButton = (user) => {
+  const box = document.querySelector(".acct");
+  if (!box) return;
+  box.querySelector(".acct-initials").textContent = initialsOf(user);
+  const name = box.querySelector(".acct-name");
+  if (name) name.textContent = (user.name || user.email).split(/[\s@]/)[0];
+  box.querySelector(".acct-head b").textContent = user.name || user.email;
+  box.querySelector(".acct-btn").title = user.name || user.email;
+};
+
 /* Promise<boolean>. A styled replacement for window.confirm(). */
 window.confirmDialog = ({ title, text, ok = "Confirm", danger = false }) => new Promise((resolve) => {
   const d = document.createElement("dialog");
@@ -149,19 +246,19 @@ const BRIEF_QUESTIONS = [
 ];
 const briefField = (q, value = "") => q.type === "select"
   ? `<label class="pfield"><span>${esc(q.label)}</span><select class="input" name="b_${q.key}">
-      <option value="">Let the team decide</option>${q.options.map(o => `<option ${o === value ? "selected" : ""}>${esc(o)}</option>`).join("")}
+      <option value="">Let the team decide</option>${q.options.map(o => `<option value="${esc(o)}" ${o === value ? "selected" : ""}>${esc(o)}</option>`).join("")}
       ${value && !q.options.includes(value) ? `<option selected>${esc(value)}</option>` : ""}</select></label>`
   : q.type === "textarea"
     ? `<label class="pfield wide"><span>${esc(q.label)}</span><textarea class="input" name="b_${q.key}" maxlength="${q.max}" rows="3" placeholder="${esc(q.placeholder)}">${esc(value)}</textarea></label>`
     : `<label class="pfield"><span>${esc(q.label)}</span><input class="input" name="b_${q.key}" maxlength="${q.max}" placeholder="${esc(q.placeholder)}" value="${esc(value)}"></label>`;
-window.projectDialog = ({ title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true, allowImport = false, brief = {}, askAssets = false } = {}) =>
-  new Promise((resolve) => {
-    const d = document.createElement("dialog");
-    d.className = "modal project-modal";
+/* The project form, in a dialog (edit details) or on a page (/projects/new). `d` is the element to fill; onSubmit gets the
+   checked answers. Returns the images chosen so far, so the caller can release their previews. */
+window.fillProjectForm = (d, { title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true, allowImport = false, brief = {}, askAssets = false, cancelHref = "", heading = true } = {}, onSubmit) => {
     d.innerHTML = `
       <form method="dialog" novalidate>
-        <h3>${esc(title)}</h3>
-        <p>${esc(note || "Every project has a name and a short description. The agents read both, so be specific.")}</p>
+        ${heading ? `<h3>${esc(title)}</h3>
+        <p>${esc(note || "Every project has a name and a short description. The agents read both, so be specific.")}</p>` : ""}
+        <div class="pf-main">
         <label class="pfield"><span>Name</span>
           <input class="input" name="name" maxlength="80" required placeholder="e.g. Bean There coffee shop" value="${esc(name)}">
           <small class="err" data-for="name"></small></label>
@@ -169,23 +266,21 @@ window.projectDialog = ({ title = "New project", ok = "Create project", name = "
           <textarea class="input" name="description" maxlength="300" rows="3" required
             placeholder="e.g. A cozy neighbourhood café in Lyon. One page with the menu, opening hours and a booking button.">${esc(description)}</textarea>
           <small class="err" data-for="description"></small></label>
-        ${allowImport ? `<div class="pfield"><span>Start from</span>
-          <div class="src-pick" role="radiogroup" aria-label="Start from">
-            <button type="button" role="radio" aria-checked="true" data-src="blank">${icon("file-plus", { size: 14 })}A blank site</button>
-            <button type="button" role="radio" aria-checked="false" data-src="files">${icon("folder", { size: 14 })}Existing files</button>
-          </div></div>
-        <div class="pfield" data-import hidden><span>Your site <em>HTML, CSS, JS, Markdown and assets</em></span>
-          <div class="src-files">
-            <button type="button" class="btn btn-ghost btn-sm" data-choose="folder">${icon("folder", { size: 14 })}Choose folder…</button>
-            <button type="button" class="btn btn-ghost btn-sm" data-choose="zip">${icon("download", { size: 14 })}Choose .zip…</button>
-            <input type="file" data-folder webkitdirectory multiple hidden>
-            <input type="file" data-zip accept=".zip,application/zip" hidden>
-          </div>
-          <small class="src-summary" data-summary>Needs an index.html at the top. Other files (server code, configs, .git…) are left out.</small>
-          <small class="err" data-for="source"></small></div>` : ""}
         <label class="pfield" data-pages><span>Pages <em>one per line · the first is the home page</em></span>
           <textarea class="input" name="pages" rows="3" placeholder="Home&#10;About&#10;Contact">${esc((pages || ["Home"]).join("\n"))}</textarea>
           <small class="err" data-for="pages"></small></label>
+        ${allowImport ? `<div class="pfield" data-import><span>Existing site <em>optional · HTML, CSS, JS, Markdown and assets</em></span>
+          <div class="src-files">
+            <button type="button" class="btn btn-ghost btn-sm" data-choose="folder">${icon("folder", { size: 14 })}Choose folder…</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-choose="zip">${icon("download", { size: 14 })}Choose .zip…</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-clear-source hidden>${icon("x", { size: 14 })}Remove</button>
+            <input type="file" data-folder webkitdirectory multiple hidden>
+            <input type="file" data-zip accept=".zip,application/zip" hidden>
+          </div>
+          <small class="src-summary" data-summary>Leave empty to start from a blank site. Needs an index.html at the top; other files (server code, configs, .git…) are left out.</small>
+          <small class="err" data-for="source"></small></div>` : ""}
+        </div>
+        <div class="pf-more">
         <fieldset class="pgroup"><legend>About your site <em>optional · the more you say, the closer the first build</em></legend>
           <div class="pgrid">${BRIEF_QUESTIONS.map(q => briefField(q, (brief || {})[q.key] || "")).join("")}</div>
         </fieldset>
@@ -201,12 +296,12 @@ window.projectDialog = ({ title = "New project", ok = "Create project", name = "
           <ul class="asset-list" data-assets></ul>
           <small class="err asset-err" data-for="assets"></small>
         </fieldset>` : ""}
+        </div>
         <div class="row">
-          ${cancellable ? `<button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>` : ""}
+          ${cancelHref ? `<a class="btn btn-ghost" href="${esc(cancelHref)}">Cancel</a>` : cancellable ? `<button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>` : ""}
           <button class="btn btn-dark" value="ok">${esc(ok)}</button>
         </div>
       </form>`;
-    document.body.append(d);
     const form = d.querySelector("form"), f = form.elements;
     const count = () => d.querySelector("[data-count]").textContent = `${f.description.value.length}/300`;
     count(); f.description.addEventListener("input", count);
@@ -227,13 +322,6 @@ window.projectDialog = ({ title = "New project", ok = "Create project", name = "
     const extOf = (p) => (p.split(".").pop() || "").toLowerCase();
     const junk = (p) => p.split("/").some(seg => seg.startsWith(".") || seg === "node_modules" || seg === "__MACOSX");
     if (allowImport) {
-      d.querySelectorAll("[data-src]").forEach(b => b.addEventListener("click", () => {
-        mode = b.dataset.src;
-        d.querySelectorAll("[data-src]").forEach(x => x.setAttribute("aria-checked", x === b));
-        d.querySelector("[data-import]").hidden = mode !== "files";
-        d.querySelector("[data-pages]").hidden = mode === "files";
-        srcErr("");
-      }));
       d.querySelector('[data-choose="folder"]').addEventListener("click", () => d.querySelector("[data-folder]").click());
       d.querySelector('[data-choose="zip"]').addEventListener("click", () => d.querySelector("[data-zip]").click());
       d.querySelector("[data-folder]").addEventListener("change", (e) => {
@@ -258,6 +346,22 @@ window.projectDialog = ({ title = "New project", ok = "Create project", name = "
         source = { zip: file };
         summary(`${file.name} (${(file.size / 1048576).toFixed(1)} MB) · only HTML, CSS, JS, Markdown and assets are kept`);
         if (!f.name.value.trim()) f.name.value = file.name.replace(/\.zip$/i, "").slice(0, 80);
+      });
+      /* With files chosen, the pages come from them, so the list of pages steps aside. */
+      const blankHint = d.querySelector("[data-summary]").textContent;
+      const refreshSource = () => {
+        mode = source ? "files" : "blank";
+        d.querySelector("[data-clear-source]").hidden = !source;
+        f.pages.disabled = !!source;
+        d.querySelector("[data-pages]").classList.toggle("off", !!source);
+        if (!source) summary(blankHint);
+      };
+      d.querySelector("[data-folder]").addEventListener("change", refreshSource);
+      d.querySelector("[data-zip]").addEventListener("change", refreshSource);
+      d.querySelector("[data-clear-source]").addEventListener("click", () => {
+        source = null; srcErr("");
+        d.querySelector("[data-folder]").value = ""; d.querySelector("[data-zip]").value = "";
+        refreshSource();
       });
     }
 
@@ -296,31 +400,40 @@ window.projectDialog = ({ title = "New project", ok = "Create project", name = "
     }
     const briefOf = () => Object.fromEntries(BRIEF_QUESTIONS.map(q => [q.key, f[`b_${q.key}`].value.trim()]).filter(([, v]) => v));
 
-    let result = null;
     form.addEventListener("submit", (e) => {
-      if (e.submitter?.value !== "ok") return;                 // cancel
+      if (e.submitter?.value === "cancel") return;
       if (!check()) { e.preventDefault(); return; }
       if (mode === "files") {
         if (!source) { e.preventDefault(); srcErr("Choose a folder or a .zip with your site."); return; }
-        result = { name: f.name.value.trim(), description: f.description.value.trim(), brief: briefOf(), source, assets };
+        onSubmit({ name: f.name.value.trim(), description: f.description.value.trim(), brief: briefOf(), source, assets }, e);
         return;
       }
       const pageList = f.pages.value.split("\n").map(x => x.trim()).filter(Boolean);
       if (pageList.length > 12) { e.preventDefault(); d.querySelector('[data-for="pages"]').textContent = "Up to 12 pages."; return; }
-      result = { name: f.name.value.trim(), description: f.description.value.trim(), pages: pageList.length ? pageList : ["Home"], brief: briefOf(), assets };
+      onSubmit({ name: f.name.value.trim(), description: f.description.value.trim(), pages: pageList.length ? pageList : ["Home"], brief: briefOf(), assets }, e);
     });
     f.description.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); form.requestSubmit(form.querySelector('[value="ok"]')); }
     });
-    if (!cancellable) d.addEventListener("cancel", (e) => e.preventDefault());
-    d.addEventListener("click", (e) => { if (cancellable && e.target === d) d.close(); });
-    d.addEventListener("close", () => {
-      if (!result) assets.forEach(a => URL.revokeObjectURL(a.url));
-      resolve(result); d.remove();
-    });
-    d.showModal();
-    (f.name.value ? f.description : f.name).focus();
+    return { focus: () => (f.name.value ? f.description : f.name).focus(), images: () => assets };
+};
+
+window.projectDialog = (opts = {}) => new Promise((resolve) => {
+  const d = document.createElement("dialog");
+  d.className = "modal project-modal";
+  document.body.append(d);
+  let result = null;
+  const form = fillProjectForm(d, opts, (answers) => { result = answers; });
+  const cancellable = opts.cancellable !== false;
+  if (!cancellable) d.addEventListener("cancel", (e) => e.preventDefault());
+  d.addEventListener("click", (e) => { if (cancellable && e.target === d) d.close(); });
+  d.addEventListener("close", () => {
+    if (!result) form.images().forEach(a => URL.revokeObjectURL(a.url));
+    resolve(result); d.remove();
   });
+  d.showModal();
+  form.focus();
+});
 
 const fileBase64 = (file) => new Promise((resolve, reject) => {
   const fr = new FileReader();
@@ -329,10 +442,15 @@ const fileBase64 = (file) => new Promise((resolve, reject) => {
   fr.readAsDataURL(file);
 });
 
-/* Ask for name + description (and optionally existing files), create the project, open it. */
+/* The New project button: its page, once the account is ready. */
 window.newProject = async () => {
-  const details = await projectDialog({ allowImport: true, askAssets: true });
-  if (!details) return;
+  const who = await getMe();
+  const thenNew = `?next=${encodeURIComponent("/projects/new")}`;
+  location.href = !who ? `/register${thenNew}` : !who.confirmed ? `/confirm${thenNew}` : "/projects/new";
+};
+
+/* Create the project from the form's answers (a blank site or existing files, plus images) and open it. */
+window.createProject = async (details) => {
   const { assets = [], ...fields } = details;
   try {
     let p;
@@ -420,9 +538,9 @@ window.importFlow = () => new Promise((resolve) => {
         <p>Check what will happen before anything changes.</p>
         <label class="pfield"><span>When something already exists</span>
           <select class="input" id="impPolicy">
-            <option value="rename" ${policy === "rename" ? "selected" : ""}>Keep both — import as a copy</option>
+            <option value="rename" ${policy === "rename" ? "selected" : ""}>Keep both: import as a copy</option>
             <option value="replace" ${policy === "replace" ? "selected" : ""}>Replace mine with the imported one</option>
-            <option value="skip" ${policy === "skip" ? "selected" : ""}>Keep mine — skip it</option></select></label>
+            <option value="skip" ${policy === "skip" ? "selected" : ""}>Keep mine: skip it</option></select></label>
         <ul class="imp-list">${p.items.map(i => `<li class="imp-${i.action}">
           <span class="imp-kind">${icon(i.kind === "team" ? "layers" : i.kind === "rules" ? "file" : "bot", { size: 14 })}</span>
           <span class="imp-main"><b>${esc(i.name || i.id || "")}</b>${i.target && i.target !== i.id ? ` <span class="mono">→ ${esc(i.target)}</span>` : ""}
@@ -463,6 +581,7 @@ window.importFlow = () => new Promise((resolve) => {
   let cache = null, cacheAt = 0;
 
   async function dynamicCommands() {
+    if (authState() !== "member") return [];
     if (cache && Date.now() - cacheAt < 20000) return cache;
     const [projects, agents, teams] = await Promise.all([
       api("/api/projects").catch(() => []), api("/api/agents").catch(() => []), api("/api/presets").catch(() => [])]);
@@ -476,8 +595,16 @@ window.importFlow = () => new Promise((resolve) => {
     return cache;
   }
   const staticCommands = () => [
-    { group: "Go to", icon: "home", title: "Home", run: () => location.href = "/" },
+    ...(authState() === "guest" ? [
+      { open: true, group: "Account", icon: "user", title: "Log in", run: () => location.href = "/login" },
+      { open: true, group: "Account", icon: "plus", title: "Create an account", run: () => location.href = "/register" }] : []),
+    ...(authState() === "unconfirmed" ? [
+      { open: true, group: "Account", icon: "check", title: "Confirm your email", run: () => location.href = "/confirm" }] : []),
+    ...(document.documentElement.dataset.admin ? [
+      { group: "Go to", icon: "user", title: "Users", run: () => location.href = "/users" }] : []),
+    { open: true, group: "Go to", icon: "home", title: "Home", run: () => location.href = "/" },
     { group: "Go to", icon: "grid", title: "Projects", run: () => location.href = "/projects" },
+    { group: "Go to", icon: "user", title: "Profile and password", run: () => location.href = "/profile" },
     { group: "Go to", icon: "users", title: "Agents", run: () => location.href = "/agents" },
     { group: "Go to", icon: "layers", title: "Teams", run: () => location.href = "/teams" },
     { group: "Go to", icon: "book", title: "Guide", run: () => location.href = "/guide" },
@@ -487,9 +614,9 @@ window.importFlow = () => new Promise((resolve) => {
     { group: "Create", icon: "plus", title: "New team", run: () => location.href = "/teams/new" },
     { group: "Agents & teams", icon: "download", title: "Export all agents and teams (.zip)", run: () => location.href = "/api/export" },
     { group: "Agents & teams", icon: "file-plus", title: "Import agents or teams…", run: async () => { if (await importFlow()) location.reload(); } },
-    { group: "Appearance", icon: "sun", title: "Theme: light", run: () => setTheme("light") },
-    { group: "Appearance", icon: "moon", title: "Theme: dark", run: () => setTheme("dark") },
-    { group: "Appearance", icon: "monitor", title: "Theme: follow the system", run: () => setTheme("system") },
+    { open: true, group: "Appearance", icon: "sun", title: "Theme: light", run: () => setTheme("light") },
+    { open: true, group: "Appearance", icon: "moon", title: "Theme: dark", run: () => setTheme("dark") },
+    { open: true, group: "Appearance", icon: "monitor", title: "Theme: follow the system", run: () => setTheme("system") },
   ];
 
   /* How well `q` matches `text`: 0 = no match. Substrings and word starts win; scattered letters only count
@@ -517,13 +644,13 @@ window.importFlow = () => new Promise((resolve) => {
     dlg = document.createElement("dialog");
     dlg.className = "palette";
     dlg.setAttribute("aria-label", "Command palette");
-    dlg.innerHTML = `<div class="pal-input">${icon("search", { size: 18 })}<input type="text" placeholder="Search projects, agents, teams and actions…"
+    dlg.innerHTML = `<div class="pal-input">${icon("search", { size: 18 })}<input type="text" placeholder="${authState() === "member" ? "Search projects, agents, teams and actions…" : "Search pages and actions…"}"
         aria-label="Search" autocomplete="off" spellcheck="false"><kbd>Esc</kbd></div>
       <div class="pal-list" role="listbox"></div>
       <div class="pal-foot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Ctrl</kbd>+<kbd>K</kbd> anywhere</span></div>`;
     document.body.append(dlg);
     const input = dlg.querySelector("input"), box = dlg.querySelector(".pal-list");
-    let all = [...pageCommands(), ...staticCommands()];
+    let all = [...pageCommands(), ...staticCommands().filter(c => c.open || authState() === "member")];
     const render = () => {
       const q = input.value.trim().toLowerCase();
       list = all.map(c => ({ c, s: Math.max(score(q, c.title), c.group.toLowerCase().startsWith(q) ? 50 : 0,
@@ -563,17 +690,46 @@ window.importFlow = () => new Promise((resolve) => {
   /* header buttons: search (palette) and theme, added to every page */
   document.addEventListener("DOMContentLoaded", () => {
     const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+    const site = document.querySelector("header.top .wrap");
     const make = () => {
       const wrap = document.createElement("span");
       wrap.className = "hdr-tools";
-      wrap.innerHTML = `<button class="icon-btn pal-btn" type="button" title="Search and commands (${mac ? "⌘" : "Ctrl+"}K)" aria-label="Search and commands">${icon("search", { size: 17 })}</button>
-        <button class="icon-btn" type="button" data-theme-btn aria-label="Change theme">${icon(themeIcon(), { size: 17 })}</button>`;
+      wrap.innerHTML = `<button class="icon-btn pal-btn" data-show="member" type="button" title="Search and commands (${mac ? "⌘" : "Ctrl+"}K)" aria-label="Search and commands">${icon("search", { size: 17 })}</button>
+        <button class="icon-btn" type="button" data-theme-btn data-show="guest unconfirmed" aria-label="Change theme">${icon(themeIcon(), { size: 17 })}</button>`;
       wrap.querySelector(".pal-btn").onclick = open;
       wrap.querySelector("[data-theme-btn]").onclick = () => cycleTheme();
       wrap.querySelector("[data-theme-btn]").title = themeTitle();
+      getMe().then(user => {
+        if (!user?.confirmed) {            // no profile page yet: the language button is here
+          const other = getLang() === "fr" ? "en" : "fr";
+          const l = document.createElement("button");
+          l.className = "icon-btn lang-btn"; l.type = "button"; l.textContent = other.toUpperCase();
+          l.title = other === "fr" ? "Français" : "English"; l.setAttribute("aria-label", l.title);
+          l.setAttribute("data-no-i18n", "");
+          l.onclick = () => setLang(other);
+          wrap.prepend(l);
+        }
+        if (!user) return;
+        wrap.append(accountButton(user, { compact: !site }));
+        if (user.role === "admin") {
+          document.documentElement.dataset.admin = "1";
+          const links = document.querySelector("header.top .links");
+          if (links && !links.querySelector('[href="/users"]')) links.insertAdjacentHTML("beforeend",
+            `<a href="/users" data-show="member" class="${location.pathname === "/users" ? "on" : ""}">${icon("user", { size: 16 })}Users</a>`);
+        }
+      });
       return wrap;
     };
-    const site = document.querySelector("header.top .wrap");
+    const main = document.querySelector("main");     // keyboard users can jump past the header
+    if (main) {
+      main.id ||= "main";
+      main.tabIndex = -1;
+      document.body.insertAdjacentHTML("afterbegin", `<a class="skip-link" href="#${main.id}">Skip to content</a>`);
+    }
+    try {
+      const note = sessionStorage.getItem("atelier-toast");
+      if (note) { sessionStorage.removeItem("atelier-toast"); toast(note); }
+    } catch {}
     if (site) site.insertBefore(make(), site.lastElementChild);
     const studio = document.querySelector(".chat .bar");
     if (studio) studio.insertBefore(make(), document.getElementById("menu"));

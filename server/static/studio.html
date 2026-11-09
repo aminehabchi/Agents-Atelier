@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#f4efea">
+<meta name="theme-color" content="#000000">
 <title>Studio · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
+<script src="/static/i18n.js"></script>
 <script src="/static/icons.js"></script>
 <script src="/static/ui.js"></script>
 <style>
@@ -20,7 +21,7 @@
   .bar { display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 64px; border-bottom: 1px solid var(--line); flex: none; }
   .title { flex: 1; min-width: 0; }
   .title .name { font-size: 15px; font-weight: 500; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    outline: none; border-radius: 2px; padding: 1px 4px; margin-left: -4px; cursor: text; }
+    outline: none; border-radius: var(--r); padding: 1px 4px; margin-left: -4px; cursor: text; }
   .title .name:hover { background: var(--linen); }
   .title .name:focus { background: var(--mist); box-shadow: 0 0 0 1px var(--espresso); }
   .title .sub { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--stone); line-height: 1.3; }
@@ -41,10 +42,10 @@
   .drawer h2 { margin: 0; font-size: 24px; font-weight: 400; letter-spacing: 0; }
   .drawer .search { margin: 0 16px 8px; }
   .plist { flex: 1; overflow-y: auto; padding: 4px 10px 12px; }
-  .pitem { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 2px; text-decoration: none; }
+  .pitem { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--r); text-decoration: none; }
   .pitem:hover { background: var(--linen); }
   .pitem.current { background: var(--bone); }
-  .pitem .thumb { width: 36px; height: 36px; border-radius: 2px; background: var(--linen); box-shadow: var(--ring); display: grid; place-items: center; color: var(--stone); flex: none; }
+  .pitem .thumb { width: 36px; height: 36px; border-radius: var(--r); background: var(--linen); box-shadow: var(--ring); display: grid; place-items: center; color: var(--stone); flex: none; }
   .pitem.current .thumb { background: var(--paper); }
   .pitem .info { flex: 1; min-width: 0; }
   .pitem .pname { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -59,11 +60,11 @@
   .messages { flex: 1; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 12px; background: var(--linen); }
   .empty { margin: auto; text-align: center; color: var(--stone); font-size: 15px; line-height: 1.6; max-width: 360px; border: 0; padding: 0 8px; }
   .empty .stack { display: flex; justify-content: center; margin-bottom: 20px; }
-  .empty .stack span { width: 34px; height: 34px; border-radius: 2px; background: var(--paper); box-shadow: var(--ring), 0 0 0 3px var(--linen);
+  .empty .stack span { width: 34px; height: 34px; border-radius: var(--r); background: var(--paper); box-shadow: var(--ring), 0 0 0 3px var(--linen);
     display: grid; place-items: center; color: var(--charcoal); margin-left: -8px; }
   .empty h3 { color: var(--ink); font-weight: 400; font-size: 32px; letter-spacing: 0; line-height: 1.1; margin: 0 0 10px; }
   .chips { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
-  .chip { background: var(--paper); border: 1px solid var(--line); border-radius: 2px; padding: 9px 16px; font-size: 14px; color: var(--graphite);
+  .chip { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 9px 16px; font-size: 14px; color: var(--graphite);
     display: flex; align-items: center; gap: 8px; text-align: left; transition: border-color .2s, color .2s; }
   .chip:hover { border-color: var(--graphite); color: var(--ink); }
   .chip .ic { color: var(--stone); }
@@ -71,12 +72,12 @@
   .msg { max-width: 100%; font-size: 14px; line-height: 1.55; animation: pop .25s ease; }
   .replay .msg { animation: none; }
   @keyframes pop { from { opacity: 0; transform: translateY(6px); } }
-  .msg.user { align-self: flex-end; background: var(--espresso); color: var(--on-espresso); padding: 10px 16px; border-radius: 2px 2px 2px 2px; max-width: 85%; white-space: pre-wrap; }
-  .msg.agent { background: var(--paper); box-shadow: var(--ring); border-radius: 2px; padding: 14px 16px; scroll-margin: 16px; transition: box-shadow .3s; }
+  .msg.user { align-self: flex-end; background: var(--espresso); color: var(--on-espresso); padding: 10px 16px; border-radius: var(--r) 2px 2px 2px; max-width: 85%; white-space: pre-wrap; }
+  .msg.agent { background: var(--paper); box-shadow: var(--ring); border-radius: var(--r); padding: 14px 16px; scroll-margin: 16px; transition: box-shadow .3s; }
   .msg.agent.highlight { box-shadow: inset 0 0 0 2px var(--ink); }
   .msg.agent.working { box-shadow: inset 0 0 0 1px var(--line-strong); }
   .who { display: flex; align-items: center; gap: 12px; }
-  .tile { width: 36px; height: 36px; border-radius: 2px; display: grid; place-items: center; flex: none; color: var(--ink);
+  .tile { width: 36px; height: 36px; border-radius: var(--r); display: grid; place-items: center; flex: none; color: var(--ink);
     background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
   .who .nm { font-weight: 500; font-size: 15px; letter-spacing: 0; }
   .who .nm small { display: block; font-weight: 400; font-size: 12px; color: var(--stone); letter-spacing: 0; }
@@ -88,7 +89,7 @@
   .typing span:nth-child(2) { animation-delay: .15s; } .typing span:nth-child(3) { animation-delay: .3s; }
   .msg.agent .text { white-space: pre-wrap; color: var(--graphite); margin-top: 10px; font-size: 14.5px; line-height: 1.6; }
   .msg.agent .text:empty { display: none; }
-  .actions { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; padding: 8px 10px; background: var(--linen); border-radius: 2px; }
+  .actions { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; padding: 8px 10px; background: var(--linen); border-radius: var(--r); }
   .actions:empty { display: none; }
   .action { display: flex; align-items: center; gap: 8px; font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--stone); min-width: 0; }
   .action b { color: var(--charcoal); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -97,10 +98,10 @@
   .more { align-self: flex-start; background: none; border: 0; padding: 2px 0; font-size: 12px; color: var(--ash); }
   .more:hover { color: var(--ink); text-decoration: underline; }
   .msg.system { align-self: center; font-size: 13px; color: var(--stone); text-align: center; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
-  .msg.done-card { align-self: stretch; background: var(--paper); box-shadow: var(--ring); border-radius: 2px; padding: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .msg.done-card { align-self: stretch; background: var(--paper); box-shadow: var(--ring); border-radius: var(--r); padding: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .msg.done-card .lbl { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 14px; min-width: 160px; }
   .msg.done-card .lbl .tile { --c: var(--ink); }
-  .msg.error { color: var(--danger); background: var(--paper); box-shadow: inset 0 0 0 1px var(--danger); border-radius: 2px; padding: 10px 14px; font-size: 13px;
+  .msg.error { color: var(--danger); background: var(--paper); box-shadow: inset 0 0 0 1px var(--danger); border-radius: var(--r); padding: 10px 14px; font-size: 13px;
     white-space: pre-wrap; display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
   .msg.error > .ic { margin-top: calc((1lh - 16px) / 2); }
 
@@ -108,33 +109,33 @@
   .composer { padding: 12px 16px 14px; border-top: 1px solid var(--line); background: var(--paper); flex: none; }
   .composer .row { display: flex; gap: 8px; align-items: flex-end; }
   .composer textarea { flex: 1; resize: none; max-height: 180px; min-height: 46px; line-height: 1.45; }
-  .send { height: 46px; width: 46px; border: 0; border-radius: 2px; background: var(--espresso); color: var(--on-espresso); display: grid; place-items: center; flex: none; transition: background .2s; }
+  .send { height: 46px; width: 46px; border: 0; border-radius: var(--r); background: var(--espresso); color: var(--on-espresso); display: grid; place-items: center; flex: none; transition: background .2s; }
   .send:hover { background: var(--charcoal); }
   .send:disabled { opacity: .35; cursor: default; }
   .send.stop { background: var(--paper); color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
   .hint { font-size: 11px; color: var(--stone); margin-top: 8px; display: flex; justify-content: space-between; gap: 8px; }
-  kbd { font: 11px ui-monospace, monospace; background: var(--linen); border-radius: 2px; padding: 1px 5px; box-shadow: var(--ring); }
+  kbd { font: 11px ui-monospace, monospace; background: var(--linen); border-radius: var(--r); padding: 1px 5px; box-shadow: var(--ring); }
 
   /* ---------- Stage column ---------- */
   .stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   .toolbar { display: flex; align-items: center; gap: 8px; padding: 0 16px; height: 64px; border-bottom: 1px solid var(--line); background: var(--paper); flex: none; }
-  .seg { display: flex; background: var(--linen); box-shadow: var(--ring); border-radius: 2px; padding: 3px; }
-  .seg button { background: transparent; border: 0; padding: 6px 12px; border-radius: 2px; font-size: 13px; color: var(--stone); display: inline-flex; align-items: center; gap: 6px; }
+  .seg { display: flex; background: var(--linen); box-shadow: var(--ring); border-radius: var(--r); padding: 3px; }
+  .seg button { background: transparent; border: 0; padding: 6px 12px; border-radius: var(--r); font-size: 13px; color: var(--stone); display: inline-flex; align-items: center; gap: 6px; }
   .seg button:hover { color: var(--ink); }
   .seg button.on { background: var(--paper); color: var(--ink); box-shadow: var(--ring); }
   .spacer { flex: 1; }
   .url { font: 12px ui-monospace, monospace; color: var(--stone); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    background: var(--linen); border-radius: 2px; padding: 6px 12px; }
+    background: var(--linen); border-radius: var(--r); padding: 6px 12px; }
 
   .view { flex: 1; position: relative; min-height: 0; background: var(--bone); }
   .frame-wrap { position: absolute; inset: 0; display: flex; justify-content: center; padding: 20px; }
-  .frame-wrap iframe { width: 100%; height: 100%; border: 0; border-radius: 2px; background: #fff; box-shadow: var(--ring); transition: width .35s ease; }
+  .frame-wrap iframe { width: 100%; height: 100%; border: 0; border-radius: var(--r); background: #fff; box-shadow: var(--ring); transition: width .35s ease; }
   .frame-wrap.tablet iframe { width: 768px; } .frame-wrap.phone iframe { width: 375px; }
-  .flash { position: absolute; inset: 20px; border-radius: 2px; pointer-events: none; box-shadow: inset 0 0 0 2px var(--c, var(--ink)); opacity: 0; transition: opacity .6s; }
+  .flash { position: absolute; inset: 20px; border-radius: var(--r); pointer-events: none; box-shadow: inset 0 0 0 2px var(--c, var(--ink)); opacity: 0; transition: opacity .6s; }
   .flash.show { opacity: 1; transition: none; }
   .placeholder { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px; }
   .placeholder .box { color: var(--stone); font-size: 15px; max-width: 300px; line-height: 1.55; }
-  .placeholder .box .tile { --c: var(--stone); width: 52px; height: 52px; border-radius: 2px; margin: 0 auto 16px; color: var(--charcoal); }
+  .placeholder .box .tile { --c: var(--stone); width: 52px; height: 52px; border-radius: var(--r); margin: 0 auto 16px; color: var(--charcoal); }
   .placeholder b { display: block; color: var(--ink); font-weight: 500; font-size: 17px; margin-bottom: 4px; }
 
   .code { position: absolute; inset: 0; display: none; grid-template-columns: 200px 1fr; background: var(--paper); }
@@ -150,7 +151,7 @@
   .research .doc li { margin: 4px 0; }
   .research .doc a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
   .research .doc a.cite { text-decoration: none; font-size: 12px; vertical-align: super; line-height: 0; padding: 0 1px; }
-  .research .doc code { font: 13px ui-monospace, monospace; background: var(--linen); padding: 1px 5px; border-radius: 2px; }
+  .research .doc code { font: 13px ui-monospace, monospace; background: var(--linen); padding: 1px 5px; border-radius: var(--r); }
   .research .doc blockquote { margin: 0 0 12px; padding: 4px 14px; border-left: 3px solid var(--line-strong); color: var(--stone); }
   .research .doc hr { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
   .research .doc .tbl { overflow-x: auto; margin: 0 0 14px; }
@@ -161,7 +162,7 @@
   .research .bar { position: sticky; top: 0; display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--paper);
     border-bottom: 1px solid var(--line); font-size: 13px; color: var(--stone); z-index: 1; }
   .files { border-right: 1px solid var(--line); padding: 10px; overflow-y: auto; background: var(--linen); }
-  .files button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: transparent; border: 0; padding: 8px 12px; border-radius: 2px;
+  .files button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: transparent; border: 0; padding: 8px 12px; border-radius: var(--r);
     font: 13px ui-monospace, monospace; color: var(--graphite); }
   .files button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
   .files button.on, .files button:hover { background: var(--paper); color: var(--ink); box-shadow: var(--ring); }
@@ -171,7 +172,7 @@
   pre { margin: 0; padding: 20px; overflow: auto; flex: 1; font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--charcoal); tab-size: 2; }
 
   /* ---------- page switcher ---------- */
-  .page-pick { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 30px 0 12px; border-radius: 2px;
+  .page-pick { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 30px 0 12px; border-radius: var(--r);
     background: var(--linen); box-shadow: var(--ring); color: var(--stone); font-size: 13px; max-width: 220px; }
   .page-pick select { appearance: none; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; outline: none; cursor: pointer; min-width: 0; text-overflow: ellipsis; }
   .page-pick::after { content: ""; position: absolute; right: 12px; top: 50%; width: 6px; height: 6px; border: solid var(--stone); border-width: 0 1.5px 1.5px 0; transform: translateY(-70%) rotate(45deg); pointer-events: none; }
@@ -187,14 +188,14 @@
   .save-state { font: 12px var(--font); color: var(--stone); display: inline-flex; align-items: center; gap: 5px; }
   .save-state.err { color: var(--danger); }
   .autosave { display: inline-flex; align-items: center; gap: 8px; font: 12px var(--font); color: var(--graphite); cursor: pointer; }
-  .autosave input { appearance: none; width: 32px; height: 20px; border-radius: 2px; background: var(--line-strong); position: relative; cursor: pointer; margin: 0; transition: background .2s; }
+  .autosave input { appearance: none; width: 32px; height: 20px; border-radius: var(--r); background: var(--line-strong); position: relative; cursor: pointer; margin: 0; transition: background .2s; }
   .autosave input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--knob); transition: transform .2s; }
   .autosave input:checked { background: var(--espresso); }
   .autosave input:checked::after { transform: translateX(12px); }
 
   .file-note { flex: 1; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--graphite); font-size: 14px; background: var(--linen); overflow: auto; }
-  .file-note img { max-width: 100%; max-height: 60vh; border-radius: 2px; box-shadow: var(--ring); background: #fff; display: block; margin: 0 auto 12px; }
-  .file-note .tile { --c: var(--stone); width: 48px; height: 48px; border-radius: 2px; margin: 0 auto 12px; }
+  .file-note img { max-width: 100%; max-height: 60vh; border-radius: var(--r); box-shadow: var(--ring); background: #fff; display: block; margin: 0 auto 12px; }
+  .file-note .tile { --c: var(--stone); width: 48px; height: 48px; border-radius: var(--r); margin: 0 auto 12px; }
   .file-note b { display: block; color: var(--ink); font-weight: 500; margin-bottom: 4px; }
   .file-note p { margin: 0 auto; max-width: 380px; line-height: 1.55; }
   .files button small { font: 11px var(--font); color: var(--stone); flex: none; }
@@ -205,29 +206,29 @@
   /* ---------- attachments ---------- */
   .attachments { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
   .attachments[hidden] { display: none; }
-  .att { position: relative; width: 64px; height: 64px; border-radius: 2px; overflow: hidden; background: var(--linen); box-shadow: var(--ring); }
+  .att { position: relative; width: 64px; height: 64px; border-radius: var(--r); overflow: hidden; background: var(--linen); box-shadow: var(--ring); }
   .att img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .att.loading::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--paper) 60%, transparent); animation: blink 1s infinite; }
-  .att button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 2px; border: 0; background: rgba(22,15,12,.75); color: #fff;
+  .att button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: var(--r); border: 0; background: rgba(22,15,12,.75); color: #fff;
     display: grid; place-items: center; padding: 0; }
   .composer .attach { width: 46px; height: 46px; }
   .composer.drag { box-shadow: inset 0 0 0 2px var(--ink); }
   .msg.user .imgs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-  .msg.user .imgs img { width: 72px; height: 72px; object-fit: cover; border-radius: 2px; display: block; background: rgb(var(--on-espresso-rgb) / .15); }
+  .msg.user .imgs img { width: 72px; height: 72px; object-fit: cover; border-radius: var(--r); display: block; background: rgb(var(--on-espresso-rgb) / .15); }
 
   /* ---------- retry + cost on agent cards ---------- */
   .who .retry { margin-left: 4px; width: 28px; height: 28px; }
   .msg.agent.working .retry { display: none; }
   .who .cost { font-feature-settings: "tnum"; }
-  .model-badge { display: inline-flex; align-items: center; gap: 3px; text-decoration: none; font: 10.5px var(--font); color: var(--stone); background: var(--paper); box-shadow: var(--ring); border-radius: 2px; padding: 1px 6px; line-height: 1.5; }
+  .model-badge { display: inline-flex; align-items: center; gap: 3px; text-decoration: none; font: 10.5px var(--font); color: var(--stone); background: var(--paper); box-shadow: var(--ring); border-radius: var(--r); padding: 1px 6px; line-height: 1.5; }
   .agent-tile.s-working .model-badge { background: rgb(var(--on-espresso-rgb) / .12); color: rgb(var(--on-espresso-rgb) / .8); box-shadow: none; }
 
   /* ---------- presets menu ---------- */
   .menu-wrap { position: relative; }
-  .menu { position: absolute; bottom: calc(100% + 8px); right: 0; z-index: 30; width: 300px; background: var(--paper); border-radius: 2px; padding: 6px;
+  .menu { position: absolute; bottom: calc(100% + 8px); right: 0; z-index: 30; width: 300px; background: var(--paper); border-radius: var(--r); padding: 6px;
     box-shadow: var(--ring), var(--hard); display: none; }
   .menu.open { display: block; }
-  .menu .mi { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; background: none; border: 0; padding: 10px 12px; border-radius: 2px; font-size: 14px; text-decoration: none; color: inherit; }
+  .menu .mi { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; background: none; border: 0; padding: 10px 12px; border-radius: var(--r); font-size: 14px; text-decoration: none; color: inherit; }
   .menu .mi:hover { background: var(--linen); }
   .menu .mi { line-height: 20px; }
   .menu .mi > .ic { margin-top: calc((20px - 15px) / 2); color: var(--stone); }
@@ -235,12 +236,12 @@
   .menu .mi b { font-weight: 500; display: flex; align-items: center; gap: 6px; }
   .menu .mi small { display: block; color: var(--stone); font-size: 12px; margin-top: 2px; line-height: 1.4; }
   .menu .mi.on { background: var(--bone); }
-  .menu .mi .del { margin-left: auto; color: var(--stone); padding: 2px; border-radius: 2px; }
+  .menu .mi .del { margin-left: auto; color: var(--stone); padding: 2px; border-radius: var(--r); }
   .menu .mi .del:hover { color: var(--danger); }
   .menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 4px; }
 
   /* ---------- big panels (versions, stats) ---------- */
-  dialog.panel { border: 0; border-radius: 2px; padding: 0; width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); background: var(--linen); color: var(--ink);
+  dialog.panel { border: 0; border-radius: var(--r); padding: 0; width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); background: var(--linen); color: var(--ink);
     box-shadow: var(--ring); display: none; flex-direction: column; overflow: hidden; }
   dialog.panel[open] { display: flex; }
   dialog.panel::backdrop { background: var(--scrim); backdrop-filter: blur(2px); }
@@ -251,14 +252,14 @@
   .note > .ic { margin-top: calc((1lh - 14px) / 2); }
 
   .vlist { display: flex; flex-direction: column; gap: 6px; }
-  .vrow { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center; background: var(--paper); border-radius: 2px; padding: 12px 14px; }
+  .vrow { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center; background: var(--paper); border-radius: var(--r); padding: 12px 14px; }
   .vrow .vn { font: 12px ui-monospace, monospace; color: var(--stone); text-align: center; }
-  .vrow .vn .tile { width: 36px; height: 36px; border-radius: 2px; margin: 0 auto 4px; }
+  .vrow .vn .tile { width: 36px; height: 36px; border-radius: var(--r); margin: 0 auto 4px; }
   .vrow b { font-weight: 500; font-size: 15px; }
   .vrow small { display: block; font-size: 12px; color: var(--stone); margin-top: 2px; }
   .vrow .vact { display: flex; gap: 2px; }
   .vrow.current { box-shadow: inset 0 0 0 1px var(--line-strong); }
-  .difffile { background: var(--paper); border-radius: 2px; margin-bottom: 10px; overflow: hidden; }
+  .difffile { background: var(--paper); border-radius: var(--r); margin-bottom: 10px; overflow: hidden; }
   .difffile summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 16px; font: 13px ui-monospace, monospace; }
   .difffile summary::-webkit-details-marker { display: none; }
   .difffile .plus { color: var(--ok); } .difffile .minus { color: var(--danger); }
@@ -267,31 +268,31 @@
   .difffile pre .a { background: var(--add-bg); color: var(--add-fg); } .difffile pre .r { background: var(--del-bg); color: var(--del-fg); } .difffile pre .h { color: var(--stone); background: var(--linen); }
 
   .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
-  .kpi { background: var(--paper); border-radius: 2px; padding: 16px 18px; }
+  .kpi { background: var(--paper); border-radius: var(--r); padding: 16px 18px; }
   .kpi b { display: block; font-weight: 400; font-size: 28px; letter-spacing: 0; line-height: 1.1; font-feature-settings: "tnum"; }
   .kpi span { font-size: 12px; color: var(--stone); }
-  .stable { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--paper); border-radius: 2px; overflow: hidden; font-size: 13.5px; margin-bottom: 16px; }
+  .stable { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--paper); border-radius: var(--r); overflow: hidden; font-size: 13.5px; margin-bottom: 16px; }
   .stable th { text-align: left; font-weight: 500; font-size: 12px; color: var(--stone); background: var(--paper); padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
   .stable td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; font-feature-settings: "tnum"; white-space: nowrap; }
   .stable tr:last-child td { border-bottom: 0; }
   .stable td.num, .stable th.num { text-align: right; }
   .stable .ag { display: flex; align-items: center; gap: 10px; }
-  .stable .ag .tile { width: 28px; height: 28px; border-radius: 2px; }
-  .sbar { height: 6px; border-radius: 2px; background: var(--linen); min-width: 80px; overflow: hidden; }
-  .sbar i { display: block; height: 100%; border-radius: 2px; background: var(--ink); }
+  .stable .ag .tile { width: 28px; height: 28px; border-radius: var(--r); }
+  .sbar { height: 6px; border-radius: var(--r); background: var(--linen); min-width: 80px; overflow: hidden; }
+  .sbar i { display: block; height: 100%; border-radius: var(--r); background: var(--ink); }
   .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 6px; }
   .status-dot.stopped { background: var(--stone); } .status-dot.error { background: var(--danger); }
   h4.sec { margin: 8px 0 10px; font-weight: 500; font-size: 14px; color: var(--charcoal); }
   @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
 
   /* security warnings */
-  .msg.security { align-self: stretch; background: var(--paper); border-radius: 2px; padding: 14px 16px;
+  .msg.security { align-self: stretch; background: var(--paper); border-radius: var(--r); padding: 14px 16px;
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 40%, transparent); }
   .msg.security .head { display: flex; gap: 10px; align-items: flex-start; color: var(--danger); font-size: 14px; line-height: 1.45; }
   .msg.security .head b { font-weight: 500; }
   .msg.security ul { margin: 8px 0 0 28px; padding: 0; font: 12px/1.6 ui-monospace, monospace; color: var(--graphite); }
   .msg.security p { margin: 8px 0 0 28px; font-size: 13px; color: var(--stone); }
-  .msg.orch { align-self: stretch; background: var(--paper); box-shadow: var(--ring); border-radius: 2px; padding: 14px 16px; }
+  .msg.orch { align-self: stretch; background: var(--paper); box-shadow: var(--ring); border-radius: var(--r); padding: 14px 16px; }
   .msg.orch .head { display: flex; gap: 10px; align-items: center; font-size: 14px; }
   .msg.orch .head b { font-weight: 500; }
   .msg.orch .head .state { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--stone); }
@@ -299,10 +300,10 @@
   .msg.orch .why { margin: 8px 0 0; font-size: 14px; line-height: 1.55; color: var(--graphite); white-space: pre-wrap; }
   .msg.orch .why:empty { display: none; }
   .msg.orch .picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .msg.orch .picks span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 8px; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink); }
+  .msg.orch .picks span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 8px; border-radius: var(--r); box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink); }
   .msg.orch .picks svg { flex-shrink: 0; display: block; }
   .msg.orch .note { margin: 8px 0 0; font-size: 12px; color: var(--stone); }
-  .msg.sendback { align-self: stretch; background: var(--paper); box-shadow: var(--ring); border-radius: 2px; padding: 14px 16px; }
+  .msg.sendback { align-self: stretch; background: var(--paper); box-shadow: var(--ring); border-radius: var(--r); padding: 14px 16px; }
   .msg.sendback .head { display: flex; gap: 10px; align-items: center; font-size: 14px; }
   .msg.sendback .head b { font-weight: 500; }
   .msg.sendback ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
@@ -311,7 +312,7 @@
   .msg.sendback li .who svg { flex-shrink: 0; display: block; }
 
   /* resume card (after a stop / error) */
-  .msg.resume-card { align-self: stretch; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line-strong); border-radius: 2px; padding: 14px 16px;
+  .msg.resume-card { align-self: stretch; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line-strong); border-radius: var(--r); padding: 14px 16px;
     display: flex; flex-direction: column; gap: 12px; }
   .resume-card .rc-text { display: flex; align-items: center; gap: 12px; }
   .resume-card .rc-text .tile { --c: var(--stone); }
@@ -330,19 +331,19 @@
   .team-head .count { font-size: 13px; color: var(--stone); }
   .team-head .now { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--graphite); }
   .team-head .now b { color: var(--ink); font-weight: 500; }
-  .team-head .clock { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--graphite); background: var(--linen); border-radius: 2px; padding: 5px 10px; font-feature-settings: "tnum"; }
-  .team-head a.lnk { color: var(--graphite); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 10px; border-radius: 2px; }
+  .team-head .clock { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--graphite); background: var(--linen); border-radius: var(--r); padding: 5px 10px; font-feature-settings: "tnum"; }
+  .team-head a.lnk { color: var(--graphite); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 10px; border-radius: var(--r); }
   .team-head a.lnk:hover { color: var(--ink); background: var(--linen); }
   .team.collapsed .team-row { display: none; }
   .team.collapsed .team-head { min-height: 52px; }
 
   .team-row { display: flex; gap: 10px; padding: 0 16px 16px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding: 16px; }
-  .agent-tile { position: relative; flex: none; width: 210px; min-height: 148px; border-radius: 2px; padding: 12px; background: var(--linen); box-shadow: var(--ring);
+  .agent-tile { position: relative; flex: none; width: 210px; min-height: 148px; border-radius: var(--r); padding: 12px; background: var(--linen); box-shadow: var(--ring);
     display: flex; flex-direction: column; gap: 4px; cursor: pointer; scroll-snap-align: start; text-align: left; transition: background .25s, color .25s, opacity .25s, transform .15s; }
   .agent-tile:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
   .agent-tile:active { transform: scale(.985); }
   .agent-tile .t-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .agent-tile .tile { width: 34px; height: 34px; border-radius: 2px; }
+  .agent-tile .tile { width: 34px; height: 34px; border-radius: var(--r); }
   .agent-tile .t-num { font: 11px ui-monospace, monospace; color: var(--stone); margin-right: auto; }
   .agent-tile .t-name { font-size: 14px; font-weight: 500; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .agent-tile .t-status { font-size: 12px; color: var(--stone); display: flex; align-items: center; gap: 6px; font-feature-settings: "tnum"; }
@@ -352,7 +353,7 @@
   .agent-tile.s-working .t-desc { display: none; }
   .agent-tile.s-done .t-desc, .agent-tile.s-stopped .t-desc { -webkit-line-clamp: 2; }
 
-  .sw { width: 32px; height: 20px; border-radius: 2px; border: 0; padding: 0; background: var(--line-strong); position: relative; flex: none; transition: background .2s; }
+  .sw { width: 32px; height: 20px; border-radius: var(--r); border: 0; padding: 0; background: var(--line-strong); position: relative; flex: none; transition: background .2s; }
   .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--knob); transition: transform .2s; }
   .sw.on { background: var(--espresso); }
   .sw.on::after { transform: translateX(12px); }
@@ -364,9 +365,9 @@
   .agent-tile.off .tile { background: var(--linen); color: var(--stone); }
   .agent-tile.s-waiting { background: var(--paper); }
   /* the working agent: sky-blue, lifted onto its hard shadow, with a scribbling crayon line along the bottom */
-  .agent-tile.s-working { --on-espresso: #383838; --on-espresso-rgb: 56 56 56; background: var(--sky); color: #383838;
-    box-shadow: inset 0 0 0 2px #383838, var(--hard-sm); transform: translate(3px, -3px); overflow: hidden; }
-  .agent-tile.s-working::after { content: ""; position: absolute; left: 0; bottom: 0; height: 4px; width: 40%; background: #383838; animation: scribble 1.3s ease-in-out infinite alternate; }
+  .agent-tile.s-working { --on-espresso: var(--on-accent); --on-espresso-rgb: 56 56 56; background: var(--sky); color: var(--on-accent);
+    box-shadow: inset 0 0 0 2px var(--on-accent), var(--hard-sm); transform: translate(3px, -3px); overflow: hidden; }
+  .agent-tile.s-working::after { content: ""; position: absolute; left: 0; bottom: 0; height: 4px; width: 40%; background: var(--on-accent); animation: scribble 1.3s ease-in-out infinite alternate; }
   @keyframes scribble { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
   .agent-tile { transition: transform .2s ease, box-shadow .2s ease, background .2s; }
   .agent-tile.flip { animation: stamp .45s cubic-bezier(.3, 1.5, .5, 1); }
@@ -391,6 +392,7 @@
     .code { grid-template-columns: 140px 1fr; }
   }
 </style>
+<link rel="stylesheet" href="/static/theme.css">
 </head>
 <body>
 
@@ -413,7 +415,7 @@
     <div class="plist" id="plist"></div>
     <div class="foot">
       <a href="/projects"><span>All projects</span><i data-icon="arrow-right" data-size="16"></i></a>
-      <a href="/agents"><span>Edit the agent team</span><i data-icon="arrow-right" data-size="16"></i></a>
+      <a href="/agents"><span>Agents</span><i data-icon="arrow-right" data-size="16"></i></a>
       <a href="/guide"><span>Guide</span><i data-icon="arrow-right" data-size="16"></i></a>
     </div>
   </aside>
@@ -450,7 +452,7 @@
     <span class="url" id="url"></span>
     <button class="icon-btn" id="reload" title="Reload preview" aria-label="Reload preview"><i data-icon="refresh" data-size="16"></i></button>
     <button class="icon-btn" id="open" title="Open in a new tab" aria-label="Open in a new tab"><i data-icon="external" data-size="16"></i></button>
-    <button class="icon-btn" id="historyBtn" title="Versions — history of the code" aria-label="Versions"><i data-icon="history" data-size="17"></i></button>
+    <button class="icon-btn" id="historyBtn" title="Versions: history of the code" aria-label="Versions"><i data-icon="history" data-size="17"></i></button>
     <button class="icon-btn" id="statsBtn" title="Cost &amp; time per agent" aria-label="Stats"><i data-icon="chart" data-size="17"></i></button>
     <a class="btn btn-ghost btn-sm" id="download" title="Download the code as .zip"><i data-icon="download" data-size="16"></i>.zip</a>
   </div>
@@ -520,7 +522,7 @@ async function boot() {
   if (!m) return location.replace("/projects");
   PID = m[1];
   try {
-    [AGENTS, project] = await Promise.all([api("/api/agents"), api(`/api/projects/${PID}`)]);
+    [AGENTS, project] = await Promise.all([api(`/api/agents?project=${PID}`), api(`/api/projects/${PID}`)]);
   } catch (err) {
     if (err.status === 404) { toast("That project doesn't exist any more", "err"); return setTimeout(() => location.replace("/projects"), 900); }
     return fatal(err);
@@ -589,6 +591,7 @@ function connect() {
   };
   ws.onclose = (e) => {
     $("conn").classList.remove("on"); $("conn").title = "Reconnecting…";
+    if (e.code === 4401) return location.replace(`/login?next=${encodeURIComponent(location.pathname)}`);
     if (e.code === 4404) { toast("This project was deleted", "err"); return setTimeout(() => location.replace("/projects"), 900); }
     if (e.code === 4403) { $("conn").title = "Refused"; return fatal(new Error("The server refused this connection. Open the studio from http://localhost (not another address)."), "Connection refused"); }
     wsFails++;
@@ -604,7 +607,7 @@ function connect() {
 function showConnBanner() {
   if ($("connBanner") || ws?.readyState === 1) return;
   $("messages").insertAdjacentHTML("beforebegin", `<div class="conn-banner" id="connBanner" role="status">${icon("alert", { size: 16 })}
-    <span>Lost the connection to the server — reconnecting… Agents keep working on the server.</span><span class="spacer"></span>
+    <span>Lost the connection to the server. Reconnecting… Agents keep working on the server.</span><span class="spacer"></span>
     <button class="btn btn-ghost btn-sm" type="button" id="reconnectNow">Retry now</button></div>`);
   $("reconnectNow").onclick = () => { wsFails = 0; connect(); };
 }
@@ -622,7 +625,7 @@ async function resync() {
   } catch (err) { console.warn("Resync failed", err); }
 }
 function wsSend(msg) {
-  if (ws?.readyState !== 1) { toast("Not connected to the server — reconnecting…", "err"); return false; }
+  if (ws?.readyState !== 1) { toast("Not connected to the server. Reconnecting…", "err"); return false; }
   ws.send(JSON.stringify(msg));
   return true;
 }
@@ -649,7 +652,7 @@ function handle(ev) {
     case "orchestrating":
       setBusy(true);
       orchCard = addMsg(`<div class="msg orch working" role="status"><div class="head"><span class="tile">${icon("cpu", { size: 18 })}</span>
-        <span><b>Orchestrator</b> — reading your request and the project</span>
+        <span><b>Orchestrator:</b> reading your request and the project</span>
         <span class="state"><span class="typing"><span></span><span></span><span></span></span></span></div>
         <p class="why"></p></div>`);
       renderTeamHead();
@@ -669,7 +672,7 @@ function handle(ev) {
         const ra = BY_ID[ev.agents[0]];
         run = { agents: AGENTS.filter(x => selected.has(x.id) || x.id === ev.agents[0]).map(x => x.id), index: -1, started: now, retry: ev.agents[0] };
         status[ev.agents[0]] = { state: "waiting" };
-        addSystem(`Retrying ${ra?.name || ev.agents[0]}${ev.note ? ` — “${ev.note}”` : ""}`);
+        addSystem(`Retrying ${ra?.name || ev.agents[0]}${ev.note ? `: “${ev.note}”` : ""}`);
         renderTeam();
         break;
       }
@@ -744,7 +747,7 @@ function handle(ev) {
       renderTeam();
       break;
     case "security":
-      addMsg(`<div class="msg security" role="alert"><div class="head">${icon("alert", { size: 18 })}<span><b>Security check</b> — ${esc(ev.text)}</span></div>
+      addMsg(`<div class="msg security" role="alert"><div class="head">${icon("alert", { size: 18 })}<span><b>Security check:</b> ${esc(ev.text)}</span></div>
         ${(ev.items || []).length ? `<ul>${ev.items.map(i => `<li>${esc(i)}</li>`).join("")}</ul>` : ""}
         <p>Blocked actions never ran. Review the files (Code tab), or restore an earlier version if something looks wrong.</p></div>`);
       if (!replaying) toast("Security check: see the warning in the chat", "err");
@@ -755,14 +758,18 @@ function handle(ev) {
         items.forEach(i => { status[i.agent] = { state: "waiting" }; });
         status[ev.agent] = { state: "waiting" };
       }
-      addMsg(`<div class="msg sendback"><div class="head">${icon("refresh", { size: 18 })}<span><b>${esc(a?.name || "Critic")} sent work back</b>
-        — round ${ev.round} of ${ev.rounds}. ${items.length === 1 ? "This agent fixes" : "These agents fix"} it, then ${esc(a?.name || "the Critic")} checks again.</span></div>
+      addMsg(`<div class="msg sendback"><div class="head">${icon("refresh", { size: 18 })}<span><b>${esc(a?.name || "Critic")} sent work back</b>, round ${ev.round} of ${ev.rounds}. ${items.length === 1 ? "This agent fixes" : "These agents fix"} it, then ${esc(a?.name || "the Critic")} checks again.</span></div>
         <ul>${items.map(i => { const t = BY_ID[i.agent] || { name: i.agent, icon: "bot", color: "#766a7c" };
           return `<li><span class="who" style="color:${esc(t.color)}">${icon(t.icon, { size: 16 })}<span style="color:var(--ink)">${esc(t.name)}</span></span><span>${esc(i.note)}</span></li>`; }).join("")}</ul></div>`);
       renderTeam();
       break;
     }
     case "versions": if ($("historyPanel")?.open) loadVersions(); break;
+    case "pages":
+      project.pages = ev.pages;
+      refreshPagesSoon();
+      if (!replaying) toast("A new page was added to the site");
+      break;
     case "restored":
       if (!replaying) { reloadPreview(); refreshCode(true); if ($("historyPanel")?.open) loadVersions(); toast(`Restored version ${ev.version}`); }
       addSystem(`Restored version ${ev.version}${ev.backup ? ` (the code before was saved as v${ev.backup})` : ""}`);
@@ -811,7 +818,7 @@ function addAgentCard(a, started, step, total, fix = false) {
     <div class="who"><span class="tile">${icon(a.icon, { size: 18 })}</span>
       <span class="nm" title="${esc(a.description || "")}">${esc(a.name)} agent${fix ? `<small>Fixing the Critic's feedback</small>` : step ? `<small>Step ${step} of ${total}</small>` : ""}</span>
       <span class="state"><span class="timer">0s</span><span class="typing"><span></span><span></span><span></span></span></span>
-      <button class="icon-btn plain retry" data-retry="${esc(a.id)}" title="Retry ${esc(a.name)} — run only this agent again">${icon("refresh", { size: 15 })}</button></div>
+      <button class="icon-btn plain retry" data-retry="${esc(a.id)}" title="Retry ${esc(a.name)}: run only this agent again">${icon("refresh", { size: 15 })}</button></div>
     <div class="actions"></div><div class="text"></div></div>`);
   el.dataset.started = started;
   return el;
@@ -877,8 +884,8 @@ function showPlan(ev) {
   const agents = (ev.agents || []).map(id => BY_ID[id] || { id, name: id, icon: "bot", color: "#766a7c" });
   const head = card.querySelector(".head span:nth-child(2)");
   if (head) head.innerHTML = agents.length
-    ? `<b>Orchestrator</b> — ${ev.first ? "first build, the whole team works" : `${agents.length} agent${agents.length === 1 ? "" : "s"} on this request`}`
-    : `<b>Orchestrator</b> — ${ev.intent === "question" ? "answer" : ev.intent === "off_topic" ? "outside what the team builds" : "a question for you"}`;
+    ? `<b>Orchestrator:</b> ${ev.first ? "first build, the whole team works" : `${agents.length} agent${agents.length === 1 ? "" : "s"} on this request`}`
+    : `<b>Orchestrator:</b> ${ev.intent === "question" ? "answer" : ev.intent === "off_topic" ? "outside what the team builds" : "a question for you"}`;
   const why = card.querySelector(".why");
   if (why) why.textContent = agents.length ? (ev.first ? "" : ev.reason || "") : (ev.reply || ev.reason || "");
   card.querySelector(".picks, .note")?.remove();
@@ -913,7 +920,7 @@ function setBusy(b) {
   dl.title = b ? "Available when the agents finish" : "Download the code as .zip";
   dl.innerHTML = icon(b ? "lock" : "download", { size: 16 }) + ".zip";
   document.querySelectorAll(".sw").forEach(x => x.disabled = b);
-  $("historyBtn").title = "Versions — history of the code";
+  $("historyBtn").title = "Versions: history of the code";
   updateEditorLock();
   updateSend();
 }
@@ -925,7 +932,7 @@ $("composer").onsubmit = async (e) => {
   if (!await flushEdits()) return;
   const text = $("input").value.trim();
   if (!text) return;
-  if (ws?.readyState !== 1) return toast("Not connected to the server — reconnecting…", "err");
+  if (ws?.readyState !== 1) return toast("Not connected to the server. Reconnecting…", "err");
   if (!selected.size) return toast("Switch on at least one agent first", "err");
   if (attachments.some(x => x.loading)) return toast("Images are still uploading…");
   lastPrompt = text;
@@ -1015,7 +1022,7 @@ function addResumeCard(r) {
   const why = r.status === "interrupted" ? "The server restarted while the agents were working. " : "";
   addMsg(`<div class="msg resume-card ${r.status === "error" ? "error" : ""}">
     <div class="rc-text"><span class="tile">${icon(r.status === "error" ? "alert" : "pause", { size: 18 })}</span>
-      <div><b>${esc(title)}</b><small>${why}${doneN} of ${total} agents finished — their work is saved. Continue from ${esc(at)}, or run the whole team again.</small></div></div>
+      <div><b>${esc(title)}</b><small>${why}${doneN} of ${total} agents finished. Their work is saved. Continue from ${esc(at)}, or run the whole team again.</small></div></div>
     <div class="rc-actions">
       <button class="btn btn-dark btn-sm" data-resume="continue">${icon("play", { size: 14 })}Continue from ${esc(at)}</button>
       <button class="btn btn-ghost btn-sm" data-resume="restart">${icon("refresh", { size: 14 })}Start again</button>
@@ -1108,7 +1115,7 @@ function tileHTML(a, i) {
       role="button" aria-label="${esc(a.name)} agent, ${state}${a.description ? ": " + esc(a.description) : ""}"
       title="${esc(a.description ? a.description + "\n\n" : "")}${locked ? "Required: always runs when the team works" : cards[a.id] ? "Click to show in chat" : on ? "Click to switch off" : "Click to switch on"}">
     <div class="t-top"><span class="tile">${icon(a.icon, { size: 17 })}</span><span class="t-num">${String(i + 1).padStart(2, "0")}</span>
-      ${a.model_ok === false ? `<a class="model-badge" style="color:var(--danger)" href="/agents/${encodeURIComponent(a.id)}/edit" title="Not a known model — click to fix">${icon("alert", { size: 10 })}${esc(a.model)}</a>`
+      ${a.model_ok === false ? `<a class="model-badge" style="color:var(--danger)" href="/agents/${encodeURIComponent(a.id)}/edit" title="Not a known model. Click to fix">${icon("alert", { size: 10 })}${esc(a.model)}</a>`
         : a.model ? `<span class="model-badge" title="Runs on ${esc(a.model)}">${esc(a.model)}</span>` : ""}
       <button class="sw ${on ? "on" : ""} ${locked ? "locked" : ""}" data-toggle role="switch" aria-checked="${on}" aria-label="Use ${esc(a.name)}${locked ? " (required)" : ""}" ${busy || locked ? "disabled" : ""}></button></div>
     <div class="t-name">${esc(a.name)}</div>
@@ -1172,7 +1179,7 @@ function renderTeamHead() {
         <button class="btn btn-ghost btn-sm" id="presetsBtn" aria-haspopup="true">${icon("sliders", { size: 14 })}${esc(matchingPreset()?.name || "Teams")}${icon("chevron-up", { size: 13 })}</button>
         <div class="menu" id="presetsMenu" role="menu"></div>
       </span>
-      <a class="lnk" href="/agents">${icon("pencil", { size: 13 })}Edit agents</a>${chevron}`;
+      <a class="lnk" href="/agents">${icon("users", { size: 13 })}Agents</a>${chevron}`;
   }
 }
 async function saveSelection() {
@@ -1182,7 +1189,7 @@ async function saveSelection() {
   catch (err) { toast(`Couldn't save the team: ${err.message}`, "err"); }
 }
 function toggleAgent(id) {
-  if (busy) return toast("Agents are working — stop them to change the team");
+  if (busy) return toast("Agents are working. Stop them to change the team");
   if (REQUIRED.includes(id)) return toast(`${BY_ID[id]?.name || id} is required: it always runs`);
   selected.has(id) ? selected.delete(id) : selected.add(id);
   if (status[id] && !selected.has(id)) delete status[id];
@@ -1223,7 +1230,7 @@ function renderPages() {
   const extra = [...builtPages].filter(f => !planned.some(p => p.file === f)).sort();
   const opts = [...planned.map(p => ({ file: p.file, label: `${p.title} · ${p.file}` })), ...extra.map(f => ({ file: f, label: f }))];
   if (!opts.some(o => o.file === currentPage)) currentPage = "index.html";
-  $("pageSel").innerHTML = opts.map(o => `<option value="${esc(o.file)}" ${o.file === currentPage ? "selected" : ""}>${esc(o.label)}${builtPages.size && !builtPages.has(o.file) ? " — not built yet" : ""}</option>`).join("");
+  $("pageSel").innerHTML = opts.map(o => `<option value="${esc(o.file)}" ${o.file === currentPage ? "selected" : ""}>${esc(o.label)}${builtPages.size && !builtPages.has(o.file) ? " (not built yet)" : ""}</option>`).join("");
   $("pageSel").closest(".page-pick").hidden = opts.length < 2;
   $("url").textContent = `/work/${PID.slice(0, 8)}…/${currentPage}`;
   $("url").title = workUrl();
@@ -1378,7 +1385,7 @@ function showFileBody(f) {
   $("source").value = editor.saved;
   if (f && !text) {
     $("fileNote").innerHTML = f.kind === "image"
-      ? `<div><img src="${esc(f.url)}?t=${Date.now()}" loading="lazy" decoding="async" alt="${esc(f.path)}"><b>${esc(f.path)}</b><p>Image · ${fmtSize(f.size)} — reference images can't be edited here.</p></div>`
+      ? `<div><img src="${esc(f.url)}?t=${Date.now()}" loading="lazy" decoding="async" alt="${esc(f.path)}"><b>${esc(f.path)}</b><p>Image · ${fmtSize(f.size)}. Reference images can't be edited here.</p></div>`
       : f.too_large
       ? `<div><span class="tile">${icon("file", { size: 22 })}</span><b>Too large to open here</b><p>${esc(f.path)} is ${fmtSize(f.size)}; the editor opens files up to 500 KB. Download the .zip to edit it in your own editor.</p></div>`
       : `<div><span class="tile">${icon("file", { size: 22 })}</span><b>Binary file</b><p>${esc(f.path)} (${fmtSize(f.size)}) isn't text, so it can't be shown here.</p></div>`;
@@ -1413,7 +1420,7 @@ async function saveFile() {
   editor.saving = true;
   const path = editor.path, content = $("source").value;
   const bytes = new Blob([content]).size;
-  if (bytes > 500 * 1024) { editor.saving = false; return updateEditorState(`Too large to save here (${fmtSize(bytes)} — limit 500 KB)`, true); }
+  if (bytes > 500 * 1024) { editor.saving = false; return updateEditorState(`Too large to save here (${fmtSize(bytes)}, limit 500 KB)`, true); }
   updateEditorState("Saving…");
   try {
     await api(`/api/projects/${PID}/files`, { method: "PUT", body: JSON.stringify({ path, content }) });
@@ -1506,7 +1513,7 @@ $("composer").addEventListener("drop", (e) => { if (e.dataTransfer.files.length)
 // ---------- retry one agent
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-retry]"); if (!b) return;
-  if (busy) return toast("Agents are working — wait or stop them first");
+  if (busy) return toast("Agents are working. Wait or stop them first");
   const a = BY_ID[b.dataset.retry];
   const note = await promptDialog({
     title: `Retry ${a?.name || "agent"}?`, ok: "Retry", optional: true, multiline: true, max: 500,
@@ -1561,7 +1568,7 @@ async function loadVersions() {
           <button class="btn btn-ghost btn-sm" data-vrestore="${v.n}">Restore</button>
         </div></div>`;
     }).join("")}</div><nav class="pager compact" id="vPager" aria-label="Pages of versions">${pagerHTML({ ...res, perPage: res.per_page }, { sizes: [10, 25, 50], noun: "versions" })}</nav>`
-      : `<p class="note">No versions yet — they appear when the first run starts.</p>`);
+      : `<p class="note">No versions yet. They appear when the first run starts.</p>`);
   const pager = $("vPager");
   if (pager) bindPager(pager, (p) => { vPage = p; loadVersions(); }, (n) => { vPer = n; savePerPage("versions", n); vPage = 1; loadVersions(); });
 }
@@ -1579,7 +1586,7 @@ async function showDiff(n) {
       <summary>${icon(f.status === "added" ? "file-plus" : f.status === "removed" ? "trash" : "pencil", { size: 14 })}${esc(f.path)}
         <span class="badge">${f.status}</span><span class="spacer"></span><span class="plus">+${f.added}</span><span class="minus">−${f.removed}</span></summary>
       <pre>${f.diff.split("\n").map(l => `<span class="${l.startsWith("@@") ? "h" : l.startsWith("+") ? "a" : l.startsWith("-") ? "r" : ""}">${esc(l) || " "}</span>`).join("")}</pre>
-    </details>`).join("") : `<p class="note">No differences — the current code is identical to v${n}.</p>`);
+    </details>`).join("") : `<p class="note">No differences: the current code is identical to v${n}.</p>`);
 }
 document.addEventListener("click", async (e) => {
   const diff = e.target.closest("[data-vdiff]"), restore = e.target.closest("[data-vrestore]");
@@ -1595,7 +1602,7 @@ document.addEventListener("click", async (e) => {
   }
   if (restore) {
     const n = +restore.dataset.vrestore;
-    if (busy) return toast("Agents are working — restore when they finish");
+    if (busy) return toast("Agents are working. Restore when they finish");
     if (!await confirmDialog({ title: `Restore version ${n}?`, ok: "Restore",
       text: "The project's code goes back to this version. The current code is saved as a new version first, so nothing is lost." })) return;
     if (!await flushEdits()) return;
@@ -1636,7 +1643,7 @@ async function loadStats() {
     <table class="stable"><thead><tr><th>Agent</th><th>Model</th><th class="num">Runs</th><th class="num">Avg time</th><th>Time share</th><th class="num">Avg cost</th><th>Cost share</th><th class="num">Total cost</th></tr></thead><tbody>
     ${(agentsPg = paginate(data.agents, sPage, sPer), sPage = agentsPg.page, agentsPg).items.map(a => `<tr>
       <td><span class="ag"><span class="tile" style="--c:${a.color}">${icon(a.icon, { size: 14 })}</span>${esc(a.name)}</span></td>
-      <td class="mono">${esc(a.models.map(m => m.replace(/^claude-/, "")).join(", ") || "—")}</td>
+      <td class="mono">${esc(a.models.map(m => m.replace(/^claude-/, "")).join(", ") || "-")}</td>
       <td class="num">${a.runs}${a.done < a.runs ? ` <span style="color:var(--stone)">(${a.runs - a.done} not finished)</span>` : ""}</td>
       <td class="num">${duration(a.avg_seconds)}</td>
       <td><div class="sbar" title="${duration(a.seconds)}"><i style="width:${(a.seconds / maxSec * 100).toFixed(1)}%"></i></div></td>
@@ -1652,7 +1659,7 @@ async function loadStats() {
       ${statsScope === "all" ? `<td>${esc(e.project_name)}</td>` : ""}
       <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${esc(e.request || "")}">${esc(e.request || "")}</td>
       <td class="num">${duration(e.seconds || 0)}</td><td class="num">${compact((e.tokens_in || 0) + (e.tokens_out || 0))}</td>
-      <td class="num">${e.cost ? money(e.cost) : "—"}</td><td class="num">${ago(e.ts)}</td></tr>`).join("")}
+      <td class="num">${e.cost ? money(e.cost) : "-"}</td><td class="num">${ago(e.ts)}</td></tr>`).join("")}
     </tbody></table>
     <nav class="pager compact" id="rPager" aria-label="Pages of agent runs">${data.recent_pager ? pagerHTML({ ...data.recent_pager, perPage: data.recent_pager.per_page }, { noun: "runs" }) : ""}</nav>`
     : `<p class="note">No agent has run ${where}yet. Stats appear after the first run.</p>`}`;
@@ -1688,7 +1695,7 @@ function renderPresetsMenu() {
       ${icon(cur?.id === p.id ? "check" : p.builtin ? "users" : "sliders", { size: 15 })}
       <span><b>${esc(p.name)} <span class="badge">${p.agents.length}</span></b>
       <small>${esc(p.description || p.agents.map(id => BY_ID[id]?.name || id).join(", "))}</small></span>
-      ${p.builtin ? "" : `<span class="del" data-preset-del="${esc(p.id)}" title="Delete team">${icon("trash", { size: 14 })}</span>`}
+      ${!p.editable ? "" : `<span class="del" data-preset-del="${esc(p.id)}" title="Delete team">${icon("trash", { size: 14 })}</span>`}
     </button>`).join("") +
     `<hr><button class="mi" data-preset-save role="menuitem">${icon("plus", { size: 15 })}<span><b>Save current agents as a team…</b><small>${selected.size} agent${selected.size === 1 ? "" : "s"} on</small></span></button>
      <a class="mi" href="/teams" role="menuitem">${icon("layers", { size: 15 })}<span><b>Manage teams</b><small>Create, view and edit teams</small></span></a>`;
@@ -1713,7 +1720,7 @@ document.addEventListener("click", async (e) => {
     const name = await promptDialog({ title: "Save as a team", label: "Team name", placeholder: "e.g. Landing page sprint", ok: "Save team", max: 40,
       text: `${selected.size} agents: ${AGENTS.filter(a => selected.has(a.id)).map(a => a.name).join(", ")}.` });
     if (!name) return;
-    try { await api("/api/presets", { method: "POST", body: JSON.stringify({ name, agents: [...selected] }) }); await loadPresets(); renderTeamHead(); toast(`Team “${name}” saved`); }
+    try { await api("/api/presets", { method: "POST", body: JSON.stringify({ name, agents: [...selected], scope: "mine" }) }); await loadPresets(); renderTeamHead(); toast(`Team “${name}” saved`); }
     catch (err) { toast(err.message, "err"); }
   } else if (!e.target.closest("#presetsMenu, #presetsBtn")) togglePresets(false);
 });

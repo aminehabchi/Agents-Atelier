@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#000000">
+<title>New project · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  .page { padding-top: 12px; padding-bottom: 16px; }
+  .wrap { max-width: 1320px; }
+  .crumb { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--graphite); text-decoration: none; }
+  .crumb:hover { color: var(--ink); }
+  .crumb .ic { transform: rotate(180deg); }
+  .page-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+  .page-title { font-size: 28px; margin: 0; }
+  #form-host { background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: var(--hard); padding: 20px 24px; min-width: 0; }
+
+  /* every field in one view: what the agents must know on the left, what helps them on the right */
+  #form-host form { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 0 28px; }
+  #form-host .pf-main { min-width: 0; padding-right: 28px; border-right: 1px solid var(--line); }
+  #form-host .pf-more { min-width: 0; }
+  #form-host .row { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+  #form-host .pfield { margin-bottom: 10px; gap: 4px; }
+  #form-host .input { padding-top: 7px; padding-bottom: 7px; }
+  #form-host .pfield textarea { min-height: 60px; }
+  #form-host textarea[name="description"] { min-height: 84px; }
+  #form-host textarea[name="pages"] { min-height: 62px; }
+  #form-host .pgrid select.input { height: 38px; font-size: 14px; }
+  #form-host .pgroup { border-top: 0; margin: 0 0 6px; padding: 0; }
+  #form-host .pgroup + .pgroup { margin-top: 2px; }
+  #form-host .pgroup legend { margin-bottom: 6px; }
+  #form-host .pfield > span { flex-wrap: wrap; gap: 0 12px; }
+  #form-host .pfield.off { opacity: .45; }
+  #form-host .src-summary { line-height: 1.4; }
+  @media (max-width: 1000px) {
+    #form-host form { grid-template-columns: minmax(0, 1fr); }
+    #form-host .pf-main { padding-right: 0; border-right: 0; margin-bottom: 8px; }
+    #form-host textarea[name="description"] { min-height: 110px; }
+  }
+  @media (max-width: 560px) {
+    #form-host { padding: 18px 16px; box-shadow: var(--hard-sm); }
+  }
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <nav class="links">
+      <a href="/projects" class="on"><i data-icon="grid" data-size="16"></i>Projects</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
+    </nav>
+    <span></span>
+  </div>
+</header>
+<main class="wrap page">
+  <div class="page-head">
+    <h1 class="page-title">New project</h1>
+    <a class="crumb" href="/projects"><i data-icon="arrow-right" data-size="14"></i>All projects</a>
+  </div>
+  <div id="form-host"></div>
+</main>
+<script>
+const host = document.getElementById("form-host");
+let dirty = false, saving = false;
+host.addEventListener("input", () => { dirty = true; });
+host.addEventListener("change", () => { dirty = true; });
+window.addEventListener("beforeunload", (e) => { if (dirty && !saving) e.preventDefault(); });   // long form: don't lose it to a stray click
+
+const form = fillProjectForm(host, { allowImport: true, askAssets: true, heading: false, cancelHref: "/projects" }, async (details, e) => {
+  e.preventDefault();
+  const go = host.querySelector('button[value="ok"]');
+  if (go.disabled) return;
+  go.disabled = true;
+  go.textContent = "Creating…";
+  saving = true;                        // createProject opens the studio when it works
+  await createProject(details);
+  saving = false;                       // still here: it failed and has said why, so the answers stay for another try
+  go.disabled = false;
+  go.textContent = "Create project";
+});
+form.focus();
+</script>
+</body>
+</html>

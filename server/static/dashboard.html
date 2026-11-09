@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#000000">
+<title>Dashboard · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  /* the one data colour */
+  :root { --chart: var(--sky); }
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+  .head .page-title { margin: 0; font-size: clamp(28px, 4vw, 44px); overflow-wrap: anywhere; min-width: 0; }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .tile { background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 18px 20px; min-width: 0; }
+  .tile h2 { margin: 0 0 8px; font-size: 12px; font-weight: 500; letter-spacing: .04em; color: var(--graphite); }
+  .tile b { display: block; font-size: 32px; font-weight: 400; line-height: 1.1; font-feature-settings: "tnum", "zero"; overflow-wrap: anywhere; }
+  .tile small { display: block; margin-top: 6px; font-size: 12px; line-height: 1.4; color: var(--stone); }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
+  .panel { background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 20px; min-width: 0; }
+  .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .panel h2 { margin: 0; font-size: 14px; font-weight: 500; letter-spacing: .02em; }
+  .panel-head a { font-size: 13px; color: var(--graphite); white-space: nowrap; }
+  .empty-note { color: var(--stone); font-size: 14px; line-height: 1.5; margin: 0; padding: 24px 0; text-align: center; }
+
+  /* runs per day: thin bars on a shared baseline, a recessive top line, and the value on hover or focus */
+  .plot { position: relative; height: 180px; margin-top: 24px; border-bottom: 1px solid var(--line-strong); }
+  .plot .top-line { position: absolute; left: 0; right: 0; top: 0; border-top: 1px dashed var(--line); }
+  .plot .top-label { position: absolute; right: 0; top: -18px; font-size: 11px; color: var(--stone); font-feature-settings: "tnum"; }
+  .days { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); }
+  .day { position: relative; display: flex; align-items: flex-end; justify-content: center; height: 100%; background: none; border: 0; padding: 0; cursor: default; }
+  .day:hover, .day:focus-visible { background: var(--ice); outline-offset: -2px; }
+  .day i { display: block; width: min(60%, 18px); min-height: 0; background: var(--chart); border-radius: 4px 4px 0 0; }
+  .tip { position: absolute; bottom: calc(100% + 6px); z-index: 5; display: none; padding: 6px 10px; background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: var(--hard-sm); font-size: 12px; line-height: 1.4; white-space: nowrap; text-align: left; pointer-events: none; }
+  .day .tip { bottom: auto; top: 8px; left: 50%; transform: translateX(-50%); }
+  .day:nth-child(-n+3) .tip { left: 0; transform: none; }
+  .day:nth-last-child(-n+3) .tip { left: auto; right: 0; transform: none; }
+  .day:hover .tip, .day:focus-visible .tip { display: block; }
+  .tip b { display: block; font-weight: 500; }
+  .x-labels { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--stone); }
+
+  /* time per agent */
+  .hbars { display: flex; flex-direction: column; gap: 12px; }
+  .hbar-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; margin-bottom: 4px; }
+  .hbar-top span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hbar-top span:last-child { color: var(--graphite); flex: none; font-feature-settings: "tnum"; }
+  .hbar-track { height: 8px; }
+  .hbar-track i { display: block; height: 100%; min-width: 2px; background: var(--chart); border-radius: 0 4px 4px 0; }
+
+  /* recent projects and shortcuts */
+  .rows { display: flex; flex-direction: column; }
+  .prow { display: flex; align-items: center; gap: 12px; padding: 10px 8px; margin: 0 -8px; text-decoration: none; color: inherit; min-width: 0; }
+  .prow + .prow { border-top: 1px solid var(--line); }
+  .prow:hover { background: var(--ice); }
+  .prow .nm { flex: 1; min-width: 0; font-size: 14px; }
+  .prow .nm b, .prow .nm small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prow .nm b { font-weight: 500; }
+  .prow .nm small { color: var(--stone); font-size: 12px; margin-top: 1px; }
+  .prow .when { flex: none; font-size: 12px; color: var(--stone); }
+  .prow .ic { flex: none; color: var(--stone); }
+  .count-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 8px; margin: 0 -8px; font-size: 14px; text-decoration: none; color: inherit; }
+  .count-row + .count-row { border-top: 1px solid var(--line); }
+  .count-row:hover { background: var(--ice); }
+  .count-row b { font-weight: 500; font-feature-settings: "tnum", "zero"; }
+  .side-gap { margin-top: 20px; }
+
+  @media (max-width: 960px) {
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .tile { padding: 14px; }
+    .tile b { font-size: 26px; }
+    .panel { padding: 16px; }
+    .prow .when { display: none; }
+  }
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <nav class="links">
+      <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
+    </nav>
+    <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
+  </div>
+</header>
+<main class="wrap page">
+  <div id="app"><p>Loading…</p></div>
+</main>
+<script>
+document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
+const app = document.getElementById("app");
+const DAYS = 14;
+
+/* Runs per day in the viewer's own time zone, oldest first. */
+function runsPerDay(times) {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const days = Array.from({ length: DAYS }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(d.getDate() - (DAYS - 1 - i));
+    return { date: d, runs: 0 };
+  });
+  for (const ts of times) {
+    const t = new Date(ts * 1000);
+    t.setHours(0, 0, 0, 0);
+    const day = days.find(d => d.date.getTime() === t.getTime());
+    if (day) day.runs++;
+  }
+  return days;
+}
+const dayLabel = (d, opts = { day: "numeric", month: "short" }) => d.toLocaleDateString(getLang(), opts);
+
+function runsChart(times) {
+  const days = runsPerDay(times), max = Math.max(...days.map(d => d.runs));
+  if (!max) return `<p class="empty-note">No agent has run in the last 14 days.</p>`;
+  return `
+    <div class="plot">
+      <span class="top-line"></span><span class="top-label">${max}</span>
+      <div class="days">${days.map(d => {
+        const when = dayLabel(d.date, { weekday: "short", day: "numeric", month: "short" });
+        return `<button type="button" class="day" aria-label="${esc(when)}: ${d.runs} ${d.runs === 1 ? "run" : "runs"}">
+          ${d.runs ? `<i style="height:${(d.runs / max) * 100}%"></i>` : ""}
+          <span class="tip"><b data-no-i18n>${esc(when)}</b><span>${d.runs} ${d.runs === 1 ? "run" : "runs"}</span></span></button>`;
+      }).join("")}</div>
+    </div>
+    <div class="x-labels" data-no-i18n><span>${esc(dayLabel(days[0].date))}</span><span>${esc(dayLabel(days[DAYS - 1].date))}</span></div>`;
+}
+
+function timeChart(agents) {
+  const top = agents.filter(a => a.runs > 0).sort((a, b) => b.seconds - a.seconds).slice(0, 6);
+  if (!top.length) return `<p class="empty-note">Appears after your first build.</p>`;
+  const max = top[0].seconds || 1;
+  return `<div class="hbars">${top.map(a => `<div>
+    <div class="hbar-top"><span>${esc(a.name)}</span><span data-no-i18n>${duration(a.seconds)}</span></div>
+    <div class="hbar-track"><i style="width:${(a.seconds / max) * 100}%"></i></div></div>`).join("")}</div>`;
+}
+
+async function load() {
+  let me, projects, stats, agents, teams, users = null;
+  try {
+    me = await getMe();
+    [projects, stats, agents, teams, users] = await Promise.all([
+      api("/api/projects?page=1&per_page=5&mine=true"), api("/api/stats?mine=true"), api("/api/agents"), api("/api/presets"),
+      me?.role === "admin" ? api("/api/users") : null]);
+  } catch (err) { return showError(app, err, load, "Couldn't load your dashboard"); }
+  const { totals } = stats, counts = projects.counts;
+  const own = (list) => list.filter(x => x.scope === "mine").length;
+  const first = (me.name || "").split(" ")[0];
+  const waiting = users ? users.filter(u => u.role === "unconfirmed").length : 0;
+  document.title = "Dashboard · Agents Atelier";
+  app.innerHTML = `
+    <div class="head"><h1 class="page-title">${first ? `Welcome back, ${esc(first)}` : "Welcome back"}</h1></div>
+
+    <section class="tiles" aria-label="Your numbers">
+      <div class="tile"><h2>Projects</h2><b>${counts.all}</b><small>${counts.working ? `${counts.working} building now` : `${counts.built} built`}</small></div>
+      <div class="tile"><h2>Agent runs</h2><b>${totals.runs}</b><small>${totals.failed ? `${totals.failed} stopped or failed` : `${projects.prompts} ${projects.prompts === 1 ? "prompt" : "prompts"} sent`}</small></div>
+      <div class="tile"><h2>Estimated cost</h2><b>${money(totals.cost)}</b><small>API equivalent, not a bill</small></div>
+      <div class="tile"><h2>Agent time</h2><b data-no-i18n>${duration(totals.seconds)}</b><small>Total across all your runs</small></div>
+    </section>
+
+    <div class="grid">
+      <section class="panel"><div class="panel-head"><h2>Agent runs, last 14 days</h2></div>${runsChart(stats.run_times || [])}</section>
+      <section class="panel"><div class="panel-head"><h2>Time per agent</h2></div>${timeChart(stats.agents)}</section>
+    </div>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="panel-head"><h2>Recent projects</h2>${counts.all ? `<a href="/projects">All projects</a>` : ""}</div>
+        ${projects.items.length ? `<div class="rows">${projects.items.map(p => `
+          <a class="prow" href="/p/${esc(p.id)}">
+            <span class="nm" data-no-i18n><b>${esc(p.name)}</b><small>${esc(p.description || "")}</small></span>
+            ${p.busy ? `<span class="badge live">Working</span>` : p.paused ? `<span class="badge">Paused</span>` : ""}
+            <span class="when">${ago(p.updated)}</span>${icon("arrow-right", { size: 15 })}</a>`).join("")}</div>`
+        : `<p class="empty-note">No projects yet.</p><div style="text-align:center"><button class="btn btn-dark" data-new>${icon("plus", { size: 16 })}Create your first project</button></div>`}
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Your agents and teams</h2></div>
+        <a class="count-row" href="/agents?show=mine"><span>Your agents</span><b>${own(agents)}</b></a>
+        <a class="count-row" href="/teams?show=mine"><span>Your teams</span><b>${own(teams)}</b></a>
+        <a class="count-row" href="/agents?show=shared"><span>Shared agents</span><b>${agents.length - own(agents)}</b></a>
+        ${users ? `<div class="panel-head side-gap"><h2>Accounts</h2></div>
+          <a class="count-row" href="/users"><span>Users</span><b>${users.length}</b></a>
+          <a class="count-row" href="/users"><span>Not confirmed</span><b>${waiting}</b></a>` : ""}
+      </section>
+    </div>`;
+}
+load();
+</script>
+</body>
+</html>

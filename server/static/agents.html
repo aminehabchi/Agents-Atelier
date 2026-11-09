@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#f4efea">
+<meta name="theme-color" content="#000000">
 <title>Agents · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
 <script src="/static/icons.js"></script>
 <script src="/static/ui.js"></script>
 <style>
@@ -19,16 +20,13 @@
   .crumb:hover { color: var(--ink); }
   .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
   .controls .search { flex: 1 1 240px; max-width: 360px; }
-  .fchip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 2px; border: 1px solid var(--line); background: var(--paper); font-size: 13px; color: var(--graphite); line-height: 1; }
-  .fchip:hover { border-color: var(--graphite); color: var(--ink); }
-  .fchip.on { background: var(--espresso); border-color: var(--espresso); color: var(--on-espresso); }
   .hint { font-size: 13px; color: var(--stone); margin: 0 0 12px; display: flex; gap: 6px; align-items: flex-start; line-height: 1.5; }
   .hint > .ic { margin-top: calc((1lh - 13px) / 2); }
-  .tile { width: 36px; height: 36px; border-radius: 2px; display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
+  .tile { width: 36px; height: 36px; border-radius: var(--r); display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
   .badge.mono { font-family: ui-monospace, monospace; }
 
   /* ---------- list ---------- */
-  .alist { background: var(--paper); border-radius: 2px; box-shadow: var(--ring); overflow: hidden; }
+  .alist { background: var(--paper); border-radius: var(--r); box-shadow: var(--ring); overflow: hidden; }
   .arow { position: relative; display: grid; grid-template-columns: 18px 26px 36px minmax(0, 1fr) auto auto 18px; gap: 14px; align-items: center;
     padding: 14px 18px 14px 12px; border-bottom: 1px solid var(--line); text-decoration: none; transition: background .15s; }
   .arow:last-child { border-bottom: 0; }
@@ -43,15 +41,15 @@
   .arow .meta { display: flex; gap: 6px; align-items: center; }
   .arow .teams { font-size: 12px; color: var(--stone); white-space: nowrap; }
   .arow .go { color: var(--stone); }
-  .rules-row { display: flex; align-items: center; gap: 14px; background: var(--paper); border-radius: 2px; box-shadow: var(--ring); padding: 14px 18px; text-decoration: none; margin-bottom: 12px; }
+  .rules-row { display: flex; align-items: center; gap: 14px; background: var(--paper); border-radius: var(--r); box-shadow: var(--ring); padding: 14px 18px; text-decoration: none; margin-bottom: 12px; }
   .rules-row:hover { background: var(--linen); }
   .rules-row b { font-weight: 500; } .rules-row small { display: block; color: var(--stone); font-size: 13px; }
   .rules-row .go { margin-left: auto; color: var(--stone); }
 
   /* ---------- view ---------- */
-  .card { background: var(--paper); border-radius: 2px; box-shadow: var(--ring); padding: 28px; }
+  .card { background: var(--paper); border-radius: var(--r); box-shadow: var(--ring); padding: 28px; }
   .vhead { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
-  .vhead .tile { width: 64px; height: 64px; border-radius: 2px; }
+  .vhead .tile { width: 64px; height: 64px; border-radius: var(--r); }
   .vhead h1 { margin: 0; font-weight: 400; font-size: 40px; letter-spacing: 0; line-height: 1.05; }
   .vhead .sub { font: 12px ui-monospace, monospace; color: var(--stone); margin-top: 6px; }
   .vhead .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
@@ -60,13 +58,13 @@
   .grid2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 16px; align-items: start; }
   .card h2 { margin: 0 0 14px; font-weight: 500; font-size: 16px; display: flex; align-items: center; gap: 8px; }
   .card h2 .spacer { flex: 1; }
-  pre.role { margin: 0; white-space: pre-wrap; font: 13.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--charcoal); background: var(--linen); border-radius: 2px; padding: 18px; }
+  pre.role { margin: 0; white-space: pre-wrap; font: 13.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--charcoal); background: var(--linen); border-radius: var(--r); padding: 18px; }
   .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .kv div { background: var(--linen); border-radius: 2px; padding: 14px; }
+  .kv div { background: var(--linen); border-radius: var(--r); padding: 14px; }
   .kv b { display: block; font-weight: 400; font-size: 24px; letter-spacing: 0; font-feature-settings: "tnum"; }
   .kv span { font-size: 12px; color: var(--stone); }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 2px; background: var(--linen); text-decoration: none; font-size: 13px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: var(--r); background: var(--linen); text-decoration: none; font-size: 13px; }
   .chip:hover { background: var(--bone); }
   .empty-note { font-size: 14px; color: var(--stone); margin: 0; }
   .pager-nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; }
@@ -87,15 +85,15 @@
   .check-result { font-size: 13px; display: flex; gap: 6px; align-items: center; }
   .check-result.ok { color: var(--ok); } .check-result.err { color: var(--danger); }
   .icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
-  .icons button { aspect-ratio: 1; border-radius: 2px; border: 1px solid var(--line); background: var(--paper); display: grid; place-items: center; color: var(--graphite); }
+  .icons button { aspect-ratio: 1; border-radius: var(--r); border: 1px solid var(--line); background: var(--paper); display: grid; place-items: center; color: var(--graphite); }
   .icons button:hover { border-color: var(--graphite); color: var(--ink); }
   .icons button.on { background: var(--espresso); color: var(--on-espresso); border-color: var(--espresso); }
   .colors { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .colors button { width: 28px; height: 28px; border-radius: 2px; border: 0; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+  .colors button { width: 28px; height: 28px; border-radius: var(--r); border: 0; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
   .colors button.on { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
   .colors input[type=color] { width: 36px; height: 30px; border: 0; padding: 0; background: none; cursor: pointer; }
   .switch { display: flex; align-items: center; gap: 12px; cursor: pointer; font-size: 14px; color: var(--graphite); }
-  .switch input { appearance: none; width: 40px; height: 24px; border-radius: 2px; background: var(--line-strong); position: relative; cursor: pointer; transition: background .2s; margin: 0; flex: none; }
+  .switch input { appearance: none; width: 40px; height: 24px; border-radius: var(--r); background: var(--line-strong); position: relative; cursor: pointer; transition: background .2s; margin: 0; flex: none; }
   .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--knob); transition: transform .2s; }
   .switch input:checked { background: var(--espresso); }
   .switch input:checked::after { transform: translateX(16px); }
@@ -113,6 +111,7 @@
     .vhead .acts { margin-left: 0; }
   }
 </style>
+<link rel="stylesheet" href="/static/theme.css">
 </head>
 <body>
 
@@ -123,7 +122,6 @@
       <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
       <a href="/agents" class="on"><i data-icon="users" data-size="16"></i>Agents</a>
       <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
-      <a href="/guide"><i data-icon="book" data-size="16"></i>Guide</a>
     </nav>
     <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
   </div>
@@ -157,50 +155,60 @@ function setTitle(t) { document.title = `${t} · Agents Atelier`; }
 
 // ================================================================ list: /agents
 let agents = [], filter = "all", query = "";
+let owner = ["mine", "shared"].includes(new URLSearchParams(location.search).get("show")) ? new URLSearchParams(location.search).get("show") : "all";
 let agentsPage = 1, agentsPer = perPagePref("agents", 10);
 async function listView() {
   setTitle("Agents");
   app.innerHTML = `<p class="note">Loading…</p>`;
   let teams;
-  try { [agents, teams] = await Promise.all([api("/api/agents?full=1"), api("/api/presets")]); }
+  let me;
+  try { [agents, teams, me] = await Promise.all([api("/api/agents?full=1"), api("/api/presets"), getMe()]); }
   catch (err) { return showError(app, err, listView, "Couldn't load the agents"); }
   const usage = Object.fromEntries(agents.map(a => [a.id, teams.filter(t => t.agents.includes(a.id)).length]));
   app.innerHTML = `
     <div class="bar-top"><h1>Agents</h1>
       <button class="btn btn-ghost" id="importBtn" title="Import an agent (.md), a team (.json) or an export (.zip)">${icon("file-plus", { size: 16 })}Import</button>
       <a class="btn btn-ghost" href="/api/export" title="All agents, shared rules and your teams as a .zip">${icon("download", { size: 16 })}Export all</a>
-      <a class="btn btn-ghost" href="/teams">${icon("layers", { size: 16 })}Teams</a>
       <a class="btn btn-dark" href="/agents/new">${icon("plus", { size: 16 })}New agent</a></div>
     <a class="rules-row" href="/agents/rules"><span class="tile" style="--c:#766a7c">${icon("layers", { size: 17 })}</span>
       <span><b>Shared rules</b><small>Instructions every agent receives before its own role</small></span><span class="go">${icon("arrow-right", { size: 16 })}</span></a>
     <div class="controls">
       <label class="search"><i data-icon="search" data-size="16"></i><input class="input" id="q" placeholder="Search agents" autocomplete="off" value="${esc(query)}"></label>
-      <button class="fchip ${filter === "all" ? "on" : ""}" data-filter="all">All <span>${agents.length}</span></button>
+      <div class="fgroup" role="group" aria-label="Whose agents">
+        <button class="fchip ${owner === "all" ? "on" : ""}" data-owner="all" aria-pressed="${owner === "all"}">All agents <span>${agents.length}</span></button>
+        <button class="fchip ${owner === "mine" ? "on" : ""}" data-owner="mine" aria-pressed="${owner === "mine"}">Mine <span>${agents.filter(a => a.scope === "mine").length}</span></button>
+        <button class="fchip ${owner === "shared" ? "on" : ""}" data-owner="shared" aria-pressed="${owner === "shared"}">Shared <span>${agents.filter(a => a.scope === "shared").length}</span></button>
+      </div>
+      <button class="fchip ${filter === "all" ? "on" : ""}" data-filter="all">Any status <span>${agents.length}</span></button>
       <button class="fchip ${filter === "on" ? "on" : ""}" data-filter="on">On by default <span>${agents.filter(a => a.default).length}</span></button>
       <button class="fchip ${filter === "off" ? "on" : ""}" data-filter="off">Optional <span>${agents.filter(a => !a.default).length}</span></button>
     </div>
-    <p class="hint">${icon("menu", { size: 13 })}Agents run top to bottom. Drag the handle — or press Alt+↑/↓ — to change the order.</p>
+    <p class="hint" ${owner === "all" && filter === "all" ? "" : "hidden"}>${icon("menu", { size: 13 })}Agents run top to bottom. Drag the handle, or press Alt+↑/↓, to change the order${me?.role === "admin" ? " (this also sets the shared order for everyone)" : " for your projects"}.</p>
     <div class="alist" id="list"></div>
     <nav class="pager compact" id="agentsPager" aria-label="Pages of agents"></nav>`;
   const draw = () => {
     const q = query.toLowerCase();
-    const shown = agents.filter(a => (filter === "all" || (filter === "on") === a.default) &&
+    const reorderable = !q && filter === "all" && owner === "all";     // the order is the whole list's
+    const shown = agents.filter(a => (owner === "all" || a.scope === owner) && (filter === "all" || (filter === "on") === a.default) &&
       (!q || a.name.toLowerCase().includes(q) || a.id.includes(q) || (a.description || "").toLowerCase().includes(q)));
     const pg = paginate(shown, agentsPage, agentsPer);
     agentsPage = pg.page;
     $("agentsPager").innerHTML = pagerHTML(pg, { noun: "agents" });
     $("list").innerHTML = pg.items.map(a => `
-      <a class="arow" href="/agents/${encodeURIComponent(a.id)}" data-id="${esc(a.id)}" draggable="${!q && filter === "all"}">
-        <span class="grip" title="Drag to reorder">${q || filter !== "all" ? "" : icon("menu", { size: 13 })}</span>
+      <a class="arow" href="/agents/${encodeURIComponent(a.id)}" data-id="${esc(a.id)}" draggable="${reorderable}">
+        <span class="grip" title="Drag to reorder">${reorderable ? icon("menu", { size: 13 }) : ""}</span>
         <span class="num">${String(agents.indexOf(a) + 1).padStart(2, "0")}</span>
         <span class="tile" style="--c:${a.color}">${icon(a.icon, { size: 17 })}</span>
         <span class="nm"><b>${esc(a.name)}</b><small>${esc(a.description || "No description")}</small></span>
-        <span class="meta">${!a.model_ok ? `<span class="badge mono" style="background:color-mix(in srgb,var(--danger) 12%,var(--paper));color:var(--danger)" title="Not a known model — this agent will fail until you pick a valid one">${icon("alert", { size: 11 })}${esc(a.model)}</span>`
+        <span class="meta">${!a.model_ok ? `<span class="badge mono" style="background:color-mix(in srgb,var(--danger) 12%,var(--paper));color:var(--danger)" title="Not a known model: this agent will fail until you pick a valid one">${icon("alert", { size: 11 })}${esc(a.model)}</span>`
           : a.model ? `<span class="badge mono" title="Model">${esc(a.model)}</span>` : `<span class="badge" title="Server default model">default model</span>`}
+          <span class="badge" title="${a.scope === "shared" ? "Shared with everyone" : "Only you can see it"}">${a.scope === "shared" ? "shared" : "mine"}</span>
           ${a.default ? `<span class="badge">on</span>` : `<span class="badge">optional</span>`}</span>
         <span class="teams">${usage[a.id]} team${usage[a.id] === 1 ? "" : "s"}</span>
         <span class="go">${icon("arrow-right", { size: 15 })}</span>
-      </a>`).join("") || `<p class="note" style="padding:20px">No agent matches.</p>`;
+      </a>`).join("") || (owner === "mine" && !q && filter === "all"
+      ? `<p class="note" style="padding:20px">You don't have your own agents yet. <a href="/agents/new">Create one</a>, or open a shared agent and duplicate it.</p>`
+      : `<p class="note" style="padding:20px">No agent matches.</p>`);
   };
   draw();
   bindPager($("agentsPager"), (p) => { agentsPage = p; draw(); $("list").scrollIntoView({ block: "nearest", behavior: "smooth" }); },
@@ -208,6 +216,11 @@ async function listView() {
   $("q").addEventListener("input", (e) => { query = e.target.value.trim(); agentsPage = 1; draw(); });
   $("importBtn").onclick = async () => { if (await importFlow()) listView(); };
   app.querySelectorAll("[data-filter]").forEach(b => b.onclick = () => { filter = b.dataset.filter; agentsPage = 1; listView(); });
+  app.querySelectorAll("[data-owner]").forEach(b => b.onclick = () => {
+    owner = b.dataset.owner; agentsPage = 1;
+    history.replaceState(null, "", owner === "all" ? "/agents" : `/agents?show=${owner}`);   // survives a reload and the back button
+    listView();
+  });
   enableReorder(draw);
 }
 
@@ -259,7 +272,7 @@ async function detailView(id) {
       <div class="vhead">
         <span class="tile" style="--c:${a.color}">${icon(a.icon, { size: 30 })}</span>
         <div><h1>${esc(a.name)}</h1>
-          <div class="sub">Agent ${a.position} of ${a.total} · agents/${esc(a.file)} · id ${esc(a.id)}</div>
+          <div class="sub">Agent ${a.position} of ${a.total} · ${a.scope === "shared" ? "shared with everyone" : "your agent"} · id ${esc(a.id)}</div>
           <div class="badges">
             <span class="badge ${a.model ? "mono" : ""}">${icon("cpu", { size: 12 })}${esc(a.model || "default model")}</span>
             <span class="badge">${a.default ? "On by default" : "Optional"}</span>
@@ -268,15 +281,16 @@ async function detailView(id) {
         <div class="acts">
           <a class="btn btn-ghost btn-sm" href="/api/agents/${encodeURIComponent(a.id)}/export" title="Download this agent as a .md file">${icon("download", { size: 14 })}Export</a>
           <a class="btn btn-ghost btn-sm" href="/agents/new?from=${encodeURIComponent(a.id)}">${icon("copy", { size: 14 })}Duplicate</a>
-          <button class="btn btn-ghost btn-sm" id="del">${icon("trash", { size: 14 })}Delete</button>
-          <a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">${icon("pencil", { size: 14 })}Edit</a>
+          ${a.editable ? `<button class="btn btn-ghost btn-sm" id="del">${icon("trash", { size: 14 })}Delete</button>
+          <a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">${icon("pencil", { size: 14 })}Edit</a>` : ""}
         </div>
       </div>
       <p class="vdesc">${esc(a.description || "No description yet.")}</p>
+      ${a.editable ? "" : `<p class="note">${icon("lock", { size: 14 })}<span>Only an admin can change a shared agent. Duplicate it to make your own version.</span></p>`}
       ${a.model_ok ? "" : `<div class="err-state" role="alert" style="max-width:none;margin:20px 0 0;padding:16px 18px;text-align:left;display:flex;gap:12px;align-items:center">
         <span class="tile" style="margin:0;width:36px;height:36px">${icon("alert", { size: 18 })}</span>
         <span style="flex:1"><b style="display:inline">“${esc(a.model)}” isn't a known model.</b> This agent will fail until you pick a valid one.</span>
-        <a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">Fix the model</a></div>`}
+        ${a.editable ? `<a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">Fix the model</a>` : ""}</div>`}
     </section>
     <div class="grid2">
       <section class="card">
@@ -307,9 +321,9 @@ async function detailView(id) {
       ${a.next ? `<a class="btn btn-ghost btn-sm" href="/agents/${encodeURIComponent(a.next)}">Next agent${icon("arrow-right", { size: 14 })}</a>` : ""}
     </nav>`;
   $("copyRole").onclick = async () => { try { await navigator.clipboard.writeText(a.role); toast("Instructions copied"); } catch { toast("Copy failed", "err"); } };
-  $("del").onclick = async () => {
+  if ($("del")) $("del").onclick = async () => {
     if (!await confirmDialog({ title: `Delete “${a.name}”?`, ok: "Delete", danger: true,
-      text: `This removes agents/${a.file}. Projects and teams that use it will simply skip it.` })) return;
+      text: `This deletes the agent${a.scope === "shared" ? " for everyone" : ""}. Projects and teams that use it will simply skip it.` })) return;
     try { await api(`/api/agents/${encodeURIComponent(a.id)}`, { method: "DELETE" }); toast("Agent deleted"); go("/agents"); }
     catch (err) { toast(err.message, "err"); }
   };
@@ -319,12 +333,14 @@ async function detailView(id) {
 async function formView(id) {
   const from = new URLSearchParams(location.search).get("from");
   app.innerHTML = `<p class="note">Loading…</p>`;
-  let source = null, catalog, all;
+  let source = null, catalog, all, me;
   try {
-    [catalog, all, source] = await Promise.all([api("/api/models"), api("/api/agents"),
-      id || from ? api(`/api/agents/${encodeURIComponent(id || from)}`) : null]);
+    [catalog, all, source, me] = await Promise.all([api("/api/models"), api("/api/agents"),
+      id || from ? api(`/api/agents/${encodeURIComponent(id || from)}`) : null, getMe()]);
   } catch (err) { return showError(app, err, () => formView(id), "Couldn't open the form"); }
+  if (id && !source.editable) return showError(app, new Error("Only an admin can change a shared agent. Duplicate it to make your own version."), null, "This agent is shared");
   const isNew = !id;
+  const askScope = isNew && me?.role === "admin";
   const draft = source
     ? { id: isNew ? "" : source.id, name: isNew ? `${source.name} copy` : source.name, icon: source.icon, color: source.color, default: isNew ? false : source.default,
         description: source.description || "", model: source.model || "", tools: source.tools || "", role: source.role }
@@ -336,7 +352,7 @@ async function formView(id) {
   const known = new Set(catalog.options.map(o => o.id));
   const group = (kind, label) => {
     const opts = catalog.options.filter(o => o.kind === kind);
-    return opts.length ? `<optgroup label="${esc(label)}">${opts.map(o => `<option value="${esc(o.id)}">${esc(o.label)} — ${esc(o.note)}</option>`).join("")}</optgroup>` : "";
+    return opts.length ? `<optgroup label="${esc(label)}">${opts.map(o => `<option value="${esc(o.id)}">${esc(o.label)}: ${esc(o.note)}</option>`).join("")}</optgroup>` : "";
   };
   app.innerHTML = `
     <a class="crumb" href="${isNew ? "/agents" : `/agents/${encodeURIComponent(id)}`}">${icon("arrow-right", { size: 14, cls: "flip" })}${isNew ? "All agents" : esc(source.name)}</a>
@@ -344,7 +360,7 @@ async function formView(id) {
       <div class="vhead" style="margin-bottom:26px">
         <span class="tile" id="pv-tile" style="--c:${draft.color}">${icon(draft.icon, { size: 30 })}</span>
         <div><h1 id="pv-name">${esc(draft.name || "New agent")}</h1>
-          <div class="sub">${isNew ? `Will be added as agent ${all.length + 1} (move it in the list afterwards)` : `agents/${esc(source.file)}`}</div></div>
+          <div class="sub">${isNew ? `Will be added as agent ${all.length + 1} (move it in the list afterwards)` : (source.scope === "shared" ? "Shared with everyone" : "Your agent")}</div></div>
       </div>
       <div class="fields">
         <label class="field"><span>Name</span><input class="input" id="f-name" maxlength="40" value="${esc(draft.name)}" placeholder="e.g. Dark mode"></label>
@@ -354,11 +370,11 @@ async function formView(id) {
           <input class="input" id="f-desc" maxlength="160" value="${esc(draft.description)}" placeholder="What this agent does, in one sentence"></label>
         <div class="field full"><span>Model <small>Aliases come from your Claude CLI (${esc(catalog.alias_source)})</small></span>
           <select class="input" id="f-model">
-            <option value="">${esc(catalog.default.label)} — ${esc(catalog.default.note)}</option>
-            ${group("alias", "Aliases from the Claude CLI — always the latest model")}
+            <option value="">${esc(catalog.default.label)}: ${esc(catalog.default.note)}</option>
+            ${group("alias", "Aliases from the Claude CLI: always the latest model")}
             ${group("full", "Specific model versions")}
             ${group("custom", "Checked by you")}
-            ${draft.model && !known.has(draft.model) ? `<option value="${esc(draft.model)}">${esc(draft.model)} — not in the list, check it below</option>` : ""}
+            ${draft.model && !known.has(draft.model) ? `<option value="${esc(draft.model)}">${esc(draft.model)}: not in the list, check it below</option>` : ""}
             <option value="__other">Another model…</option>
           </select>
           <div class="other-model" id="otherModel" hidden>
@@ -375,7 +391,8 @@ async function formView(id) {
             <input type="color" id="f-color" value="${esc(draft.color)}" title="Custom colour"></div>
           <label class="switch" style="margin-top:18px"><input type="checkbox" id="f-default" ${draft.default ? "checked" : ""}><span>On by default for new projects</span></label>
           <label class="switch" style="margin-top:10px" title="Adds web search and page fetching. Such an agent may only write research.md and plan.md: the server undoes any other change it makes.">
-            <input type="checkbox" id="f-web" ${draft.tools === "web" ? "checked" : ""}><span>Web research — can search the web and read pages (writes only research.md and plan.md)</span></label></div>
+            <input type="checkbox" id="f-web" ${draft.tools === "web" ? "checked" : ""}><span>Web research: can search the web and read pages (writes only research.md and plan.md)</span></label>
+          ${askScope ? `<label class="switch" style="margin-top:10px"><input type="checkbox" id="f-shared" checked><span>Shared with everyone (off: only you see it)</span></label>` : ""}</div>
         <label class="field full"><span>Instructions <small>the agent sees the shared rules, then this, then the project files</small></span>
           <textarea class="input role-input" id="f-role" spellcheck="false">${esc(draft.role)}</textarea></label>
       </div>
@@ -413,9 +430,9 @@ async function formView(id) {
     try {
       const r = await api("/api/models/check", { method: "POST", body: JSON.stringify({ model: name }), timeout: 120000 });
       res.className = "check-result ok";
-      res.innerHTML = `${icon("check", { size: 14 })}“${esc(name)}” works — it runs ${esc(r.resolved)}.`;
+      res.innerHTML = `${icon("check", { size: 14 })}“${esc(name)}” works. It runs ${esc(r.resolved)}.`;
       if (![...$("f-model").options].some(o => o.value === name)) {
-        $("f-model").querySelector('option[value="__other"]').insertAdjacentHTML("beforebegin", `<option value="${esc(name)}">${esc(name)} — checked just now</option>`);
+        $("f-model").querySelector('option[value="__other"]').insertAdjacentHTML("beforebegin", `<option value="${esc(name)}">${esc(name)}: checked just now</option>`);
       }
       $("f-model").value = name; $("otherModel").hidden = true;
       draft.model = name; changed();
@@ -439,6 +456,7 @@ async function formView(id) {
   $("save").onclick = async () => {
     if ($("f-model").value === "__other") return toast("Check the model with the Claude CLI first, or pick one from the list", "err");
     const body = { ...draft }; delete body._idTouched;
+    if (askScope && !$("f-shared").checked) body.scope = "mine";
     $("save").disabled = true;
     try {
       const saved = isNew
@@ -454,20 +472,21 @@ async function formView(id) {
 async function rulesView() {
   setTitle("Shared rules");
   app.innerHTML = `<p class="note">Loading…</p>`;
-  let rules;
-  try { rules = (await api("/api/agents/common")).text; }
+  let rules, me;
+  try { [rules, me] = await Promise.all([api("/api/agents/common").then(r => r.text), getMe()]); }
   catch (err) { return showError(app, err, rulesView, "Couldn't load the shared rules"); }
   app.innerHTML = `
     <a class="crumb" href="/agents">${icon("arrow-right", { size: 14, cls: "flip" })}All agents</a>
     <section class="card">
       <div class="vhead" style="margin-bottom:18px"><span class="tile" style="--c:#766a7c">${icon("layers", { size: 30 })}</span>
-        <div><h1>Shared rules</h1><div class="sub">agents/_common.md · given to every agent before its own instructions</div></div></div>
+        <div><h1>Shared rules</h1><div class="sub">Given to every agent before its own instructions${me?.role === "admin" ? "" : " · only an admin can change them"}</div></div></div>
       <p class="note">${icon("alert", { size: 16 })}<span>These rules are the contract between agents: which files make a project, “small edits, keep earlier work”, and the sections of plan.md. Change them carefully.</span></p>
-      <textarea class="input role-input" id="rules" spellcheck="false" style="min-height:420px;width:100%">${esc(rules)}</textarea>
-      <div class="form-actions"><span class="status" id="status"></span>
+      <textarea class="input role-input" id="rules" spellcheck="false" style="min-height:420px;width:100%" ${me?.role === "admin" ? "" : "readonly"}>${esc(rules)}</textarea>
+      ${me?.role === "admin" ? `<div class="form-actions"><span class="status" id="status"></span>
         <a class="btn btn-ghost" href="/agents">Cancel</a>
-        <button class="btn btn-dark" id="save">${icon("check", { size: 16 })}Save rules</button></div>
+        <button class="btn btn-dark" id="save">${icon("check", { size: 16 })}Save rules</button></div>` : ""}
     </section>`;
+  if (me?.role !== "admin") return;
   $("rules").oninput = () => { dirty = $("rules").value !== rules; $("status").innerHTML = dirty ? `${icon("pencil", { size: 14 })}Unsaved changes` : ""; };
   $("save").onclick = async () => {
     try { rules = (await api("/api/agents/common", { method: "PUT", body: JSON.stringify({ text: $("rules").value }) })).text; dirty = false; $("status").innerHTML = `${icon("check", { size: 14 })}Saved`; toast("Shared rules saved"); }

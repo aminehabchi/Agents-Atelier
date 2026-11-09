@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#000000">
+<title>Profile · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  /* who you are, across the top */
+  .hero { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: var(--hard); padding: 24px; margin: 8px 0 32px; }
+  .hero-avatar { flex: none; width: 72px; height: 72px; display: grid; place-items: center; background: var(--canary); color: var(--on-accent); border: 1px solid var(--line-strong); border-radius: var(--r); font-weight: 600; font-size: 24px; }
+  .hero-who { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+  .hero-who h1 { margin: 0; font-weight: 500; font-size: 24px; line-height: 1.2; }
+  .hero-who p { margin: 4px 0 8px; color: var(--graphite); font-size: 14px; }
+  .hero-who small { color: var(--stone); font-size: 13px; margin-left: 8px; }
+
+  /* the sections, with a contents list that follows you */
+  .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; align-items: start; }
+  .toc { position: sticky; top: 92px; display: flex; flex-direction: column; gap: 2px; }
+  .toc a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; font-size: 13px; text-decoration: none; color: var(--graphite); border-radius: var(--r); border: 1.5px solid transparent; }
+  .toc a:hover { background: var(--ice); color: var(--ink); }
+  .toc a.on { background: var(--paper); border-color: var(--line-strong); color: var(--ink); font-weight: 500; }
+  .toc a.danger:hover, .toc a.danger.on { color: var(--danger); }
+
+  .sect { scroll-margin-top: 92px; background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 24px; margin-bottom: 16px; }
+  .sect h2 { margin: 0 0 4px; font-size: 16px; font-weight: 500; }
+  .sect > p { margin: 0 0 20px; color: var(--graphite); font-size: 14px; line-height: 1.55; }
+  .pf { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; min-width: 0; }
+  .pf label, .pref-label { font-size: 13px; font-weight: 500; display: flex; justify-content: space-between; gap: 12px; }
+  .pf em { font-style: normal; font-weight: 400; color: var(--stone); font-size: 12px; }
+  .pf em.met { color: var(--ok); }
+  .pf .input { width: 100%; }
+  .pf .input[readonly] { background: var(--mist); color: var(--graphite); }
+  .pf select.input { height: 46px; font-size: 15px; }
+  .pf small.help { color: var(--stone); font-size: 12px; line-height: 1.4; }
+  .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+  .pw { position: relative; }
+  .pw .input { padding-right: 46px; }
+  .pw button { position: absolute; top: 0; right: 0; bottom: 0; width: 44px; display: grid; place-items: center; background: none; border: 0; color: var(--stone); }
+  .pw button:hover, .pw button[aria-pressed="true"] { color: var(--ink); }
+  .form-end { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+  .perr { color: var(--danger); font-size: 13px; line-height: 1.5; margin: 0 0 12px; }
+  .perr:empty { display: none; }
+  .saved { font-size: 13px; color: var(--ok); display: inline-flex; align-items: center; gap: 6px; }
+  .saved:empty { display: none; }
+
+  .prefs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 24px; }
+  .pref-label { margin-bottom: 8px; }
+  .prefs .seg { display: flex; box-shadow: var(--ring); }
+  .prefs .seg button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 6px; white-space: nowrap; }
+
+  .danger-zone { border-color: var(--danger); }
+  .danger-zone h2 { color: var(--danger); }
+  dialog.modal .pf { text-align: left; }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .toc { position: sticky; top: 68px; z-index: 5; flex-direction: row; overflow-x: auto; background: var(--linen); padding: 8px 0; margin: 0 -16px; padding-inline: 16px; scrollbar-width: none; }
+    .toc a { flex: none; padding: 7px 10px; }
+    .sect { scroll-margin-top: 140px; }
+  }
+  @media (max-width: 560px) {
+    .two, .prefs { grid-template-columns: minmax(0, 1fr); }
+    .hero { padding: 20px 16px; box-shadow: var(--hard-sm); }
+    .sect { padding: 20px 16px; }
+  }
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <nav class="links">
+      <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
+    </nav>
+    <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
+  </div>
+</header>
+<main class="wrap page">
+  <div id="app"><p>Loading…</p></div>
+</main>
+<script>
+document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
+const app = document.getElementById("app");
+const $ = (id) => document.getElementById(id);
+const ROLE = { admin: "Admin", user: "User" };
+const MIN_PASSWORD = 8;
+const send = (path, method, body) => api(path, { method, body: JSON.stringify(body || {}) });
+const DETAILS = ["name", "company", "job_role", "use_case", "referral"];
+
+const choice = (id, label, answers = [], value = "") => `
+  <div class="pf"><label for="${id}"><span>${label}</span></label>
+    <select class="input" id="${id}"><option value="">Not answered</option>
+      ${answers.map(a => `<option value="${esc(a)}" ${a === value ? "selected" : ""}>${esc(a)}</option>`).join("")}</select></div>`;
+const password = (id, label, ac, hint = "") => `
+  <div class="pf"><label for="${id}"><span>${label}</span>${hint ? `<em id="${id}-hint">${hint}</em>` : ""}</label>
+    <div class="pw"><input class="input" id="${id}" type="password" autocomplete="${ac}" maxlength="200">
+      <button type="button" data-peek="${id}" aria-label="Show password" aria-pressed="false" title="Show password">${icon("eye", { size: 17 })}</button></div></div>`;
+const seg = (attr, label, id, current, items) => `
+  <div><span class="pref-label" id="${id}">${label}</span>
+    <div class="seg" role="radiogroup" aria-labelledby="${id}">${items.map(([k, text, ic, raw]) =>
+      `<button type="button" role="radio" ${raw ? "data-no-i18n" : ""} data-${attr}="${k}" aria-checked="${current === k}" class="${current === k ? "on" : ""}">${ic ? icon(ic, { size: 14 }) : ""}<span>${text}</span></button>`).join("")}</div></div>`;
+
+function wirePeek(root) {
+  root.querySelectorAll("[data-peek]").forEach(b => { b.onclick = () => {
+    const input = $(b.dataset.peek), show = input.type === "password";
+    input.type = show ? "text" : "password";
+    b.setAttribute("aria-pressed", show);
+    b.title = show ? "Hide password" : "Show password";
+    b.setAttribute("aria-label", b.title);
+  }; });
+}
+
+async function load() {
+  let me, opts, sessions;
+  try {
+    [me, opts, sessions] = await Promise.all([api("/api/auth/me").then(r => r.user), api("/api/auth/options"), api("/api/auth/sessions")]);
+  } catch (err) { return showError(app, err, load, "Couldn't load your profile"); }
+  app.innerHTML = `
+    <section class="hero">
+      <span class="hero-avatar" id="hero-avatar" aria-hidden="true">${esc(initialsOf(me))}</span>
+      <div class="hero-who">
+        <h1 id="hero-name" data-no-i18n>${esc(me.name || me.email)}</h1>
+        <p data-no-i18n>${esc(me.email)}</p>
+        <span class="badge">${esc(ROLE[me.role] || me.role)}</span><small>joined ${ago(me.created)}</small>
+      </div>
+    </section>
+
+    <div class="layout">
+      <nav class="toc" id="toc" aria-label="Sections of your profile">
+        <a href="#preferences">${icon("sliders", { size: 15 })}<span>Preferences</span></a>
+        <a href="#details">${icon("user", { size: 15 })}<span>Your details</span></a>
+        <a href="#password-section">${icon("lock", { size: 15 })}<span>Password</span></a>
+        <a href="#devices">${icon("monitor", { size: 15 })}<span>Other devices</span></a>
+        <a href="#delete" class="danger">${icon("trash", { size: 15 })}<span>Delete account</span></a>
+      </nav>
+      <div>
+        <section class="sect" id="preferences">
+          <h2>Preferences</h2>
+          <p>Saved on your account, so they follow you to your other devices.</p>
+          <div class="prefs">
+            ${seg("lang", "Language", "lang-label", getLang(), [["en", "English", "", true], ["fr", "Français", "", true]])}
+            ${seg("pref-theme", "Appearance", "theme-label", getTheme(), [["system", "System", "monitor"], ["light", "Light", "sun"], ["dark", "Dark", "moon"]])}
+          </div>
+        </section>
+
+        <section class="sect" id="details">
+          <h2>Your details</h2>
+          <p>Your email is your login, so it can't be changed here.</p>
+          <form id="details-form" novalidate>
+            <div class="two">
+              <div class="pf"><label for="name"><span>Full name</span></label><input class="input" id="name" autocomplete="name" maxlength="80" value="${esc(me.name)}"></div>
+              <div class="pf"><label for="company"><span>Company</span></label><input class="input" id="company" autocomplete="organization" maxlength="80" value="${esc(me.company)}"></div>
+            </div>
+            ${choice("job_role", "What best describes you?", opts.job_role, me.job_role)}
+            <div class="two">
+              ${choice("use_case", "What do you build sites for?", opts.use_case, me.use_case)}
+              ${choice("referral", "How did you hear about us?", opts.referral, me.referral)}
+            </div>
+            <p class="perr" id="details-err" role="alert"></p>
+            <div class="form-end"><button class="btn btn-dark" id="details-go" disabled>Save details</button><span class="saved" id="details-saved" role="status"></span></div>
+          </form>
+        </section>
+
+        <section class="sect" id="password-section">
+          <h2>Password</h2>
+          <p>Changing it logs out your other devices, and we email you a notice. Forgot it? Log out and use “Forgot your password?”.</p>
+          <form id="pw" novalidate>
+            ${password("current", "Current password", "current-password")}
+            <div class="two">
+              ${password("password", "New password", "new-password", "at least 8 characters")}
+              ${password("password2", "Repeat new password", "new-password")}
+            </div>
+            <p class="perr" id="pw-err" role="alert"></p>
+            <div class="form-end"><button class="btn btn-dark" id="pw-go">Change password</button><span class="saved" id="pw-saved" role="status"></span></div>
+          </form>
+        </section>
+
+        <section class="sect" id="devices">
+          <h2>Other devices</h2>
+          <p id="others-text"></p>
+          <button class="btn btn-ghost" type="button" id="others-go">${icon("log-out", { size: 15 })}Log out other devices</button>
+        </section>
+
+        <section class="sect danger-zone" id="delete">
+          <h2>Delete account</h2>
+          <p>Permanently deletes your account, your private agents and teams, and all your projects with their files. Download anything you want to keep first. This can't be undone.</p>
+          <button class="btn btn-danger" type="button" id="del-go">${icon("trash", { size: 15 })}Delete my account</button>
+        </section>
+      </div>
+    </div>`;
+  wirePeek(app);
+
+  /* the contents list follows the section you're reading */
+  const links = [...$("toc").querySelectorAll("a")];
+  const spy = new IntersectionObserver((entries) => entries.forEach(e => {
+    if (e.isIntersecting) links.forEach(a => a.classList.toggle("on", a.hash === "#" + e.target.id));
+  }), { rootMargin: "-20% 0px -70% 0px" });
+  app.querySelectorAll(".sect").forEach(s => spy.observe(s));
+  links[0].classList.add("on");
+
+  /* preferences apply at once */
+  app.querySelectorAll("[data-lang]").forEach(b => { b.onclick = async () => {
+    if (b.dataset.lang === getLang()) return;
+    await savePreferences({ language: b.dataset.lang });
+    setLang(b.dataset.lang);
+  }; });
+  app.querySelectorAll("[data-pref-theme]").forEach(b => { b.onclick = () => {
+    setTheme(b.dataset.prefTheme);
+    app.querySelectorAll("[data-pref-theme]").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", x === b); });
+  }; });
+
+  /* details: Save wakes up when something changed */
+  const detailValues = () => Object.fromEntries(DETAILS.map(k => [k, $(k).value.trim()]));
+  let savedDetails = JSON.stringify(detailValues());
+  const refreshDetails = () => {
+    const changed = JSON.stringify(detailValues()) !== savedDetails;
+    $("details-go").disabled = !changed;
+    if (changed) $("details-saved").textContent = "";
+    return changed;
+  };
+  $("details-form").addEventListener("input", refreshDetails);
+  $("details-form").addEventListener("change", refreshDetails);
+  $("details-form").onsubmit = async (e) => {
+    e.preventDefault();
+    $("details-err").textContent = "";
+    const body = detailValues();
+    if (body.name.length < 2) { $("details-err").textContent = "Enter your full name."; return $("name").focus(); }
+    $("details-go").disabled = true;
+    try {
+      const { user } = await send("/api/auth/me", "PATCH", body);
+      savedDetails = JSON.stringify(detailValues());
+      $("hero-name").textContent = user.name;
+      $("hero-avatar").textContent = initialsOf(user);
+      updateAccountButton(user);
+      $("details-saved").textContent = "Saved";
+    } catch (err) { $("details-err").textContent = err.message; refreshDetails(); }
+  };
+
+  /* password */
+  const paintOthers = (n) => {
+    $("others-text").textContent = n ? `You're also logged in on ${n} other device${n === 1 ? "" : "s"} or browser${n === 1 ? "" : "s"}.` : "You're not logged in anywhere else.";
+    $("others-go").disabled = !n;
+  };
+  paintOthers(sessions.others);
+  $("password").addEventListener("input", () => { $("password-hint").classList.toggle("met", $("password").value.length >= MIN_PASSWORD); });
+  $("pw").addEventListener("input", () => { $("pw-saved").textContent = ""; $("pw-err").textContent = ""; });
+  $("pw").onsubmit = async (e) => {
+    e.preventDefault();
+    $("pw-err").textContent = "";
+    const fail = (message, id) => { $("pw-err").textContent = message; $(id).focus(); };
+    if (!$("current").value) return fail("Enter your current password.", "current");
+    if ($("password").value.length < MIN_PASSWORD) return fail("Use at least 8 characters for your new password.", "password");
+    if ($("password").value !== $("password2").value) return fail("The two new passwords don't match.", "password2");
+    $("pw-go").disabled = true;
+    try {
+      await send("/api/auth/password", "POST", { current: $("current").value, password: $("password").value });
+      $("pw").reset();
+      $("password-hint").classList.remove("met");
+      paintOthers(0);
+      $("pw-saved").textContent = "Password changed. Your other devices were logged out.";
+    } catch (err) { $("pw-err").textContent = err.message; }
+    $("pw-go").disabled = false;
+  };
+
+  $("others-go").onclick = async () => {
+    try {
+      const { ended } = await send("/api/auth/sessions", "DELETE");
+      paintOthers(0);
+      toast(`Logged out ${ended} other device${ended === 1 ? "" : "s"}`);
+    } catch (err) { toast(err.message, "err"); }
+  };
+
+  /* delete */
+  $("del-go").onclick = () => {
+    const d = document.createElement("dialog");
+    d.className = "modal";
+    d.innerHTML = `<h3>Delete your account?</h3>
+      <p>Your account, private agents and teams, and all your projects and their files will be gone for good.</p>
+      <form id="del-form" novalidate>
+        ${password("del-password", "Enter your password to confirm", "current-password")}
+        <p class="perr" id="del-err" role="alert"></p>
+        <div class="row"><button class="btn btn-ghost" type="button" data-close>Keep my account</button>
+          <button class="btn btn-danger" id="del-yes">Delete everything</button></div>
+      </form>`;
+    document.body.append(d);
+    wirePeek(d);
+    d.addEventListener("close", () => d.remove());
+    d.querySelector("[data-close]").onclick = () => d.close();
+    d.showModal();
+    d.querySelector("[data-close]").focus();          // the safe choice is the one under Enter
+    d.querySelector("#del-form").onsubmit = async (e) => {
+      e.preventDefault();
+      $("del-err").textContent = "";
+      if (!$("del-password").value) { $("del-err").textContent = "Enter your password."; return $("del-password").focus(); }
+      $("del-yes").disabled = true;
+      try {
+        await send("/api/auth/delete", "POST", { password: $("del-password").value });
+        try { sessionStorage.setItem("atelier-toast", "Your account was deleted."); } catch {}
+        location.href = "/";
+      } catch (err) { $("del-err").textContent = err.message; $("del-yes").disabled = false; }
+    };
+  };
+
+  if (location.hash) document.querySelector(location.hash)?.scrollIntoView();
+}
+load();
+</script>
+</body>
+</html>

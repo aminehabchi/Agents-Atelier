@@ -1,4 +1,4 @@
-/* Agents Atelier icon set — thin-stroke line icons on a 24px grid, hand-drawn for this project.
+/* Agents Atelier icon set: thin-stroke line icons on a 24px grid, hand-drawn for this project.
  *
  *   icon("menu")                -> "<svg ...>" string
  *   icon("menu", { size: 16 })
@@ -17,6 +17,8 @@
     menu: P("M4 6h16M4 12h16M4 18h16"),
     plus: P("M12 5v14M5 12h14"),
     x: P("M6 6l12 12M18 6L6 18"),
+    user: C(12, 8, 4) + P("M4 21c0-4 4-6 8-6s8 2 8 6"),
+    "log-out": P("M9 4H5v16h4M16 8l4 4-4 4M20 12H10"),
     check: P("M5 12.5l4.5 4.5L19 7"),
     "arrow-right": P("M5 12h14M13 6l6 6-6 6"),
     "arrow-up": P("M12 19V5M6 11l6-6 6 6"),

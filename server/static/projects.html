@@ -4,32 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#f4efea">
+<meta name="theme-color" content="#000000">
 <title>Projects · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
 <script src="/static/icons.js"></script>
 <script src="/static/ui.js"></script>
 <style>
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 0; }
-  .stat { background: var(--paper); border-radius: 2px; padding: 20px 22px; display: flex; align-items: center; gap: 14px; }
-  .stat .ico { width: 40px; height: 40px; border-radius: 2px; background: var(--linen); display: grid; place-items: center; color: var(--charcoal); flex: none; }
+  .stat { background: var(--paper); border-radius: var(--r); padding: 20px 22px; display: flex; align-items: center; gap: 14px; }
+  .stat .ico { width: 40px; height: 40px; border-radius: var(--r); background: var(--linen); display: grid; place-items: center; color: var(--charcoal); flex: none; }
   .stat b { display: block; font-weight: 400; font-size: 32px; line-height: 1; letter-spacing: 0; font-feature-settings: "tnum"; }
   .stat span { display: block; font-size: 13px; color: var(--stone); margin-top: 4px; }
 
   .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 32px 0 20px; }
   .controls .search { flex: 1 1 260px; max-width: 380px; }
-  .controls .search kbd { position: absolute; right: 10px; font: 11px ui-monospace, monospace; color: var(--stone); background: var(--paper); border-radius: 2px; padding: 2px 6px; box-shadow: var(--ring); }
+  .controls .search kbd { position: absolute; right: 10px; font: 11px ui-monospace, monospace; color: var(--stone); background: var(--paper); border-radius: var(--r); padding: 2px 6px; box-shadow: var(--ring); }
   .filters { display: flex; gap: 6px; flex-wrap: wrap; }
-  .fchip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 2px; border: 1px solid var(--line); background: var(--paper);
+  .fchip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--r); border: 1px solid var(--line); background: var(--paper);
     font-size: 13px; color: var(--graphite); line-height: 1; }
   .fchip:hover { border-color: var(--graphite); color: var(--ink); }
   .fchip.on { background: var(--espresso); border-color: var(--espresso); color: var(--on-espresso); }
   .fchip .n { font-size: 11px; font-feature-settings: "tnum"; opacity: .7; }
   .controls .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
-  select.input { height: 36px; padding: 0 34px 0 14px; border-radius: 2px; background: var(--paper) no-repeat right 12px center / 14px;
+  select.input { height: 36px; padding: 0 34px 0 14px; border-radius: var(--r); background: var(--paper) no-repeat right 12px center / 14px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23898683' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
     appearance: none; font-size: 13px; cursor: pointer; border-color: var(--line); }
   .seg.views button { width: 36px; height: 30px; padding: 0; display: grid; place-items: center; }
@@ -38,11 +39,11 @@
 
   /* grid view */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
-  .pcard { position: relative; background: var(--paper); border-radius: 2px; overflow: hidden; display: flex; flex-direction: column;
+  .pcard { position: relative; background: var(--paper); border-radius: var(--r); overflow: hidden; display: flex; flex-direction: column;
     box-shadow: var(--ring); transition: transform .2s ease, box-shadow .2s ease; }
   .pcard:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--line-strong); }
-  .pcard > a.cover { position: absolute; inset: 0; z-index: 1; border-radius: 2px; }
-  .thumb { position: relative; aspect-ratio: 16 / 10; background: var(--bone); overflow: hidden; margin: 8px 8px 0; border-radius: 2px; }
+  .pcard > a.cover { position: absolute; inset: 0; z-index: 1; border-radius: var(--r); }
+  .thumb { position: relative; aspect-ratio: 16 / 10; background: var(--bone); overflow: hidden; margin: 8px 8px 0; border-radius: var(--r); }
   .thumb iframe { position: absolute; top: 0; left: 0; width: 400%; height: 400%; border: 0; transform: scale(.25); transform-origin: 0 0; pointer-events: none; background: #fff; }
   .thumb .none { position: absolute; inset: 0; display: grid; place-items: center; color: var(--stone); font-size: 13px; text-align: center; }
   .thumb .none .ic { margin: 0 auto 8px; }
@@ -63,13 +64,13 @@
   .pfoot .icon-btn { width: 32px; height: 32px; }
 
   /* list view */
-  .list { display: flex; flex-direction: column; background: var(--paper); border-radius: 2px; box-shadow: var(--ring); overflow: hidden; }
+  .list { display: flex; flex-direction: column; background: var(--paper); border-radius: var(--r); box-shadow: var(--ring); overflow: hidden; }
   .row { position: relative; display: grid; grid-template-columns: 44px minmax(0, 2.2fr) minmax(0, 1fr) 120px auto; gap: 16px; align-items: center;
     padding: 12px 16px; border-bottom: 1px solid var(--line); transition: background .15s; }
   .row:last-child { border-bottom: 0; }
   .row:hover { background: var(--linen); }
   .row > a.cover { position: absolute; inset: 0; z-index: 1; }
-  .row .ico { width: 44px; height: 44px; border-radius: 2px; background: var(--linen); display: grid; place-items: center; color: var(--stone); }
+  .row .ico { width: 44px; height: 44px; border-radius: var(--r); background: var(--linen); display: grid; place-items: center; color: var(--stone); }
   .row:hover .ico { background: var(--paper); }
   .row .main { min-width: 0; }
   .row .pname { font-size: 15px; display: flex; align-items: center; gap: 8px; }
@@ -80,19 +81,19 @@
   .row .tools { display: flex; gap: 2px; position: relative; z-index: 2; }
   .row .tools .icon-btn { width: 32px; height: 32px; }
 
-  .newcard { border: 1px dashed var(--line-strong); border-radius: 2px; display: grid; place-items: center; min-height: 300px;
+  .newcard { border: 1px dashed var(--line-strong); border-radius: var(--r); display: grid; place-items: center; min-height: 300px;
     color: var(--graphite); background: transparent; transition: border-color .2s, background .2s; text-align: center; }
   .newcard:hover { border-color: var(--graphite); background: var(--paper); color: var(--ink); }
-  .newcard .tile { width: 52px; height: 52px; border-radius: 2px; background: var(--espresso); color: var(--on-espresso); display: grid; place-items: center; margin: 0 auto 14px; }
+  .newcard .tile { width: 52px; height: 52px; border-radius: var(--r); background: var(--espresso); color: var(--on-espresso); display: grid; place-items: center; margin: 0 auto 14px; }
   .newcard b { font-weight: 500; font-size: 16px; display: block; }
   .newcard small { display: block; font-size: 13px; color: var(--stone); margin-top: 4px; }
 
-  .empty { background: var(--paper); border-radius: 2px; padding: 64px 24px; text-align: center; color: var(--graphite); }
-  .empty .tile { width: 56px; height: 56px; border-radius: 2px; background: var(--linen); display: grid; place-items: center; margin: 0 auto 16px; color: var(--charcoal); }
+  .empty { background: var(--paper); border-radius: var(--r); padding: 64px 24px; text-align: center; color: var(--graphite); }
+  .empty .tile { width: 56px; height: 56px; border-radius: var(--r); background: var(--linen); display: grid; place-items: center; margin: 0 auto 16px; color: var(--charcoal); }
   .empty h3 { font-weight: 400; font-size: 28px; letter-spacing: 0; margin: 0 0 8px; color: var(--ink); }
   .empty p { margin: 0 auto 20px; max-width: 380px; font-size: 15px; }
 
-  .skel { background: var(--paper); border-radius: 2px; height: 340px; box-shadow: var(--ring); position: relative; overflow: hidden; }
+  .skel { background: var(--paper); border-radius: var(--r); height: 340px; box-shadow: var(--ring); position: relative; overflow: hidden; }
   .skel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(237, 236, 231, .8), transparent); animation: shimmer 1.2s infinite; }
   @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 
@@ -117,6 +118,7 @@
     .pages .num:not(.on), .pages .gap { display: none; }
   }
 </style>
+<link rel="stylesheet" href="/static/theme.css">
 </head>
 <body>
 
@@ -127,7 +129,6 @@
       <a href="/projects" class="on"><i data-icon="grid" data-size="16"></i>Projects</a>
       <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
       <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
-      <a href="/guide"><i data-icon="book" data-size="16"></i>Guide</a>
     </nav>
     <button class="btn btn-dark" data-new title="New project (N)"><i data-icon="plus" data-size="16"></i>New project</button>
   </div>
@@ -171,6 +172,7 @@
 </main>
 
 <script>
+let refreshFailed = false;
 const $ = (id) => document.getElementById(id);
 const url = new URL(location.href);
 let prefs = {};
@@ -196,13 +198,13 @@ async function load({ quiet = false } = {}) {
   catch (err) {
     loading = false; pending = false;
     if (quiet && data) {           // background refresh: keep the list, just say so
-      offline = true; $("resultLine").textContent = `Can't refresh right now — ${err.message}`; return;
+      offline = true; refreshFailed = true; $("resultLine").textContent = `Can't refresh right now: ${err.message}`; return;
     }
     signature = "";
     $("pager").innerHTML = "";
     return showError($("results"), err, () => load(), "Couldn't load your projects");
   }
-  if ($("resultLine").textContent.startsWith("Can't refresh")) $("resultLine").textContent = "";
+  if (refreshFailed) { $("resultLine").textContent = ""; refreshFailed = false; }
   loading = false;
   if (pending) { pending = false; return load(); }
   state.page = data.page;
@@ -263,7 +265,7 @@ const newCard = () => `<button class="newcard" data-new><div><div class="tile">$
 
 const desc = (p) => p.description
   ? `<div class="pdesc" title="${esc(p.description)}">${esc(p.description)}</div>`
-  : `<div class="pdesc missing">No description yet — add one</div>`;
+  : `<div class="pdesc missing">No description yet. Add one</div>`;
 
 function tools(p) {
   return `
@@ -280,7 +282,7 @@ function cardHTML(p) {
     <div class="thumb">
       ${p.has_preview ? `<iframe data-src="/work/${p.id}/index.html" tabindex="-1" title="" aria-hidden="true" sandbox=""></iframe>`
         : `<div class="none"><div>${icon("file", { size: 24 })}No page yet</div></div>`}
-      ${p.busy ? `<span class="badge live">Building</span>` : p.paused ? `<span class="badge" title="Stopped before the team finished — open it to continue">Paused</span>` : ""}
+      ${p.busy ? `<span class="badge live">Building</span>` : p.paused ? `<span class="badge" title="Stopped before the team finished. Open it to continue">Paused</span>` : ""}
       <div class="hover">
         <a class="btn btn-dark btn-sm" href="/p/${p.id}">${icon("message", { size: 14 })}Open project</a>
         ${p.has_preview ? `<a class="btn btn-sm" href="/work/${p.id}/index.html" target="_blank" rel="noopener">${icon("external", { size: 14 })}View page</a>` : ""}
@@ -289,6 +291,7 @@ function cardHTML(p) {
     <div class="pbody">
       <div class="pname" title="${esc(p.name)}">${esc(p.name)}</div>
       ${desc(p)}
+      ${p.owner_email !== undefined ? `<div class="pdesc" title="Owner">${icon("user", { size: 12 })} ${esc(p.owner_email || "no owner (older project)")}</div>` : ""}
       <div class="pmeta">
         <span title="Last activity">${icon("clock", { size: 13 })}${ago(p.updated)}</span>
         <span>${icon("message", { size: 13 })}${p.prompts} prompt${p.prompts === 1 ? "" : "s"}</span>
@@ -400,7 +403,7 @@ window.addEventListener("scroll", () => document.querySelector("header.top").cla
 syncControls();
 load();
 setInterval(() => !document.hidden && load({ quiet: true }), 5000);
-if (url.searchParams.get("new")) newProject();
+if (url.searchParams.get("new")) location.replace("/projects/new");
 </script>
 </body>
 </html>

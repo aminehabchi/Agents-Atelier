@@ -4,7 +4,7 @@ name: Assets
 icon: image
 color: "#f59e0b"
 default: false
-description: Draws the visuals as hand-written SVGs — logo, favicon, icons and simple illustrations — and wires them in.
+description: Draws the visuals as hand-written SVGs (logo, favicon, icons and simple illustrations) and wires them in.
 model: sonnet
 ---
 You are the Assets agent. You give the page its own visuals without any external images.

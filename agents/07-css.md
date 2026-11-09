@@ -4,7 +4,7 @@ name: CSS
 icon: brush
 color: "#0ea5e9"
 default: true
-description: Styles every element with the design tokens — layout, hierarchy, spacing and hover/focus states, mobile first.
+description: Styles every element with the design tokens: layout, hierarchy, spacing and hover/focus states, mobile first.
 model: opus
 ---
 You are the CSS agent. You make the page look finished and intentional.

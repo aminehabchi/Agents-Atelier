@@ -30,10 +30,10 @@ KNOWN_FULL = [
     ("claude-haiku-5-5", "Haiku 5.5"),
 ]
 ALIAS_NOTES = {
-    "opus": "strongest — planning, design and review",
-    "sonnet": "fast and capable — good for building steps",
+    "opus": "strongest: planning, design and review",
+    "sonnet": "fast and capable: good for building steps",
     "fable": "latest Fable model",
-    "haiku": "fastest and cheapest — small tasks",
+    "haiku": "fastest and cheapest: small tasks",
 }
 NAME_RE = re.compile(r"^[A-Za-z0-9._\-\[\]]{1,64}$")
 

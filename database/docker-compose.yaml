@@ -1,0 +1,28 @@
+# Postgres for Agents Atelier: users, sessions, email codes, agents and teams.
+#
+#   docker compose -f database/docker-compose.yaml up -d      start it (data is kept in the "pgdata" volume)
+#   docker compose -f database/docker-compose.yaml down       stop it (add -v to also delete the data)
+#
+# Change the values in database/.env (POSTGRES_USER=…, POSTGRES_PORT=…) and keep DATABASE_URL in the project's .env in sync.
+name: agents-atelier
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-atelier}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atelier}
+      POSTGRES_DB: ${POSTGRES_DB:-atelier}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"   # only reachable from this machine
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

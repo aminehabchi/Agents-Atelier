@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#f4efea">
+<meta name="theme-color" content="#000000">
 <title>Teams · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
 <script src="/static/icons.js"></script>
 <script src="/static/ui.js"></script>
 <style>
@@ -19,40 +20,40 @@
   .crumb:hover { color: var(--ink); }
   .note { font-size: 13px; color: var(--stone); margin: 0 0 16px; display: flex; gap: 8px; align-items: flex-start; line-height: 1.5; }
   .note > .ic { margin-top: calc((1lh - 14px) / 2); }
-  .tile { width: 36px; height: 36px; border-radius: 2px; display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
-  .card { background: var(--paper); border-radius: 2px; box-shadow: var(--ring); padding: 28px; }
+  .tile { width: 36px; height: 36px; border-radius: var(--r); display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
+  .card { background: var(--paper); border-radius: var(--r); box-shadow: var(--ring); padding: 28px; }
   .card h2 { margin: 0 0 14px; font-weight: 500; font-size: 16px; display: flex; align-items: center; gap: 8px; }
 
   /* ---------- list ---------- */
   .tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-  .tcard { background: var(--paper); border-radius: 2px; box-shadow: var(--ring); padding: 22px; display: flex; flex-direction: column; gap: 12px; text-decoration: none;
+  .tcard { background: var(--paper); border-radius: var(--r); box-shadow: var(--ring); padding: 22px; display: flex; flex-direction: column; gap: 12px; text-decoration: none;
     transition: transform .2s, box-shadow .2s; }
   .tcard:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--line-strong); }
   .tcard .top { display: flex; align-items: center; gap: 8px; }
   .tcard h3 { margin: 0; font-weight: 500; font-size: 19px; letter-spacing: 0; flex: 1; }
   .tcard p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--graphite); min-height: 42px; }
   .stack { display: flex; flex-wrap: wrap; gap: 4px; }
-  .stack .tile { width: 30px; height: 30px; border-radius: 2px; }
+  .stack .tile { width: 30px; height: 30px; border-radius: var(--r); }
   .tmeta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--stone); margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); }
   .tmeta span { display: inline-flex; gap: 4px; align-items: center; }
-  .newcard { border: 1px dashed var(--line-strong); border-radius: 2px; display: grid; place-items: center; min-height: 220px; color: var(--graphite); text-decoration: none; text-align: center; }
+  .newcard { border: 1px dashed var(--line-strong); border-radius: var(--r); display: grid; place-items: center; min-height: 220px; color: var(--graphite); text-decoration: none; text-align: center; }
   .newcard:hover { border-color: var(--graphite); background: var(--paper); color: var(--ink); }
-  .newcard .tile { --c: var(--ink); width: 48px; height: 48px; border-radius: 2px; margin: 0 auto 12px; background: var(--espresso); color: var(--on-espresso); }
+  .newcard .tile { --c: var(--ink); width: 48px; height: 48px; border-radius: var(--r); margin: 0 auto 12px; background: var(--espresso); color: var(--on-espresso); }
   .sec-title { font-size: 13px; color: var(--stone); margin: 28px 0 12px; }
 
   /* ---------- view ---------- */
   .vhead { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
-  .vhead .big { width: 64px; height: 64px; border-radius: 2px; background: var(--espresso); color: var(--on-espresso); display: grid; place-items: center; flex: none; }
+  .vhead .big { width: 64px; height: 64px; border-radius: var(--r); background: var(--espresso); color: var(--on-espresso); display: grid; place-items: center; flex: none; }
   .vhead h1 { margin: 0; font-weight: 400; font-size: 40px; letter-spacing: 0; line-height: 1.05; }
   .vhead .sub { font-size: 13px; color: var(--stone); margin-top: 6px; }
   .vhead .acts { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
   .vdesc { font-size: 18px; line-height: 1.5; color: var(--graphite); margin: 20px 0 0; max-width: 760px; }
   .kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 22px; }
-  .kv div { background: var(--linen); border-radius: 2px; padding: 14px 16px; }
+  .kv div { background: var(--linen); border-radius: var(--r); padding: 14px 16px; }
   .kv b { display: block; font-weight: 400; font-size: 26px; letter-spacing: 0; font-feature-settings: "tnum"; }
   .kv span { font-size: 12px; color: var(--stone); }
   .flow { display: flex; flex-direction: column; gap: 6px; }
-  .fstep { display: grid; grid-template-columns: 28px 36px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 12px 14px; border-radius: 2px; background: var(--linen);
+  .fstep { display: grid; grid-template-columns: 28px 36px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 12px 14px; border-radius: var(--r); background: var(--linen);
     text-decoration: none; }
   .fstep:hover { background: var(--bone); }
   .fstep .n { font: 12px ui-monospace, monospace; color: var(--stone); text-align: right; }
@@ -67,14 +68,14 @@
   .pick-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .pick-head .spacer { flex: 1; }
   .pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
-  .pitem { display: grid; grid-template-columns: 22px 36px minmax(0, 1fr); gap: 12px; align-items: center; padding: 12px; border-radius: 2px; border: 1px solid var(--line);
+  .pitem { display: grid; grid-template-columns: 22px 36px minmax(0, 1fr); gap: 12px; align-items: center; padding: 12px; border-radius: var(--r); border: 1px solid var(--line);
     background: var(--paper); cursor: pointer; transition: border-color .15s, background .15s; }
   .pitem:hover { border-color: var(--graphite); }
   .pitem.on { background: var(--bone); border-color: var(--ink); }
   .pitem input { width: 18px; height: 18px; accent-color: var(--espresso); margin: 0; }
   .pitem b { font-weight: 500; font-size: 14px; display: block; }
   .pitem small { display: block; font-size: 12px; color: var(--stone); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .summary { font-size: 13px; color: var(--graphite); background: var(--linen); border-radius: 2px; padding: 12px 14px; line-height: 1.5; }
+  .summary { font-size: 13px; color: var(--graphite); background: var(--linen); border-radius: var(--r); padding: 12px 14px; line-height: 1.5; }
   .form-actions { display: flex; gap: 8px; align-items: center; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
   .form-actions .status { font-size: 13px; color: var(--stone); margin-right: auto; display: inline-flex; gap: 6px; align-items: center; }
 
@@ -85,7 +86,9 @@
     .card { padding: 20px; }
     .vhead .acts { margin-left: 0; }
   }
+  .team-filter { border-right: 0; padding-right: 0; margin-top: 16px; }
 </style>
+<link rel="stylesheet" href="/static/theme.css">
 </head>
 <body>
 
@@ -96,7 +99,6 @@
       <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
       <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
       <a href="/teams" class="on"><i data-icon="layers" data-size="16"></i>Teams</a>
-      <a href="/guide"><i data-icon="book" data-size="16"></i>Guide</a>
     </nav>
     <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
   </div>
@@ -143,6 +145,7 @@ const stack = (ids, byId, max = 10) => `<div class="stack">${ids.slice(0, max).m
 }).join("")}${ids.length > max ? `<span class="badge" style="align-self:center">+${ids.length - max}</span>` : ""}</div>`;
 
 // ================================================================ list: /teams
+let owner = ["mine", "shared"].includes(new URLSearchParams(location.search).get("show")) ? new URLSearchParams(location.search).get("show") : "all";
 async function listView() {
   setTitle("Teams");
   app.innerHTML = `<p class="note">Loading…</p>`;
@@ -152,7 +155,7 @@ async function listView() {
   const card = (t) => {
     const est = estimate(t.agents, base.avg);
     return `<a class="tcard" href="/teams/${encodeURIComponent(t.id)}">
-      <div class="top"><h3>${esc(t.name)}</h3>${t.builtin ? `<span class="badge">built-in</span>` : ""}</div>
+      <div class="top"><h3>${esc(t.name)}</h3>${t.builtin ? `<span class="badge">built-in</span>` : t.scope === "shared" ? `<span class="badge">shared</span>` : ""}</div>
       <p>${esc(t.description || "No description.")}</p>
       ${stack(t.agents, base.byId)}
       <div class="tmeta"><span>${icon("users", { size: 13 })}${t.agents.length} agent${t.agents.length === 1 ? "" : "s"}</span>
@@ -160,25 +163,37 @@ async function listView() {
         ${est.measured ? `<span>${icon("chart", { size: 13 })}~${money(est.cost)}</span>` : ""}</div>
     </a>`;
   };
-  const builtin = teams.filter(t => t.builtin), mine = teams.filter(t => !t.builtin);
+  const builtin = teams.filter(t => t.builtin), mine = teams.filter(t => t.scope === "mine"), shared = teams.filter(t => t.scope === "shared");
   app.innerHTML = `
     <div class="bar-top"><h1>Teams</h1>
       <button class="btn btn-ghost" id="importBtn" title="Import a team (.json), an agent (.md) or an export (.zip)">${icon("file-plus", { size: 16 })}Import</button>
       <a class="btn btn-ghost" href="/api/export" title="All agents, shared rules and your teams as a .zip">${icon("download", { size: 16 })}Export all</a>
-      <a class="btn btn-ghost" href="/agents">${icon("users", { size: 16 })}Agents</a>
       <a class="btn btn-dark" href="/teams/new">${icon("plus", { size: 16 })}New team</a></div>
     <p class="note">${icon("alert", { size: 14 })}<span>A team is a set of agents that run together, always in the agents' order. Pick one in a project's Team panel. Times and costs are estimates from past runs (about ${DEFAULT_SECONDS}s for agents that haven't run yet).</span></p>
-    <p class="sec-title">Your teams</p>
-    <div class="tgrid" id="mine"></div>
-    <nav class="pager compact" id="teamsPager" aria-label="Pages of your teams"></nav>
-    <p class="sec-title">Built-in teams</p>
-    <div class="tgrid">${builtin.map(card).join("")}</div>`;
-  const newCard = `<a class="newcard" href="/teams/new"><div><span class="tile">${icon("plus", { size: 20 })}</span><b style="font-weight:500">New team</b>
-        <div style="font-size:13px;color:var(--stone);margin-top:4px">Choose agents for a kind of job</div></div></a>`;
+    <div class="fgroup team-filter" role="group" aria-label="Whose teams">
+      ${[["all", "All teams", teams.length], ["mine", "Mine", mine.length], ["shared", "Shared", shared.length + builtin.length]].map(([k, label, n]) =>
+        `<button class="fchip ${owner === k ? "on" : ""}" data-owner="${k}" aria-pressed="${owner === k}">${label} <span>${n}</span></button>`).join("")}
+    </div>
+    ${owner === "mine" && !mine.length ? `<p class="note" style="margin-top:20px">You don't have your own teams yet. <a href="/teams/new">Create one</a>, or open a shared team and duplicate it.</p>` : ""}
+    <div ${owner === "shared" || !mine.length ? "hidden" : ""}>
+      <p class="sec-title">Your teams</p>
+      <div class="tgrid" id="mine"></div>
+      <nav class="pager compact" id="teamsPager" aria-label="Pages of your teams"></nav>
+    </div>
+    <div ${owner === "mine" ? "hidden" : ""}>
+      ${shared.length ? `<p class="sec-title">Shared teams</p><div class="tgrid">${shared.map(card).join("")}</div>` : ""}
+      <p class="sec-title">Built-in teams</p>
+      <div class="tgrid">${builtin.map(card).join("")}</div>
+    </div>`;
+  app.querySelectorAll("[data-owner]").forEach(b => b.onclick = () => {
+    owner = b.dataset.owner;
+    history.replaceState(null, "", owner === "all" ? "/teams" : `/teams?show=${owner}`);   // survives a reload and the back button
+    listView();
+  });
   const drawMine = () => {
     const pg = paginate(mine, teamsPage, teamsPer);
     teamsPage = pg.page;
-    $("mine").innerHTML = pg.items.map(card).join("") + (pg.page === pg.pages ? newCard : "");
+    $("mine").innerHTML = pg.items.map(card).join("");
     $("teamsPager").innerHTML = pagerHTML(pg, { sizes: [6, 12, 24], noun: "teams" });
   };
   drawMine();
@@ -202,11 +217,11 @@ async function detailView(id) {
       <div class="vhead">
         <span class="big">${icon(t.builtin ? "users" : "sliders", { size: 28 })}</span>
         <div><h1>${esc(t.name)}</h1>
-          <div class="sub">${t.builtin ? "Built-in team — duplicate it to make your own version" : `Your team${t.updated ? ` · updated ${ago(t.updated)}` : ""}`} · id <span class="mono">${esc(t.id)}</span></div></div>
+          <div class="sub">${t.builtin ? "Built-in team. Duplicate it to make your own version" : t.scope === "shared" ? `Shared team${t.editable ? "" : ". Duplicate it to make your own version"}` : `Your team${t.updated ? ` · updated ${ago(t.updated)}` : ""}`} · id <span class="mono">${esc(t.id)}</span></div></div>
         <div class="acts">
           <a class="btn btn-ghost btn-sm" href="/api/presets/${encodeURIComponent(t.id)}/export" title="Download this team and its agents as a .json file">${icon("download", { size: 14 })}Export</a>
           <a class="btn btn-ghost btn-sm" href="/teams/new?from=${encodeURIComponent(t.id)}">${icon("copy", { size: 14 })}Duplicate</a>
-          ${t.builtin ? "" : `<button class="btn btn-ghost btn-sm" id="del">${icon("trash", { size: 14 })}Delete</button>
+          ${!t.editable ? "" : `<button class="btn btn-ghost btn-sm" id="del">${icon("trash", { size: 14 })}Delete</button>
           <a class="btn btn-dark btn-sm" href="/teams/${encodeURIComponent(t.id)}/edit">${icon("pencil", { size: 14 })}Edit</a>`}
         </div>
       </div>
@@ -214,7 +229,7 @@ async function detailView(id) {
       <div class="kv">
         <div><b>${t.agents.length}</b><span>agents, run in order</span></div>
         <div><b>~${duration(est.seconds)}</b><span>estimated run time (${est.measured}/${est.total} measured)</span></div>
-        <div><b>${est.measured ? "~" + money(est.cost) : "—"}</b><span>estimated cost${est.measured < est.total ? " (measured agents only)" : ""}</span></div>
+        <div><b>${est.measured ? "~" + money(est.cost) : "-"}</b><span>estimated cost${est.measured < est.total ? " (measured agents only)" : ""}</span></div>
       </div>
     </section>
     <section class="card" style="margin-top:16px">
@@ -241,11 +256,12 @@ async function detailView(id) {
 async function formView(id) {
   const from = new URLSearchParams(location.search).get("from");
   app.innerHTML = `<p class="note">Loading…</p>`;
-  let base, source = null;
-  try { [base, source] = await Promise.all([loadBase(), id || from ? api(`/api/presets/${encodeURIComponent(id || from)}`) : null]); }
+  let base, source = null, me;
+  try { [base, source, me] = await Promise.all([loadBase(), id || from ? api(`/api/presets/${encodeURIComponent(id || from)}`) : null, getMe()]); }
   catch (err) { return showError(app, err, () => formView(id), "Couldn't open the form"); }
-  if (id && source.builtin) return showError(app, new Error("Built-in teams can't be edited. Duplicate it to make your own version."), null, "This team is built in");
+  if (id && !source.editable) return showError(app, new Error("This team can't be edited here. Duplicate it to make your own version."), null, source.builtin ? "This team is built in" : "This team is shared");
   const isNew = !id;
+  const askScope = isNew && me?.role === "admin";
   const draft = { name: source ? (isNew ? `${source.name} copy` : source.name) : "", description: source?.description || "",
                   agents: new Set(source ? source.agents : []) };
   const snap = () => JSON.stringify([draft.name, draft.description, [...draft.agents].sort()]);
@@ -269,6 +285,7 @@ async function formView(id) {
           <div class="pick" id="pick"></div>
           <div class="summary" id="summary"></div>
         </div>
+        ${askScope ? `<label class="switch"><input type="checkbox" id="f-shared" checked><span>Shared with everyone (off: only you see it)</span></label>` : ""}
       </div>
       <div class="form-actions"><span class="status" id="status"></span>
         <a class="btn btn-ghost" href="${isNew ? "/teams" : `/teams/${encodeURIComponent(id)}`}">Cancel</a>
@@ -298,6 +315,7 @@ async function formView(id) {
   $("noneA").onclick = () => { draft.agents = new Set(); draw(); };
   $("save").onclick = async () => {
     const body = { name: draft.name, description: draft.description, agents: [...draft.agents] };
+    if (askScope && !$("f-shared").checked) body.scope = "mine";
     $("save").disabled = true;
     try {
       const t = isNew ? await api("/api/presets", { method: "POST", body: JSON.stringify(body) })

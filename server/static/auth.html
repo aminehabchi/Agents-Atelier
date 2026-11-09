@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#000000">
+<title>Log in · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<script src="/static/i18n.js"></script>
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  .split { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+
+  /* the brand side: what you're signing up for */
+  .pitch { position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; gap: 40px; padding: 40px 48px; background: var(--canary); color: var(--on-accent); border-right: 1px solid var(--line-strong); overflow: hidden; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; font-weight: 600; align-self: flex-start; }
+  .brand .mark { display: grid; place-items: center; width: 32px; height: 32px; background: var(--on-accent); color: #fff; border-radius: var(--r); }
+  .pitch-body { margin: auto 0; }
+  .pitch h2 { margin: 0 0 32px; font-weight: 400; font-size: clamp(30px, 3.4vw, 44px); line-height: 1.08; }
+  .points { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+  .points li { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; line-height: 1.5; }
+  .points .tile { flex: none; display: grid; place-items: center; width: 32px; height: 32px; background: #fff; border: 1.5px solid var(--on-accent); border-radius: var(--r); }
+  .crew { display: flex; flex-wrap: wrap; gap: 6px; min-height: 26px; }
+  .crew span { background: #fff; border: 1.5px solid var(--on-accent); border-radius: var(--r); padding: 2px 8px; font-size: 12px; }
+
+  /* the form side */
+  .auth-main { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 40px 24px; min-width: 0; position: relative; }
+  .corner { position: absolute; top: 16px; right: 16px; display: flex; gap: 6px; }
+  .m-brand { display: none; color: var(--ink); }
+  .m-brand .mark { background: var(--espresso); color: var(--on-espresso); }
+  .auth-card { width: min(440px, 100%); background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: var(--hard); padding: 32px; }
+  .auth-card h1 { margin: 0 0 8px; font-weight: 500; font-size: 24px; line-height: 1.2; }
+  .intro { margin: 0 0 24px; color: var(--graphite); font-size: 15px; line-height: 1.55; overflow-wrap: anywhere; }
+
+  .progress { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0 0 24px; padding: 0; list-style: none; font-size: 11px; font-weight: 500; letter-spacing: .04em; color: var(--stone); }
+  .progress li { border-top: 4px solid var(--bone); padding-top: 6px; }
+  .progress li.done { border-color: var(--ink); color: var(--graphite); }
+  .progress li.now { border-color: var(--sky); color: var(--ink); }
+
+  .afield { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .afield > label, .group-label { font-size: 13px; font-weight: 500; color: var(--charcoal); display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .afield em { font-style: normal; font-weight: 400; color: var(--stone); font-size: 12px; }
+  .afield em.met { color: var(--ok); }
+  .afield .input { width: 100%; }
+  .afield .input[aria-invalid="true"] { border-color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
+  .ferr { color: var(--danger); font-size: 13px; line-height: 1.4; }
+  .ferr:empty { display: none; }
+  .pw { position: relative; }
+  .pw .input { padding-right: 46px; }
+  .pw button { position: absolute; top: 0; right: 0; bottom: 0; width: 44px; display: grid; place-items: center; background: none; border: 0; color: var(--stone); }
+  .pw button:hover, .pw button[aria-pressed="true"] { color: var(--ink); }
+
+  fieldset { border: 0; margin: 0 0 18px; padding: 0; min-width: 0; }
+  legend.group-label { padding: 0; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { position: relative; cursor: pointer; }
+  .chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .chip span { display: block; padding: 5px 10px; font-size: 13px; line-height: 1.4; border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--paper); transition: background .12s; }
+  .chip:hover span { background: var(--ice); }
+  .chip input:checked + span { background: var(--sky); color: var(--on-sky); }
+  .chip input:focus-visible + span { outline: 2px solid var(--sky); outline-offset: 2px; }
+
+  .code-input { font-size: 28px !important; height: 64px; letter-spacing: .45em; text-indent: .45em; text-align: center; font-feature-settings: "tnum", "zero"; }
+  .code-input::placeholder { color: var(--bone); }
+  .auth-err { color: var(--danger); border: 1.5px solid var(--danger); border-radius: var(--r); padding: 8px 12px; font-size: 13px; line-height: 1.5; margin: 0 0 16px; }
+  .auth-err:empty { display: none; }
+  .auth-ok { color: var(--graphite); font-size: 13px; line-height: 1.5; margin: 0 0 16px; }
+  .auth-ok:empty { display: none; }
+  .note { background: var(--pale); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 8px 12px; font-size: 13px; line-height: 1.5; margin: 0 0 16px; }
+  .forgot { margin: -6px 0 16px; text-align: right; font-size: 13px; }
+  .forgot a { color: var(--graphite); }
+  .forgot a:hover { color: var(--ink); }
+  .actions { display: flex; gap: 12px; }
+  .actions .btn { height: 46px; }
+  .actions .grow { flex: 1; }
+  .auth-alt { margin: 24px 0 0; font-size: 14px; color: var(--graphite); text-align: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; }
+  .auth-alt a, .auth-alt button { color: var(--ink); text-decoration: underline; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+  .auth-alt button:disabled { color: var(--stone); cursor: default; text-decoration: none; font-feature-settings: "tnum"; }
+
+  @media (max-width: 900px) {
+    .split { grid-template-columns: minmax(0, 1fr); }
+    .pitch { display: none; }
+    .m-brand { display: inline-flex; align-self: center; }
+    .auth-main { justify-content: flex-start; padding: 24px 16px 40px; }
+    .auth-card { padding: 24px 20px; box-shadow: var(--hard-sm); }
+  }
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+<div class="split">
+  <aside class="pitch">
+    <a class="brand" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <div class="pitch-body">
+      <h2 id="pitch-title">Describe a page. Watch a team build it.</h2>
+      <ul class="points">
+        <li><span class="tile"><i data-icon="users" data-size="16"></i></span>Specialist AI agents build a real site in plain HTML, CSS and JavaScript.</li>
+        <li><span class="tile"><i data-icon="eye" data-size="16"></i></span>Watch every step in a live preview. Stop, steer or roll back at any point.</li>
+        <li><span class="tile"><i data-icon="download" data-size="16"></i></span>Download the finished site as a .zip. The code is yours.</li>
+      </ul>
+    </div>
+    <div class="crew" id="crew" aria-hidden="true"></div>
+  </aside>
+  <div class="auth-main">
+    <div class="corner">
+      <button class="icon-btn lang-btn" type="button" id="lang" data-no-i18n></button>
+      <button class="icon-btn" type="button" data-theme-btn aria-label="Change theme"></button>
+    </div>
+    <a class="brand m-brand" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <main class="auth-card" id="card"></main>
+  </div>
+</div>
+<script>
+const card = document.getElementById("card");
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const rawNext = params.get("next") || "";
+const next = /^\/(?![\/\\])/.test(rawNext) ? rawNext : "/projects";    // only ever a page of this site
+const withNext = (path) => rawNext ? `${path}?next=${encodeURIComponent(rawNext)}` : path;
+const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body || {}) });
+const MIN_PASSWORD = 8;
+
+document.querySelector("[data-theme-btn]").innerHTML = icon(themeIcon(), { size: 17 });
+document.querySelector("[data-theme-btn]").title = themeTitle();
+document.querySelector("[data-theme-btn]").onclick = () => cycleTheme();
+
+{
+  const other = getLang() === "fr" ? "en" : "fr", b = $("lang");
+  b.textContent = other.toUpperCase();
+  b.title = other === "fr" ? "Français" : "English";
+  b.setAttribute("aria-label", b.title);
+  b.onclick = () => setLang(other);
+}
+
+api("/api/agents").then(agents => { $("crew").innerHTML = agents.map(a => `<span>${esc(a.name)}</span>`).join(""); }).catch(() => {});
+
+/* ---------- small form pieces ---------- */
+const field = (id, label, { type = "text", ac = "off", hint = "", max = 254, ph = "", attrs = "" } = {}) => `
+  <div class="afield"><label for="${id}"><span>${label}</span>${hint ? `<em id="${id}-hint">${hint}</em>` : ""}</label>
+    ${type === "password"
+      ? `<div class="pw"><input class="input" id="${id}" type="password" autocomplete="${ac}" maxlength="${max}" aria-describedby="${id}-err" ${attrs}>
+           <button type="button" data-peek="${id}" aria-label="Show password" aria-pressed="false" title="Show password">${icon("eye", { size: 17 })}</button></div>`
+      : `<input class="input" id="${id}" type="${type}" autocomplete="${ac}" maxlength="${max}" placeholder="${ph}" aria-describedby="${id}-err" ${attrs}>`}
+    <small class="ferr" id="${id}-err" role="alert"></small></div>`;
+
+const chips = (name, legend, answers = []) => !answers.length ? "" : `
+  <fieldset><legend class="group-label">${legend}</legend>
+    <div class="chips">${answers.map(a => `<label class="chip"><input type="radio" name="${name}" value="${esc(a)}"><span>${esc(a)}</span></label>`).join("")}</div>
+  </fieldset>`;
+
+const progress = (now) => `<ol class="progress" aria-label="Step ${now} of 3">${["Account", "About you", "Confirm"].map((s, i) =>
+  `<li class="${i + 1 < now ? "done" : i + 1 === now ? "now" : ""}" ${i + 1 === now ? 'aria-current="step"' : ""}>${s}</li>`).join("")}</ol>`;
+
+function setErr(id, message) {
+  $(`${id}-err`).textContent = message || "";
+  if (message) $(id).setAttribute("aria-invalid", "true"); else $(id).removeAttribute("aria-invalid");
+}
+
+/* Behaviour shared by the forms: errors clear as you type, the eye shows the password, a click on a chosen chip undoes it. */
+function wireForm() {
+  card.querySelectorAll("input.input").forEach(i => i.addEventListener("input", () => setErr(i.id, "")));
+  card.querySelectorAll("[data-peek]").forEach(b => { b.onclick = () => {
+    const input = $(b.dataset.peek), show = input.type === "password";
+    input.type = show ? "text" : "password";
+    b.setAttribute("aria-pressed", show);
+    b.title = show ? "Hide password" : "Show password";
+    b.setAttribute("aria-label", b.title);
+  }; });
+  card.querySelectorAll('.chip input').forEach(r => r.addEventListener("click", () => {
+    if (r.dataset.was) r.checked = false;
+    card.querySelectorAll(`input[name="${r.name}"]`).forEach(o => { delete o.dataset.was; });
+    if (r.checked) r.dataset.was = "1";
+  }));
+  const pw = $("password");
+  if (!pw) return;
+  let capsShown = false;
+  pw.addEventListener("keyup", (e) => {
+    if (!e.getModifierState) return;
+    const on = e.getModifierState("CapsLock");
+    if (on) $("password-err").textContent = "Caps Lock is on.";
+    else if (capsShown) $("password-err").textContent = "";
+    capsShown = on;
+  });
+}
+
+function busy(button, label) {
+  button.disabled = true;
+  const before = button.textContent;
+  button.textContent = label;
+  return () => { button.disabled = false; button.textContent = before; };
+}
+
+/* The email follows you between log in and forgot password, without going in the URL. */
+const rememberEmail = (email) => { try { sessionStorage.setItem("atelier-email", email); } catch {} };
+const rememberedEmail = () => { try { return sessionStorage.getItem("atelier-email") || ""; } catch { return ""; } };
+
+const RESEND_SECONDS = 60;
+let resendTimer = null;
+function waitToResend(seconds) {
+  clearInterval(resendTimer);
+  let left = seconds;
+  const paint = () => {
+    $("resend").disabled = left > 0;
+    $("resend").textContent = left > 0 ? `Send a new code in ${left}s` : "Send a new code";
+  };
+  paint();
+  resendTimer = setInterval(() => { left--; paint(); if (left <= 0) clearInterval(resendTimer); }, 1000);
+}
+
+/* ---------- log in ---------- */
+function loginView() {
+  document.title = "Log in · Agents Atelier";
+  $("pitch-title").textContent = "Your team is ready when you are.";
+  card.innerHTML = `
+    <h1>Log in</h1>
+    <p class="intro">Welcome back. Your projects, agents and teams are waiting.</p>
+    <form id="form" novalidate>
+      ${field("email", "Email", { type: "email", ac: "email", ph: "you@example.com" })}
+      ${field("password", "Password", { type: "password", ac: "current-password", max: 200 })}
+      <p class="forgot"><a id="forgot" href="${esc(withNext("/forgot"))}">Forgot your password?</a></p>
+      <p class="auth-err" id="err" role="alert"></p>
+      <div class="actions"><button class="btn btn-dark grow" id="go">Log in</button></div>
+    </form>
+    <p class="auth-alt"><span>New here? <a href="${esc(withNext("/register"))}">Create an account</a></span></p>`;
+  wireForm();
+  $("email").value = rememberedEmail();
+  ($("email").value ? $("password") : $("email")).focus();
+  $("forgot").onclick = () => rememberEmail($("email").value.trim());
+  $("form").onsubmit = async (e) => {
+    e.preventDefault();
+    $("err").textContent = "";
+    const email = $("email").value.trim();
+    setErr("email", email ? "" : "Enter your email.");
+    setErr("password", $("password").value ? "" : "Enter your password.");
+    if (!email) return $("email").focus();
+    if (!$("password").value) return $("password").focus();
+    const done = busy($("go"), "Logging in…");
+    try {
+      const { user } = await post("/api/auth/login", { email, password: $("password").value });
+      location.href = user.confirmed ? next : withNext("/confirm");
+    } catch (err) { $("err").textContent = err.message; done(); $("password").select(); }
+  };
+}
+
+/* ---------- register: account, then a few optional questions, then the emailed code ---------- */
+async function registerView() {
+  document.title = "Create your account · Agents Atelier";
+  const opts = await api("/api/auth/options").catch(() => ({}));      // without them, only the company is asked
+  card.innerHTML = `
+    <div id="progress"></div>
+    <form id="form" novalidate>
+      <div id="step1">
+        <h1>Create your account</h1>
+        <p class="intro">Start with the basics. It takes about a minute.</p>
+        ${field("name", "Full name", { ac: "name", max: 80, ph: "Your name" })}
+        ${field("email", "Email", { type: "email", ac: "email", ph: "you@example.com" })}
+        ${field("password", "Password", { type: "password", ac: "new-password", max: 200, hint: `at least ${MIN_PASSWORD} characters` })}
+        ${field("password2", "Repeat password", { type: "password", ac: "new-password", max: 200 })}
+      </div>
+      <div id="step2" hidden>
+        <h1>Tell us about you</h1>
+        <p class="intro">All optional. It helps us improve Agents Atelier, so skip anything you like.</p>
+        ${field("company", "Company", { ac: "organization", max: 80, hint: "optional" })}
+        ${chips("job_role", "What best describes you?", opts.job_role)}
+        ${chips("use_case", "What will you build sites for?", opts.use_case)}
+        ${chips("referral", "How did you hear about us?", opts.referral)}
+      </div>
+      <p class="auth-err" id="err" role="alert"></p>
+      <div class="actions"><button class="btn btn-ghost" type="button" id="back" hidden>Back</button>
+        <button class="btn btn-dark grow" id="go">Continue</button></div>
+    </form>
+    <p class="auth-alt" id="alt"><span>Already have an account? <a href="${esc(withNext("/login"))}">Log in</a></span></p>`;
+  wireForm();
+
+  let step = 1;
+  function showStep(n) {
+    step = n;
+    $("step1").hidden = n !== 1;
+    $("step2").hidden = n !== 2;
+    $("back").hidden = n !== 2;
+    $("alt").hidden = n !== 1;
+    $("go").textContent = n === 1 ? "Continue" : "Create account";
+    $("progress").innerHTML = progress(n);
+    $("err").textContent = "";
+    if (n === 2) $("company").focus();
+  }
+  showStep(1);
+  $("name").focus();
+  $("back").onclick = () => showStep(1);
+  $("password").addEventListener("input", () => { $("password-hint").classList.toggle("met", $("password").value.length >= MIN_PASSWORD); });
+
+  function checkStep1() {
+    const name = $("name").value.trim(), email = $("email").value.trim(), pw = $("password").value;
+    setErr("name", name.length >= 2 ? "" : "Enter your full name.");
+    setErr("email", /^\S+@\S+\.\S{2,}$/.test(email) ? "" : "Enter a valid email address.");
+    setErr("password", pw.length >= MIN_PASSWORD ? "" : `Use at least ${MIN_PASSWORD} characters for your password.`);
+    setErr("password2", pw === $("password2").value ? "" : "The two passwords don't match.");
+    const bad = card.querySelector("#step1 [aria-invalid]");
+    bad?.focus();
+    return !bad;
+  }
+
+  $("form").onsubmit = async (e) => {
+    e.preventDefault();
+    $("err").textContent = "";
+    if (!checkStep1()) return showStep(1);
+    if (step === 1) return showStep(2);
+    const choice = (name) => card.querySelector(`input[name="${name}"]:checked`)?.value || "";
+    const done = busy($("go"), "Creating your account…");
+    try {
+      const { user } = await post("/api/auth/register", {
+        name: $("name").value.trim(), email: $("email").value.trim(), password: $("password").value,
+        company: $("company").value.trim(), job_role: choice("job_role"), use_case: choice("use_case"), referral: choice("referral"),
+        language: getLang(),
+      });
+      location.href = user.confirmed ? next : withNext("/confirm");
+    } catch (err) {
+      done();
+      const target = /email/i.test(err.message) ? "email" : /password/i.test(err.message) ? "password" : /name/i.test(err.message) && !/company/i.test(err.message) ? "name" : null;
+      if (!target) { $("err").textContent = err.message; return; }
+      showStep(1);
+      setErr(target, err.message);
+      $(target).focus();
+    }
+  };
+}
+
+/* ---------- forgot password: the email, then the code and a new password ---------- */
+async function forgotView() {
+  document.title = "Reset your password · Agents Atelier";
+  $("pitch-title").textContent = "It happens. Let's get you back in.";
+  const opts = await api("/api/auth/options").catch(() => ({}));
+  const askEmail = () => {
+    card.innerHTML = `
+      <h1>Reset your password</h1>
+      <p class="intro">Enter your account's email and we'll send you a 6-digit code.</p>
+      <form id="form" novalidate>
+        ${field("email", "Email", { type: "email", ac: "email", ph: "you@example.com" })}
+        <p class="auth-err" id="err" role="alert"></p>
+        <div class="actions"><button class="btn btn-dark grow" id="go">Send code</button></div>
+      </form>
+      <p class="auth-alt"><a href="${esc(withNext("/login"))}">Back to log in</a></p>`;
+    wireForm();
+    $("email").value = rememberedEmail();
+    $("email").focus();
+    $("form").onsubmit = async (e) => {
+      e.preventDefault();
+      $("err").textContent = "";
+      const email = $("email").value.trim();
+      if (!/^\S+@\S+\.\S{2,}$/.test(email)) { setErr("email", "Enter a valid email address."); return $("email").focus(); }
+      const done = busy($("go"), "Sending…");
+      try { await post("/api/auth/forgot", { email }); rememberEmail(email); askCode(email); }
+      catch (err) { $("err").textContent = err.message; done(); }
+    };
+  };
+  const askCode = (email) => {
+    card.innerHTML = `
+      <h1>Check your email</h1>
+      <p class="intro">If <b>${esc(email)}</b> has an account, a 6-digit code is on its way. Check your spam folder too.</p>
+      ${opts.email_enabled === false ? `<p class="note">This server doesn't send email yet, so the code is in the server log.</p>` : ""}
+      <form id="form" novalidate>
+        ${field("code", "Reset code", { max: 6, ac: "one-time-code", ph: "000000", attrs: 'inputmode="numeric"' })}
+        ${field("password", "New password", { type: "password", ac: "new-password", max: 200, hint: `at least ${MIN_PASSWORD} characters` })}
+        ${field("password2", "Repeat new password", { type: "password", ac: "new-password", max: 200 })}
+        <p class="auth-err" id="err" role="alert"></p>
+        <p class="auth-ok" id="ok" role="status"></p>
+        <div class="actions"><button class="btn btn-dark grow" id="go">Set new password</button></div>
+      </form>
+      <p class="auth-alt"><button type="button" id="resend"></button><button type="button" id="other">Use another email</button></p>`;
+    wireForm();
+    $("code").classList.add("code-input", "mono");
+    $("code").focus();
+    waitToResend(RESEND_SECONDS);
+    $("code").addEventListener("input", () => { $("code").value = $("code").value.replace(/\D/g, "").slice(0, 6); });
+    $("password").addEventListener("input", () => { $("password-hint").classList.toggle("met", $("password").value.length >= MIN_PASSWORD); });
+    $("other").onclick = askEmail;
+    $("resend").onclick = async () => {
+      $("err").textContent = ""; $("ok").textContent = "";
+      try { await post("/api/auth/forgot", { email }); $("ok").textContent = "If the account exists, a new code is on its way."; waitToResend(RESEND_SECONDS); }
+      catch (err) { $("err").textContent = err.message; waitToResend(15); }
+    };
+    $("form").onsubmit = async (e) => {
+      e.preventDefault();
+      $("err").textContent = ""; $("ok").textContent = "";
+      const code = $("code").value, pw = $("password").value;
+      setErr("code", code.length === 6 ? "" : "Enter the 6 digits from the email.");
+      setErr("password", pw.length >= MIN_PASSWORD ? "" : `Use at least ${MIN_PASSWORD} characters for your password.`);
+      setErr("password2", pw === $("password2").value ? "" : "The two passwords don't match.");
+      const bad = card.querySelector("[aria-invalid]");
+      if (bad) return bad.focus();
+      const done = busy($("go"), "Saving…");
+      try {
+        await post("/api/auth/reset", { email, code, password: pw });
+        try { sessionStorage.setItem("atelier-toast", "Password changed. Log in with your new password."); } catch {}
+        location.href = withNext("/login");
+      } catch (err) { $("err").textContent = err.message; done(); $("code").select(); }
+    };
+  };
+  askEmail();
+}
+
+/* ---------- confirm: the 6-digit code ---------- */
+async function confirmView() {
+  document.title = "Confirm your email · Agents Atelier";
+  $("pitch-title").textContent = "One last step, then the team is yours.";
+  const [user, opts] = await Promise.all([getMe(), api("/api/auth/options").catch(() => ({}))]);
+  card.innerHTML = `
+    ${progress(3)}
+    <h1>Check your email</h1>
+    <p class="intro">We sent a 6-digit code to <b>${esc(user?.email || "your email")}</b>. It works for a few minutes.</p>
+    ${opts.email_enabled === false ? `<p class="note">This server doesn't send email yet, so the code is in the server log.</p>` : ""}
+    <form id="form" novalidate>
+      <div class="afield"><label for="code">Confirmation code</label>
+        <input class="input code-input mono" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-describedby="err"></div>
+      <p class="auth-err" id="err" role="alert"></p>
+      <p class="auth-ok" id="ok" role="status"></p>
+      <div class="actions"><button class="btn btn-dark grow" id="go">Confirm</button></div>
+    </form>
+    <p class="auth-alt"><button type="button" id="resend"></button><button type="button" id="out">Use another account</button></p>`;
+  $("code").focus();
+
+  waitToResend(RESEND_SECONDS);
+
+  $("code").oninput = () => {
+    $("code").value = $("code").value.replace(/\D/g, "").slice(0, 6);
+    $("err").textContent = "";
+    if ($("code").value.length === 6 && !$("go").disabled) $("form").requestSubmit();   // typed or pasted: no extra click
+  };
+  $("form").onsubmit = async (e) => {
+    e.preventDefault();
+    $("err").textContent = ""; $("ok").textContent = "";
+    if ($("code").value.length !== 6) { $("err").textContent = "Enter the 6 digits from the email."; return $("code").focus(); }
+    const done = busy($("go"), "Checking…");
+    try {
+      await post("/api/auth/confirm", { code: $("code").value });
+      try { sessionStorage.setItem("atelier-toast", `Email confirmed. Welcome${user?.name ? `, ${user.name.split(" ")[0]}` : ""}!`); } catch {}
+      location.href = next;
+    } catch (err) { $("err").textContent = err.message; done(); $("code").select(); }
+  };
+  $("resend").onclick = async () => {
+    $("err").textContent = ""; $("ok").textContent = "";
+    try {
+      await post("/api/auth/resend");
+      $("ok").textContent = "A new code is on its way. Check your spam folder too.";
+      waitToResend(RESEND_SECONDS);
+    } catch (err) { $("err").textContent = err.message; waitToResend(15); }
+    $("code").value = "";
+    $("code").focus();
+  };
+  $("out").onclick = async () => { await post("/api/auth/logout").catch(() => {}); location.href = "/login"; };
+}
+
+const mode = location.pathname.replace(/\/+$/, "");
+if (mode === "/confirm") confirmView();
+else if (mode === "/register") registerView();
+else if (mode === "/forgot") forgotView();
+else loginView();
+</script>
+</body>
+</html>
