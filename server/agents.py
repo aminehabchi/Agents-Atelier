@@ -16,6 +16,8 @@ Each agent file is a small frontmatter block followed by the agent's role prompt
   default: true        # switched on for new projects
   description: Plans the page structure…   # one line shown in the UI
   model: sonnet        # optional: Claude model for this agent (empty = the server default)
+  tools: web           # optional: also give it web search and page fetching (WebSearch, WebFetch); it may then
+                       # only write research.md and plan.md (the server reverts anything else it changes)
   ---
   You are the UX agent...
 
@@ -36,6 +38,7 @@ ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 ICON_RE = re.compile(r"^[a-z0-9-]{1,32}$")
 MODEL_RE = re.compile(r"^[A-Za-z0-9._\-\[\]]{0,64}$")
+TOOL_SETS = {"", "web"}   # extra tool sets an agent can be given (see `tools:` above)
 PRESETS_FILE = AGENTS_DIR / "_presets.json"
 
 
@@ -84,6 +87,7 @@ def load_agents() -> list[dict]:
             "default": meta.get("default", True) is True,
             "description": str(meta.get("description") or ""),
             "model": str(meta.get("model") or ""),
+            "tools": str(meta.get("tools") or "") if str(meta.get("tools") or "") in TOOL_SETS else "",
             "role": role,
             "file": path.name,
         })
@@ -127,14 +131,18 @@ def validate(data: dict, *, new: bool) -> dict:
     import models   # local import: models.py reads the CLI and agents/_models.json
     if not models.allowed(model):
         raise ValueError(f"“{model}” isn't in the model list. Pick one, or check it with the Claude CLI first.")
+    tools = str(data.get("tools") or "").strip().lower()
+    if tools not in TOOL_SETS:
+        raise ValueError("Tools must be empty, or “web” for web search and page fetching.")
     out.update(name=name, role=role, icon=icon, color=color.lower(), default=bool(data.get("default", True)),
-               description=description, model=model)
+               description=description, model=model, tools=tools)
     return out
 
 
 def _render(agent: dict) -> str:
     desc = f"description: {agent['description']}\n" if agent.get("description") else ""
     desc += f"model: {agent['model']}\n" if agent.get("model") else ""
+    desc += f"tools: {agent['tools']}\n" if agent.get("tools") else ""
     return (f"---\nid: {agent['id']}\nname: {agent['name']}\nicon: {agent['icon']}\n"
             f"color: \"{agent['color']}\"\ndefault: {str(agent['default']).lower()}\n{desc}---\n{agent['role'].strip()}\n")
 
@@ -156,7 +164,7 @@ def update_agent(agent_id: str, data: dict) -> dict:
     target = next((a for a in agents if a["id"] == agent_id), None)
     if not target:
         raise KeyError(agent_id)
-    target.update(validate(data, new=False))
+    target.update(validate({"tools": target.get("tools", ""), **data}, new=False))   # a form without `tools` keeps it
     _write_all(agents)
     return target
 
@@ -308,7 +316,7 @@ def export_agent(agent_id: str) -> tuple[str, str]:
 def export_team(preset_id: str) -> tuple[str, dict]:
     t = get_preset(preset_id)
     by_id = {a["id"]: a for a in load_agents()}
-    agents = [{k: by_id[i][k] for k in ("id", "name", "icon", "color", "default", "description", "model", "role")}
+    agents = [{k: by_id[i][k] for k in ("id", "name", "icon", "color", "default", "description", "model", "tools", "role")}
               for i in t["agents"] if i in by_id]
     return f"team-{t['id']}.json", {"format": TEAM_FORMAT, "version": 1, "exported": time.time(),
                                     "team": {"name": t["name"], "description": t.get("description", ""), "agents": t["agents"]},
@@ -322,11 +330,11 @@ def parse_agent_text(text: str, filename: str = "") -> dict:
     return {"id": str(meta.get("id") or slug).strip().lower(), "name": str(meta.get("name") or slug.title()),
             "icon": str(meta.get("icon") or "bot"), "color": str(meta.get("color") or "#766a7c"),
             "default": meta.get("default", False) is True, "description": str(meta.get("description") or ""),
-            "model": str(meta.get("model") or ""), "role": role}
+            "model": str(meta.get("model") or ""), "tools": str(meta.get("tools") or ""), "role": role}
 
 
 def _same_agent(a: dict, b: dict) -> bool:
-    keys = ("name", "icon", "color", "default", "description", "model", "role")
+    keys = ("name", "icon", "color", "default", "description", "model", "tools", "role")
     return all(str(a.get(k, "")).strip() == str(b.get(k, "")).strip() for k in keys)
 
 

@@ -87,7 +87,24 @@ specialist did. It's not meant for web apps that need a server, a database or lo
 
 ### What happens when you press Enter
 
-A typical run of the default team (times vary):
+**Who works is decided first:**
+
+- **First prompt on a new project:** every agent that's switched on builds the site.
+- **Any later prompt:** the **Orchestrator** reads your request and the project (files, `plan.md`, earlier requests, the
+  last run) and picks only the agents the request needs. "Make the buttons rounder" runs CSS, not the whole team. Its
+  choice and reason appear in the chat, and the run starts right away (press Stop if it picked wrong).
+- **The Brief agent always runs** whenever any agent runs, so its switch is locked on. On follow-ups it restates your
+  request as a precise change instead of rewriting the brief.
+- The server adds what the Orchestrator might forget: agents that must adapt (HTML changes → CSS) and **QA + Critic
+  after any code change**. It only ever picks from the agents you've switched on.
+- **Unclear, off-topic or a question** ("fix it", "write me a poem", "which fonts did you use?"): no agent runs. The
+  Orchestrator answers or asks one question in the chat; just reply.
+- If the Orchestrator fails or gives an unusable answer, every switched-on agent runs, so a prompt is never blocked.
+
+The Orchestrator's instructions are in `agents/_orchestrator.md` (editable, like any agent; set `model:` there to give
+it a faster model).
+
+A typical first build with the default team (times vary):
 
 | Time   | Agent          | What it does                                                                 |
 |--------|----------------|------------------------------------------------------------------------------|
@@ -205,7 +222,7 @@ Relative folder paths start at the project root. Restart the server after changi
 | Code                       | Edit any file, with **Auto-save** on or off (Save button or Ctrl/Cmd+S)                  |
 | Versions (clock button)    | A version after every agent: open, compare line by line, download or restore            |
 | Cost & time (chart button) | Estimated cost, time and tokens per agent, for this project or all projects              |
-| Team panel                 | Switch agents on or off, choose a preset, jump to an agent's card, follow progress       |
+| Team panel                 | Switch agents on or off (the ones the Orchestrator may use), choose a preset, jump to a card, follow progress |
 
 ### Multi-page sites
 
@@ -238,21 +255,28 @@ In the studio, the page switcher above the preview shows any page, and marks pag
 
 | #  | Agent          | Default | Model   | What it does                                                                   |
 |----|----------------|---------|---------|--------------------------------------------------------------------------------|
-| 01 | Brief          | off     | default | Turns your prompt into a brief: goal, audience, tone, success criteria         |
-| 02 | UX             | on      | default | Plans the structure: sections, navigation, user flow, calls to action          |
-| 03 | Design System  | on      | default | Defines palette, fonts, type scale, spacing and radii as CSS variables         |
-| 04 | Copywriter     | on      | default | Writes every word: headlines, body text, buttons, form labels and errors       |
-| 05 | HTML           | on      | sonnet  | Builds semantic, accessible markup from the plan and the copy                  |
-| 06 | CSS            | on      | sonnet  | Styles everything with the tokens: layout, hierarchy, states, mobile first    |
-| 07 | Assets         | off     | sonnet  | Draws the logo, favicon, icons and illustrations as hand-written SVG           |
-| 08 | Responsive     | on      | sonnet  | Makes it work from 320px phones to wide desktops                               |
-| 09 | JS             | on      | sonnet  | Adds interactivity in vanilla JavaScript: menu, tabs, forms, scrolling         |
-| 10 | Animation      | on      | sonnet  | Adds tasteful motion, respecting reduced-motion settings                       |
-| 11 | Accessibility  | on      | default | Audits against WCAG 2.2 AA and fixes what it finds                             |
-| 12 | SEO            | off     | sonnet  | Title, meta description, Open Graph tags, structured data                      |
-| 13 | Performance    | off     | sonnet  | Leaner CSS and JS, smart loading, no layout shift                              |
-| 14 | QA             | off     | default | Traces links, buttons, forms and selectors like a tester, and fixes bugs       |
-| 15 | Critic         | on      | default | Reviews, fixes small issues, sends big ones back to their agent, scores it     |
+| 01 | Brief          | required| default | Turns your prompt into a brief: goal, audience, tone, success criteria         |
+| 02 | Research       | off     | default | Researches the brief on the web (competitors, reviews, trends) and writes a sourced report with an improved idea |
+| 03 | UX             | on      | default | Plans the structure: sections, navigation, user flow, calls to action          |
+| 04 | Design System  | on      | default | Defines palette, fonts, type scale, spacing and radii as CSS variables         |
+| 05 | Copywriter     | on      | default | Writes every word: headlines, body text, buttons, form labels and errors       |
+| 06 | HTML           | on      | sonnet  | Builds semantic, accessible markup from the plan and the copy                  |
+| 07 | CSS            | on      | sonnet  | Styles everything with the tokens: layout, hierarchy, states, mobile first    |
+| 08 | Assets         | off     | sonnet  | Draws the logo, favicon, icons and illustrations as hand-written SVG           |
+| 09 | Responsive     | on      | sonnet  | Makes it work from 320px phones to wide desktops                               |
+| 10 | JS             | on      | sonnet  | Adds interactivity in vanilla JavaScript: menu, tabs, forms, scrolling         |
+| 11 | Animation      | on      | sonnet  | Adds tasteful motion, respecting reduced-motion settings                       |
+| 12 | Accessibility  | on      | default | Audits against WCAG 2.2 AA and fixes what it finds                             |
+| 13 | SEO            | off     | sonnet  | Title, meta description, Open Graph tags, structured data                      |
+| 14 | Performance    | off     | sonnet  | Leaner CSS and JS, smart loading, no layout shift                              |
+| 15 | QA             | off     | default | Traces links, buttons, forms and selectors like a tester, and fixes bugs       |
+| 16 | Critic         | on      | default | Reviews, fixes small issues, sends big ones back to their agent, scores it     |
+
+**Research** is the only agent with web access (`tools: web` in its file): it can search the web and read pages, but
+may only write `research.md` and the `## Research` section of `plan.md`. The server undoes any other change it makes.
+It runs right after Brief and researches that brief. Its report opens in the studio's **Research** tab (or
+`/p/<id>#research`), and every later agent builds its improved idea and recommended features automatically. It's off by default because it adds several minutes and cost; switch it on, or just ask
+("research competitors"), and the Orchestrator picks it.
 
 "default" means your Claude Code model (or `AGENT_MODEL`). The mechanical agents use the faster `sonnet`, while the
 planning and judging agents use the stronger default.
@@ -299,6 +323,7 @@ reusing the CSS variables in :root. Don't change the light theme.
   file names an unknown model gets a warning on its page and in the studio, and fails at once with a clear message.
 - **The number in the file name sets the order.** Drag agents on the Agents page to reorder them.
 - **`agents/_common.md`** holds the shared rules every agent follows. Edit it to change what all agents know.
+- **`agents/_orchestrator.md`** tells the Orchestrator how to pick the agents for a follow-up prompt.
 - Full details are in [doc.md](doc.md#3-agents).
 
 ## Sharing agents and teams
@@ -365,7 +390,8 @@ HTML/CSS/JS that runs in the browser. A contact form or login screen will look a
 nothing is sent or stored; wire it to your own back end afterwards.
 
 **Why is it slower than single-AI builders?**
-Ten specialists each do a careful pass. For small changes, use the **Quick** preset or switch agents off. You can
+Ten specialists each do a careful pass on the first build. After that, the Orchestrator runs only the agents a change
+needs. To narrow it further, use the **Quick** preset or switch agents off. You can
 also start the server with `AGENT_MODEL=sonnet` for faster runs.
 
 **What if I don't like what one agent did?**

@@ -15,6 +15,15 @@ Markers inside the prompt choose what happens during an agent run:
   [[escape]]        reports a blocked read of /etc/passwd (a permission denial)
   [[inject-script]] writes an external <script> into index.html (to test the safety scan)
   [[redo]]          the Critic sends work back (REDO lines) whenever <send_back> lists agents
+  [[research-escape]]  the Research agent also edits index.html and creates evil.html (the server must undo both)
+
+The Research agent writes research.md (with a WebSearch step) instead of touching index.html.
+
+The Orchestrator (its system prompt starts "You are the Orchestrator") answers with a JSON decision, chosen by
+markers inside <user_request>:
+  [[orch:css,js]]   picks those agents (default: css)
+  [[orch-talk]]     no agent: asks the user a question
+  [[orch-garbage]]  replies with text that isn't JSON (the server falls back to the whole team)
 
 Every call is appended to $FAKE_CLAUDE_LOG as one JSON line: {"argv": [...], "cwd": "..."}.
 """
@@ -65,6 +74,21 @@ def out(obj):
 
 
 role = arg("--append-system-prompt") or ""
+if role.startswith("You are the Orchestrator"):
+    out({"type": "system", "subtype": "init", "model": f"claude-{model}-test"})
+    req = re.search(r"<user_request>(.*?)</user_request>", prompt, re.S)
+    req = req.group(1) if req else ""
+    pick = re.search(r"\[\[orch:([a-z0-9,-]+)\]\]", req)
+    if "[[orch-garbage]]" in req:
+        answer = "I think the CSS agent should do it."
+    elif "[[orch-talk]]" in req:
+        answer = json.dumps({"intent": "unclear", "agents": [], "reason": "", "reply": "Which section should change?"})
+    else:
+        ids = pick.group(1).split(",") if pick else ["css"]
+        answer = "```json\n" + json.dumps({"intent": "change", "agents": ids, "notes": {i: f"note for {i}" for i in ids},
+                                           "reason": "Only styling is needed."}) + "\n```"
+    out({"type": "result", "subtype": "success", "is_error": False, "result": answer, "total_cost_usd": 0.001, "num_turns": 1})
+    sys.exit(0)
 m = re.search(r"You are the (.+?) agent", role)
 agent = m.group(1) if m else "Some"
 out({"type": "system", "subtype": "init", "model": f"claude-{model}-test"})
@@ -91,6 +115,20 @@ if "[[fail-once]]" in prompt and not Path(".failed-once").exists():
     sys.exit(0)
 if "[[fail]]" in prompt:
     result("Simulated failure for the test.", is_error=True)
+    sys.exit(0)
+
+if agent == "Research":
+    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "toolu_s", "name": "WebSearch",
+                                                       "input": {"query": "coffee shop websites"}}]}})
+    out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_s", "content": "results"}]}})
+    Path("research.md").write_text("# Research: test\n\n## Sources\n1. [1] Example — https://example.com\n")
+    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "toolu_r", "name": "Write",
+                                                       "input": {"file_path": str(Path("research.md").resolve()), "content": "…"}}]}})
+    out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_r", "content": "ok"}]}})
+    if "[[research-escape]]" in prompt:
+        Path("index.html").write_text("hacked")
+        Path("evil.html").write_text("<script>bad()</script>")
+    result("Research agent: improved idea, 1 source.")
     sys.exit(0)
 
 # a normal step: append a line to index.html with a Write tool use

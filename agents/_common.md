@@ -30,7 +30,10 @@ The result must look like a product from a professional design team: calm, dense
 
 ## plan.md (single source of truth)
 Keep these sections, in this order, creating any that are missing:
-  ## Brief · ## Structure · ## Design tokens · ## Copy · ## Notes · ## Review
+  ## Brief · ## Research (only when the Research agent ran) · ## Structure · ## Design tokens · ## Copy · ## Notes · ## Review
+## Research is part of the brief: build its improved idea and its Must and Should features, and apply its
+"Changes to the brief" over ## Brief. research.md is its full report: read it when you need detail, never edit it,
+never link it from the site.
 Write in your own section only. Add short bullets to ## Notes for anything later agents must know (data-* hooks, assumptions, known gaps).
 
 ## When you finish

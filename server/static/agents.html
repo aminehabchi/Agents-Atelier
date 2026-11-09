@@ -327,8 +327,8 @@ async function formView(id) {
   const isNew = !id;
   const draft = source
     ? { id: isNew ? "" : source.id, name: isNew ? `${source.name} copy` : source.name, icon: source.icon, color: source.color, default: isNew ? false : source.default,
-        description: source.description || "", model: source.model || "", role: source.role }
-    : { id: "", name: "", icon: "bot", color: "#766a7c", default: false, description: "", model: "",
+        description: source.description || "", model: source.model || "", tools: source.tools || "", role: source.role }
+    : { id: "", name: "", icon: "bot", color: "#766a7c", default: false, description: "", model: "", tools: "",
         role: "You are the … agent. <your mission in one sentence>\n\nRead: <which files and plan.md sections>.\n\nDo:\n- …\n- …\n\nDon't: <what to leave to other agents>." };
   if (isNew && source) draft.id = slug(draft.name);
   const initial = JSON.stringify(draft);
@@ -373,7 +373,9 @@ async function formView(id) {
         <div class="field"><span>Colour <small>a small accent in the studio</small></span>
           <div class="colors" id="f-colors">${COLORS.map(c => `<button type="button" data-color="${c}" style="--c:${c}" class="${c === draft.color ? "on" : ""}" title="${c}"></button>`).join("")}
             <input type="color" id="f-color" value="${esc(draft.color)}" title="Custom colour"></div>
-          <label class="switch" style="margin-top:18px"><input type="checkbox" id="f-default" ${draft.default ? "checked" : ""}><span>On by default for new projects</span></label></div>
+          <label class="switch" style="margin-top:18px"><input type="checkbox" id="f-default" ${draft.default ? "checked" : ""}><span>On by default for new projects</span></label>
+          <label class="switch" style="margin-top:10px" title="Adds web search and page fetching. Such an agent may only write research.md and plan.md: the server undoes any other change it makes.">
+            <input type="checkbox" id="f-web" ${draft.tools === "web" ? "checked" : ""}><span>Web research — can search the web and read pages (writes only research.md and plan.md)</span></label></div>
         <label class="field full"><span>Instructions <small>the agent sees the shared rules, then this, then the project files</small></span>
           <textarea class="input role-input" id="f-role" spellcheck="false">${esc(draft.role)}</textarea></label>
       </div>
@@ -396,6 +398,7 @@ async function formView(id) {
   $("f-desc").oninput = (e) => { draft.description = e.target.value; changed(); };
   $("f-role").oninput = (e) => { draft.role = e.target.value; changed(); };
   $("f-default").onchange = (e) => { draft.default = e.target.checked; changed(); };
+  $("f-web").onchange = (e) => { draft.tools = e.target.checked ? "web" : ""; changed(); };
   $("f-model").onchange = (e) => {
     const other = e.target.value === "__other";
     $("otherModel").hidden = !other; $("checkResult").textContent = "";
