@@ -77,7 +77,7 @@ def project_state(meta: dict, folder: Path, clean) -> str:
             f"What each agent reported in the last run:\n{notes}{asked}")
 
 
-def build_prompt(meta: dict, request: str, team: list[dict], folder: Path, clean, site_pages: str) -> str:
+def build_prompt(meta: dict, request: str, team: list[dict], folder: Path, clean, site_pages: str, brief: str = "") -> str:
     past = "\n".join(f"- {clean(h, 300)}" for h in meta.get("history", [])[-8:]) or "(none)"
     roster = "\n".join(f"- {a['id']}: {a['name']} — {clean(a.get('description') or '', 160)}"
                        + (" (switched off: choose it only when the user asks for research)" if a["id"] in ON_REQUEST
@@ -86,7 +86,7 @@ def build_prompt(meta: dict, request: str, team: list[dict], folder: Path, clean
 name: {clean(meta.get("name"), 80)}
 description: {clean(meta.get("description") or "(no description)", 300)}
 </project>
-
+{brief}
 <site_pages>
 {site_pages}
 </site_pages>

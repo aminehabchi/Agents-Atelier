@@ -130,7 +130,31 @@ window.confirmDialog = ({ title, text, ok = "Confirm", danger = false }) => new 
 window.SITE_EXT = ["html", "htm", "css", "js", "mjs", "md", "png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "ico",
   "woff", "woff2", "ttf", "otf", "mp4", "webm", "mp3", "ogg", "wav"];
 const MAX_SITE_MB = 40;
-window.projectDialog = ({ title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true, allowImport = false } = {}) =>
+const MAX_ASSET_MB = 5, MAX_ASSETS = 12;
+const ASSET_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+/* The questions a project asks (all optional). Keys match BRIEF_FIELDS in server/main.py. */
+const BRIEF_QUESTIONS = [
+  { key: "site_type", label: "What kind of site is it?", type: "select",
+    options: ["Landing page", "Business / brochure site", "Portfolio", "Product page", "Restaurant or café", "Event", "Personal site or blog", "Other"] },
+  { key: "audience", label: "Who is it for?", max: 200, placeholder: "e.g. Young families looking for weekend activities" },
+  { key: "goal", label: "What should visitors do?", max: 200, placeholder: "e.g. Book a table, call us, join the newsletter" },
+  { key: "tone", label: "Tone and style", type: "select",
+    options: ["Friendly and warm", "Professional and trustworthy", "Minimal and calm", "Bold and energetic", "Luxurious and elegant", "Playful and fun", "Technical and precise"] },
+  { key: "colors", label: "Brand colours", max: 120, placeholder: "e.g. #0e7c66 and cream, or “no preference”" },
+  { key: "language", label: "Language(s) of the site", max: 80, placeholder: "e.g. French, with an Arabic version" },
+  { key: "sections", label: "Must-have content", max: 600, type: "textarea",
+    placeholder: "e.g. Menu with prices, opening hours, map and address, customer reviews, booking button" },
+  { key: "inspiration", label: "Sites or styles you like", max: 300, placeholder: "e.g. apple.com for the calm layout" },
+  { key: "avoid", label: "Anything to avoid?", max: 200, placeholder: "e.g. no stock-photo look, no pop-ups" },
+];
+const briefField = (q, value = "") => q.type === "select"
+  ? `<label class="pfield"><span>${esc(q.label)}</span><select class="input" name="b_${q.key}">
+      <option value="">Let the team decide</option>${q.options.map(o => `<option ${o === value ? "selected" : ""}>${esc(o)}</option>`).join("")}
+      ${value && !q.options.includes(value) ? `<option selected>${esc(value)}</option>` : ""}</select></label>`
+  : q.type === "textarea"
+    ? `<label class="pfield wide"><span>${esc(q.label)}</span><textarea class="input" name="b_${q.key}" maxlength="${q.max}" rows="3" placeholder="${esc(q.placeholder)}">${esc(value)}</textarea></label>`
+    : `<label class="pfield"><span>${esc(q.label)}</span><input class="input" name="b_${q.key}" maxlength="${q.max}" placeholder="${esc(q.placeholder)}" value="${esc(value)}"></label>`;
+window.projectDialog = ({ title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true, allowImport = false, brief = {}, askAssets = false } = {}) =>
   new Promise((resolve) => {
     const d = document.createElement("dialog");
     d.className = "modal project-modal";
@@ -162,6 +186,21 @@ window.projectDialog = ({ title = "New project", ok = "Create project", name = "
         <label class="pfield" data-pages><span>Pages <em>one per line · the first is the home page</em></span>
           <textarea class="input" name="pages" rows="3" placeholder="Home&#10;About&#10;Contact">${esc((pages || ["Home"]).join("\n"))}</textarea>
           <small class="err" data-for="pages"></small></label>
+        <fieldset class="pgroup"><legend>About your site <em>optional · the more you say, the closer the first build</em></legend>
+          <div class="pgrid">${BRIEF_QUESTIONS.map(q => briefField(q, (brief || {})[q.key] || "")).join("")}</div>
+        </fieldset>
+        ${askAssets ? `<fieldset class="pgroup"><legend>Your images <em>optional · PNG, JPG, WebP or GIF, up to ${MAX_ASSET_MB} MB each</em></legend>
+          <div class="pgrid">
+            <div class="pfield"><span>Logo</span>
+              <div class="src-files"><button type="button" class="btn btn-ghost btn-sm" data-pick="logo">${icon("image", { size: 14 })}Choose logo…</button>
+                <input type="file" data-asset="logo" accept="${ASSET_TYPES.join(",")}" hidden></div></div>
+            <div class="pfield"><span>Photos <em>products, team, place…</em></span>
+              <div class="src-files"><button type="button" class="btn btn-ghost btn-sm" data-pick="photo">${icon("image", { size: 14 })}Add photos…</button>
+                <input type="file" data-asset="photo" accept="${ASSET_TYPES.join(",")}" multiple hidden></div></div>
+          </div>
+          <ul class="asset-list" data-assets></ul>
+          <small class="err asset-err" data-for="assets"></small>
+        </fieldset>` : ""}
         <div class="row">
           ${cancellable ? `<button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>` : ""}
           <button class="btn btn-dark" value="ok">${esc(ok)}</button>
@@ -222,25 +261,63 @@ window.projectDialog = ({ title = "New project", ok = "Create project", name = "
       });
     }
 
+    // ---- the user's own images (logo + photos), uploaded once the project exists
+    let assets = [];   // {file, kind, note, url}
+    const assetErr = (t) => { const el = d.querySelector('[data-for="assets"]'); if (el) el.textContent = t; };
+    const renderAssets = () => {
+      d.querySelector("[data-assets]").innerHTML = assets.map((a, i) => `<li><img src="${a.url}" alt="" width="40" height="40">
+        <span class="asset-kind">${a.kind === "logo" ? "Logo" : "Photo"}</span>
+        <input class="input" data-note="${i}" maxlength="120" placeholder="${a.kind === "logo" ? "Optional note" : "What it shows, e.g. our terrace at sunset"}" value="${esc(a.note)}" aria-label="Note for ${esc(a.file.name)}">
+        <button type="button" class="icon-btn plain" data-remove="${i}" aria-label="Remove ${esc(a.file.name)}">${icon("x", { size: 14 })}</button></li>`).join("");
+    };
+    if (askAssets) {
+      d.querySelectorAll("[data-pick]").forEach(b => b.addEventListener("click", () => d.querySelector(`[data-asset="${b.dataset.pick}"]`).click()));
+      d.querySelectorAll("[data-asset]").forEach(input => input.addEventListener("change", () => {
+        const kind = input.dataset.asset;
+        assetErr("");
+        for (const file of input.files) {
+          if (!ASSET_TYPES.includes(file.type)) { assetErr(`${file.name} isn't a PNG, JPG, WebP or GIF image.`); continue; }
+          if (file.size > MAX_ASSET_MB * 1048576) { assetErr(`${file.name} is ${(file.size / 1048576).toFixed(1)} MB; the limit is ${MAX_ASSET_MB} MB.`); continue; }
+          if (kind === "logo") assets = assets.filter(a => { if (a.kind === "logo") URL.revokeObjectURL(a.url); return a.kind !== "logo"; });
+          if (assets.length >= MAX_ASSETS) { assetErr(`Up to ${MAX_ASSETS} images.`); break; }
+          const entry = { file, kind, note: "", url: URL.createObjectURL(file) };
+          kind === "logo" ? assets.unshift(entry) : assets.push(entry);
+        }
+        input.value = "";
+        renderAssets();
+      }));
+      d.querySelector("[data-assets]").addEventListener("input", (e) => { if (e.target.dataset.note) assets[+e.target.dataset.note].note = e.target.value; });
+      d.querySelector("[data-assets]").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-remove]");
+        if (!b) return;
+        URL.revokeObjectURL(assets[+b.dataset.remove].url);
+        assets.splice(+b.dataset.remove, 1); renderAssets();
+      });
+    }
+    const briefOf = () => Object.fromEntries(BRIEF_QUESTIONS.map(q => [q.key, f[`b_${q.key}`].value.trim()]).filter(([, v]) => v));
+
     let result = null;
     form.addEventListener("submit", (e) => {
       if (e.submitter?.value !== "ok") return;                 // cancel
       if (!check()) { e.preventDefault(); return; }
       if (mode === "files") {
         if (!source) { e.preventDefault(); srcErr("Choose a folder or a .zip with your site."); return; }
-        result = { name: f.name.value.trim(), description: f.description.value.trim(), source };
+        result = { name: f.name.value.trim(), description: f.description.value.trim(), brief: briefOf(), source, assets };
         return;
       }
       const pageList = f.pages.value.split("\n").map(x => x.trim()).filter(Boolean);
       if (pageList.length > 12) { e.preventDefault(); d.querySelector('[data-for="pages"]').textContent = "Up to 12 pages."; return; }
-      result = { name: f.name.value.trim(), description: f.description.value.trim(), pages: pageList.length ? pageList : ["Home"] };
+      result = { name: f.name.value.trim(), description: f.description.value.trim(), pages: pageList.length ? pageList : ["Home"], brief: briefOf(), assets };
     });
     f.description.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); form.requestSubmit(form.querySelector('[value="ok"]')); }
     });
     if (!cancellable) d.addEventListener("cancel", (e) => e.preventDefault());
     d.addEventListener("click", (e) => { if (cancellable && e.target === d) d.close(); });
-    d.addEventListener("close", () => { resolve(result); d.remove(); });
+    d.addEventListener("close", () => {
+      if (!result) assets.forEach(a => URL.revokeObjectURL(a.url));
+      resolve(result); d.remove();
+    });
     d.showModal();
     (f.name.value ? f.description : f.name).focus();
   });
@@ -254,20 +331,35 @@ const fileBase64 = (file) => new Promise((resolve, reject) => {
 
 /* Ask for name + description (and optionally existing files), create the project, open it. */
 window.newProject = async () => {
-  const details = await projectDialog({ allowImport: true });
+  const details = await projectDialog({ allowImport: true, askAssets: true });
   if (!details) return;
+  const { assets = [], ...fields } = details;
   try {
     let p;
     if (details.source) {
       toast("Importing your site…");
-      const { name, description, source } = details;
+      const { name, description, brief, source } = details;
       const body = source.zip
-        ? { name, description, zip: await fileBase64(source.zip) }
-        : { name, description, files: await Promise.all(source.files.map(async x => ({ path: x.path, data: await fileBase64(x.file) }))) };
+        ? { name, description, brief, zip: await fileBase64(source.zip) }
+        : { name, description, brief, files: await Promise.all(source.files.map(async x => ({ path: x.path, data: await fileBase64(x.file) }))) };
       p = await api("/api/projects/import", { method: "POST", body: JSON.stringify(body), timeout: 120000 });
       if (p.skipped?.length) sessionStorage.setItem("atelier-import-note", `Left out ${p.skipped.length} file${p.skipped.length === 1 ? "" : "s"} that aren't HTML, CSS, JS, Markdown or assets.`);
     } else {
-      p = await api("/api/projects", { method: "POST", body: JSON.stringify(details) });
+      p = await api("/api/projects", { method: "POST", body: JSON.stringify(fields) });
+    }
+    if (assets.length) toast(`Uploading ${assets.length} image${assets.length === 1 ? "" : "s"}…`);
+    const failed = [];
+    for (const a of assets) {   // one at a time, so each request stays under the body limit
+      try {
+        const data = `data:${a.file.type};base64,${await fileBase64(a.file)}`;
+        await api(`/api/projects/${p.id}/assets`, { method: "POST", timeout: 60000,
+          body: JSON.stringify({ name: a.file.name, data, kind: a.kind, note: a.note.trim() }) });
+      } catch (err) { failed.push(`${a.file.name}: ${err.message}`); }
+      URL.revokeObjectURL(a.url);
+    }
+    if (failed.length) {
+      const prev = sessionStorage.getItem("atelier-import-note");
+      sessionStorage.setItem("atelier-import-note", (prev ? prev + " " : "") + `Some images weren't added: ${failed.join(" · ")}`);
     }
     location.href = `/p/${p.id}`;
   } catch (err) { toast(err.message, "err"); }

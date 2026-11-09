@@ -86,4 +86,13 @@ MAX_IMAGE = _mb("MAX_IMAGE_MB", 5)
 MAX_SITE_IMPORT = _mb("MAX_SITE_IMPORT_MB", 40)   # largest existing site you can start a project from
 MAX_EDIT = int(float(os.environ.get("MAX_EDIT_KB", "").strip() or 500) * 1024)
 MAX_VERSIONS = _int("MAX_VERSIONS", 150)
-REVIEW_ROUNDS = _int("REVIEW_ROUNDS", 2)   # times the Critic may send work back to earlier agents in one run
+# ---- plan
+# "free" limits the costly parts of a run: the Critic reviews once and can't send work back.
+PLAN = (os.environ.get("ATELIER_PLAN", "").strip() or "pro").lower()
+if PLAN not in ("free", "pro"):
+    raise SystemExit(f"Setting ATELIER_PLAN must be free or pro, got {PLAN!r} (check your .env).")
+# times the Critic may send work back to earlier agents in one run (always 0 on the free plan)
+REVIEW_ROUNDS = 0 if PLAN == "free" else _int("REVIEW_ROUNDS", 2, low=0)
+
+# ---- project brief & assets (asked when a project is created)
+MAX_ASSETS = _int("MAX_ASSETS", 12)   # logo + photos a project can start with

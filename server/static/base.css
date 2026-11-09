@@ -141,6 +141,22 @@ dialog.project-modal { width: min(520px, calc(100vw - 32px)); }
 .pfield .err:empty { display: none; }
 .pfield .input[aria-invalid="true"] { border-color: var(--danger); }
 dialog.project-modal .row { margin-top: 8px; }
+dialog.project-modal { width: min(680px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.pgroup { border: 0; border-top: 1px solid var(--line); margin: 8px 0 16px; padding: 16px 0 0; min-width: 0; }
+.pgroup legend { padding: 0 8px 0 0; font-size: 14px; font-weight: 500; color: var(--ink); }
+.pgroup legend em { font-style: normal; font-weight: 400; color: var(--stone); font-size: 12px; margin-left: 6px; }
+.pgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+.pgrid .pfield.wide { grid-column: 1 / -1; }
+.pgrid .pfield textarea { min-height: 72px; }
+.pgrid select.input { height: 46px; font-size: 15px; border: 1.5px solid var(--line-strong); }
+@media (max-width: 560px) { .pgrid { grid-template-columns: minmax(0, 1fr); } }
+.asset-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.asset-list:empty { display: none; }
+.asset-list li { display: grid; grid-template-columns: 40px auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.asset-list img { width: 40px; height: 40px; object-fit: cover; border-radius: 2px; box-shadow: var(--ring); background: var(--paper); }
+.asset-kind { font-size: 12px; color: var(--stone); min-width: 40px; }
+.asset-err { color: var(--danger); font-size: 12px; }
+.asset-err:empty { display: none; }
 .src-pick { display: flex; gap: 2px; padding: 3px; background: var(--paper); box-shadow: var(--ring); border-radius: 2px; }
 .src-pick button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: transparent; border: 0;
   padding: 8px 12px; border-radius: 2px; font: inherit; font-size: 13px; color: var(--stone); cursor: pointer; }

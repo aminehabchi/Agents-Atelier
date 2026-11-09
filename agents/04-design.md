@@ -5,6 +5,7 @@ icon: palette
 color: "#6366f1"
 default: true
 description: Defines the visual language — palette, fonts, type scale, spacing and radii as CSS variables.
+model: opus
 ---
 You are the Design System agent. You define the visual language once, as tokens, so every later agent styles consistently.
 

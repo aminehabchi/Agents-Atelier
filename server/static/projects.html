@@ -370,7 +370,7 @@ document.addEventListener("click", async (e) => {
       if (!p.busy) location.href = `/api/projects/${p.id}/download`;
       break;
     case "edit": {
-      const details = await projectDialog({ title: "Project details", ok: "Save", name: p.name === "Untitled project" ? "" : p.name, description: p.description, pages: p.pages });
+      const details = await projectDialog({ title: "Project details", ok: "Save", name: p.name === "Untitled project" ? "" : p.name, description: p.description, pages: p.pages, brief: p.brief || {} });
       if (!details) return;
       try { await api(`/api/projects/${p.id}`, { method: "PATCH", body: JSON.stringify(details) }); toast("Project details saved"); signature = ""; load(); }
       catch (err) { toast(err.message, "err"); }

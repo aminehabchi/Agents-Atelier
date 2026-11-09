@@ -945,7 +945,7 @@ async function editDetails({ required = false, note = "" } = {}) {
   const details = await projectDialog({
     title: required ? "Name this project" : "Project details", ok: required ? "Save and continue" : "Save",
     name: project.name === "Untitled project" ? "" : project.name, description: project.description || "",
-    pages: (project.pages || [{ title: "Home" }]).map(p => p.title),
+    pages: (project.pages || [{ title: "Home" }]).map(p => p.title), brief: project.brief || {},
     note: note || (required ? "This project is missing its name or description. The agents read both, so be specific." : ""),
     cancellable: !required,
   });

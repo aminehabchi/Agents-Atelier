@@ -469,7 +469,8 @@ class T06Runs(unittest.TestCase):
         calls = [c for c in log_calls() if "-p" in c["argv"]]
         self.assertEqual(len(calls), 3)
         argv = calls[0]["argv"]
-        for flag in ["--restricted", "--strict-mcp-config", "--disable-slash-commands"]:
+        for flag in ["--restricted", "--strict-mcp-config", "--disable-slash-commands",
+                     "--exclude-dynamic-system-prompt-sections"]:                # prompt-cache reuse across projects
             self.assertIn(flag, argv)
         self.assertEqual(argv[argv.index("--tools") + 1], "Read,Write,Edit,Glob,Grep")
         self.assertEqual(Path(calls[0]["cwd"]).resolve(), (TMP / "work" / pid).resolve())
@@ -932,6 +933,55 @@ class T08bSiteImport(unittest.TestCase):
         self.assertEqual([x["file"] for x in m["pages"]], ["index.html", "contact-us.html", "blog.html"])
 
 
+class T03bBriefAndAssets(unittest.TestCase):
+    """The new-project questionnaire and the user's own images reach every agent."""
+    PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+
+    def test_brief_is_cleaned_saved_and_editable(self):
+        s, p, _ = call("POST", "/api/projects", {"name": "Café", "description": "A café site.",
+                                                  "brief": {"audience": "  Families   nearby ", "tone": "", "evil": "x"}})
+        self.assertEqual(s, 200, p)
+        self.assertEqual(p["brief"], {"audience": "Families nearby"})          # trimmed; empty and unknown dropped
+        self.assertEqual(call("POST", "/api/projects", {"name": "x", "description": "y", "brief": {"goal": "g" * 201}})[0], 400)
+        self.assertEqual(call("POST", "/api/projects", {"name": "x", "description": "y", "brief": "nope"})[0], 400)
+        s, m, _ = call("PATCH", f"/api/projects/{p['id']}", {"brief": {"colors": "#0e7c66"}})
+        self.assertEqual(m["brief"], {"colors": "#0e7c66"})
+        s, m, _ = call("PATCH", f"/api/projects/{p['id']}", {"name": "Café 2"})       # no brief sent: kept
+        self.assertEqual(m["brief"], {"colors": "#0e7c66"})
+
+    def test_assets_are_saved_in_the_site_and_listed(self):
+        pid = new_project()
+        s, a, _ = call("POST", f"/api/projects/{pid}/assets", {"name": "My Logo.png", "data": self.PNG, "kind": "logo"})
+        self.assertEqual(s, 200, a)
+        self.assertEqual(a["path"], "assets/logo.png")
+        s, b, _ = call("POST", f"/api/projects/{pid}/assets", {"name": "Terrace.png", "data": self.PNG, "kind": "photo", "note": "Our terrace"})
+        self.assertEqual(b["path"], "assets/terrace.png")
+        s, c, _ = call("POST", f"/api/projects/{pid}/assets", {"name": "logo.png", "data": self.PNG, "kind": "logo"})
+        self.assertEqual(c["path"], "assets/logo-2.png")                        # never overwrites
+        self.assertTrue((TMP / "work" / pid / "assets" / "logo.png").is_file())
+        for body, code in [({"data": self.PNG, "kind": "banner"}, 400), ({"data": "data:image/svg+xml;base64,PHN2Zz4=", "kind": "logo"}, 400),
+                           ({"data": self.PNG, "kind": "photo", "note": "n" * 121}, 400)]:
+            self.assertEqual(call("POST", f"/api/projects/{pid}/assets", body)[0], code, body)
+        meta = call("GET", f"/api/projects/{pid}")[1]
+        self.assertEqual([x["path"] for x in meta["assets"]], ["assets/logo.png", "assets/terrace.png", "assets/logo-2.png"])
+
+    def test_agents_receive_the_brief_and_assets(self):
+        s, p, _ = call("POST", "/api/projects", {"name": "Bakery", "description": "A bakery.",
+                                                  "brief": {"goal": "Order a cake", "language": "French"}})
+        call("POST", f"/api/projects/{p['id']}/assets", {"name": "logo.png", "data": self.PNG, "kind": "logo"})
+        LOG.write_text("")
+
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": "build it", "agents": ["html"]}))
+            return await recv(("run_done", "error", "run_stopped"))
+        events = ws(p["id"], script)
+        self.assertEqual(events[-1]["type"], "run_done", events[-3:])
+        prompt = next(c["argv"] for c in log_calls() if "-p" in c["argv"])
+        prompt = prompt[prompt.index("-p") + 1]
+        self.assertIn("<project_brief>\nMain goal / call to action: Order a cake\nLanguage(s) of the site: French\n</project_brief>", prompt)
+        self.assertIn("- assets/logo.png — the brand logo", prompt)
+
+
 class T09Settings(unittest.TestCase):
     """config.load_env: .env values fill in what the environment doesn't already set."""
     def setUp(self):
@@ -947,6 +997,16 @@ class T09Settings(unittest.TestCase):
         for k in self.keys:
             os.environ.pop(k, None)
         sys.path.remove(str(ROOT / "server"))
+
+    def test_free_plan_limits_the_critic_to_one_review(self):
+        def rounds(**env):
+            code = "import config; print(config.PLAN, config.REVIEW_ROUNDS)"
+            return subprocess.run([str(PYTHON), "-c", code], cwd=ROOT / "server", capture_output=True, text=True,
+                                  env={**os.environ, "ATELIER_ENV_FILE": str(TMP / "no.env"), **env})
+        self.assertEqual(rounds(ATELIER_PLAN="free", REVIEW_ROUNDS="3").stdout.split(), ["free", "0"])
+        self.assertEqual(rounds(ATELIER_PLAN="pro", REVIEW_ROUNDS="3").stdout.split(), ["pro", "3"])
+        self.assertEqual(rounds(ATELIER_PLAN="pro", REVIEW_ROUNDS="0").stdout.split(), ["pro", "0"])
+        self.assertNotEqual(rounds(ATELIER_PLAN="gold").returncode, 0)
 
     def test_parsing_and_precedence(self):
         f = TMP / "test.env"
