@@ -225,7 +225,6 @@ const BRIEF_QUESTIONS = [
   { key: "goal", label: "What should visitors do?", max: 200, placeholder: "e.g. Book a table, call us, join the newsletter" },
   { key: "tone", label: "Tone and style", type: "select",
     options: ["Friendly and warm", "Professional and trustworthy", "Minimal and calm", "Bold and energetic", "Luxurious and elegant", "Playful and fun", "Technical and precise"] },
-  { key: "colors", label: "Brand colours", max: 120, placeholder: "e.g. #0e7c66 and cream, or “no preference”" },
   { key: "language", label: "Language(s) of the site", max: 80, placeholder: "e.g. French, with an Arabic version" },
   { key: "sections", label: "Must-have content", max: 600, type: "textarea",
     placeholder: "e.g. Menu with prices, opening hours, map and address, customer reviews, booking button" },
@@ -239,9 +238,109 @@ const briefField = (q, value = "") => q.type === "select"
   : q.type === "textarea"
     ? `<label class="pfield wide"><span>${esc(q.label)}</span><textarea class="input" name="b_${q.key}" maxlength="${q.max}" rows="3" placeholder="${esc(q.placeholder)}">${esc(value)}</textarea></label>`
     : `<label class="pfield"><span>${esc(q.label)}</span><input class="input" name="b_${q.key}" maxlength="${q.max}" placeholder="${esc(q.placeholder)}" value="${esc(value)}"></label>`;
+/* ---------- a project's brand kit: logo, colours and fonts ----------
+   brandFieldsHTML() draws it; bindBrandFields() runs it and returns { values(), state } (state.logoFile, state.removeLogo,
+   state.from = the kit to copy the logo from). `live` (the studio) saves each change through `live` callbacks instead. */
+const BRAND_FONTS = ["Inter", "Roboto", "Open Sans", "Lato", "Montserrat", "Poppins", "Source Sans 3", "Work Sans", "DM Sans", "Manrope", "Playfair Display",
+  "Fraunces", "Lora", "Merriweather", "Cormorant Garamond", "Space Grotesk", "IBM Plex Sans", "Noto Sans Arabic", "Cairo", "Tajawal", "Reem Kufi"];
+const BRAND_DEFAULTS = ["#4f5bd5", "#f2b632", "#1fa97a", "#14161f", "#f3f4f8", "#e5484d"];
+window.brandFieldsHTML = (sources = []) => `<div class="bk">
+    ${sources.length ? `<label class="pfield"><span>Copy from</span><select class="input" data-bk-copy>
+      <option value="">Start from scratch</option>${sources.map(k => `<option value="${esc(k.id)}">${esc(k.name)}</option>`).join("")}</select></label>` : ""}
+    <div class="bk-grid">
+      <div class="bk-side pfield"><span>Logo</span><div class="logo-box" data-bk-logo-box></div>
+        <div class="src-files"><button type="button" class="btn btn-ghost btn-sm" data-bk-logo-pick>${icon("image", { size: 14 })}<span data-bk-logo-label>Choose logo…</span></button>
+          <button type="button" class="btn btn-ghost btn-sm" data-bk-logo-remove hidden>Remove</button>
+          <input type="file" data-bk-logo-file accept="image/png,image/jpeg,image/webp,image/gif" hidden></div>
+        <small class="help">PNG, JPG, WebP or GIF, up to 5 MB.</small></div>
+      <div class="bk-main">
+        <div class="pfield"><span>Colours <em>up to 6 · the first is the main colour</em></span><div class="swatches" data-bk-swatches></div>
+          <div class="bk-preview" data-bk-preview aria-hidden="true"></div></div>
+        <div class="bk-fonts">
+          <label class="pfield"><span>Heading font</span><input class="input" data-bk-heading list="bk-fonts" maxlength="40" placeholder="e.g. Fraunces"></label>
+          <label class="pfield"><span>Body font</span><input class="input" data-bk-body list="bk-fonts" maxlength="40" placeholder="e.g. Inter"></label>
+        </div>
+        <small class="help">Any font from Google Fonts.</small>
+        <datalist id="bk-fonts">${BRAND_FONTS.map(f => `<option value="${f}">`).join("")}</datalist>
+      </div>
+    </div>
+    <small class="err" data-bk-err></small>
+  </div>`;
+window.bindBrandFields = (root, kit = {}, { sources = [], live = null } = {}) => {
+  const q = (sel) => root.querySelector(sel);
+  const st = { colors: [...(kit.colors || [])], logoUrl: kit.logo || null, logoFile: null, removeLogo: false, from: "" };
+  const values = () => ({ colors: st.colors, heading_font: q("[data-bk-heading]").value.trim(), body_font: q("[data-bk-body]").value.trim() });
+  const changed = () => { root.dispatchEvent(new Event("input", { bubbles: true })); live?.change?.(values()); };
+  const paintLogo = () => {
+    q("[data-bk-logo-box]").innerHTML = st.logoUrl ? `<img src="${esc(st.logoUrl)}" alt="Logo">` : `<span>No logo yet</span>`;
+    q("[data-bk-logo-remove]").hidden = !st.logoUrl;
+    q("[data-bk-logo-label]").textContent = st.logoUrl ? "Replace logo…" : "Choose logo…";
+  };
+  const paintColors = () => {
+    q("[data-bk-swatches]").innerHTML = st.colors.map((c, i) => `<span class="swatch"><input type="color" value="${esc(c)}" data-i="${i}" aria-label="Colour ${i + 1}"><span data-no-i18n>${esc(c)}</span>
+      <button type="button" data-del="${i}" aria-label="Remove ${esc(c)}">${icon("x", { size: 12 })}</button></span>`).join("")
+      + (st.colors.length < 6 ? `<button type="button" class="btn btn-ghost btn-sm add-color" data-add-color>${icon("plus", { size: 14 })}Add colour</button>` : "");
+    q("[data-bk-preview]").innerHTML = st.colors.map(c => `<i style="background:${esc(c)}"></i>`).join("");
+    q("[data-bk-preview]").hidden = !st.colors.length;
+  };
+  q("[data-bk-heading]").value = kit.heading_font || ""; q("[data-bk-body]").value = kit.body_font || "";
+  paintLogo(); paintColors();
+  q("[data-bk-swatches]").addEventListener("input", (e) => {
+    if (e.target.dataset.i === undefined) return;
+    st.colors[+e.target.dataset.i] = e.target.value;
+    e.target.nextElementSibling.textContent = e.target.value;
+    q("[data-bk-preview]").children[+e.target.dataset.i].style.background = e.target.value;
+  });
+  q("[data-bk-swatches]").addEventListener("change", (e) => { if (e.target.dataset.i !== undefined) changed(); });
+  q("[data-bk-swatches]").addEventListener("click", (e) => {
+    if (e.target.closest("[data-add-color]")) { st.colors.push(BRAND_DEFAULTS.find(c => !st.colors.includes(c)) || "#888888"); paintColors(); changed(); }
+    const del = e.target.closest("[data-del]");
+    if (del) { st.colors.splice(+del.dataset.del, 1); paintColors(); changed(); }
+  });
+  ["[data-bk-heading]", "[data-bk-body]"].forEach(sel => q(sel).addEventListener("change", changed));
+  q("[data-bk-logo-pick]").onclick = () => q("[data-bk-logo-file]").click();
+  q("[data-bk-logo-file]").onchange = async () => {
+    const file = q("[data-bk-logo-file]").files[0];
+    q("[data-bk-logo-file]").value = "";
+    q("[data-bk-err]").textContent = "";
+    if (!file) return;
+    if (!ASSET_TYPES.includes(file.type)) { q("[data-bk-err]").textContent = `${file.name}: use PNG, JPG, WebP or GIF`; return; }
+    if (file.size > MAX_ASSET_MB * 1048576) { q("[data-bk-err]").textContent = `${file.name} is over 5 MB`; return; }
+    if (live) {
+      try { const k = await live.logo(`data:${file.type};base64,${await fileBase64(file)}`); st.logoUrl = k.logo; }
+      catch (err) { q("[data-bk-err]").textContent = err.message; return; }
+    } else {
+      if (st.logoUrl?.startsWith("blob:")) URL.revokeObjectURL(st.logoUrl);
+      st.logoFile = file; st.logoUrl = URL.createObjectURL(file); st.removeLogo = false; st.from = "";
+    }
+    paintLogo(); changed();
+  };
+  q("[data-bk-logo-remove]").onclick = async () => {
+    if (live) {
+      try { await live.removeLogo(); } catch (err) { q("[data-bk-err]").textContent = err.message; return; }
+    }
+    st.logoUrl = null; st.logoFile = null; st.removeLogo = true; st.from = "";
+    paintLogo(); changed();
+  };
+  q("[data-bk-copy]")?.addEventListener("change", async (e) => {
+    const src = sources.find(k => k.id === e.target.value);
+    if (!src) return;
+    if (live) {
+      try { const k = await live.copy(src.id); Object.assign(st, { colors: [...k.colors], logoUrl: k.logo }); q("[data-bk-heading]").value = k.heading_font; q("[data-bk-body]").value = k.body_font; }
+      catch (err) { q("[data-bk-err]").textContent = err.message; return; }
+    } else {
+      st.colors = [...(src.colors || [])]; q("[data-bk-heading]").value = src.heading_font || ""; q("[data-bk-body]").value = src.body_font || "";
+      st.from = src.logo ? src.id : ""; st.logoFile = null; st.logoUrl = src.logo || null;
+    }
+    paintColors(); paintLogo(); changed();
+    e.target.value = "";
+  });
+  return { values, state: st };
+};
+
 /* The project form, in a dialog (edit details) or on a page (/projects/new). `d` is the element to fill; onSubmit gets the
    checked answers. Returns the images chosen so far, so the caller can release their previews. */
-window.fillProjectForm = (d, { title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true, allowImport = false, brief = {}, askAssets = false, cancelHref = "", heading = true, brand = null } = {}, onSubmit) => {
+window.fillProjectForm = (d, { title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true, allowImport = false, brief = {}, askAssets = false, cancelHref = "", heading = true, brandSources = null } = {}, onSubmit) => {
     d.innerHTML = `
       <form method="dialog" novalidate>
         ${heading ? `<h3>${esc(title)}</h3>
@@ -267,21 +366,16 @@ window.fillProjectForm = (d, { title = "New project", ok = "Create project", nam
           </div>
           <small class="src-summary" data-summary>Leave empty to start from a blank site. Needs an index.html at the top; other files (server code, configs, .git…) are left out.</small>
           <small class="err" data-for="source"></small></div>` : ""}
-        ${brand ? `<label class="pfield brand-use"><span>Brand kit</span>
-          <span class="brand-row"><input type="checkbox" name="use_brand" checked>
-            <span class="brand-sum">${brand.logo ? `<img src="${esc(brand.logo)}" alt="">` : ""}${(brand.colors || []).map(c => `<i style="background:${esc(c)}"></i>`).join("")}
-              <small>${esc([brand.heading_font, brand.body_font].filter(Boolean).join(" / ") || "Use my brand kit")}</small></span></span>
-          <small class="src-summary">Use my logo, colours and fonts in this project. <a href="/profile#brand">Edit</a></small></label>` : ""}
+
         </div>
         <div class="pf-more">
+        ${brandSources ? `<fieldset class="pgroup" data-brand><legend>Brand kit <em>optional · this project's logo, colours and fonts</em></legend>
+          ${brandFieldsHTML(brandSources)}</fieldset>` : ""}
         <fieldset class="pgroup"><legend>About your site <em>optional · the more you say, the closer the first build</em></legend>
           <div class="pgrid">${BRIEF_QUESTIONS.map(q => briefField(q, (brief || {})[q.key] || "")).join("")}</div>
         </fieldset>
         ${askAssets ? `<fieldset class="pgroup"><legend>Your images <em>optional · PNG, JPG, WebP or GIF, up to ${MAX_ASSET_MB} MB each</em></legend>
           <div class="pgrid">
-            <div class="pfield"><span>Logo</span>
-              <div class="src-files"><button type="button" class="btn btn-ghost btn-sm" data-pick="logo">${icon("image", { size: 14 })}Choose logo…</button>
-                <input type="file" data-asset="logo" accept="${ASSET_TYPES.join(",")}" hidden></div></div>
             <div class="pfield"><span>Photos <em>products, team, place…</em></span>
               <div class="src-files"><button type="button" class="btn btn-ghost btn-sm" data-pick="photo">${icon("image", { size: 14 })}Add photos…</button>
                 <input type="file" data-asset="photo" accept="${ASSET_TYPES.join(",")}" multiple hidden></div></div>
@@ -296,6 +390,8 @@ window.fillProjectForm = (d, { title = "New project", ok = "Create project", nam
         </div>
       </form>`;
     const form = d.querySelector("form"), f = form.elements;
+    const brandUI = brandSources ? bindBrandFields(d.querySelector("[data-brand]"), {}, { sources: brandSources }) : null;
+    const brandOf = () => brandUI ? { brand: brandUI.values(), brand_logo: brandUI.state.logoFile, brand_from: brandUI.state.from } : {};
     const count = () => d.querySelector("[data-count]").textContent = `${f.description.value.length}/300`;
     count(); f.description.addEventListener("input", count);
     const check = () => {
@@ -398,12 +494,12 @@ window.fillProjectForm = (d, { title = "New project", ok = "Create project", nam
       if (!check()) { e.preventDefault(); return; }
       if (mode === "files") {
         if (!source) { e.preventDefault(); srcErr("Choose a folder or a .zip with your site."); return; }
-        onSubmit({ name: f.name.value.trim(), description: f.description.value.trim(), brief: briefOf(), source, assets, use_brand: !!f.use_brand?.checked }, e);
+        onSubmit({ name: f.name.value.trim(), description: f.description.value.trim(), brief: briefOf(), source, assets, ...brandOf() }, e);
         return;
       }
       const pageList = f.pages.value.split("\n").map(x => x.trim()).filter(Boolean);
       if (pageList.length > 12) { e.preventDefault(); d.querySelector('[data-for="pages"]').textContent = "Up to 12 pages."; return; }
-      onSubmit({ name: f.name.value.trim(), description: f.description.value.trim(), pages: pageList.length ? pageList : ["Home"], brief: briefOf(), assets, use_brand: !!f.use_brand?.checked }, e);
+      onSubmit({ name: f.name.value.trim(), description: f.description.value.trim(), pages: pageList.length ? pageList : ["Home"], brief: briefOf(), assets, ...brandOf() }, e);
     });
     f.description.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); form.requestSubmit(form.querySelector('[value="ok"]')); }
@@ -444,15 +540,15 @@ window.newProject = async () => {
 
 /* Create the project from the form's answers (a blank site or existing files, plus images) and open it. */
 window.createProject = async (details) => {
-  const { assets = [], use_brand = false, ...fields } = details;
+  const { assets = [], brand_logo = null, brand_from = "", ...fields } = details;
   try {
     let p;
     if (details.source) {
       toast("Importing your site…");
-      const { name, description, brief, source } = details;
+      const { name, description, brief, source, brand } = details;
       const body = source.zip
-        ? { name, description, brief, zip: await fileBase64(source.zip) }
-        : { name, description, brief, files: await Promise.all(source.files.map(async x => ({ path: x.path, data: await fileBase64(x.file) }))) };
+        ? { name, description, brief, brand, zip: await fileBase64(source.zip) }
+        : { name, description, brief, brand, files: await Promise.all(source.files.map(async x => ({ path: x.path, data: await fileBase64(x.file) }))) };
       p = await api("/api/projects/import", { method: "POST", body: JSON.stringify(body), timeout: 120000 });
       if (p.skipped?.length) sessionStorage.setItem("atelier-import-note", `Left out ${p.skipped.length} file${p.skipped.length === 1 ? "" : "s"} that aren't HTML, CSS, JS, Markdown or assets.`);
     } else {
@@ -472,10 +568,11 @@ window.createProject = async (details) => {
       const prev = sessionStorage.getItem("atelier-import-note");
       sessionStorage.setItem("atelier-import-note", (prev ? prev + " " : "") + `Some images weren't added: ${failed.join(" · ")}`);
     }
-    if (use_brand) {   // after the uploads, so a logo chosen in the form wins over the kit's
-      try { await api(`/api/projects/${p.id}/brand`, { method: "POST" }); }
-      catch (err) { sessionStorage.setItem("atelier-import-note", `The brand kit wasn't applied: ${err.message}`); }
-    }
+    try {                // the brand kit's logo: the one chosen in the form, or the copied kit's
+      if (brand_logo) await api(`/api/projects/${p.id}/brand/logo`, { method: "POST", timeout: 60000,
+        body: JSON.stringify({ data: `data:${brand_logo.type};base64,${await fileBase64(brand_logo)}` }) });
+      else if (brand_from) await api(`/api/projects/${p.id}/brand/copy`, { method: "POST", body: JSON.stringify({ from: brand_from, logo_only: true }) });
+    } catch (err) { sessionStorage.setItem("atelier-import-note", `The brand kit's logo wasn't added: ${err.message}`); }
     location.href = `/p/${p.id}`;
   } catch (err) { toast(err.message, "err"); }
 };
@@ -601,10 +698,11 @@ window.importFlow = () => new Promise((resolve) => {
       { group: "Go to", icon: "user", title: "Users", run: () => location.href = "/users" },
       { group: "Go to", icon: "chart", title: "Analytics", run: () => location.href = "/analytics" }] : []),
     { open: true, group: "Go to", icon: "home", title: "Home", run: () => location.href = "/" },
+    { open: true, group: "Go to", icon: "briefcase", title: "Hire agents", run: () => location.href = "/hire" },
     { group: "Go to", icon: "grid", title: "Projects", run: () => location.href = "/projects" },
     { group: "Go to", icon: "user", title: "Profile and password", run: () => location.href = "/profile" },
-    { group: "Go to", icon: "users", title: "Agents", run: () => location.href = "/agents" },
-    { group: "Go to", icon: "layers", title: "Teams", run: () => location.href = "/teams" },
+    { group: "Go to", icon: "users", title: "My agents", run: () => location.href = "/agents" },
+    { group: "Go to", icon: "layers", title: "My teams", run: () => location.href = "/teams" },
     { group: "Go to", icon: "book", title: "Guide", run: () => location.href = "/guide" },
     { group: "Go to", icon: "file", title: "Shared rules", run: () => location.href = "/agents/rules" },
     { group: "Create", icon: "plus", title: "New project", run: () => newProject() },
@@ -701,6 +799,12 @@ window.importFlow = () => new Promise((resolve) => {
         if (!user?.confirmed) wrap.prepend(languageButton());   // no profile page yet: the language button is here
         if (!user) return;
         wrap.append(accountButton(user, { compact: !site }));
+        const nav = document.querySelector("header.top .links");
+        if (user.confirmed && nav && !nav.querySelector('[href="/hire"]')) {     // the marketplace, right after Projects
+          const hire = `<a href="/hire" data-show="member" class="${location.pathname.startsWith("/hire") ? "on" : ""}">${icon("briefcase", { size: 16 })}Hire</a>`;
+          const first = nav.querySelector('[href="/projects"]');
+          first ? first.insertAdjacentHTML("afterend", hire) : nav.insertAdjacentHTML("afterbegin", hire);
+        }
         if (user.role === "admin") {
           document.documentElement.dataset.admin = "1";
           const links = document.querySelector("header.top .links");
@@ -748,12 +852,12 @@ function siteFooter() {
         ${link(onLanding ? "#how" : "/#how", "How it works", "guest unconfirmed")}
         ${link(onLanding ? "#examples" : "/#examples", "Examples", "guest unconfirmed")}
         ${link(onLanding ? "#faq" : "/#faq", "FAQ", "guest unconfirmed")}
-        ${link("/projects", "Projects", "member")}${link("/agents", "Agents", "member")}${link("/teams", "Teams", "member")}${link("/guide", "Guide", "member")}
+        ${link("/hire", "Hire agents", "member")}${link("/projects", "Projects", "member")}${link("/agents", "My agents", "member")}${link("/teams", "My teams", "member")}${link("/guide", "Guide", "member")}
       </ul></div>
       <div><h2>Account</h2><ul>
         ${link("/register", "Sign up", "guest")}${link("/login", "Log in", "guest")}${link("/forgot", "Forgot your password?", "guest")}
         ${link("/confirm", "Confirm your email", "unconfirmed")}
-        ${link("/profile", "Profile", "member")}${link("/profile#brand", "Brand kit", "member")}${link("/profile#data", "Download my data", "member")}
+        ${link("/profile", "Profile", "member")}${link("/profile#data", "Download my data", "member")}
       </ul></div>
       <div><h2>Legal</h2><ul>${link("/terms", "Terms of use")}${link("/privacy", "Privacy policy")}
         <li><button type="button" class="foot-cookies">Cookie notice</button></li></ul></div>

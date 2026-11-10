@@ -68,7 +68,7 @@
   .chips { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
   .uc-title { margin: 24px 0 10px; font-family: var(--mono); font-size: 12px; letter-spacing: .03em; color: var(--stone); }
   .usecases { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; width: 100%; text-align: start; }
-  .uc { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 0; border-radius: 12px; background: var(--paper); box-shadow: var(--ring); color: var(--ink); text-align: start; cursor: pointer; transition: background .15s, transform .15s; }
+  .uc { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 0; border-radius: 8px; background: var(--paper); box-shadow: var(--ring); color: var(--ink); text-align: start; cursor: pointer; transition: background .15s, transform .15s; }
   .uc:hover { background: var(--ice); transform: translateY(-2px); }
   .uc b { font-size: 14px; font-weight: 500; }
   .uc small { font-size: 12px; line-height: 1.45; color: var(--graphite); }
@@ -79,7 +79,7 @@
   .chip:hover { border-color: var(--graphite); color: var(--ink); }
   .chip .ic { color: var(--stone); }
 
-  .msg.bcheck { padding: 12px 14px; border-radius: 12px; box-shadow: var(--ring); background: var(--paper); font-size: 13px; color: var(--graphite); }
+  .msg.bcheck { padding: 12px 14px; border-radius: 8px; box-shadow: var(--ring); background: var(--paper); font-size: 13px; color: var(--graphite); }
   .msg.bcheck .head { display: flex; gap: 8px; align-items: center; }
   .msg.bcheck .shots { display: flex; gap: 8px; margin-top: 10px; }
   .msg.bcheck .shots a { flex: none; border-radius: 8px; overflow: hidden; box-shadow: var(--ring); }
@@ -203,7 +203,7 @@
   .save-state { font: 12px var(--font); color: var(--stone); display: inline-flex; align-items: center; gap: 5px; }
   .save-state.err { color: var(--danger); }
   .autosave { display: inline-flex; align-items: center; gap: 8px; font: 12px var(--font); color: var(--graphite); cursor: pointer; }
-  .autosave input { appearance: none; width: 32px; height: 20px; border-radius: var(--r); background: var(--line-strong); position: relative; cursor: pointer; margin: 0; transition: background .2s; }
+  .autosave input { appearance: none; width: 32px; height: 20px; border-radius: var(--r-field); background: var(--line-strong); position: relative; cursor: pointer; margin: 0; transition: background .2s; }
   .autosave input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--knob); transition: transform .2s; }
   .autosave input:checked { background: var(--espresso); }
   .autosave input:checked::after { transform: translateX(12px); }
@@ -234,6 +234,14 @@
   /* ---------- retry + cost on agent cards ---------- */
   .who .retry { margin-left: 4px; width: 28px; height: 28px; }
   .msg.agent.working .retry { display: none; }
+  .msg.agent .rate { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--stone); }
+  .msg.agent .rate .icon-btn { width: 28px; height: 28px; }
+  .msg.agent .rate .icon-btn.on { color: var(--zellige); background: rgb(var(--zellige-rgb) / .15); }
+  .msg.agent .rate .icon-btn.on.bad { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+  .msg.agent .rate .link { border: 0; background: none; padding: 0 4px; font-size: 12px; color: var(--graphite); text-decoration: underline; cursor: pointer; }
+  .done-card .showcase { flex-basis: 100%; display: flex; gap: 8px; align-items: center; margin-top: 6px; font-size: 12px; color: var(--graphite); cursor: pointer; }
+  .done-card .showcase input { width: 16px; height: 16px; accent-color: var(--sky); margin: 0; }
+  .msg.agent .rate .said { flex-basis: 100%; color: var(--graphite); font-style: italic; }
   .who .cost { font-feature-settings: "tnum"; }
   .model-badge { display: inline-flex; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis; align-items: center; gap: 3px; text-decoration: none; font: 10.5px var(--font); color: var(--stone); background: var(--paper); box-shadow: var(--ring); border-radius: var(--r); padding: 1px 6px; line-height: 1.5; }
   .agent-tile.s-working .model-badge { background: rgb(var(--on-espresso-rgb) / .12); color: rgb(var(--on-espresso-rgb) / .8); box-shadow: none; }
@@ -368,7 +376,7 @@
   .agent-tile.s-working .t-desc { display: none; }
   .agent-tile.s-done .t-desc, .agent-tile.s-stopped .t-desc { -webkit-line-clamp: 2; }
 
-  .sw { width: 32px; height: 20px; border-radius: var(--r); border: 0; padding: 0; background: var(--line-strong); position: relative; flex: none; transition: background .2s; }
+  .sw { width: 32px; height: 20px; border-radius: var(--r-field); border: 0; padding: 0; background: var(--line-strong); position: relative; flex: none; transition: background .2s; }
   .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--knob); transition: transform .2s; }
   .sw.on { background: var(--espresso); }
   .sw.on::after { transform: translateX(12px); }
@@ -476,6 +484,7 @@
     <span class="url" id="url"></span>
     <button class="icon-btn" id="reload" title="Reload preview" aria-label="Reload preview"><i data-icon="refresh" data-size="16"></i></button>
     <button class="icon-btn" id="open" title="Open in a new tab" aria-label="Open in a new tab"><i data-icon="external" data-size="16"></i></button>
+    <button class="icon-btn" id="brandBtn" title="Brand kit: this project's logo, colours and fonts" aria-label="Brand kit"><i data-icon="palette" data-size="17"></i></button>
     <button class="icon-btn" id="historyBtn" title="Versions: history of the code" aria-label="Versions"><i data-icon="history" data-size="17"></i></button>
     <button class="icon-btn" id="statsBtn" title="Cost &amp; time per agent" aria-label="Stats"><i data-icon="chart" data-size="17"></i></button>
     <a class="btn btn-ghost btn-sm" id="download" title="Download the code as .zip"><i data-icon="download" data-size="16"></i>.zip</a>
@@ -522,6 +531,7 @@ let showAllUseCases = false;
 const MAX_ACTIONS = 4;
 
 let AGENTS = [], BY_ID = {}, PID = null, project = null, selected = new Set();
+let canRate = false, myRatings = {};   // the project's owner rates each agent that worked on it
 let busy = false, ws, lastSeq = 0, replaying = false;
 let currentFile = "index.html", changed = new Set(), cards = {};
 let run = null;   // { agents: [...ids], index, started }
@@ -551,6 +561,9 @@ async function boot() {
   }
   AGENTS.forEach(a => BY_ID[a.id] = a);
   await loadPresets();
+  const me = await getMe().catch(() => null);
+  canRate = !!me && project.owner === me.id;
+  if (canRate) myRatings = await api(`/api/projects/${PID}/ratings`).catch(() => ({}));
 
   selected = new Set(project.agents.filter(id => BY_ID[id]));
   lockRequired();
@@ -565,11 +578,33 @@ async function boot() {
   replaying = true; $("messages").classList.add("replay");
   (project.events || []).forEach(safeHandle);
   replaying = false; $("messages").classList.remove("replay");
-  if (!project.events.length) {
-    showEmpty();
-    let start = null;          // "New project with this team" on a team's page
-    try { start = sessionStorage.getItem("atelier-start-team"); sessionStorage.removeItem("atelier-start-team"); } catch {}
-    if (start) useTeam(presets.find(p => p.id === start), { fillPrompt: true });
+  if (!project.events.length) showEmpty();
+  {
+    // Handed over by another page: "New project with this team", the project form, or "Start a job" in the
+    // marketplace (atelier-start-for names the project it's meant for; it may already have a history).
+    const take = (k) => { try { const v = sessionStorage.getItem(k); sessionStorage.removeItem(k); return v; } catch { return null; } };
+    const start = take("atelier-start-team"), startFor = take("atelier-start-for"), startPrompt = take("atelier-start-prompt");
+    let startAgents = null, addAgents = null;
+    try { startAgents = JSON.parse(take("atelier-start-agents") || "null"); addAgents = JSON.parse(take("atelier-start-add") || "null"); } catch {}
+    const forThis = startFor ? startFor === PID : !project.events.length;
+    if (forThis && (start || startAgents || addAgents || startPrompt)) {
+      if (project.busy) toast("Agents are working. Change the team when they finish", "err");
+      else {
+        if (start) useTeam(presets.find(p => p.id === start), { fillPrompt: !startPrompt && !project.events.length });
+        if (Array.isArray(startAgents) && startAgents.length) {
+          selected = new Set(startAgents.filter(id => BY_ID[id]));
+          lockRequired(); saveSelection(); renderTeam();
+        }
+        if (Array.isArray(addAgents)) {
+          const added = addAgents.filter(id => BY_ID[id]);
+          added.forEach(id => selected.add(id));
+          lockRequired(); saveSelection(); renderTeam();
+          if (added.length) toast(`${BY_ID[added[0]].name} joined this project's team. Describe the job, then press Enter`);
+          $("input").focus();
+        }
+        if (startPrompt) { $("input").value = startPrompt; autosize(); $("input").focus(); toast("Your job is ready: check the prompt, then press Enter"); }
+      }
+    }
   }
   if (!project.busy) {
     run = null; markStopped();
@@ -754,7 +789,9 @@ function handle(ev) {
       addMsg(`<div class="msg done-card">
         <span class="lbl"><span class="tile">${icon("check", { size: 16 })}</span>Team finished${took}</span>
         <a class="btn btn-ghost btn-sm" href="/api/projects/${PID}/download">${icon("download", { size: 16 })}.zip</a>
-        <button class="btn btn-dark btn-sm" data-new>${icon("plus", { size: 16 })}New project</button></div>`);
+        <button class="btn btn-dark btn-sm" data-new>${icon("plus", { size: 16 })}New project</button>
+        ${canRate ? `<label class="showcase"><input type="checkbox" data-showcase ${project.showcase ? "checked" : ""}>
+          <span>Show this site in the portfolios of the agents that built it</span></label>` : ""}</div>`);
       if (!replaying) toast("The team finished the page");
       break;
     }
@@ -775,7 +812,7 @@ function handle(ev) {
       break;
     case "browser_check_start": break;
     case "browser_check": {
-      const shots = (ev.screenshots || []).map(f => `<a href="/work/${PID}/${encodeURI(f)}" target="_blank" rel="noopener"><img src="/work/${PID}/${encodeURI(f)}?v=${Date.now()}" alt="${esc(f.includes("phone") ? "Phone screenshot" : "Desktop screenshot")}"></a>`).join("");
+      const shots = (ev.screenshots || []).map(f => `<a href="/work/${PID}/${encodeURI(f)}" target="_blank" rel="noopener"><img loading="lazy" src="/work/${PID}/${encodeURI(f)}?v=${Date.now()}" alt="${esc(f.includes("phone") ? "Phone screenshot" : "Desktop screenshot")}"></a>`).join("");
       addMsg(`<div class="msg bcheck ${ev.problems ? "warn" : ""}"><div class="head">${icon(ev.problems ? "alert" : "check", { size: 16 })}<span>${esc(ev.text)}</span></div>${shots ? `<div class="shots">${shots}</div>` : ""}</div>`);
       break;
     }
@@ -915,7 +952,54 @@ function finishCard(id, text, ended, stat) {
   const cost = stat?.cost ? ` · <span class="cost" title="Estimated API cost">${money(stat.cost)}</span>` : "";
   card.querySelector(".state").innerHTML = `${icon("check", { size: 14 })}Done${took}${cost}`;
   if (stat?.model) card.querySelector(".nm small")?.insertAdjacentHTML("beforeend", ` · ${esc(stat.model.replace(/^claude-/, ""))}`);
+  addRateRow(card, id);
 }
+
+$("messages").addEventListener("change", async (e) => {
+  const box = e.target.closest("[data-showcase]"); if (!box) return;
+  try {
+    project = { ...project, ...(await api(`/api/projects/${PID}`, { method: "PATCH", body: JSON.stringify({ showcase: box.checked }) })) };
+    document.querySelectorAll("[data-showcase]").forEach(b => { b.checked = !!project.showcase; });
+    toast(project.showcase ? "Other members can see this site on the agents' profiles" : "This site is private again");
+  } catch (err) { box.checked = !box.checked; toast(err.message, "err"); }
+});
+
+/* ---------- ratings: a thumbs up or down for each agent's work on this project (the owner only) ---------- */
+function rateRowHTML(id) {
+  const r = myRatings[id] || { value: 0, comment: "" };
+  return `${r.value ? (r.value > 0 ? "You liked this agent's work" : "You didn't like this agent's work") : "Rate this agent's work"}
+    <button class="icon-btn plain ${r.value > 0 ? "on" : ""}" type="button" data-rate="1" aria-pressed="${r.value > 0}" title="Good work" aria-label="Good work">${icon("thumbs-up", { size: 15 })}</button>
+    <button class="icon-btn plain ${r.value < 0 ? "on bad" : ""}" type="button" data-rate="-1" aria-pressed="${r.value < 0}" title="Not good" aria-label="Not good">${icon("thumbs-down", { size: 15 })}</button>
+    ${r.value ? `<button class="link" type="button" data-rate-comment>${r.comment ? "Edit comment" : "Add a comment"}</button>` : ""}
+    ${r.comment ? `<span class="said" data-no-i18n>“${esc(r.comment)}”</span>` : ""}`;
+}
+function addRateRow(card, id) {
+  if (!canRate || !BY_ID[id] || card.querySelector(".rate")) return;
+  card.insertAdjacentHTML("beforeend", `<div class="rate" data-rate-agent="${esc(id)}">${rateRowHTML(id)}</div>`);
+}
+const refreshRateRows = (id) => document.querySelectorAll(`.rate[data-rate-agent="${CSS.escape(id)}"]`).forEach(el => { el.innerHTML = rateRowHTML(id); });
+async function saveRating(id, value, comment) {
+  try {
+    const r = await api(`/api/projects/${PID}/ratings`, { method: "PUT", body: JSON.stringify({ agent: id, value, comment }) });
+    myRatings[id] = r.value ? { value: r.value, comment: r.comment } : undefined;
+    refreshRateRows(id);
+  } catch (err) { toast(err.message, "err"); }
+}
+$("messages").addEventListener("click", async (e) => {
+  const row = e.target.closest(".rate"); if (!row) return;
+  const id = row.dataset.rateAgent, cur = myRatings[id] || { value: 0, comment: "" };
+  const b = e.target.closest("[data-rate]");
+  if (b) {
+    const v = +b.dataset.rate;
+    await saveRating(id, cur.value === v ? 0 : v, cur.value === v ? "" : cur.comment);
+    if (myRatings[id] && !cur.value) toast(`Thanks: your rating shows on ${BY_ID[id]?.name || "the agent"}'s profile`);
+  }
+  if (e.target.closest("[data-rate-comment]")) {
+    const text = await promptDialog({ title: `Your comment on ${BY_ID[id]?.name || "this agent"}`, label: "Comment", placeholder: "What was good, or what was missing?",
+                                      value: cur.comment, ok: "Save", optional: true, multiline: true, max: 500 });
+    if (text !== null) saveRating(id, cur.value || 1, text);
+  }
+});
 function markStopped() {
   Object.values(status).forEach(st => {
     if (st.state === "working") st.state = "stopped";
@@ -1178,7 +1262,7 @@ function tileHTML(a, i) {
       title="${esc(a.description ? a.description + "\n\n" : "")}${locked ? "Required: always runs when the team works" : cards[a.id] ? "Click to show in chat" : on ? "Click to switch off" : "Click to switch on"}">
     <div class="t-top"><span class="tile">${icon(a.icon, { size: 17 })}</span><span class="t-num">${String(i + 1).padStart(2, "0")}</span>
       ${a.model_ok === false ? `<a class="model-badge" style="color:var(--danger)" href="/agents/${encodeURIComponent(a.id)}/edit" title="Not a known model. Click to fix">${icon("alert", { size: 10 })}${esc(a.model)}</a>`
-        : a.model ? `<span class="model-badge" title="Runs on ${esc(a.model)}">${esc(a.model)}</span>` : ""}
+        : a.model ? `<span class="model-badge" title="Runs on ${esc(a.model)}" data-no-i18n>${esc(a.model.replace(/^claude-/, ""))}</span>` : ""}
       <button class="sw ${on ? "on" : ""} ${locked ? "locked" : ""}" data-toggle role="switch" aria-checked="${on}" aria-label="Use ${esc(a.name)}${locked ? " (required)" : ""}" ${busy || locked ? "disabled" : ""}></button></div>
     <div class="t-name">${esc(a.name)}</div>
     <div class="t-status">${line}</div>
@@ -1673,6 +1757,36 @@ document.addEventListener("click", async (e) => {
   }
 });
 $("historyBtn").onclick = openHistory;
+$("brandBtn").onclick = openBrand;
+
+/* ---------- this project's brand kit: saved as you change it; agents follow it from the next request ---------- */
+async function openBrand() {
+  let kit, sources;
+  try { [kit, sources] = await Promise.all([api(`/api/projects/${PID}/brand`), api("/api/brand/sources")]); }
+  catch (err) { return toast(err.message, "err"); }
+  const d = document.createElement("dialog");
+  d.className = "modal project-modal brand-modal";
+  d.innerHTML = `<form method="dialog"><h3>Brand kit</h3>
+    <p>${canRate ? "This project's logo, colours and fonts. Every agent follows them from the next request." : "Only the project's owner can change its brand kit."}</p>
+    <fieldset ${canRate ? "" : "disabled"}>${brandFieldsHTML(canRate ? sources.filter(k => k.id !== PID) : [])}</fieldset>
+    <div class="row"><span class="bk-saved" role="status"></span><button class="btn btn-dark" value="close">Done</button></div></form>`;
+  document.body.append(d);
+  const saved = (text) => { d.querySelector(".bk-saved").textContent = text; };
+  const call = async (path, method, body) => {
+    const k = await api(path, { method, ...(body ? { body: JSON.stringify(body) } : {}), timeout: 60000 });
+    saved("Saved"); return k;
+  };
+  let logoChanged = false;
+  bindBrandFields(d.querySelector(".bk"), kit, { sources, live: {
+    change: (v) => call(`/api/projects/${PID}/brand`, "PUT", v).catch(err => toast(err.message, "err")),
+    logo: (data) => { logoChanged = true; return call(`/api/projects/${PID}/brand/logo`, "POST", { data }); },
+    removeLogo: () => { logoChanged = true; return call(`/api/projects/${PID}/brand/logo`, "DELETE"); },
+    copy: (from) => { logoChanged = true; return call(`/api/projects/${PID}/brand/copy`, "POST", { from }); },
+  } });
+  d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
+  d.addEventListener("close", () => { d.remove(); if (logoChanged) refreshCode?.(); });
+  d.showModal();
+}
 
 // ---------- stats (cost & time)
 let statsScope = "project";

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0f1117">
+<title>Profile · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/site.css">
+<link rel="stylesheet" href="/static/market.css">
+<script src="/static/i18n.js"></script>
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<script src="/static/market.js"></script>
+<style>
+  .crumb { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 18px; font-size: 14px; color: var(--graphite); text-decoration: none; }
+  .crumb:hover { color: var(--ink); }
+  .crumb .ic { transform: scaleX(-1); }
+  [dir="rtl"] .crumb .ic { transform: none; }
+  .p-teams { display: flex; flex-wrap: wrap; gap: 6px; }
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <nav class="links">
+      <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>My agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>My teams</a>
+    </nav>
+    <a class="btn btn-dark" href="/projects/new"><i data-icon="plus" data-size="16"></i>New project</a>
+  </div>
+</header>
+
+<main class="wrap page" id="app"></main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const [, , kind, pk] = location.pathname.split("/");      // /hire/agents/12 or /hire/teams/4
+const isTeam = kind === "teams";
+const app = $("app");
+
+document.addEventListener("click", async (e) => {
+  if (e.target.closest("[data-new]")) newProject();
+});
+window.addEventListener("market:hired", () => load());      // market.js hires, then asks which project
+
+const kpi = (value, label) => `<li><b>${value}</b><span>${label}</span></li>`;
+let profile = null, folioPage = 1, reviewPage = 1;
+const FOLIO_PER = 9, REVIEWS_PER = 8;
+function folioHTML(list) {
+  const pg = paginate(list, folioPage, FOLIO_PER);
+  return `<ul class="p-folio">${pg.items.map(p => `<li><a href="${p.mine ? `/p/${p.id}` : `/work/${p.id}/index.html`}" ${p.mine ? "" : 'target="_blank" rel="noopener"'}>
+      <div class="shot">${p.preview ? `<iframe data-src="/work/${p.id}/index.html" tabindex="-1" title="" aria-hidden="true" sandbox=""></iframe>` : ""}</div>
+      <div class="cap"><b data-no-i18n>${esc(p.name)}</b><small data-no-i18n>${esc(p.description)}</small></div></a></li>`).join("")}</ul>
+    <nav class="pager" data-pager="folio" aria-label="Pages of the portfolio">${pagerHTML(pg, { sizes: [FOLIO_PER], noun: "sites" })}</nav>`;
+}
+function reviewsHTML(list) {
+  const pg = paginate(list, reviewPage, REVIEWS_PER);
+  return `<ul class="p-reviews">${pg.items.map(v => `<li><span class="ico">${icon(v.value > 0 ? "thumbs-up" : "thumbs-down", { size: 16 })}</span>
+      <div><p data-no-i18n>${esc(v.comment)}</p><small><span data-no-i18n>${esc(v.by)}</span> · ${ago(v.when)}</small></div></li>`).join("")}</ul>
+    <nav class="pager" data-pager="reviews" aria-label="Pages of reviews">${pagerHTML(pg, { sizes: [REVIEWS_PER], noun: "reviews" })}</nav>`;
+}
+app.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pager] [data-page]"); if (!b || b.disabled || !profile) return;
+  const which = b.closest("[data-pager]").dataset.pager;
+  if (which === "folio") { folioPage = +b.dataset.page; $("folio").innerHTML = folioHTML(profile.portfolio); lazyEach($("folio")); $("folio").scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+  else { reviewPage = +b.dataset.page; $("reviews").innerHTML = reviewsHTML(profile.reviews); }
+});
+
+function ratingsSection(r, reviews) {
+  const bar = r.count ? `<div class="p-bar" aria-hidden="true"><i style="width:${100 * r.up / r.count}%"></i><i style="width:${100 * r.down / r.count}%"></i></div>` : "";
+  return `<section class="p-sec"><h2>Ratings</h2>
+    <p class="hint">${r.count ? `${r.up} thumbs up · ${r.down} thumbs down, from the owners of the projects it worked on.` : "No ratings yet. Owners rate each agent in the studio once it has finished its work."}</p>
+    ${bar}
+    ${reviews.length ? `<div id="reviews">${reviewsHTML(reviews)}</div>` : ""}
+  </section>`;
+}
+
+function agentPage(a) {
+  document.title = `${a.name} · Agents Atelier`;
+  const actions = [hireButtons("agent", a, { big: true })];
+  if (a.mine || a.official || a.hired_as) actions.push(`<a class="btn btn-ghost" href="/agents/${encodeURIComponent(a.hired_as || a.id)}">${icon("users", { size: 15 })}Open in your agents</a>`);
+  return `<a class="crumb" href="/hire">${icon("arrow-right", { size: 14 })}Hire</a>
+  <section class="p-hero">
+    <span class="ico">${icon(a.icon || "bot", { size: 30 })}</span>
+    <div><h1 data-no-i18n>${esc(a.name)}</h1>
+      <p class="who">${sourceBadge(a)}<span><span>by</span> <span data-no-i18n>${esc(a.by)}</span></span><span>·</span><span>${esc(CATEGORY[a.category] || "")}</span>
+        ${a.model ? `<span class="badge mono" data-no-i18n>${esc(a.model)}</span>` : ""}${a.web ? `<span class="badge">Web research</span>` : ""}
+        ${a.copy_of ? `<span><span>Hired from</span> <a href="/hire/agents/${a.copy_of.pk}" data-no-i18n>${esc(a.copy_of.name)}</a></span>` : ""}</p>
+      <p class="desc">${esc(a.description)}</p>
+      ${a.mine && a.listing === "rejected" && a.note ? `<p class="desc" style="color:var(--danger)"><span>Not approved.</span> <span data-no-i18n>${esc(a.note)}</span></p>` : ""}</div>
+    <div class="acts">${actions.join("")}</div>
+  </section>
+  <ul class="p-kpis">
+    ${kpi(a.jobs, "jobs done")}
+    ${kpi(a.projects, a.projects === 1 ? "project" : "projects")}
+    ${kpi(timeText(a.avg_seconds), "average time")}
+    ${kpi(costText(a.avg_cost), "average cost")}
+    ${kpi(a.score != null ? `${a.score}/10` : "–", "Critic's average score")}
+    ${kpi(a.rating.count ? `${a.rating.percent}%` : "–", "liked its work")}
+    ${a.official ? "" : kpi(a.hires, a.hires === 1 ? "hire" : "hires")}
+  </ul>
+  ${ratingsSection(a.rating, a.reviews)}
+  <section class="p-sec"><h2>Portfolio</h2>
+    <p class="hint">Sites it worked on: your own projects, and other members' projects they chose to show.</p>
+    ${a.portfolio.length ? `<div id="folio">${folioHTML(a.portfolio)}</div>` : `<p class="m-empty">No sites to show yet.</p>`}
+  </section>
+  ${a.teams.length ? `<section class="p-sec"><h2>Teams it's part of</h2><p class="hint">Hire the whole team for a kind of job.</p>
+    <div class="p-teams">${a.teams.map(t => `<a class="fchip" href="/hire/teams/${t.pk}">${icon("layers", { size: 14 })}${esc(t.name)}</a>`).join("")}</div></section>` : ""}
+  <section class="p-sec"><h2>How it works</h2><p class="hint">The instructions it follows, after the shared rules every agent receives.</p>
+    <pre class="p-role" data-no-i18n>${esc(a.role)}</pre></section>`;
+}
+
+function teamPage(t) {
+  document.title = `${t.name} · Agents Atelier`;
+  const prompt = (t.prompt || "").split("\n").map(line => esc(window.t(line))).join("\n");
+  return `<a class="crumb" href="/hire?tab=teams">${icon("arrow-right", { size: 14 })}Hire</a>
+  <section class="p-hero">
+    <span class="ico">${icon(CATEGORY_ICON[t.category] || "layers", { size: 30 })}</span>
+    <div><h1>${esc(t.name)}</h1>
+      <p class="who">${sourceBadge(t)}<span><span>by</span> <span data-no-i18n>${esc(t.by)}</span></span><span>·</span><span>${esc(CATEGORY[t.category] || "")}</span></p>
+      <p class="desc">${esc(t.description)}</p>
+      ${t.mine && t.listing === "rejected" && t.note ? `<p class="desc" style="color:var(--danger)"><span>Not approved.</span> <span data-no-i18n>${esc(t.note)}</span></p>` : ""}</div>
+    <div class="acts">${hireButtons("team", t, { big: true })}</div>
+  </section>
+  <ul class="p-kpis">
+    ${kpi(t.agents.length, "agents")}
+    ${kpi(`~${timeText(t.seconds)}`, "estimated time")}
+    ${kpi(`~${costText(t.cost)}`, "estimated cost")}
+    ${kpi(t.rating.count ? `${t.rating.percent}%` : "–", "liked its agents' work")}
+    ${t.official ? "" : kpi(t.hires, t.hires === 1 ? "hire" : "hires")}
+  </ul>
+  <section class="p-sec"><h2>The crew</h2><p class="hint">They work in this order. Estimates come from their past jobs.</p>
+    <ul class="p-crew">${t.agents.map((a, i) => `<li><a href="/hire/agents/${a.pk}">
+      <span class="n" data-no-i18n>${String(i + 1).padStart(2, "0")}</span><span class="ico">${icon(a.icon || "bot", { size: 18 })}</span>
+      <span><b>${esc(a.name)}</b><small>${esc(a.description || "")}</small></span>
+      <span class="est">${a.measured ? "" : "~"}${timeText(a.seconds)} · ${costText(a.cost)}</span></a></li>`).join("")}</ul></section>
+  ${t.prompt ? `<section class="p-sec"><h2>Starting prompt</h2><p class="hint">Filled in when you start a job with this team. Replace the parts in [brackets].</p>
+    <pre class="p-prompt" data-no-i18n>${prompt}</pre></section>` : ""}`;
+}
+
+async function load() {
+  try {
+    const d = profile = await api(`/api/market/${isTeam ? "teams" : "agents"}/${encodeURIComponent(pk)}`);
+    app.innerHTML = isTeam ? teamPage(d) : agentPage(d);
+    lazyEach(app);       // portfolio previews load as they come near the screen
+  } catch (err) { showError(app, err, load, "Couldn't load this profile"); }
+}
+load();
+</script>
+</body>
+</html>

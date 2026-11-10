@@ -942,11 +942,14 @@ description: Adds a dark theme.
 You are the Dark mode agent. Add a dark theme with prefers-color-scheme.
 """
 
+    def setUp(self):
+        self.teams_before = {t["id"] for t in call("GET", "/api/presets")[1]}
+
     def tearDown(self):
         for aid in ["dark-mode", "dark-mode-2", "dark-mode-3"]:
             call("DELETE", f"/api/agents/{aid}")
-        for t in call("GET", "/api/presets")[1]:
-            if not t["builtin"]:
+        for t in call("GET", "/api/presets")[1]:      # only the teams this test made: the shared use-case teams stay
+            if not t["builtin"] and t["id"] not in self.teams_before:
                 call("DELETE", f"/api/presets/{t['id']}")
 
     def test_exports(self):
@@ -1827,35 +1830,59 @@ PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUl
 
 
 class T16BrandKit(unittest.TestCase):
-    def test_brand_kit_is_checked_saved_and_private(self):
-        cookie = register(f"brand-{time.time_ns()}@example.com")
-        self.assertTrue(call("GET", "/api/brand", cookie=cookie)[1]["empty"])
-        for bad in ({"colors": ["red"]}, {"colors": ["#000000"] * 7}, {"heading_font": "<script>"}):
-            self.assertEqual(call("PUT", "/api/brand", bad, cookie=cookie)[0], 400, bad)
-        s, kit, _ = call("PUT", "/api/brand", {"colors": ["#0E7C66", "#f4f4f5"], "heading_font": "Fraunces", "body_font": "Inter"}, cookie=cookie)
-        self.assertEqual(s, 200, kit)
-        self.assertEqual(kit["colors"], ["#0e7c66", "#f4f4f5"])
-        self.assertEqual(call("POST", "/api/brand/logo", {"data": "data:text/html;base64,PGI+"}, cookie=cookie)[0], 400)
-        self.assertTrue(call("POST", "/api/brand/logo", {"data": PNG}, cookie=cookie)[1]["logo"])
-        self.assertEqual(call("GET", "/api/brand/logo", cookie=cookie)[0], 200)
-        self.assertTrue(call("GET", "/api/brand")[1]["empty"], "the admin doesn't see someone else's kit")
-        self.assertEqual(call("GET", "/api/brand/logo", cookie=None)[0], 401)
-        uid = asyncio.run(_db("SELECT user_id FROM brand_kits WHERE heading_font = 'Fraunces'"))[0]["user_id"]
-        self.assertEqual(call("GET", f"/work/.brand/{uid}/logo.png", cookie=cookie)[0], 404, "never served as a file")
+    """Each project has its own brand kit: colours and fonts in the project, the logo as its "logo" asset."""
+    def project(self, cookie, **brand):
+        s, p, _ = call("POST", "/api/projects", {"name": "Brand", "description": "x", **({"brand": brand} if brand else {})}, cookie=cookie)
+        self.assertEqual(s, 200, p)
+        return p["id"]
 
-    def test_a_new_project_can_use_the_kit(self):
+    def test_a_project_kit_is_checked_saved_and_private(self):
         cookie = register(f"brand-{time.time_ns()}@example.com")
-        call("PUT", "/api/brand", {"colors": ["#0e7c66"], "heading_font": "Fraunces", "body_font": "Inter"}, cookie=cookie)
-        call("POST", "/api/brand/logo", {"data": PNG}, cookie=cookie)
-        pid = call("POST", "/api/projects", {"name": "Brand", "description": "x"}, cookie=cookie)[1]["id"]
-        s, r, _ = call("POST", f"/api/projects/{pid}/brand", cookie=cookie)
-        self.assertEqual(s, 200, r)
-        self.assertEqual(r["brief"]["colors"], "#0e7c66")
-        self.assertIn("Fraunces", r["brief"]["fonts"])
-        self.assertEqual([a["kind"] for a in r["assets"]], ["logo"])
+        self.assertEqual(call("POST", "/api/projects", {"name": "B", "description": "x", "brand": {"colors": ["red"]}}, cookie=cookie)[0], 400)
+        pid = self.project(cookie, colors=["#0E7C66"], heading_font="Fraunces")
+        kit = call("GET", f"/api/projects/{pid}/brand", cookie=cookie)[1]
+        self.assertEqual((kit["colors"], kit["heading_font"], kit["logo"]), (["#0e7c66"], "Fraunces", None))
+        for bad in ({"colors": ["red"]}, {"colors": ["#000000"] * 7}, {"heading_font": "<script>"}):
+            self.assertEqual(call("PUT", f"/api/projects/{pid}/brand", bad, cookie=cookie)[0], 400, bad)
+        s, kit, _ = call("PUT", f"/api/projects/{pid}/brand", {"colors": ["#0e7c66", "#f4f4f5"], "heading_font": "Fraunces", "body_font": "Inter"}, cookie=cookie)
+        self.assertEqual((s, kit["body_font"]), (200, "Inter"), kit)
+        self.assertEqual(call("POST", f"/api/projects/{pid}/brand/logo", {"data": "data:text/html;base64,PGI+"}, cookie=cookie)[0], 400)
+        self.assertTrue(call("POST", f"/api/projects/{pid}/brand/logo", {"data": PNG}, cookie=cookie)[1]["logo"])
+        call("POST", f"/api/projects/{pid}/brand/logo", {"data": PNG}, cookie=cookie)
+        assets = json.loads((TMP / "work" / ".projects" / f"{pid}.json").read_text())["assets"]
+        self.assertEqual([a["kind"] for a in assets], ["logo"], "a new logo replaces the old one")
         self.assertTrue((TMP / "work" / pid / "assets" / "logo.png").is_file())
-        self.assertEqual(len(call("POST", f"/api/projects/{pid}/brand", cookie=cookie)[1]["assets"]), 1, "applying again adds no second logo")
-        self.assertEqual(call("POST", f"/api/projects/{pid}/brand")[0], 403, "only the owner, not even an admin")
+        self.assertEqual(call("PUT", f"/api/projects/{pid}/brand", {"colors": []})[0], 403, "only the owner, not even an admin")
+        self.assertEqual(call("GET", f"/api/projects/{pid}/brand", cookie=register(f"other-{time.time_ns()}@example.com"))[0], 404)
+        self.assertTrue(call("DELETE", f"/api/projects/{pid}/brand/logo", cookie=cookie)[1]["logo"] is None)
+        self.assertFalse((TMP / "work" / pid / "assets" / "logo.png").exists())
+        self.assertEqual(call("GET", "/api/brand", cookie=cookie)[0], 404, "the account-wide kit is gone")
+
+    def test_agents_get_the_kit_and_kits_can_be_copied(self):
+        cookie = register(f"brand-{time.time_ns()}@example.com")
+        a = self.project(cookie, colors=["#123456"], heading_font="Fraunces", body_font="Inter")
+        call("POST", f"/api/projects/{a}/brand/logo", {"data": PNG}, cookie=cookie)
+        sources = call("GET", "/api/brand/sources", cookie=cookie)[1]
+        self.assertEqual([k["id"] for k in sources], [a])
+        b = self.project(cookie)
+        self.assertEqual(call("POST", f"/api/projects/{b}/brand/copy", {"from": a}, cookie=cookie)[1]["colors"], ["#123456"])
+        self.assertTrue((TMP / "work" / b / "assets" / "logo.png").is_file(), "the logo is copied too")
+        stranger = register(f"brand-{time.time_ns()}@example.com")
+        c = self.project(stranger)
+        self.assertEqual(call("POST", f"/api/projects/{c}/brand/copy", {"from": a}, cookie=stranger)[0], 403)
+        # a kit saved on the account by an earlier version is offered once, as a copy source
+        uid = call("GET", "/api/auth/me", cookie=stranger)[1]["user"]["id"]
+        asyncio.run(_db(f"INSERT INTO brand_kits (user_id, colors, heading_font) VALUES ('{uid}', ARRAY['#abcdef'], 'Lora')"))
+        self.assertEqual(call("GET", "/api/brand/sources", cookie=stranger)[1][0]["id"], "account")
+        self.assertEqual(call("POST", f"/api/projects/{c}/brand/copy", {"from": "account"}, cookie=stranger)[1]["heading_font"], "Lora")
+        # every agent reads the kit
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": "Make a page", "agents": ["html"]}))
+            return await recv(("run_done", "error", "run_stopped"))
+        before = len(log_calls())
+        ws(b, script, cookie=cookie)
+        prompts = [c["argv"][c["argv"].index("-p") + 1] for c in log_calls()[before:] if "-p" in c["argv"]]
+        self.assertTrue(any("<brand_kit>" in p and "#123456" in p and "Fraunces" in p and "assets/logo.png" in p for p in prompts))
 
 
 class T17AdminAndData(unittest.TestCase):
@@ -2134,3 +2161,163 @@ class T09Settings(unittest.TestCase):
         used = set(re.findall(r'(?:environ\.get|_int|_mb|_path)\("([A-Z_]+)"', source)) - {"ATELIER_ENV_FILE"}
         for name in used:
             self.assertRegex(example, rf"(?m)^{name}=", f"{name} is missing from .env.example")
+
+
+class T22Marketplace(unittest.TestCase):
+    def email(self):
+        return f"market-{time.time_ns()}@example.com"
+
+    def agent(self, cookie, slug, name="FAQ writer"):
+        s, r, _ = call("POST", "/api/agents", {"id": slug, "name": name, "icon": "message", "color": "#334455", "default": False,
+                                                "description": "Writes a FAQ section.", "role": "You are the FAQ agent. Add a FAQ."}, cookie=cookie)
+        self.assertEqual(s, 200, r)
+
+    def catalogue(self, cookie):
+        return call("GET", "/api/market", cookie=cookie)[1]
+
+    def run_team(self, pid, cookie, agents):
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": "Make a page", "agents": list(agents)}))
+            return await recv(("run_done", "error", "run_stopped"))
+        return ws(pid, script, cookie=cookie)
+
+    def test_publish_review_and_hire_an_agent(self):
+        a, b = register(self.email()), register(self.email())
+        slug = f"faq-{time.time_ns() % 10**8}"
+        self.agent(a, slug)
+        self.assertEqual(call("POST", "/api/market/publish", {"kind": "agent", "id": slug, "category": "nope"}, cookie=a)[0], 400)
+        self.assertEqual(call("POST", "/api/market/publish", {"kind": "agent", "id": "css", "category": "code"}, cookie=a)[0], 404)
+        s, r, _ = call("POST", "/api/market/publish", {"kind": "agent", "id": slug, "category": "writing"}, cookie=a)
+        self.assertEqual((s, r["listing"]), (200, "pending"), r)
+        self.assertNotIn(slug, [x["id"] for x in self.catalogue(b)["agents"]])          # not before an admin approves
+        self.assertEqual(call("GET", "/api/market/pending", cookie=b)[0], 403)
+        pending = call("GET", "/api/market/pending")[1]["agents"]
+        pk = next(x["pk"] for x in pending if x["slug"] == slug)
+        self.assertEqual(call("POST", "/api/market/review", {"kind": "agent", "pk": pk, "decision": "approve"}, cookie=b)[0], 403)
+        self.assertEqual(call("POST", "/api/market/review", {"kind": "agent", "pk": pk, "decision": "approve"})[0], 200)
+        item = next(x for x in self.catalogue(b)["agents"] if x["pk"] == pk)
+        self.assertEqual((item["official"], item["category"], item["by"], item["hires"]), (False, "writing", "Test", 0))
+        official = next(x for x in self.catalogue(b)["agents"] if x["id"] == "css")
+        self.assertTrue(official["official"])
+        s, r, _ = call("POST", f"/api/market/agents/{pk}/hire", cookie=b)
+        self.assertEqual((s, r["already"]), (200, False), r)
+        copy = r["id"]
+        self.assertTrue(call("POST", f"/api/market/agents/{pk}/hire", cookie=b)[1]["already"])
+        mine = {x["id"]: x for x in call("GET", "/api/agents", cookie=b)[1]}
+        self.assertEqual(mine[copy]["scope"], "mine")
+        self.assertEqual(next(x for x in self.catalogue(b)["agents"] if x["pk"] == pk)["hires"], 1)
+        self.assertEqual(call("POST", "/api/market/publish", {"kind": "agent", "id": copy, "category": "writing"}, cookie=b)[0], 400)
+        profile = call("GET", f"/api/market/agents/{pk}", cookie=b)[1]
+        self.assertEqual(profile["hired_as"], copy)
+        self.assertIn("FAQ agent", profile["role"])
+        # editing a listed agent sends it back for review; withdrawing makes it private
+        s, r, _ = call("PUT", f"/api/agents/{slug}", {"name": "FAQ writer", "role": "You are the FAQ agent. Add a longer FAQ.",
+                                                      "description": "Writes a FAQ section."}, cookie=a)
+        self.assertEqual(s, 200, r)
+        self.assertEqual(call("GET", f"/api/agents/{slug}", cookie=a)[1]["market"]["listing"], "pending")
+        self.assertEqual(call("POST", "/api/market/withdraw", {"kind": "agent", "id": slug}, cookie=a)[1]["listing"], "private")
+        self.assertEqual(call("GET", f"/api/market/agents/{pk}", cookie=register(self.email()))[0], 404)
+
+    def test_hiring_a_team_brings_its_private_agents(self):
+        a, b = register(self.email()), register(self.email())
+        slug = f"faq-{time.time_ns() % 10**8}"
+        self.agent(a, slug)
+        s, team, _ = call("POST", "/api/presets", {"name": f"FAQ team {slug}", "agents": [slug, "html"], "prompt": "Add a FAQ to [page]."}, cookie=a)
+        self.assertEqual(s, 200, team)
+        call("POST", "/api/market/publish", {"kind": "team", "id": team["id"], "category": "add"}, cookie=a)
+        pk = next(x["pk"] for x in call("GET", "/api/market/pending")[1]["teams"] if x["slug"] == team["id"])
+        call("POST", "/api/market/review", {"kind": "team", "pk": pk, "decision": "reject", "note": "Too vague"})
+        self.assertEqual(call("GET", f"/api/presets/{team['id']}", cookie=a)[1]["market"]["note"], "Too vague")
+        self.assertEqual(call("POST", f"/api/market/teams/{pk}/hire", cookie=b)[0], 404)          # rejected: not hireable
+        call("POST", "/api/market/review", {"kind": "team", "pk": pk, "decision": "approve"})
+        s, r, _ = call("POST", f"/api/market/teams/{pk}/hire", cookie=b)
+        self.assertEqual(s, 200, r)
+        hired = call("GET", f"/api/presets/{r['id']}", cookie=b)[1]
+        self.assertEqual(hired["scope"], "mine")
+        self.assertIn("html", hired["agents"])
+        self.assertEqual(len(hired["agents"]), 2)
+        self.assertTrue(hired["market"]["copy"])
+        profile = call("GET", f"/api/market/teams/{pk}", cookie=b)[1]
+        self.assertEqual((profile["hired_as"], profile["hires"], len(profile["agents"])), (r["id"], 1, 2))
+        self.assertGreater(profile["seconds"], 0)
+
+    def test_ratings_scores_and_the_portfolio(self):
+        c, d = register(self.email()), register(self.email())
+        pid = new_project(name="Rated site", cookie=c)
+        events = self.run_team(pid, c, ["ux", "html", "critic"])
+        self.assertEqual(events[-1]["type"], "run_done")
+        stats = json.loads((TMP / "work" / ".projects" / f"{pid}.json").read_text())["stats"]
+        critic = next(e for e in stats if e["agent"] == "critic")
+        self.assertEqual(critic["score"], 8.5)
+        self.assertTrue(all(e.get("run") == critic["run"] for e in stats))
+        put = lambda body, cookie=c: call("PUT", f"/api/projects/{pid}/ratings", body, cookie=cookie)
+        self.assertEqual(put({"agent": "seo", "value": 1})[0], 400)                 # it didn't work on this project
+        self.assertEqual(put({"agent": "ux", "value": 5})[0], 400)
+        self.assertEqual(put({"agent": "ux", "value": 1}, cookie=d)[0], 404)       # not their project
+        self.assertEqual(put({"agent": "ux", "value": 1, "comment": "Clear plan"})[0], 200)
+        self.assertEqual(put({"agent": "html", "value": -1})[0], 200)
+        mine = call("GET", f"/api/projects/{pid}/ratings", cookie=c)[1]
+        self.assertEqual((mine["ux"]["value"], mine["html"]["value"]), (1, -1))
+        ux = next(x for x in self.catalogue(c)["agents"] if x["id"] == "ux")
+        profile = call("GET", f"/api/market/agents/{ux['pk']}", cookie=c)[1]
+        self.assertGreaterEqual(profile["rating"]["up"], 1)
+        self.assertIn("Clear plan", [r["comment"] for r in profile["reviews"]])
+        self.assertIn(pid, [p["id"] for p in profile["portfolio"]])
+        self.assertIsNotNone(profile["score"])
+        self.assertGreaterEqual(profile["jobs"], 1)
+        # someone else sees the site in the portfolio only once its owner shows it
+        self.assertNotIn(pid, [p["id"] for p in call("GET", f"/api/market/agents/{ux['pk']}", cookie=d)[1]["portfolio"]])
+        call("PATCH", f"/api/projects/{pid}", {"showcase": True}, cookie=c)
+        self.assertIn(pid, [p["id"] for p in call("GET", f"/api/market/agents/{ux['pk']}", cookie=d)[1]["portfolio"]])
+        self.assertEqual(put({"agent": "html", "value": 0})[0], 200)
+        self.assertNotIn("html", call("GET", f"/api/projects/{pid}/ratings", cookie=c)[1])
+        ratings = call("GET", "/api/auth/export", cookie=c)
+        self.assertEqual(ratings[0], 200)
+
+    def test_marketplace_pages_need_an_account(self):
+        member = register(self.email())
+        for path in ("/hire", "/hire/agents/1", "/hire/teams/1"):
+            self.assertEqual(call("GET", path, cookie=member)[0], 200, path)
+            self.assertTrue((page_redirect(path)[1] or "").startswith("/login"), path)
+        self.assertEqual(call("GET", "/api/market", cookie=None)[0], 401)
+
+    def test_3d_agents_and_teams(self):
+        agents = {a["id"]: a for a in call("GET", "/api/agents")[1]}
+        for slug in ("3d-design", "3d-scene", "depth"):
+            self.assertIn(slug, agents)
+            self.assertFalse(agents[slug]["default"])
+        ids = list(agents)
+        self.assertLess(ids.index("design"), ids.index("3d-design"))
+        self.assertLess(ids.index("js"), ids.index("3d-scene"))
+        teams = {t["id"]: t for t in call("GET", "/api/presets")[1]}
+        self.assertTrue({"3d-design", "3d-scene", "depth"} <= set(teams["3d-site"]["agents"]))
+        self.assertIn("[", teams["add-3d"]["prompt"])
+        self.assertEqual(call("GET", "/hire/job")[0], 404)                      # the job post page was removed
+        rules = (ROOT / "agents" / "09c-3d-scene.md").read_text()
+        self.assertIn("No libraries", rules)
+        cat = {a["id"]: a["category"] for a in call("GET", "/api/market")[1]["agents"] if a["official"]}
+        self.assertEqual((cat["3d-design"], cat["3d-scene"], cat["depth"]), ("design", "code", "design"))
+
+
+class T23FirstRunSeed(unittest.TestCase):
+    def test_a_fresh_database_gets_every_shared_agent_and_team(self):
+        """The server under test started on an empty database: everything in agents/ must be there, shared by everyone."""
+        sys.path.insert(0, str(ROOT / "server"))
+        try:
+            import migrate
+        finally:
+            sys.path.pop(0)
+        files = migrate.snapshot_from_files()
+        agents = {r["slug"]: r for r in asyncio.run(_db("SELECT slug, origin FROM agents WHERE owner_id IS NULL"))}
+        teams = {r["slug"] for r in asyncio.run(_db("SELECT slug FROM teams WHERE owner_id IS NULL"))}
+        self.assertTrue({a["slug"] for a in files["agents"]} <= set(agents), "every agent file is a shared agent")
+        self.assertTrue({t["slug"] for t in files["teams"]} <= teams, "every team in _presets.json is a shared team")
+        self.assertTrue(migrate.latest_data()["agents"], "the data migrations hold the shared agents")
+        latest = {a["slug"]: a for a in migrate.latest_data()["agents"]}
+        for a in files["agents"]:
+            self.assertEqual(latest.get(a["slug"]), a, f"{a['slug']}: agents/ changed without a migration (manage.py make-agents-migration)")
+        member = register(f"seed-{time.time_ns()}@example.com")
+        seen = {a["id"] for a in call("GET", "/api/agents", cookie=member)[1]}
+        self.assertTrue({a["slug"] for a in files["agents"]} <= seen, "a brand-new member sees them all")
+        seen_teams = {t["id"] for t in call("GET", "/api/presets", cookie=member)[1]}
+        self.assertTrue({t["slug"] for t in files["teams"]} <= seen_teams)

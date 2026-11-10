@@ -60,18 +60,6 @@
   .prefs .seg { display: flex; box-shadow: var(--ring); }
   .prefs .seg button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 6px; white-space: nowrap; }
 
-  .brand-grid { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; }
-  .logo-box { display: grid; place-items: center; height: 120px; border-radius: 12px; background: var(--mist); box-shadow: var(--ring); color: var(--stone); font-size: 13px; overflow: hidden; }
-  .logo-box img { max-width: 80%; max-height: 80%; object-fit: contain; }
-  .swatches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .swatch { position: relative; display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; border-radius: var(--r-pill); box-shadow: var(--ring); font-family: var(--mono); font-size: 12px; }
-  .swatch input[type=color] { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
-  .swatch input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
-  .swatch input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
-  .swatch button { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--stone); }
-  .swatch button:hover { color: var(--ink); background: var(--ice); }
-  .add-color { height: 34px; }
-  @media (max-width: 760px) { .brand-grid { grid-template-columns: minmax(0, 1fr); } }
   .danger-zone { border-color: var(--danger); }
   .danger-zone h2 { color: var(--danger); }
   dialog.modal .pf { text-align: start; }
@@ -96,10 +84,10 @@
     <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
     <nav class="links">
       <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
-      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
-      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>My agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>My teams</a>
     </nav>
-    <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
+    <a class="btn btn-dark" href="/projects/new"><i data-icon="plus" data-size="16"></i>New project</a>
   </div>
 </header>
 <main class="wrap page">
@@ -156,7 +144,6 @@ async function load() {
       <nav class="toc" id="toc" aria-label="Sections of your profile">
         <a href="#preferences">${icon("sliders", { size: 15 })}<span>Preferences</span></a>
         <a href="#details">${icon("user", { size: 15 })}<span>Your details</span></a>
-        <a href="#brand">${icon("palette", { size: 15 })}<span>Brand kit</span></a>
         <a href="#password-section">${icon("lock", { size: 15 })}<span>Password</span></a>
         <a href="#devices">${icon("monitor", { size: 15 })}<span>Other devices</span></a>
         <a href="#data">${icon("download", { size: 15 })}<span>Your data</span></a>
@@ -190,31 +177,6 @@ async function load() {
           </form>
         </section>
 
-        <section class="sect" id="brand">
-          <h2>Brand kit</h2>
-          <p>Save your logo, colours and fonts once. New projects can use them, so the agents start from your brand.</p>
-          <div class="brand-grid">
-            <div class="pf"><span class="pref-label">Logo</span>
-              <div class="logo-box" id="logo-box"></div>
-              <div class="form-end"><button class="btn btn-ghost btn-sm" type="button" id="logo-pick">${icon("image", { size: 14 })}<span id="logo-pick-label">Choose logo…</span></button>
-                <button class="btn btn-ghost btn-sm" type="button" id="logo-remove" hidden>Remove</button>
-                <input type="file" id="logo-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></div>
-              <small class="help">PNG, JPG, WebP or GIF, up to 5 MB.</small></div>
-            <div>
-              <div class="pf"><span class="pref-label">Colours <em>up to 6</em></span>
-                <div class="swatches" id="swatches"></div></div>
-              <div class="two">
-                <div class="pf"><label for="heading_font"><span>Heading font</span></label><input class="input" id="heading_font" list="font-list" maxlength="40" placeholder="e.g. Fraunces"></div>
-                <div class="pf"><label for="body_font"><span>Body font</span></label><input class="input" id="body_font" list="font-list" maxlength="40" placeholder="e.g. Inter"></div>
-              </div>
-              <datalist id="font-list">${["Inter", "Roboto", "Open Sans", "Lato", "Montserrat", "Poppins", "Source Sans 3", "Work Sans", "DM Sans", "Manrope", "Playfair Display", "Fraunces", "Lora", "Merriweather", "Cormorant Garamond", "Space Grotesk", "IBM Plex Sans", "Noto Sans Arabic", "Cairo", "Tajawal", "Reem Kufi"].map(f => `<option value="${f}">`).join("")}</datalist>
-              <small class="help">Any font from Google Fonts.</small>
-            </div>
-          </div>
-          <p class="perr" id="brand-err" role="alert"></p>
-          <div class="form-end"><button class="btn btn-dark" type="button" id="brand-go" disabled>Save brand kit</button><span class="saved" id="brand-saved" role="status"></span></div>
-        </section>
-
         <section class="sect" id="password-section">
           <h2>Password</h2>
           <p>Changing it logs out your other devices, and we email you a notice. Forgot it? Log out and use “Forgot your password?”.</p>
@@ -237,7 +199,7 @@ async function load() {
 
         <section class="sect" id="data">
           <h2>Your data</h2>
-          <p>Download everything stored about you as a .zip: your account, agents, teams, brand kit, and every project with its chat and files.</p>
+          <p>Download everything stored about you as a .zip: your account, agents, teams, ratings, and every project with its brand kit, chat and files.</p>
           <a class="btn btn-ghost" href="/api/auth/export" download>${icon("download", { size: 15 })}Download my data</a>
         </section>
 
@@ -294,65 +256,6 @@ async function load() {
       updateAccountButton(user);
       $("details-saved").textContent = "Saved";
     } catch (err) { $("details-err").textContent = err.message; refreshDetails(); }
-  };
-
-  /* brand kit: saved with its own button; the logo is saved as soon as it's chosen */
-  let kit = await api("/api/brand").catch(() => ({ colors: [], heading_font: "", body_font: "", logo: null }));
-  let colors = [...kit.colors];
-  const paintLogo = () => {
-    $("logo-box").innerHTML = kit.logo ? `<img src="${esc(kit.logo)}" alt="Your logo">` : `<span>No logo yet</span>`;
-    $("logo-remove").hidden = !kit.logo;
-    $("logo-pick-label").textContent = kit.logo ? "Replace logo…" : "Choose logo…";
-  };
-  const brandValues = () => JSON.stringify({ colors, heading_font: $("heading_font").value.trim(), body_font: $("body_font").value.trim() });
-  let savedBrand = "";
-  const refreshBrand = () => { const changed = brandValues() !== savedBrand; $("brand-go").disabled = !changed; if (changed) $("brand-saved").textContent = ""; };
-  const paintColors = () => {
-    $("swatches").innerHTML = colors.map((c, i) => `<span class="swatch"><input type="color" value="${esc(c)}" data-i="${i}" aria-label="Colour ${i + 1}"><span data-no-i18n>${esc(c)}</span>
-      <button type="button" data-del="${i}" aria-label="Remove ${esc(c)}">${icon("x", { size: 12 })}</button></span>`).join("")
-      + (colors.length < 6 ? `<button type="button" class="btn btn-ghost btn-sm add-color" id="add-color">${icon("plus", { size: 14 })}Add colour</button>` : "");
-    refreshBrand();
-  };
-  $("heading_font").value = kit.heading_font; $("body_font").value = kit.body_font;
-  savedBrand = brandValues();
-  paintLogo(); paintColors();
-  $("swatches").addEventListener("input", (e) => {
-    if (e.target.dataset.i === undefined) return;
-    colors[+e.target.dataset.i] = e.target.value;
-    e.target.nextElementSibling.textContent = e.target.value;
-    refreshBrand();
-  });
-  $("swatches").addEventListener("click", (e) => {
-    if (e.target.closest("#add-color")) { colors.push(["#4f5bd5", "#f2b632", "#1fa97a", "#14161f", "#f3f4f8", "#e5484d"][colors.length] || "#888888"); paintColors(); }
-    const del = e.target.closest("[data-del]");
-    if (del) { colors.splice(+del.dataset.del, 1); paintColors(); }
-  });
-  ["heading_font", "body_font"].forEach(id => $(id).addEventListener("input", refreshBrand));
-  $("brand-go").onclick = async () => {
-    $("brand-err").textContent = "";
-    $("brand-go").disabled = true;
-    try {
-      kit = await send("/api/brand", "PUT", JSON.parse(brandValues()));
-      colors = [...kit.colors]; savedBrand = brandValues(); paintColors();
-      $("brand-saved").textContent = "Saved";
-    } catch (err) { $("brand-err").textContent = err.message; refreshBrand(); }
-  };
-  $("logo-pick").onclick = () => $("logo-file").click();
-  $("logo-file").onchange = async () => {
-    const file = $("logo-file").files[0];
-    $("logo-file").value = "";
-    if (!file) return;
-    $("brand-err").textContent = "";
-    if (file.size > 5 * 1048576) { $("brand-err").textContent = `${file.name} is over 5 MB.`; return; }
-    try {
-      const data = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(file); });
-      kit = await send("/api/brand/logo", "POST", { data });
-      paintLogo(); toast("Logo saved");
-    } catch (err) { $("brand-err").textContent = err.message; }
-  };
-  $("logo-remove").onclick = async () => {
-    try { kit = await api("/api/brand/logo", { method: "DELETE" }); paintLogo(); toast("Logo removed"); }
-    catch (err) { toast(err.message, "err"); }
   };
 
   /* password */

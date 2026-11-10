@@ -57,3 +57,4 @@ header.top.clear { position: sticky; }
   header.top .logo { font-size: 0; gap: 0; }
   header.top .pal-btn { display: none; }      /* a phone has no room for it, and no Ctrl+K to go with it */
 }
+

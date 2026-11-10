@@ -39,6 +39,9 @@ Rules:
   - pricing: "add a pricing table", "show our plans", "add the menu with prices". With html and css only if the page is new.
   - gallery: "add a photo gallery", "show our photos", "lightbox".
   - local: "show our hours and address", "add a map link", "local SEO", "click to call".
+  - 3d-design, 3d-scene, depth: "add 3D", "a 3D logo", "a rotating product", "make it interactive in 3D", "tilting cards",
+    "parallax". 3d-design plans first; 3d-scene builds a real 3D object (WebGL); depth adds CSS 3D effects (tilt, parallax,
+    flip). For a light touch ("make the cards tilt") choose depth alone.
 - Research (web research on the idea, competitors and market): choose it only when the user asks for research,
   competitors, market insights or ideas to improve the concept. If they also want the site improved from it
   ("research competitors and improve the page"), choose the agents that build the changes too (usually ux, copy,

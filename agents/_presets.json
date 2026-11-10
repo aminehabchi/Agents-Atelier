@@ -329,5 +329,42 @@
       "qa"
     ],
     "prompt": "Clean up this site's code without changing how it looks or works: remove unused CSS and code, merge duplicates and make the formatting consistent."
+  },
+  {
+    "id": "3d-site",
+    "name": "3D website",
+    "description": "A site with a real 3D object at its heart, plus depth effects, fast on phones and with still fallbacks.",
+    "agents": [
+      "brief",
+      "ux",
+      "design",
+      "3d-design",
+      "copy",
+      "html",
+      "css",
+      "js",
+      "3d-scene",
+      "responsive",
+      "anim",
+      "depth",
+      "a11y",
+      "perf",
+      "critic"
+    ],
+    "prompt": "Build a website for [business or product] with 3D at its heart.\nThe 3D star: [a rotating product / a 3D logo / a low-poly globe / floating shapes in the hero].\nVisitors should be able to [drag to rotate it / see it follow the mouse / watch it turn as they scroll].\nPages: [Home, Product, Contact]. Tone: [futuristic / playful / premium]. Colours: [your colours, or \"you choose\"].\nKeep it fast on phones, and show a still picture when 3D isn't available."
+  },
+  {
+    "id": "add-3d",
+    "name": "Add 3D to my site",
+    "description": "Add a 3D object, tilting cards or parallax layers to a site you already have, without changing its content.",
+    "agents": [
+      "brief",
+      "3d-design",
+      "3d-scene",
+      "depth",
+      "perf",
+      "critic"
+    ],
+    "prompt": "Add 3D to this site without changing its content or text.\nWhat I'd like: [a 3D object in the hero / cards that tilt towards the mouse / parallax layers / flip cards].\nThe object: [describe it, e.g. our logo in 3D, a phone showing the app, a coffee cup].\nKeep it fast, respect reduced motion, and keep a still fallback."
   }
 ]

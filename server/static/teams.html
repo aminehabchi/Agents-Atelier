@@ -10,9 +10,11 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
+<link rel="stylesheet" href="/static/market.css">
 <script src="/static/i18n.js"></script>
 <script src="/static/icons.js"></script>
 <script src="/static/ui.js"></script>
+<script src="/static/market.js"></script>
 <style>
   .bar-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
   .bar-top h1 { margin: 0 auto 0 0; font-weight: 400; font-size: 40px; letter-spacing: 0; line-height: 1.1; }
@@ -87,7 +89,7 @@
     .vhead .acts { margin-left: 0; }
   }
   .team-filter { border-right: 0; padding-right: 0; margin-top: 16px; }
-  .starter { margin-top: 20px; padding: 16px 18px; border-radius: 12px; background: var(--mist); box-shadow: var(--ring); }
+  .starter { margin-top: 20px; padding: 16px 18px; border-radius: 8px; background: var(--mist); box-shadow: var(--ring); }
   .starter-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
   .starter-head small { flex: 1; min-width: 200px; color: var(--stone); font-size: 12px; }
   .starter-text { margin: 0; white-space: pre-wrap; font-family: var(--font); font-size: 15px; line-height: 1.6; color: var(--ink); }
@@ -103,10 +105,10 @@
     <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
     <nav class="links">
       <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
-      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
-      <a href="/teams" class="on"><i data-icon="layers" data-size="16"></i>Teams</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>My agents</a>
+      <a href="/teams" class="on"><i data-icon="layers" data-size="16"></i>My teams</a>
     </nav>
-    <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
+    <a class="btn btn-dark" href="/projects/new"><i data-icon="plus" data-size="16"></i>New project</a>
   </div>
 </header>
 
@@ -157,7 +159,7 @@ const stack = (ids, byId, max = 10) => `<div class="stack">${ids.slice(0, max).m
 // ================================================================ list: /teams
 let owner = ["mine", "shared"].includes(new URLSearchParams(location.search).get("show")) ? new URLSearchParams(location.search).get("show") : "all";
 async function listView() {
-  setTitle("Teams");
+  setTitle("My teams");
   app.innerHTML = `<p class="note">Loading…</p>`;
   let teams, base;
   try { [teams, base] = await Promise.all([api("/api/presets"), loadBase()]); }
@@ -175,7 +177,8 @@ async function listView() {
   };
   const builtin = teams.filter(t => t.builtin), mine = teams.filter(t => t.scope === "mine"), shared = teams.filter(t => t.scope === "shared");
   app.innerHTML = `
-    <div class="bar-top"><h1>Teams</h1>
+    <div class="bar-top"><h1>My teams</h1>
+      <a class="btn btn-ghost" href="/hire?tab=teams">${icon("briefcase", { size: 16 })}Browse ready teams</a>
       <button class="btn btn-ghost" id="importBtn" title="Import a team (.json), an agent (.md) or an export (.zip)">${icon("file-plus", { size: 16 })}Import</button>
       <a class="btn btn-ghost" href="/api/export" title="All agents, shared rules and your teams as a .zip">${icon("download", { size: 16 })}Export all</a>
       <a class="btn btn-dark" href="/teams/new">${icon("plus", { size: 16 })}New team</a></div>
@@ -258,7 +261,10 @@ async function detailView(id) {
           <span class="est">${s && s.runs ? `${duration(s.avg_seconds)} · ${money(s.avg_cost)}` : "not run yet"}</span>
         </a>`;
       }).join("") || `<p class="note">This team has no agents left (they may have been deleted).</p>`}</div>
-    </section>`;
+    </section>
+    ${marketCard("team", t.market)}`;
+  const mk = app.querySelector(".market-card");
+  if (mk) bindMarketCard(mk, "team", t.id, () => detailView(id));
   $("copy-prompt")?.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(t.prompt); toast("Prompt copied"); } catch { toast("Copy failed", "err"); }
   });

@@ -84,8 +84,8 @@
   .tm .tile { width: 36px; height: 36px; border-radius: var(--r); display: grid; place-items: center; color: var(--ink); background: color-mix(in srgb, var(--c) 14%, var(--paper)); flex: none; }
   .tm .nm { font-size: 14px; font-weight: 500; flex: 1; line-height: 1.2; }
   .tm .nm small { display: block; font-weight: 400; color: var(--stone); font-size: 12px; margin-top: 2px; }
-  .tm { align-items: flex-start; }
-  .tm .nm p { margin: 6px 0 0; font-weight: 400; font-size: 13px; line-height: 1.5; color: var(--graphite); }
+  .tm { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; align-content: start; }   /* icon and name on one row, text below */
+  .tm > p { grid-column: 1 / -1; margin: 0; font-weight: 400; font-size: 13px; line-height: 1.5; color: var(--graphite); }
 
   details { background: var(--paper); border-radius: var(--r); margin-top: 8px; }
   summary { list-style: none; cursor: pointer; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 16px; font-weight: 500; line-height: 1.3; }
@@ -115,10 +115,10 @@
     <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
     <nav class="links">
       <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
-      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
-      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>My agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>My teams</a>
     </nav>
-    <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
+    <a class="btn btn-dark" href="/projects/new"><i data-icon="plus" data-size="16"></i>New project</a>
   </div>
 </header>
 
@@ -136,6 +136,7 @@
       <a href="#custom"><i data-icon="pencil" data-size="16"></i>Custom agents</a>
       <a href="#projects"><i data-icon="folder" data-size="16"></i>Projects &amp; files</a>
       <a href="#keys"><i data-icon="keyboard" data-size="16"></i>Shortcuts</a>
+      <a href="#market"><i data-icon="briefcase" data-size="16"></i>The marketplace</a>
       <a href="#faq"><i data-icon="help" data-size="16"></i>FAQ</a>
     </nav>
 
@@ -147,7 +148,7 @@
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="message" data-size="20"></i></span><span class="n">STEP 1</span></div>
             <h3>Describe the job</h3><p>Click <b>New project</b> and give it a name and a short description, like a job post. To improve a site you already have, use <b>Existing site</b> and pick its folder or a .zip (HTML, CSS, JS, Markdown and assets only).</p></div>
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="users" data-size="20"></i></span><span class="n">STEP 2</span></div>
-            <h3>Hire a team</h3><p>In the studio, pick one of the 20 ready teams or switch agents on yourself. Duplicate any agent on the <a href="/agents">Agents page</a> to make your own version, or save a team for a kind of job.</p></div>
+            <h3>Hire a team</h3><p>In the studio, pick one of the ready teams or switch agents on yourself. Duplicate any agent on the <a href="/agents">Agents page</a> to make your own version, or save a team for a kind of job.</p></div>
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="eye" data-size="20"></i></span><span class="n">STEP 3</span></div>
             <h3>Watch &amp; refine</h3><p>Agents build it one after another. Ask for changes anytime, then download the .zip.</p></div>
         </div>
@@ -302,8 +303,39 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
         </table>
       </section>
 
+      <section id="market">
+        <h2><span class="num">09</span>The marketplace</h2>
+        <p>Agents Atelier works like a freelance platform: every agent and team has a profile, and you hire them for your jobs.</p>
+        <div class="anatomy">
+          <div class="part"><span class="ico"><i data-icon="briefcase" data-size="20"></i></span><h3>Start a job</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>On an agent or a team, press <b>Start a job</b> and choose one of your projects.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>The studio opens with that agent added to the project's team, or with that team selected. Describe the work and press Enter.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>No project yet? <b>Start a new project instead</b> opens the project form, and the agent or team is ready when the project opens.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="star" data-size="20"></i></span><h3>Profiles</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>Each agent's profile shows the jobs it did, its average time and cost, the Critic's average score and its ratings.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Its portfolio shows your own sites it worked on, and other members' sites when they chose to show them.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Read its instructions before you hire it: they are always public.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="thumbs-up" data-size="20"></i></span><h3>Ratings</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>When an agent finishes, its card in the studio has a thumbs up and a thumbs down. Add a comment if you like.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Ratings are per project: click again to change or remove yours.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>On the <b>Team finished</b> card, you can show the site in the portfolios of the agents that built it.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="users" data-size="20"></i></span><h3>Community agents</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>Official agents are in your team already. Community agents are made by members: <b>Hire</b> copies one into your agents.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>To publish your own agent or team, open it and use <b>Publish to the marketplace</b>. An admin checks it first.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>If you edit a listed agent or team, it goes back to the admin for review.</span></li>
+            </ul></div>
+        </div>
+      </section>
+
       <section id="faq">
-        <h2><span class="num">09</span>FAQ</h2>
+        <h2><span class="num">10</span>FAQ</h2>
         <details><summary>How long does a run take?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>Each agent takes about 20–60 seconds, so the default team of 10 needs roughly 5–8 minutes. Switch off agents you don't need, or start the server with <code>AGENT_MODEL=sonnet ./run.sh</code> for faster runs.</div></details>
         <details><summary>Does it cost anything?<i data-icon="chevron-down" data-size="18"></i></summary>
@@ -339,8 +371,8 @@ api("/api/agents").then(agents => {
   document.getElementById("teamList").innerHTML = agents.map((a, i) => `
     <a class="tm" href="/agents/${encodeURIComponent(a.id)}" title="Open ${esc(a.name)}" style="--c:${a.color};${a.default ? "" : "opacity:.55"}">
       <span class="tile">${icon(a.icon, { size: 17 })}</span>
-      <span class="nm">${esc(a.name)}<small>${String(i + 1).padStart(2, "0")} · ${a.default ? "on by default" : "optional"}</small>
-        ${a.description ? `<p>${esc(a.description)}</p>` : ""}</span>
+      <span class="nm">${esc(a.name)}<small>${String(i + 1).padStart(2, "0")} · ${a.default ? "on by default" : "optional"}</small></span>
+      ${a.description ? `<p>${esc(a.description)}</p>` : ""}
     </a>`).join("");
 }).catch((err) => showError(document.getElementById("teamList"), err, () => location.reload(), "Couldn't load the agents"));
 

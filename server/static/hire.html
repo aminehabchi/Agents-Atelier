@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0f1117">
+<title>Hire · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/site.css">
+<link rel="stylesheet" href="/static/market.css">
+<script src="/static/i18n.js"></script>
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<script src="/static/market.js"></script>
+<link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <nav class="links">
+      <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>My agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>My teams</a>
+    </nav>
+    <a class="btn btn-dark" href="/projects/new"><i data-icon="plus" data-size="16"></i>New project</a>
+  </div>
+</header>
+
+<main class="wrap page">
+  <section class="mk-hero">
+    <div class="mk-intro">
+      <p class="eyebrow">Marketplace</p>
+      <h1>Hire AI agents</h1>
+      <p class="m-lead">Specialists and ready teams for your website. Official ones are already in your team. Community ones are made by members and checked by an admin: hire one and it joins your agents.</p>
+      <label class="mk-search"><i data-icon="search" data-size="18"></i>
+        <input class="input" id="q" type="search" placeholder="Search by name or skill" autocomplete="off" aria-label="Search by name or skill"></label>
+      <div class="mk-quick" aria-label="Popular searches"><span>Popular:</span>
+        <button type="button" data-quick="3D">3D</button><button type="button" data-quick="SEO">SEO</button>
+        <button type="button" data-quick="restaurant">Restaurant</button><button type="button" data-quick="form">Forms</button>
+        <button type="button" data-quick="translat">Languages</button><button type="button" data-quick="portfolio">Portfolio</button></div>
+    </div>
+    <aside class="mk-post">
+      <span class="ico"><i data-icon="briefcase" data-size="22"></i></span>
+      <h2>How hiring works</h2>
+      <ol class="mk-steps"><li>Pick an agent or a ready team.</li><li>Press <b>Start a job</b> and choose one of your projects.</li><li>It joins the project's team in the studio: describe the work and press Enter.</li></ol>
+      <a class="btn btn-ghost" href="/projects/new"><i data-icon="plus" data-size="16"></i>New project</a>
+    </aside>
+  </section>
+
+  <div id="review"></div>
+
+  <ul class="mk-cats" id="cats" aria-label="Categories"></ul>
+
+  <div class="mk-bar" id="bar">
+    <div class="seg mk-tabs" role="tablist">
+      <button type="button" data-tab="agents" role="tab"><i data-icon="users" data-size="15"></i>Agents <span class="n" id="n-agents" data-no-i18n></span></button>
+      <button type="button" data-tab="teams" role="tab"><i data-icon="layers" data-size="15"></i>Teams <span class="n" id="n-teams" data-no-i18n></span></button>
+    </div>
+    <div class="mk-src" role="group" aria-label="Source">
+      <button class="fchip on" type="button" data-source="all">All</button>
+      <button class="fchip" type="button" data-source="official">Official</button>
+      <button class="fchip" type="button" data-source="community">Community</button>
+    </div>
+    <span class="spacer"></span>
+    <span class="mk-count" id="count" aria-live="polite"></span>
+    <select class="input" id="sort" aria-label="Sort">
+      <option value="jobs">Most jobs done</option>
+      <option value="hired">Most hired</option>
+      <option value="rated">Top rated</option>
+      <option value="new">Newest</option>
+    </select>
+  </div>
+  <div class="mk-active" id="active"></div>
+
+  <ul class="m-grid" id="grid" aria-busy="true"></ul>
+  <nav class="pager" id="pager" aria-label="Pages of the marketplace"></nav>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = { tab: new URLSearchParams(location.search).get("tab") === "teams" ? "teams" : "agents", source: "all", cat: "", q: "", sort: "jobs", page: 1 };
+let perPage = perPagePref("market", 12), reviewPage = 1, data = null;
+
+$("grid").innerHTML = Array.from({ length: 6 }, () => `<li class="m-skel" aria-hidden="true"><span></span><span></span><span></span></li>`).join("");
+const reset = () => { state.page = 1; render(); };
+document.addEventListener("click", (e) => {
+  const tab = e.target.closest("[data-tab]");
+  if (tab) { state.tab = tab.dataset.tab; state.cat = ""; history.replaceState(null, "", state.tab === "teams" ? "?tab=teams" : location.pathname); reset(); }
+  const src = e.target.closest("[data-source]");
+  if (src) { state.source = src.dataset.source; reset(); }
+  const cat = e.target.closest("[data-cat]");
+  if (cat) { state.cat = state.cat === cat.dataset.cat ? "" : cat.dataset.cat; reset(); }
+  const quick = e.target.closest("[data-quick]");
+  if (quick) { $("q").value = quick.dataset.quick; state.q = quick.dataset.quick.toLowerCase(); reset(); }
+  if (e.target.closest("[data-clear]")) { $("q").value = ""; Object.assign(state, { q: "", cat: "", source: "all" }); reset(); }
+  const rv = e.target.closest("[data-review]");
+  if (rv) review(rv.dataset.kind, rv.dataset.pk, rv.dataset.review);
+});
+let typing;
+$("q").addEventListener("input", () => { clearTimeout(typing); typing = setTimeout(() => { state.q = $("q").value.trim().toLowerCase(); reset(); }, 120); });
+$("sort").addEventListener("change", () => { state.sort = $("sort").value; reset(); });
+bindPager($("pager"), (p) => { state.page = p; render(); $("bar").scrollIntoView({ block: "start", behavior: "smooth" }); },
+          (n) => { perPage = n; savePerPage("market", n); reset(); });
+window.addEventListener("market:hired", () => load());
+// the toolbar sticks under the header while you scroll the results
+new IntersectionObserver(([e]) => $("bar").classList.toggle("stuck", e.intersectionRatio < 1), { rootMargin: "-73px 0px 0px 0px", threshold: [1] }).observe($("bar"));
+
+const stat = (ic, value, title) => `<span title="${esc(title)}">${icon(ic, { size: 13 })}${value}</span>`;
+function price(x, est = false) {
+  if (!est && x.avg_cost == null) { est = true; x = { ...x, cost: x.est_cost, seconds: x.est_seconds }; }   // never run: its model's estimate
+  const cost = est ? x.cost : x.avg_cost, sec = est ? x.seconds : x.avg_seconds;
+  return `<div class="mc-price"><b>${cost == null ? "–" : `${est ? "~" : ""}${costText(cost)}`}</b>
+    <span><span>${est ? "per job" : "average per job"}</span> · <span>${sec == null ? "not measured yet" : `${est ? "~" : ""}${timeText(sec)}`}</span></span></div>`;
+}
+function agentCard(a) {
+  return `<li><article class="m-card">
+    <header class="mc-head"><span class="ico">${icon(a.icon || "bot", { size: 22 })}</span>
+      <div class="mc-who"><h3><a href="/hire/agents/${a.pk}">${esc(a.name)}</a></h3>
+        <span class="m-by"><span>by</span> <span data-no-i18n>${esc(a.by)}</span> · <span>${esc(CATEGORY[a.category] || "")}</span></span></div>
+      ${sourceBadge(a)}</header>
+    <p>${esc(a.description)}</p>
+    <div class="m-stats">${ratingText(a.rating)}${stat("check", `${a.jobs} job${a.jobs === 1 ? "" : "s"}`, "Jobs done")}
+      ${a.official ? "" : stat("users", `${a.hires} hire${a.hires === 1 ? "" : "s"}`, "Hires")}
+      ${a.web ? `<span class="tagline">Web research</span>` : ""}</div>
+    <footer class="mc-foot">${price(a)}
+      <div class="m-acts"><a class="btn btn-ghost btn-sm" href="/hire/agents/${a.pk}">Profile</a>${hireButtons("agent", a)}</div></footer>
+  </article></li>`;
+}
+function teamCard(t) {
+  return `<li><article class="m-card">
+    <header class="mc-head"><span class="ico">${icon(CATEGORY_ICON[t.category] || "layers", { size: 22 })}</span>
+      <div class="mc-who"><h3><a href="/hire/teams/${t.pk}">${esc(t.name)}</a></h3>
+        <span class="m-by"><span>by</span> <span data-no-i18n>${esc(t.by)}</span> · <span>${t.agents.length} agents</span></span></div>
+      ${sourceBadge(t)}</header>
+    <p>${esc(t.description)}</p>
+    <div class="m-stack">${t.agents.slice(0, 10).map(a => `<span class="mini" title="${esc(a.name)}">${icon(a.icon || "bot", { size: 14 })}</span>`).join("")}${t.agents.length > 10 ? `<span class="mini more" data-no-i18n>+${t.agents.length - 10}</span>` : ""}</div>
+    <div class="m-stats">${ratingText(t.rating)}${t.official ? "" : stat("users", `${t.hires} hire${t.hires === 1 ? "" : "s"}`, "Hires")}</div>
+    <footer class="mc-foot">${price(t, true)}
+      <div class="m-acts"><a class="btn btn-ghost btn-sm" href="/hire/teams/${t.pk}">Team</a>${hireButtons("team", t)}</div></footer>
+  </article></li>`;
+}
+
+function filtered() {
+  let items = data[state.tab].filter(x => (state.source === "all" || (state.source === "official") === x.official) && (!state.cat || x.category === state.cat));
+  if (state.q) items = items.filter(x => `${x.name} ${t(x.name)} ${x.description} ${t(x.description)} ${x.by} ${(x.agents || []).map(a => a.name).join(" ")}`.toLowerCase().includes(state.q));
+  const by = {
+    jobs: (a, b) => (b.jobs ?? b.hires) - (a.jobs ?? a.hires),
+    hired: (a, b) => b.hires - a.hires || (b.jobs || 0) - (a.jobs || 0),
+    rated: (a, b) => (b.rating.percent ?? -1) - (a.rating.percent ?? -1) || b.rating.count - a.rating.count,
+    new: (a, b) => b.listed_at - a.listed_at,
+  }[state.sort];
+  return items.sort((a, b) => by(a, b) || a.name.localeCompare(b.name));
+}
+
+function render() {
+  if (!data) return;
+  document.querySelectorAll("[data-tab]").forEach(b => { b.classList.toggle("on", b.dataset.tab === state.tab); b.setAttribute("aria-selected", b.dataset.tab === state.tab); });
+  document.querySelectorAll("[data-source]").forEach(b => b.classList.toggle("on", b.dataset.source === state.source));
+  const list = data[state.tab];
+  const cats = state.tab === "agents" ? data.agent_categories : data.team_categories;
+  $("cats").innerHTML = cats.map(c => `<li><button type="button" class="mk-cat ${state.cat === c ? "on" : ""}" data-cat="${c}" aria-pressed="${state.cat === c}">
+      <span class="ico">${icon(CATEGORY_ICON[c], { size: 18 })}</span><b>${esc(CATEGORY[c])}</b><small>${list.filter(x => x.category === c).length} ${state.tab === "agents" ? "agents" : "teams"}</small></button></li>`).join("");
+  const items = filtered();
+  const pg = paginate(items, state.page, perPage);
+  state.page = pg.page;
+  $("count").textContent = `${items.length} ${state.tab === "agents" ? (items.length === 1 ? "agent" : "agents") : (items.length === 1 ? "team" : "teams")}`;
+  const chips = [state.q && `<span class="fchip on" data-no-i18n>“${esc(state.q)}”</span>`, state.cat && `<span class="fchip on">${esc(CATEGORY[state.cat])}</span>`,
+                 state.source !== "all" && `<span class="fchip on">${state.source === "official" ? "Official" : "Community"}</span>`].filter(Boolean);
+  $("active").innerHTML = chips.length ? `${chips.join("")}<button class="btn btn-ghost btn-sm" type="button" data-clear>${icon("x", { size: 14 })}Clear filters</button>` : "";
+  $("grid").setAttribute("aria-busy", "false");
+  $("grid").innerHTML = items.length ? pg.items.map(state.tab === "agents" ? agentCard : teamCard).join("")
+    : `<li class="m-empty"><p>Nothing matches. Try another category or search.</p><button class="btn btn-ghost btn-sm" type="button" data-clear>${icon("x", { size: 14 })}Clear filters</button></li>`;
+  $("pager").innerHTML = pagerHTML(pg, { sizes: [12, 24, 48], noun: state.tab === "agents" ? "agents" : "teams" });
+}
+
+async function loadReview() {
+  const p = await api("/api/market/pending");
+  const rows = [...p.agents.map(a => ({ ...a, kind: "agent" })), ...p.teams.map(t => ({ ...t, kind: "team" }))];
+  const rpg = paginate(rows, reviewPage, 5);
+  reviewPage = rpg.page;
+  $("review").innerHTML = rows.length ? `<section class="m-review"><h2>Waiting for review <span class="badge pending" data-no-i18n>${rows.length}</span></h2>
+    <p>Members asked to list these in the marketplace. Read the instructions before you approve: everyone who hires it will run them.</p>
+    ${rpg.items.map(r => `<div class="m-rrow"><div>
+        <b data-no-i18n>${esc(r.name)}</b> <span class="badge">${r.kind === "agent" ? "Agent" : "Team"}</span> <span class="badge">${esc(CATEGORY[r.category] || r.category)}</span>
+        <small data-no-i18n>${esc(r.by)}</small>
+        <p data-no-i18n>${esc(r.description)}</p>
+        <details><summary>${r.kind === "agent" ? "Instructions" : "Agents and starting prompt"}</summary>
+          <pre data-no-i18n>${esc(r.kind === "agent" ? r.role : `${(r.agents || []).join(", ")}\n\n${r.prompt || ""}`)}</pre></details></div>
+      <div class="m-acts"><button class="btn btn-ghost btn-sm" type="button" data-review="reject" data-kind="${r.kind}" data-pk="${r.pk}">Reject</button>
+        <button class="btn btn-dark btn-sm" type="button" data-review="approve" data-kind="${r.kind}" data-pk="${r.pk}">${icon("check", { size: 15 })}Approve</button></div></div>`).join("")}
+    <nav class="pager" id="reviewPager" aria-label="Pages of listings to review">${pagerHTML(rpg, { sizes: [5], noun: "to review" })}</nav>
+  </section>` : "";
+  $("reviewPager")?.addEventListener("click", (e) => { const b = e.target.closest("[data-page]"); if (b && !b.disabled) { reviewPage = +b.dataset.page; loadReview(); } });
+}
+async function review(kind, pk, decision) {
+  let note = "";
+  if (decision === "reject") {
+    note = await promptDialog({ title: "Reject this listing?", label: "Tell the member why", placeholder: "e.g. The instructions ask for external scripts", ok: "Reject", optional: true });
+    if (note === null) return;
+  }
+  try {
+    await api("/api/market/review", { method: "POST", body: JSON.stringify({ kind, pk: +pk, decision, note }) });
+    toast(decision === "approve" ? "Listed in the marketplace" : "Rejected");
+    await load();
+  } catch (err) { toast(err.message, "err"); }
+}
+
+async function load() {
+  try {
+    data = await api("/api/market");
+    $("n-agents").textContent = data.agents.length;
+    $("n-teams").textContent = data.teams.length;
+    render();
+    const me = await getMe();
+    if (me?.role === "admin") await loadReview();
+  } catch (err) { showError($("grid"), err, load, "Couldn't load the marketplace"); }
+}
+load();
+</script>
+</body>
+</html>

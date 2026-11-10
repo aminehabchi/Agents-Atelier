@@ -16,6 +16,7 @@ Markers inside the prompt choose what happens during an agent run:
   [[inject-script]] writes an external <script> into index.html (to test the safety scan)
   [[redo]]          the Critic sends work back (REDO lines) whenever <send_back> lists agents
   [[research-escape]]  the Research agent also edits index.html and creates evil.html (the server must undo both)
+  (the Critic always ends with "Score: 8.5/10.")
   [[new-page]]      the HTML agent also creates about.html (titled "About us") and a page with a bad name, Bad Name.html
 
 The Research agent writes research.md (with a WebSearch step) instead of touching index.html.
@@ -148,6 +149,8 @@ out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_i
 out({"type": "assistant", "message": {"content": [{"type": "text", "text": f"{agent} agent: did my step."}]}})
 denials = [{"tool_name": "Read", "tool_use_id": "toolu_x", "tool_input": {"file_path": "/etc/passwd"}}] if "[[escape]]" in prompt else []
 reply = f"{agent} agent: did my step."
+if agent == "Critic":
+    reply += "\nScore: 8.5/10."
 if "[[redo]]" in prompt and agent == "Critic" and "Agents you can send work back to" in prompt:
     reply += ("\nREDO: css — icons in .features are misaligned; use the icon-text pattern"
               "\nREDO: html — the hero has an empty spacer div\nREDO: seo — not in this run, must be ignored")

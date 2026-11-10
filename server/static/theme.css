@@ -63,7 +63,7 @@ header.top { background: var(--linen); border-bottom: 1px solid var(--line); }
 [data-theme="dark"] .badge.tone-shared { color: #a9b0ff; }
 
 /* ---------- forms ---------- */
-.input, select.input, textarea.input, .pgrid select.input { background: var(--field); color: var(--ink); border: 0; border-radius: var(--r); box-shadow: 0 0 1px 0 rgb(var(--fg-rgb) / .2); }
+.input, select.input, textarea.input, .pgrid select.input { background: var(--field); color: var(--ink); border: 0; border-radius: var(--r-field); box-shadow: 0 0 1px 0 rgb(var(--fg-rgb) / .2); }
 .input:focus { border: 0; box-shadow: inset 0 0 0 1.5px var(--sky); }
 .input::placeholder { color: var(--stone); }
 .input[aria-invalid="true"] { border: 0; box-shadow: inset 0 0 0 1.5px var(--danger); }
@@ -92,7 +92,7 @@ dialog.modal h3 { font-weight: 400; letter-spacing: -0.02em; }
 dialog.modal .input, dialog.palette .input, .acct-menu .input { background: var(--bone); }
 .acct-btn { border: 0; border-radius: var(--r-pill); background: transparent; box-shadow: var(--ring); padding: 0 10px 0 4px; }
 .acct-btn:hover, .acct-btn[aria-expanded="true"] { background: var(--ice); }
-.acct-initials { background: var(--steel); color: var(--ink); border-radius: var(--r-pill); }
+.acct-initials { background: var(--steel); color: var(--ink); border-radius: 50%; }
 .acct-links { border-top-color: var(--line); }
 
 /* ---------- switches ---------- */
@@ -112,7 +112,7 @@ dialog.modal .input, dialog.palette .input, .acct-menu .input { background: var(
 .site-footer > .wrap:first-child { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr); gap: 40px; }
 .foot-brand p { max-width: 320px; margin: 16px 0; line-height: 1.55; color: var(--stone); }
 .foot-lang, .foot-cookies { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
-.foot-lang { padding: 6px 14px; border-radius: var(--r-pill, 59px); box-shadow: var(--ring); font-size: 13px; }
+.foot-lang { padding: 6px 14px; border-radius: var(--r-pill); box-shadow: var(--ring); font-size: 13px; }
 .foot-lang:hover { background: var(--ice); }
 .foot-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
 .foot-cols h2 { margin: 0 0 14px; font-family: var(--mono); font-size: 12px; font-weight: 400; letter-spacing: .03em; color: var(--stone); }
@@ -128,7 +128,7 @@ dialog.modal .input, dialog.palette .input, .acct-menu .input { background: var(
 
 /* ---------- language menu ---------- */
 .lang-pick { position: relative; display: inline-flex; }
-.lang-menu { position: absolute; top: calc(100% + 8px); inset-inline-end: 0; z-index: 70; display: flex; flex-direction: column; min-width: 160px; padding: 6px; border-radius: 12px; background: var(--steel); box-shadow: var(--ring), 0 16px 40px rgb(0 0 0 / .3); }
+.lang-menu { position: absolute; top: calc(100% + 8px); inset-inline-end: 0; z-index: 70; display: flex; flex-direction: column; min-width: 160px; padding: 6px; border-radius: 8px; background: var(--steel); box-shadow: var(--ring), 0 16px 40px rgb(0 0 0 / .3); }
 [data-theme="light"] .lang-menu { background: var(--paper); }
 .lang-menu[hidden] { display: none; }
 .lang-menu button { padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; font-size: 14px; text-align: start; cursor: pointer; }

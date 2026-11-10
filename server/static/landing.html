@@ -67,7 +67,7 @@
   .legend { margin: 20px 0 0; font-size: 14px; color: var(--stone); }
 
   .cards.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  #what .cards, #who .cards, #limits .cards { margin-top: 56px; }
+  #what .cards, #who .cards, #limits .cards, #marketplace .cards { margin-top: 56px; }
   ol.timeline { list-style: none; margin: 56px 0 12px; padding: 0; text-align: start; background: var(--paper); box-shadow: var(--ring); border-radius: var(--r-card); overflow: hidden; }
   ol.timeline li { display: grid; grid-template-columns: 44px 170px minmax(0, 1fr); gap: 12px; align-items: baseline; padding: 14px 24px; font-size: 15px; }
   ol.timeline li + li { border-top: 1px solid var(--line); }
@@ -156,7 +156,7 @@
   .step h3 { margin: 20px 0 8px; font-size: 20px; font-weight: 400; line-height: 1.3; letter-spacing: -0.027em; }
   .step p { margin: 0; font-size: 15px; line-height: 1.55; color: var(--graphite); }
 
-  .mock { display: flex; flex-direction: column; gap: 8px; height: 172px; padding: 16px; border-radius: 12px; background: var(--mist); box-shadow: var(--ring); font-size: 12px; overflow: hidden; }
+  .mock { display: flex; flex-direction: column; gap: 8px; height: 172px; padding: 16px; border-radius: 8px; background: var(--mist); box-shadow: var(--ring); font-size: 12px; overflow: hidden; }
   .m-label { color: var(--stone); font-size: 11px; }
   .m-field { display: block; min-height: 26px; padding: 5px 8px; border-radius: 6px; background: var(--field); color: var(--ink); white-space: nowrap; overflow: hidden; }
   .m-field.tall { min-height: 26px; }
@@ -320,9 +320,30 @@
   .uc-item .ico { display: grid; place-items: center; width: 36px; height: 36px; }
   .uc-item b { font-size: 15px; font-weight: 500; line-height: 1.3; }
   .uc-item small { font-size: 13px; line-height: 1.45; color: var(--graphite); }
+  #usecases .uc-item a { grid-template-rows: auto auto 1fr auto; }      /* the team and the count sit at the bottom of every card */
+  #usecases .uc-item small { align-self: start; }
+  .uc-team { align-self: end; grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .uc-team .mini { display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--r); background: var(--bone); color: var(--graphite); font: 10px var(--mono); font-style: normal; }
   .uc-n { margin-top: 4px; font-family: var(--mono); font-size: 11px; color: var(--t); }
   .motion #usecases .uc-item { opacity: 0; transform: translateY(18px) rotate(-1.5deg) scale(.96); transition: opacity .5s ease, transform .6s cubic-bezier(.3, 1.4, .5, 1); transition-delay: calc(var(--i) * 45ms); }
   .motion #usecases.in-view .uc-item { opacity: 1; transform: none; }
+  /* marketplace: a preview of the catalogue's cards */
+  .mp-preview { list-style: none; margin: 48px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; text-align: start; }
+  .mp-card { display: flex; flex-direction: column; gap: 10px; padding: 20px; border-radius: var(--r-card); background: var(--paper); box-shadow: var(--ring); }
+  .mp-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+  .mp-head .ico { width: 44px; height: 44px; }
+  .mp-head b { display: block; font-size: 17px; font-weight: 500; }
+  .mp-head small { display: block; font-size: 12px; color: var(--stone); }
+  .mp-card p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--graphite); }
+  .mp-foot { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .mp-foot b { display: block; font-size: 20px; font-weight: 500; font-feature-settings: "tnum"; }
+  .mp-foot small { font-size: 12px; color: var(--stone); }
+  .mp-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: var(--r-pill); background: var(--sky); color: var(--on-sky); font-size: 13px; font-weight: 500; }
+  .mp-note { margin: 12px 0 0; font-size: 13px; color: var(--stone); }
+  .motion #marketplace .mp-card { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .7s cubic-bezier(.2, .7, .2, 1); }
+  .motion #marketplace.in-view .mp-card { opacity: 1; transform: none; }
+  .motion #marketplace.in-view .mp-card:nth-child(2) { transition-delay: .12s; } .motion #marketplace.in-view .mp-card:nth-child(3) { transition-delay: .24s; }
+  @media (max-width: 860px) { .mp-preview { grid-template-columns: minmax(0, 1fr); } }
   .reveal { opacity: 0; transform: translateY(12px); transition: opacity .6s ease, transform .6s ease; }
   .reveal.in { opacity: 1; transform: none; }
   @media (prefers-reduced-motion: reduce) { .stream-row, .final .btn-dark { animation: none !important; } .type::after, .m-a.now::before { animation: none; } .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } .live-dot, .hero-pill .dot, .ticker li.now .st { animation: none; } .ex, .ex-img img { transition: none; } }
@@ -350,7 +371,7 @@
       <a href="#examples" data-show="guest unconfirmed"><i data-icon="eye" data-size="16"></i>Examples</a>
       <a href="#how" data-show="guest unconfirmed"><i data-icon="play" data-size="16"></i>How it works</a>
       <a href="#usecases" data-show="guest unconfirmed"><i data-icon="layers" data-size="16"></i>Use cases</a>
-      <a href="#features" data-show="guest unconfirmed"><i data-icon="sparkles" data-size="16"></i>Features</a>
+      <a href="#marketplace" data-show="guest unconfirmed"><i data-icon="briefcase" data-size="16"></i>Marketplace</a>
       <a href="#faq" data-show="guest unconfirmed"><i data-icon="message" data-size="16"></i>FAQ</a>
     </nav>
     <div class="hdr-actions">
@@ -383,8 +404,8 @@
       </aside>
     </div>
     <ul class="proof">
-      <li><b data-count="27">27</b><span>specialist agents</span></li>
-      <li><b>0</b><span>frameworks or build steps</span></li>
+      <li><b data-count="30">30</b><span>specialist agents</span></li>
+      <li><b data-count="22">22</b><span>ready teams to hire</span></li>
       <li><b>150</b><span>versions saved per project</span></li>
       <li><b>RTL</b><span>any language, right-to-left included</span></li>
     </ul>
@@ -481,7 +502,7 @@
     <div class="wrap">
       <p class="eyebrow reveal">The specialists</p>
       <h2 class="reveal">Ten specialists take your first job.</h2>
-      <p class="lead reveal">This is the default team you hire for a new website. Seventeen more are available when the job needs them, from a Site auditor and Research to a Translator, Pricing, Gallery, Forms, Local business, Legal pages and Conversion.</p>
+      <p class="lead reveal">This is the default team you hire for a new website. Twenty more are available when the job needs them, from a Site auditor and Research to a Translator, Pricing, Gallery, Forms, Legal pages and 3D.</p>
       <ol class="timeline">
           <li><span class="num">01</span><b>UX</b><span>Plans the sections, the navigation and where each button goes.</span></li>
           <li><span class="num">02</span><b>Design System</b><span>Chooses the colours, fonts and spacing as reusable tokens.</span></li>
@@ -506,42 +527,81 @@
   <section class="block" id="usecases">
     <div class="wrap">
       <p class="eyebrow reveal">Use cases</p>
-      <h2 class="reveal">Twenty ready teams to hire, each with its starting prompt.</h2>
+      <h2 class="reveal">Ready teams to hire, each with its starting prompt.</h2>
       <p class="lead reveal">Pick what you want to do. The right agents are switched on and the prompt is written for you: fill in the parts in [brackets] and send.</p>
       <div class="uc-group reveal">
         <h3>Build something new</h3>
         <ul class="uc-grid">
-          <li class="uc-item" style="--i:0"><a href="/register"><span class="ico"><i data-icon="sparkles" data-size="18"></i></span><b>New website from scratch</b><small>A complete site from a description: plan, copy, design, code and a final review.</small><span class="uc-n">11 agents</span></a></li>
-          <li class="uc-item" style="--i:1"><a href="/register"><span class="ico"><i data-icon="zap" data-size="18"></i></span><b>Landing page that converts</b><small>One page with one goal: a clear offer, proof and a strong call to action.</small><span class="uc-n">12 agents</span></a></li>
-          <li class="uc-item" style="--i:2"><a href="/register"><span class="ico"><i data-icon="message" data-size="18"></i></span><b>Restaurant or café</b><small>Menu with prices, opening hours, map, booking and local search.</small><span class="uc-n">16 agents</span></a></li>
-          <li class="uc-item" style="--i:3"><a href="/register"><span class="ico"><i data-icon="phone" data-size="18"></i></span><b>Local service business</b><small>Plumbers, salons, clinics, garages: services with prices, area served, reviews and quick contact.</small><span class="uc-n">15 agents</span></a></li>
-          <li class="uc-item" style="--i:4"><a href="/register"><span class="ico"><i data-icon="image" data-size="18"></i></span><b>Portfolio</b><small>Show your work, your story and how to hire you.</small><span class="uc-n">13 agents</span></a></li>
-          <li class="uc-item" style="--i:5"><a href="/register"><span class="ico"><i data-icon="book" data-size="18"></i></span><b>Blog or content site</b><small>Articles and guides that answer real questions, with clear navigation and search basics.</small><span class="uc-n">13 agents</span></a></li>
-          <li class="uc-item" style="--i:6"><a href="/register"><span class="ico"><i data-icon="grid" data-size="18"></i></span><b>Product page</b><small>Sell one product: benefits, details, reviews, questions and a clear buy button.</small><span class="uc-n">13 agents</span></a></li>
-          <li class="uc-item" style="--i:7"><a href="/register"><span class="ico"><i data-icon="clock" data-size="18"></i></span><b>Event page</b><small>Date, programme, speakers, venue and registration.</small><span class="uc-n">13 agents</span></a></li>
-          <li class="uc-item" style="--i:8"><a href="/register"><span class="ico"><i data-icon="search" data-size="18"></i></span><b>Research, then build</b><small>The Research agent studies the market and competitors first, then the team builds a better page.</small><span class="uc-n">12 agents</span></a></li>
-          <li class="uc-item" style="--i:9"><a href="/register"><span class="ico"><i data-icon="brush" data-size="18"></i></span><b>Build from a sketch or screenshot</b><small>Turn an attached sketch, wireframe or screenshot into a real page.</small><span class="uc-n">9 agents</span></a></li>
+          <li class="uc-item" style="--i:0"><a href="/register"><span class="ico"><i data-icon="sparkles" data-size="18"></i></span><b>New website from scratch</b><small>A complete site from a description: plan, copy, design, code and a final review.</small><span class="uc-team" aria-label="11 agents"><i class="mini" title="Brief" data-icon="clipboard" data-size="13"></i><i class="mini" title="UX" data-icon="compass" data-size="13"></i><i class="mini" title="Design System" data-icon="palette" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="HTML" data-icon="code" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini" title="JS" data-icon="zap" data-size="13"></i><i class="mini" title="Responsive" data-icon="devices" data-size="13"></i><i class="mini more" data-no-i18n>+3</i></span><span class="uc-n">11 agents</span></a></li>
+          <li class="uc-item" style="--i:1"><a href="/register"><span class="ico"><i data-icon="zap" data-size="18"></i></span><b>Landing page that converts</b><small>One page with one goal: a clear offer, proof and a strong call to action.</small><span class="uc-team" aria-label="12 agents"><i class="mini" title="Brief" data-icon="clipboard" data-size="13"></i><i class="mini" title="UX" data-icon="compass" data-size="13"></i><i class="mini" title="Design System" data-icon="palette" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="HTML" data-icon="code" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini" title="Pricing" data-icon="chart" data-size="13"></i><i class="mini" title="JS" data-icon="zap" data-size="13"></i><i class="mini more" data-no-i18n>+4</i></span><span class="uc-n">12 agents</span></a></li>
+          <li class="uc-item" style="--i:2"><a href="/register"><span class="ico"><i data-icon="message" data-size="18"></i></span><b>Restaurant or café</b><small>Menu with prices, opening hours, map, booking and local search.</small><span class="uc-team" aria-label="16 agents"><i class="mini" title="Brief" data-icon="clipboard" data-size="13"></i><i class="mini" title="UX" data-icon="compass" data-size="13"></i><i class="mini" title="Design System" data-icon="palette" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="HTML" data-icon="code" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini" title="Pricing" data-icon="chart" data-size="13"></i><i class="mini" title="Gallery" data-icon="image" data-size="13"></i><i class="mini more" data-no-i18n>+8</i></span><span class="uc-n">16 agents</span></a></li>
+          <li class="uc-item" style="--i:3"><a href="/register"><span class="ico"><i data-icon="phone" data-size="18"></i></span><b>Local service business</b><small>Plumbers, salons, clinics, garages: services with prices, area served, reviews and quick contact.</small><span class="uc-team" aria-label="15 agents"><i class="mini" title="Brief" data-icon="clipboard" data-size="13"></i><i class="mini" title="UX" data-icon="compass" data-size="13"></i><i class="mini" title="Design System" data-icon="palette" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="Content writer" data-icon="pencil" data-size="13"></i><i class="mini" title="HTML" data-icon="code" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini" title="Pricing" data-icon="chart" data-size="13"></i><i class="mini more" data-no-i18n>+7</i></span><span class="uc-n">15 agents</span></a></li>
+          <li class="uc-item" style="--i:4"><a href="/register"><span class="ico"><i data-icon="image" data-size="18"></i></span><b>Portfolio</b><small>Show your work, your story and how to hire you.</small><span class="uc-team" aria-label="13 agents"><i class="mini" title="Brief" data-icon="clipboard" data-size="13"></i><i class="mini" title="UX" data-icon="compass" data-size="13"></i><i class="mini" title="Design System" data-icon="palette" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="Content writer" data-icon="pencil" data-size="13"></i><i class="mini" title="HTML" data-icon="code" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini" title="Gallery" data-icon="image" data-size="13"></i><i class="mini more" data-no-i18n>+5</i></span><span class="uc-n">13 agents</span></a></li>
+          <li class="uc-item" style="--i:5"><a href="/register"><span class="ico"><i data-icon="book" data-size="18"></i></span><b>Blog or content site</b><small>Articles and guides that answer real questions, with clear navigation and search basics.</small><span class="uc-team" aria-label="13 agents"><i class="mini" title="Brief" data-icon="clipboard" data-size="13"></i><i class="mini" title="Research" data-icon="search" data-size="13"></i><i class="mini" title="UX" data-icon="compass" data-size="13"></i><i class="mini" title="Design System" data-icon="palette" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="Content writer" data-icon="pencil" data-size="13"></i><i class="mini" title="HTML" data-icon="code" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini more" data-no-i18n>+5</i></span><span class="uc-n">13 agents</span></a></li>
+          <li class="uc-item" style="--i:6"><a href="/register"><span class="ico"><i data-icon="grid" data-size="18"></i></span><b>Product page</b><small>Sell one product: benefits, details, reviews, questions and a clear buy button.</small><span class="uc-team" aria-label="13 agents"><i class="mini" title="Brief" data-icon="clipboard" data-size="13"></i><i class="mini" title="UX" data-icon="compass" data-size="13"></i><i class="mini" title="Design System" data-icon="palette" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="HTML" data-icon="code" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini" title="Pricing" data-icon="chart" data-size="13"></i><i class="mini" title="JS" data-icon="zap" data-size="13"></i><i class="mini more" data-no-i18n>+5</i></span><span class="uc-n">13 agents</span></a></li>
+          <li class="uc-item" style="--i:7"><a href="/register"><span class="ico"><i data-icon="clock" data-size="18"></i></span><b>Event page</b><small>Date, programme, speakers, venue and registration.</small><span class="uc-team" aria-label="13 agents"><i class="mini" title="Brief" data-icon="clipboard" data-size="13"></i><i class="mini" title="UX" data-icon="compass" data-size="13"></i><i class="mini" title="Design System" data-icon="palette" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="HTML" data-icon="code" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini" title="Gallery" data-icon="image" data-size="13"></i><i class="mini" title="JS" data-icon="zap" data-size="13"></i><i class="mini more" data-no-i18n>+5</i></span><span class="uc-n">13 agents</span></a></li>
+          <li class="uc-item" style="--i:8"><a href="/register"><span class="ico"><i data-icon="cube" data-size="18"></i></span><b>3D website</b><small>A site with a real 3D object at its heart, plus depth effects, fast on phones and with still fallbacks.</small><span class="uc-team" aria-label="15 agents"><i class="mini" title="Brief" data-icon="clipboard" data-size="13"></i><i class="mini" title="UX" data-icon="compass" data-size="13"></i><i class="mini" title="Design System" data-icon="palette" data-size="13"></i><i class="mini" title="3D designer" data-icon="orbit" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="HTML" data-icon="code" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini" title="JS" data-icon="zap" data-size="13"></i><i class="mini more" data-no-i18n>+7</i></span><span class="uc-n">15 agents</span></a></li>
+          <li class="uc-item" style="--i:9"><a href="/register"><span class="ico"><i data-icon="search" data-size="18"></i></span><b>Research, then build</b><small>The Research agent studies the market and competitors first, then the team builds a better page.</small><span class="uc-team" aria-label="12 agents"><i class="mini" title="Brief" data-icon="clipboard" data-size="13"></i><i class="mini" title="Research" data-icon="search" data-size="13"></i><i class="mini" title="UX" data-icon="compass" data-size="13"></i><i class="mini" title="Design System" data-icon="palette" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="Content writer" data-icon="pencil" data-size="13"></i><i class="mini" title="HTML" data-icon="code" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini more" data-no-i18n>+4</i></span><span class="uc-n">12 agents</span></a></li>
+          <li class="uc-item" style="--i:10"><a href="/register"><span class="ico"><i data-icon="brush" data-size="18"></i></span><b>Build from a sketch or screenshot</b><small>Turn an attached sketch, wireframe or screenshot into a real page.</small><span class="uc-team" aria-label="9 agents"><i class="mini" title="UX" data-icon="compass" data-size="13"></i><i class="mini" title="Design System" data-icon="palette" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="HTML" data-icon="code" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini" title="JS" data-icon="zap" data-size="13"></i><i class="mini" title="Responsive" data-icon="devices" data-size="13"></i><i class="mini" title="Accessibility" data-icon="accessibility" data-size="13"></i><i class="mini more" data-no-i18n>+1</i></span><span class="uc-n">9 agents</span></a></li>
         </ul>
       </div>
       <div class="uc-group reveal">
         <h3>Improve a site you have</h3>
         <ul class="uc-grid">
-          <li class="uc-item" style="--i:10"><a href="/register"><span class="ico"><i data-icon="refresh" data-size="18"></i></span><b>Improve an imported site</b><small>Fix and polish a site you imported, keeping its content and brand.</small><span class="uc-n">9 agents</span></a></li>
-          <li class="uc-item" style="--i:11"><a href="/register"><span class="ico"><i data-icon="palette" data-size="18"></i></span><b>Redesign: new look, same content</b><small>Keep the words and pages, change the visual design completely.</small><span class="uc-n">7 agents</span></a></li>
-          <li class="uc-item" style="--i:12"><a href="/register"><span class="ico"><i data-icon="chart" data-size="18"></i></span><b>Boost conversions</b><small>More visitors take the main action: clearer offer, real proof, less friction.</small><span class="uc-n">5 agents</span></a></li>
-          <li class="uc-item" style="--i:13"><a href="/register"><span class="ico"><i data-icon="gauge" data-size="18"></i></span><b>SEO and speed checkup</b><small>Search and sharing tags, structured data, faster loading and a bug check.</small><span class="uc-n">6 agents</span></a></li>
-          <li class="uc-item" style="--i:14"><a href="/register"><span class="ico"><i data-icon="accessibility" data-size="18"></i></span><b>Accessibility audit</b><small>Check and fix the site against WCAG 2.2 AA, then review it.</small><span class="uc-n">4 agents</span></a></li>
-          <li class="uc-item" style="--i:15"><a href="/register"><span class="ico"><i data-icon="code" data-size="18"></i></span><b>Code cleanup</b><small>Tidy the code without changing how the site looks or works.</small><span class="uc-n">2 agents</span></a></li>
+          <li class="uc-item" style="--i:11"><a href="/register"><span class="ico"><i data-icon="refresh" data-size="18"></i></span><b>Improve an imported site</b><small>Fix and polish a site you imported, keeping its content and brand.</small><span class="uc-team" aria-label="9 agents"><i class="mini" title="Site auditor" data-icon="search" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini" title="JS" data-icon="zap" data-size="13"></i><i class="mini" title="Responsive" data-icon="devices" data-size="13"></i><i class="mini" title="Accessibility" data-icon="accessibility" data-size="13"></i><i class="mini" title="Performance" data-icon="gauge" data-size="13"></i><i class="mini" title="QA" data-icon="bug" data-size="13"></i><i class="mini more" data-no-i18n>+1</i></span><span class="uc-n">9 agents</span></a></li>
+          <li class="uc-item" style="--i:12"><a href="/register"><span class="ico"><i data-icon="palette" data-size="18"></i></span><b>Redesign: new look, same content</b><small>Keep the words and pages, change the visual design completely.</small><span class="uc-team" aria-label="7 agents"><i class="mini" title="Site auditor" data-icon="search" data-size="13"></i><i class="mini" title="Design System" data-icon="palette" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini" title="Responsive" data-icon="devices" data-size="13"></i><i class="mini" title="Animation" data-icon="sparkles" data-size="13"></i><i class="mini" title="Accessibility" data-icon="accessibility" data-size="13"></i><i class="mini" title="Critic" data-icon="award" data-size="13"></i></span><span class="uc-n">7 agents</span></a></li>
+          <li class="uc-item" style="--i:13"><a href="/register"><span class="ico"><i data-icon="chart" data-size="18"></i></span><b>Boost conversions</b><small>More visitors take the main action: clearer offer, real proof, less friction.</small><span class="uc-team" aria-label="5 agents"><i class="mini" title="Site auditor" data-icon="search" data-size="13"></i><i class="mini" title="Copywriter" data-icon="type" data-size="13"></i><i class="mini" title="Responsive" data-icon="devices" data-size="13"></i><i class="mini" title="Conversion" data-icon="chart" data-size="13"></i><i class="mini" title="Critic" data-icon="award" data-size="13"></i></span><span class="uc-n">5 agents</span></a></li>
+          <li class="uc-item" style="--i:14"><a href="/register"><span class="ico"><i data-icon="gauge" data-size="18"></i></span><b>SEO and speed checkup</b><small>Search and sharing tags, structured data, faster loading and a bug check.</small><span class="uc-team" aria-label="6 agents"><i class="mini" title="Site auditor" data-icon="search" data-size="13"></i><i class="mini" title="Content writer" data-icon="pencil" data-size="13"></i><i class="mini" title="SEO" data-icon="search" data-size="13"></i><i class="mini" title="Local business" data-icon="compass" data-size="13"></i><i class="mini" title="Performance" data-icon="gauge" data-size="13"></i><i class="mini" title="QA" data-icon="bug" data-size="13"></i></span><span class="uc-n">6 agents</span></a></li>
+          <li class="uc-item" style="--i:15"><a href="/register"><span class="ico"><i data-icon="accessibility" data-size="18"></i></span><b>Accessibility audit</b><small>Check and fix the site against WCAG 2.2 AA, then review it.</small><span class="uc-team" aria-label="4 agents"><i class="mini" title="Site auditor" data-icon="search" data-size="13"></i><i class="mini" title="Accessibility" data-icon="accessibility" data-size="13"></i><i class="mini" title="QA" data-icon="bug" data-size="13"></i><i class="mini" title="Critic" data-icon="award" data-size="13"></i></span><span class="uc-n">4 agents</span></a></li>
+          <li class="uc-item" style="--i:16"><a href="/register"><span class="ico"><i data-icon="code" data-size="18"></i></span><b>Code cleanup</b><small>Tidy the code without changing how the site looks or works.</small><span class="uc-team" aria-label="2 agents"><i class="mini" title="Tidy" data-icon="layers" data-size="13"></i><i class="mini" title="QA" data-icon="bug" data-size="13"></i></span><span class="uc-n">2 agents</span></a></li>
         </ul>
       </div>
       <div class="uc-group reveal">
         <h3>Add one thing</h3>
         <ul class="uc-grid">
-          <li class="uc-item" style="--i:16"><a href="/register"><span class="ico"><i data-icon="type" data-size="18"></i></span><b>Make it multilingual</b><small>Add more languages, a language switcher and right-to-left layouts.</small><span class="uc-n">3 agents</span></a></li>
-          <li class="uc-item" style="--i:17"><a href="/register"><span class="ico"><i data-icon="file" data-size="18"></i></span><b>Legal pages</b><small>Privacy policy and legal notice, linked from every footer.</small><span class="uc-n">2 agents</span></a></li>
-          <li class="uc-item" style="--i:18"><a href="/register"><span class="ico"><i data-icon="moon" data-size="18"></i></span><b>Add a dark mode</b><small>A dark theme that follows the visitor&#x27;s system, with a toggle.</small><span class="uc-n">3 agents</span></a></li>
-          <li class="uc-item" style="--i:19"><a href="/register"><span class="ico"><i data-icon="clipboard" data-size="18"></i></span><b>Contact and booking forms</b><small>Forms with good fields, validation, errors and success messages.</small><span class="uc-n">3 agents</span></a></li>
+          <li class="uc-item" style="--i:17"><a href="/register"><span class="ico"><i data-icon="type" data-size="18"></i></span><b>Make it multilingual</b><small>Add more languages, a language switcher and right-to-left layouts.</small><span class="uc-team" aria-label="3 agents"><i class="mini" title="Translator" data-icon="message" data-size="13"></i><i class="mini" title="CSS" data-icon="brush" data-size="13"></i><i class="mini" title="QA" data-icon="bug" data-size="13"></i></span><span class="uc-n">3 agents</span></a></li>
+          <li class="uc-item" style="--i:18"><a href="/register"><span class="ico"><i data-icon="file" data-size="18"></i></span><b>Legal pages</b><small>Privacy policy and legal notice, linked from every footer.</small><span class="uc-team" aria-label="2 agents"><i class="mini" title="Legal pages" data-icon="lock" data-size="13"></i><i class="mini" title="QA" data-icon="bug" data-size="13"></i></span><span class="uc-n">2 agents</span></a></li>
+          <li class="uc-item" style="--i:19"><a href="/register"><span class="ico"><i data-icon="moon" data-size="18"></i></span><b>Add a dark mode</b><small>A dark theme that follows the visitor&#x27;s system, with a toggle.</small><span class="uc-team" aria-label="3 agents"><i class="mini" title="Dark mode" data-icon="moon" data-size="13"></i><i class="mini" title="Accessibility" data-icon="accessibility" data-size="13"></i><i class="mini" title="QA" data-icon="bug" data-size="13"></i></span><span class="uc-n">3 agents</span></a></li>
+          <li class="uc-item" style="--i:20"><a href="/register"><span class="ico"><i data-icon="clipboard" data-size="18"></i></span><b>Contact and booking forms</b><small>Forms with good fields, validation, errors and success messages.</small><span class="uc-team" aria-label="3 agents"><i class="mini" title="Forms" data-icon="clipboard" data-size="13"></i><i class="mini" title="Accessibility" data-icon="accessibility" data-size="13"></i><i class="mini" title="QA" data-icon="bug" data-size="13"></i></span><span class="uc-n">3 agents</span></a></li>
+          <li class="uc-item" style="--i:21"><a href="/register"><span class="ico"><i data-icon="orbit" data-size="18"></i></span><b>Add 3D to my site</b><small>Add a 3D object, tilting cards or parallax layers to a site you already have, without changing its content.</small><span class="uc-team" aria-label="6 agents"><i class="mini" title="Brief" data-icon="clipboard" data-size="13"></i><i class="mini" title="3D designer" data-icon="orbit" data-size="13"></i><i class="mini" title="3D scene" data-icon="cube" data-size="13"></i><i class="mini" title="Depth effects" data-icon="layers" data-size="13"></i><i class="mini" title="Performance" data-icon="gauge" data-size="13"></i><i class="mini" title="Critic" data-icon="award" data-size="13"></i></span><span class="uc-n">6 agents</span></a></li>
         </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="marketplace">
+    <div class="wrap">
+      <p class="eyebrow reveal">Marketplace</p>
+      <h2 class="reveal">Profiles, ratings and a growing catalogue of agents.</h2>
+      <p class="lead reveal">Every agent has a profile, like a freelancer: the jobs it did, how long it takes, what it costs and how its work was rated.</p>
+      <ul class="mp-preview reveal" aria-label="Examples of agents in the marketplace">
+          <li class="mp-card"><div class="mp-head"><span class="ico"><i data-icon="cube" data-size="20"></i></span>
+            <div><b>3D scene</b><small><span>by</span> Agents Atelier · <span>Code</span></small></div><span class="badge official">Official</span></div>
+            <p>Builds a real interactive 3D object in plain WebGL, with no libraries: drag to rotate, smooth motion and fallbacks.</p>
+            <div class="mp-foot"><div><b>~$0.45</b><small><span>per job</span> · ~40s</small></div><span class="mp-btn"><i data-icon="briefcase" data-size="14"></i>Start a job</span></div></li>
+          <li class="mp-card"><div class="mp-head"><span class="ico"><i data-icon="type" data-size="20"></i></span>
+            <div><b>Copywriter</b><small><span>by</span> Agents Atelier · <span>Writing</span></small></div><span class="badge official">Official</span></div>
+            <p>Writes every word on the page (headlines, body text, buttons, form labels and errors) in the brand's voice.</p>
+            <div class="mp-foot"><div><b>~$0.15</b><small><span>per job</span> · ~40s</small></div><span class="mp-btn"><i data-icon="briefcase" data-size="14"></i>Start a job</span></div></li>
+          <li class="mp-card"><div class="mp-head"><span class="ico"><i data-icon="award" data-size="20"></i></span>
+            <div><b>Critic</b><small><span>by</span> Agents Atelier · <span>Quality</span></small></div><span class="badge official">Official</span></div>
+            <p>Reviews the finished page like a senior designer and engineer, fixes small issues, sends bigger ones back to the agent that owns them, and scores the result.</p>
+            <div class="mp-foot"><div><b>~$0.45</b><small><span>per job</span> · ~40s</small></div><span class="mp-btn"><i data-icon="briefcase" data-size="14"></i>Start a job</span></div></li>
+      </ul>
+      <p class="mp-note reveal">Costs are estimates for one run, before an agent has a history. After that, its profile shows its real averages.</p>
+      <div class="cards two">
+        <article class="card reveal"><span class="ico"><i data-icon="star" data-size="20"></i></span>
+          <h3>Freelancer profiles</h3>
+          <p>Jobs done, average time and cost, the Critic's average score, and a portfolio of the sites it built.</p></article>
+        <article class="card reveal"><span class="ico"><i data-icon="thumbs-up" data-size="20"></i></span>
+          <h3>Rated after every job</h3>
+          <p>Owners give each agent a thumbs up or down, with a comment if they like. Ratings show on its profile.</p></article>
+        <article class="card reveal"><span class="ico"><i data-icon="users" data-size="20"></i></span>
+          <h3>Community agents</h3>
+          <p>Members publish their own agents and teams. An admin checks each one before anyone can hire it.</p></article>
+        <article class="card reveal"><span class="ico"><i data-icon="briefcase" data-size="20"></i></span>
+          <h3>Hire in one click</h3>
+          <p>Pick an agent or a ready team, choose one of your projects, and it joins the team, ready for your next request.</p></article>
       </div>
     </div>
   </section>
@@ -591,7 +651,7 @@
         <article class="feature reveal">
           <span class="ico"><i data-icon="palette" data-size="22"></i></span>
           <h3>Your brand kit</h3>
-          <p>Save your logo, colours and fonts once. Every new project can start from them, so the first build already looks like your brand.</p>
+          <p>Give each project its own logo, colours and fonts, or copy them from another project. Every agent follows them, so the first build already looks like your brand.</p>
           <span class="tag">Logo, colours, fonts</span>
         </article>
         <article class="feature reveal">
@@ -687,6 +747,7 @@
         <details class="reveal"><summary>What happens if I stop a build?<i data-icon="chevron-down" data-size="18"></i></summary><p>Nothing is lost. Finished work is kept, and you can continue from the agent that stopped or start again. The same choice appears after an error or a server restart.</p></details>
         <details class="reveal"><summary>Can I undo a change?<i data-icon="chevron-down" data-size="18"></i></summary><p>Yes. A version is saved before each run and after each agent. You can compare any version with the current code and restore it in one click.</p></details>
         <details class="reveal"><summary>Can I change how the agents work?<i data-icon="chevron-down" data-size="18"></i></summary><p>Yes. Duplicate a shared agent and edit its instructions, or write a new one in plain Markdown. Your agents and teams are private to you.</p></details>
+        <details class="reveal"><summary>What does hiring an agent cost?<i data-icon="chevron-down" data-size="18"></i></summary><p>Agents run on your Claude Code plan, so there's no fee per hire. Each agent's profile shows its average time and its API-equivalent cost per job, and a team's page estimates the whole team before you start.</p></details>
         <details class="reveal"><summary>Which languages can I use?<i data-icon="chevron-down" data-size="18"></i></summary><p>The app speaks English, French and Moroccan Darija. Your site can be in any language, or in several: the Translator agent adds a language switcher and right-to-left layouts.</p></details>
         <details class="reveal"><summary>Who can see my projects?<i data-icon="chevron-down" data-size="18"></i></summary><p>Your projects are private to your account, though admins can open every project. A site's preview link works for anyone you send it to.</p></details>
       </div>

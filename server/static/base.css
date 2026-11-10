@@ -4,7 +4,8 @@
 :root {
   --font: "Inter", "IBM Plex Sans Arabic", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "JetBrains Mono", "IBM Plex Mono", "IBM Plex Sans Arabic", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --r: 8px; --r-card: 16px; --r-pill: 59px;
+  --r: 6px; --r-card: 10px; --r-pill: 8px;      /* small elements, cards, buttons and chips: tight corners */
+  --r-field: 8px;                                 /* inputs and switches keep their shape */
   /* light theme: the same shapes on a pale floor */
   /* Majorelle trio on neutral floors: blue for actions, saffron for highlights, zellige green for success */
   --ink: #14161f; --espresso: #14161f; --ash: #626877; --graphite: #4a4f5c; --stone: #626877; --charcoal: #14161f;
@@ -108,7 +109,7 @@ p, li { text-wrap: pretty; }
 .logo .mark { width: 32px; height: 32px; border-radius: var(--r); background: var(--espresso); color: var(--on-espresso); display: grid; place-items: center; flex: none; }
 
 /* ---------- inputs ---------- */
-.input { background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 10px 14px; font: inherit; font-size: 15px; outline: none; }
+.input { background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--r-field); padding: 10px 14px; font: inherit; font-size: 15px; outline: none; }
 .input::placeholder { color: var(--stone); }
 .input:focus { border-color: var(--sky); box-shadow: inset 0 0 0 1px var(--sky); }
 .search { position: relative; display: flex; align-items: center; }
@@ -302,7 +303,7 @@ main:focus { outline: 0; }
 dialog.modal .acct-row { flex-wrap: wrap; }
 
 /* ---------- cookie notice ---------- */
-.cookie-note { position: fixed; right: 16px; bottom: 16px; z-index: 90; width: min(380px, calc(100vw - 32px)); padding: 16px; border-radius: var(--r-card, 16px); background: var(--steel, var(--paper)); color: var(--ink); box-shadow: var(--ring), 0 16px 40px rgb(0 0 0 / .3); font-size: 13px; line-height: 1.5; }
+.cookie-note { position: fixed; right: 16px; bottom: 16px; z-index: 90; width: min(380px, calc(100vw - 32px)); padding: 16px; border-radius: var(--r-card); background: var(--steel, var(--paper)); color: var(--ink); box-shadow: var(--ring), 0 16px 40px rgb(0 0 0 / .3); font-size: 13px; line-height: 1.5; }
 .cookie-note p { margin: 0 0 12px; color: var(--graphite); }
 .cookie-note div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .cookie-note a { color: var(--ink); }
@@ -310,8 +311,36 @@ dialog.modal .acct-row { flex-wrap: wrap; }
 /* ---------- brand kit in the project form ---------- */
 .brand-row { display: flex; align-items: center; gap: 10px; }
 .brand-row input { width: 16px; height: 16px; accent-color: var(--sky); }
-.brand-sum { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 10px; border-radius: var(--r-pill, 59px); box-shadow: var(--ring); }
+.brand-sum { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 10px; border-radius: var(--r-pill); box-shadow: var(--ring); }
 .brand-sum img { height: 20px; width: auto; max-width: 48px; object-fit: contain; }
 .brand-sum i { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(var(--fg-rgb) / .2); }
 .brand-sum small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--graphite); }
 .brand-use .src-summary a { color: inherit; }
+
+/* ---------- a project's brand kit editor (new-project form and the studio's Brand kit panel) ---------- */
+.bk { display: grid; gap: 14px; }
+.bk-grid { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 18px; align-items: start; }
+.bk-side { display: grid; gap: 8px; }
+.bk-main { display: grid; gap: 14px; }
+.bk-fonts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bk .help { font-size: 12px; color: var(--stone); }
+.bk-preview { display: flex; gap: 0; height: 10px; border-radius: 6px; overflow: hidden; box-shadow: var(--ring); }
+.bk-preview i { flex: 1; }
+.logo-box { display: grid; place-items: center; height: 120px; border-radius: 8px; background: var(--mist); box-shadow: var(--ring); color: var(--stone); font-size: 13px; overflow: hidden; }
+.logo-box img { max-width: 80%; max-height: 80%; object-fit: contain; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.swatch { position: relative; display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; border-radius: var(--r-pill); box-shadow: var(--ring); font-family: var(--mono); font-size: 12px; }
+.swatch input[type=color] { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.swatch input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.swatch input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.swatch button { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--stone); }
+.swatch button:hover { color: var(--ink); background: var(--ice); }
+.add-color { height: 34px; }
+dialog.brand-modal { width: min(720px, calc(100vw - 32px)); }
+@media (max-width: 640px) { .bk-grid, .bk-fonts { grid-template-columns: minmax(0, 1fr); } }
+.brand-modal fieldset { border: 0; padding: 0; margin: 14px 0 0; min-width: 0; }
+.brand-modal .row { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 16px; }
+.brand-modal .bk-saved { margin-inline-end: auto; font-size: 13px; color: var(--zellige); }
+.bk-grid > *, .bk-fonts > *, .bk-main > * { min-width: 0; }
+.bk .input { width: 100%; }
+dialog.brand-modal { overflow-x: hidden; }

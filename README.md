@@ -11,9 +11,9 @@ result in a real browser, sending bigger problems back to the agent that owns th
 
 | On a freelance platform                 | On Agents Atelier                                                       |
 |-----------------------------------------|-------------------------------------------------------------------------|
-| Browse profiles and hire people         | Browse **27 specialist agents** and hire them per project               |
-| Hire an agency for a whole job          | Hire one of **20 ready teams** (restaurant site, portfolio, redesign…), each with a starting prompt |
-| A job post, offers, then days of waiting | The team starts **the moment you press Enter**, and you watch every step |
+| Browse profiles and hire people         | Browse **30 specialist agents** with profiles, ratings and portfolios  |
+| Hire an agency for a whole job          | Hire one of **22 ready teams** (restaurant site, portfolio, 3D site, redesign…), each with a starting prompt |
+| Offers, then days of waiting             | **Start a job**: pick one of your projects and the team starts at once  |
 | Each round of changes means new messages | Ask for a change anytime: **only the agents it needs** work on it      |
 | You trust a profile                     | Every agent's **instructions are readable**, and its **time and cost** are shown |
 | Build your own agency                   | **Duplicate any agent**, change its instructions, save **your own teams** |
@@ -27,9 +27,9 @@ Agents Atelier is a web platform that works like a freelance marketplace, except
 AI agent: rather than posting a job, comparing offers and waiting days for a delivery, you describe the website you
 need and hire a team of agents that starts working the moment you press Enter. Each project begins with a name, a short
 description and optional answers about your audience, goal, tone, colours, languages and must-have content; you can
-add your logo and photos, apply your saved brand kit, or import an existing site to improve. You then pick one of 20
+give it its own brand kit (logo, colours, fonts), or import an existing site to improve. You then pick one of 22
 ready use-case teams (a restaurant site, a portfolio, a landing page, a redesign, a multilingual version, legal
-pages…), each with a starting prompt to fill in, or choose agents yourself from 27 specialists: a Brief agent turns your
+pages, a 3D site…), each with a starting prompt to fill in, or choose agents yourself from 30 specialists: a Brief agent turns your
 request into a clear brief, UX plans the structure, Design System sets the colours and fonts, the Copywriter writes
 every word, HTML, CSS, JS, Responsive and Animation agents build the pages, Accessibility audits them, and QA and the
 Critic check the result in a real browser at desktop and phone width, fix small problems and send bigger ones back to
@@ -66,6 +66,7 @@ team strip below. (Light theme: [docs/screenshots/studio-light.png](docs/screens
 - [Getting started](#getting-started)
 - [Using it](#using-it)
 - [The agent team](#the-agent-team)
+- [The marketplace](#the-marketplace)
 - [Customising the agents](#customising-the-agents)
 - [Sharing agents and teams](#sharing-agents-and-teams)
 - [Languages, theme and colours](#languages-theme-and-colours)
@@ -85,8 +86,8 @@ accept or re-roll. Agents Atelier works more like a small design studio:
 
 | A single AI builder                         | Agents Atelier                                                                 |
 |---------------------------------------------|--------------------------------------------------------------------------------|
-| One generalist does everything at once      | **27 specialists**, each with one job and its own instructions                 |
-| A blank chat box                            | **20 use-case teams**, each with the right agents and a prompt to fill in      |
+| One generalist does everything at once      | **30 specialists**, each with one job and its own instructions                 |
+| A blank chat box                            | **22 use-case teams**, each with the right agents and a prompt to fill in      |
 | You see the result, not the process         | You see **every agent, every file it touches, how long it took and its cost**  |
 | Unhappy? Regenerate everything              | **Retry just one agent** ("CSS: warmer palette") or **roll back** to any step |
 | Stopping loses the work                     | **Stop, then Continue** from where it stopped, even after a crash              |
@@ -167,7 +168,7 @@ A typical first build with the default team (times vary):
 Each agent receives:
 - the **project's name and description**, and the answers to the optional project questions (audience, goal, tone,
   colours, languages, must-have content)
-- the **brand kit** (logo, colours, fonts) when the project uses it
+- the project's **brand kit** (logo, colours, heading and body fonts) in a `<brand_kit>` block
 - the **current request**, plus the last few requests in the project
 - the **notes from the agents before it**, for example "CSS agent: styled the hero; the menu button uses `data-menu-toggle`"
 - any **reference images** you attached
@@ -274,10 +275,11 @@ command line wins over the file: `AGENT_MODEL=sonnet PORT=9000 ./run.sh`. Restar
 ### Your first job in five steps
 
 1. **Describe the job.** Click **New project** (the page `/projects/new`). Give it a name and a short description,
-   like a job post; the agents read both with every prompt. The optional questions (kind of site, audience, goal, tone, colours,
+   like a job post; the agents read both with every prompt. The optional questions (kind of site, audience, goal, tone,
    languages, must-have content, sites you like, things to avoid) help the first build land closer. Add your logo and
-   photos, tick **Use my brand kit**, or start from an **existing site** (a folder or a .zip with an `index.html`).
-2. **Hire a team.** The studio offers the 20 ready teams: pick one and its agents are switched
+   photos, fill in the project's **brand kit** (logo, up to six colours, heading and body fonts, or copy another
+   project's kit), or start from an **existing site** (a folder or a .zip with an `index.html`).
+2. **Hire a team.** The studio offers the 22 ready teams: pick one and its agents are switched
    on and its starting prompt is filled in; replace the parts in [brackets]. Or write your own: *"A one-page site with
    a hero and a booking button, services with prices, opening hours and a map link. Calm, trustworthy."* Attach a
    sketch or screenshot with the paperclip, or paste or drop it. Press **Enter**.
@@ -296,13 +298,15 @@ tips for good results.
 |------------|------------------|-------------------------------------------------------------------------------|
 | Landing    | `/`              | For visitors: hire AI agents, not freelancers; examples, use cases, features, FAQ |
 | Dashboard  | `/`              | Once logged in: your numbers, runs over 14 days, time per agent, recent work  |
+| Hire       | `/hire`          | The marketplace: agents and teams by category, search, sort, Start a job       |
+| Profiles   | `/hire/agents/<n>`, `/hire/teams/<n>` | Jobs, time, cost, Critic score, ratings, portfolio, instructions |
 | Projects   | `/projects`      | Your projects: stats, search, filters, sort, grid or list view, pagination    |
 | New project| `/projects/new`  | Every project field on one screen                                             |
-| Studio     | `/p/<id>`        | One project: chat, live preview, code editor, versions, cost, team           |
-| Agents     | `/agents`        | Mine or shared, on or optional; view, create, edit, reorder, import, export   |
-| Teams      | `/teams`         | Mine or shared use-case teams with their starting prompts                     |
+| Studio     | `/p/<id>`        | One project: chat, live preview, code, versions, cost, brand kit, team, ratings |
+| My agents  | `/agents`        | Mine or shared, on or optional; view, create, edit, reorder, publish, export  |
+| My teams   | `/teams`         | Mine or shared use-case teams with their starting prompts; publish           |
 | Guide      | `/guide`         | Tour, prompt recipe, tips, shortcuts and FAQ (logged in)                      |
-| Profile    | `/profile`       | Language, theme, details, brand kit, password, devices, your data, delete     |
+| Profile    | `/profile`       | Language, theme, details, password, devices, your data, delete                |
 | Users      | `/users`         | Admins: every account in a paginated table, change roles                      |
 | Analytics  | `/analytics`     | Admins: sign-ups, active users, runs, cost per day, top accounts              |
 | Legal      | `/terms`, `/privacy` | Terms of use and privacy policy                                           |
@@ -347,7 +351,7 @@ continue, switch view, device or page).
 
 ## The agent team
 
-The 27 shared agents, in run order. "On" agents run by default; the others are helpers you switch on per project, pick
+The 30 shared agents, in run order. "On" agents run by default; the others are helpers you switch on per project, pick
 with a use-case team, or the Orchestrator brings in when a request needs them.
 
 | Agent          | Default  | Model    | What it does |
@@ -357,6 +361,7 @@ with a use-case team, or the Orchestrator brings in when a request needs them.
 | Site auditor   | off      | sonnet   | Studies an existing or imported site and writes a prioritised list of what to fix |
 | UX             | on       | opus     | Plans the structure: sections, navigation, user flow, calls to action |
 | Design System  | on       | opus     | Palette, fonts, type scale, spacing and radii as CSS variables |
+| 3D designer    | off      | opus     | Plans the site's 3D: which elements get depth, the object, interaction and fallbacks |
 | Copywriter     | on       | sonnet   | Writes every word: headlines, body text, buttons, form labels and errors |
 | Content writer | off      | sonnet   | Longer content: about and service pages, articles, FAQs and guides |
 | HTML           | on       | sonnet   | Semantic, accessible markup from the plan and the copy |
@@ -368,9 +373,11 @@ with a use-case team, or the Orchestrator brings in when a request needs them.
 | Gallery        | off      | sonnet   | A fast, accessible photo gallery with a lightbox |
 | Assets         | off      | sonnet   | Logo, favicon, icons and illustrations as hand-written SVG |
 | JS             | on       | sonnet   | Vanilla JavaScript: menu, tabs, forms, scrolling |
+| 3D scene       | off      | opus     | A real interactive 3D object in hand-written WebGL (no libraries), with fallbacks |
 | Forms          | off      | sonnet   | Contact, booking, quote and newsletter forms with validation and clear states |
 | Responsive     | on       | sonnet   | Works from 320px phones to wide desktops |
 | Animation      | on       | sonnet   | Tasteful motion that respects reduced-motion settings |
+| Depth effects  | off      | sonnet   | CSS 3D: tilt cards, layered parallax, flip cards, pressable buttons |
 | Conversion     | off      | opus     | A clearer main action, trust signals, answers to objections, using only real facts |
 | Accessibility  | on       | sonnet   | Audits against WCAG 2.2 AA and fixes what it finds |
 | SEO            | off      | haiku    | Title, meta description, Open Graph tags, structured data |
@@ -396,13 +403,35 @@ manage them on the **Teams** page. Four built-in teams can be viewed and duplica
 | Polish  | Accessibility, Performance, Critic | Improving a page that already exists    |
 | Full    | all of them                        | The most thorough result                |
 
-And **20 shared use-case teams**, each with a starting prompt that fills the prompt box when you pick it:
+And **22 shared use-case teams**, each with a starting prompt that fills the prompt box when you pick it:
 
 | Build something new | Improve a site you have | Add one thing |
 |---|---|---|
-| New website from scratch · Landing page that converts · Restaurant or café · Local service business · Portfolio · Blog or content site · Product page · Event page · Research, then build · Build from a sketch or screenshot | Improve an imported site · Redesign: new look, same content · Boost conversions · SEO and speed checkup · Accessibility audit · Code cleanup | Make it multilingual · Legal pages · Add a dark mode · Contact and booking forms |
+| New website from scratch · Landing page that converts · Restaurant or café · Local service business · Portfolio · Blog or content site · Product page · Event page · 3D website · Research, then build · Build from a sketch or screenshot | Improve an imported site · Redesign: new look, same content · Boost conversions · SEO and speed checkup · Accessibility audit · Code cleanup | Make it multilingual · Legal pages · Add a dark mode · Contact and booking forms · Add 3D to my site |
 
 Users can save their own teams (with their own starting prompt) from the studio or the Teams page.
+
+All shared agents and teams are seeded by database migrations on the first start (see below), so every user of a new
+installation has them; a test checks that a fresh database gets everything in `agents/`.
+
+## The marketplace
+
+The app works like a freelance platform where the freelancers are agents (**Hire**, `/hire`):
+
+- **Catalogue:** agents and teams by category (planning, writing, design, code, growth, quality; build, improve, add),
+  with search, Official/Community filters, sorting (jobs done, hires, rating, newest) and pages. Each card shows the
+  average cost and time per job (an estimate from its model until it has run), its rating and its jobs.
+- **Profiles** (`/hire/agents/<n>`, `/hire/teams/<n>`): jobs done, projects, average time and cost, the Critic's average
+  score (parsed from its "Score: x/10"), ratings with comments, a portfolio, the teams it belongs to and its full
+  instructions. The portfolio shows your own projects, and other members' only if their owner ticked **Show this site
+  in the portfolios of the agents that built it** on the studio's Team finished card.
+- **Start a job:** pick one of your projects (or start a new one) and the agent joins its team, or the team becomes its
+  team; the studio opens ready for your request.
+- **Ratings:** when an agent finishes, its card in the studio has a thumbs up and down, and a comment (owner only, one
+  rating per agent per project).
+- **Community agents and teams:** on your own agent or team page, **Publish to the marketplace** with a category. An admin
+  approves or rejects it (with a note) in the review queue at the top of `/hire`; editing a listed one sends it back for
+  review. **Hire** copies it into your agents (a team brings its private agents along); hires are counted on the original.
 
 ## Customising the agents
 
@@ -413,7 +442,9 @@ migrations** in `server/migrations/`, which the server applies on startup, once 
 |---|---|
 | `0001_schema.sql` | the tables |
 | `0002_shared_origin.sql` | remembers which shared agents and teams an admin edited or deleted |
-| `0003_shared_agents_and_teams.json` | the 27 shared agents and 20 use-case teams |
+| `0003_shared_agents_and_teams.json` | the first 27 shared agents and 20 use-case teams |
+| `0004_marketplace.sql` | listings (publish, review), hires and ratings |
+| `0005_3d_agents.json` | the three 3D agents and the two 3D teams |
 
 To change the shared agents or teams, edit `agents/*.md` or `agents/_presets.json`, then run
 `.venv/bin/python server/manage.py make-agents-migration`. It writes the next migration with what changed, applied on
@@ -481,9 +512,11 @@ choose **Keep both** (imported as a copy), **Replace mine** or **Keep mine**.
 - **Sign-up** asks for a name, email, password and acceptance of the terms; company, role, what you build sites for
   and how you heard about the app are optional (admins see the totals on **/analytics**). The email is confirmed with a
   6-digit code.
-- **Profile** (`/profile`): language and theme, your details, your **brand kit** (logo, colours, heading and body
-  fonts, applied to new projects that tick *Use my brand kit*), password change (logs out other devices and sends a
-  notice), log out other devices, **Download my data** (a .zip of your account, agents, teams, brand kit and every
+- **Brand kit, per project:** each project has its own logo, colours and fonts, set in the new-project form or in the
+  studio (palette button), and copyable from another of your projects. A kit saved on the account by an earlier version
+  is offered once as a copy source.
+- **Profile** (`/profile`): language and theme, your details, password change (logs out other devices and sends a
+  notice), log out other devices, **Download my data** (a .zip of your account, agents, teams, ratings and every
   project with its chat and files), and **Delete my account**.
 - **Forgot your password?** on the login page emails a 6-digit reset code, with limits on sends and wrong tries.
 - **GDPR basics:** **/terms** and **/privacy** pages (fill in `LEGAL_NAME`, `LEGAL_EMAIL` and `LEGAL_ADDRESS`), terms
@@ -553,13 +586,14 @@ Yes, in the Code tab or in any editor. The agents read the current files on the 
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-The suite (`tests/test_server.py`, about 140 tests in roughly 80 seconds) needs Postgres running
+The suite (`tests/test_server.py`, about 150 tests in roughly 80 seconds) needs Postgres running
 (`docker compose -f database/docker-compose.yaml up -d`, or set `TEST_DATABASE_URL`). It starts its own server on a free
 port, with a throwaway database, a temporary copy of `agents/` and an empty `work/` folder, so your data is never
 touched. It uses a **fake Claude CLI** (`tests/fake-claude`), so no model is called and nothing is spent. It covers:
 - every page and API error path, and who may see what (guest, unconfirmed, user, admin)
 - accounts: sign-up, codes, password reset and change, sessions, preferences, deletion, data export
-- sign-up protection, the brand kit, analytics, legal details
+- sign-up protection, per-project brand kits, analytics, legal details
+- the marketplace: publishing, review, hiring, ratings, Critic scores, portfolios, and the first-run seed
 - request guards (foreign Host, cross-site writes, body size)
 - files, uploads, imports and versions
 - agents, models, teams, use cases and the migrations

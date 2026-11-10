@@ -10,9 +10,11 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
+<link rel="stylesheet" href="/static/market.css">
 <script src="/static/i18n.js"></script>
 <script src="/static/icons.js"></script>
 <script src="/static/ui.js"></script>
+<script src="/static/market.js"></script>
 <style>
   .bar-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
   .bar-top h1 { margin: 0 auto 0 0; font-weight: 400; font-size: 40px; letter-spacing: 0; line-height: 1.1; }
@@ -93,7 +95,7 @@
   .colors button.on { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
   .colors input[type=color] { width: 36px; height: 30px; border: 0; padding: 0; background: none; cursor: pointer; }
   .switch { display: flex; align-items: center; gap: 12px; cursor: pointer; font-size: 14px; color: var(--graphite); }
-  .switch input { appearance: none; width: 40px; height: 24px; border-radius: var(--r); background: var(--line-strong); position: relative; cursor: pointer; transition: background .2s; margin: 0; flex: none; }
+  .switch input { appearance: none; width: 40px; height: 24px; border-radius: var(--r-field); background: var(--line-strong); position: relative; cursor: pointer; transition: background .2s; margin: 0; flex: none; }
   .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--knob); transition: transform .2s; }
   .switch input:checked { background: var(--espresso); }
   .switch input:checked::after { transform: translateX(16px); }
@@ -120,10 +122,10 @@
     <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
     <nav class="links">
       <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
-      <a href="/agents" class="on"><i data-icon="users" data-size="16"></i>Agents</a>
-      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
+      <a href="/agents" class="on"><i data-icon="users" data-size="16"></i>My agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>My teams</a>
     </nav>
-    <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
+    <a class="btn btn-dark" href="/projects/new"><i data-icon="plus" data-size="16"></i>New project</a>
   </div>
 </header>
 
@@ -158,7 +160,7 @@ let agents = [], filter = "all", query = "";
 let owner = ["mine", "shared"].includes(new URLSearchParams(location.search).get("show")) ? new URLSearchParams(location.search).get("show") : "all";
 let agentsPage = 1, agentsPer = perPagePref("agents", 10);
 async function listView() {
-  setTitle("Agents");
+  setTitle("My agents");
   app.innerHTML = `<p class="note">Loading…</p>`;
   let teams;
   let me;
@@ -166,7 +168,8 @@ async function listView() {
   catch (err) { return showError(app, err, listView, "Couldn't load the agents"); }
   const usage = Object.fromEntries(agents.map(a => [a.id, teams.filter(t => t.agents.includes(a.id)).length]));
   app.innerHTML = `
-    <div class="bar-top"><h1>Agents</h1>
+    <div class="bar-top"><h1>My agents</h1>
+      <a class="btn btn-ghost" href="/hire">${icon("briefcase", { size: 16 })}Browse the marketplace</a>
       <button class="btn btn-ghost" id="importBtn" title="Import an agent (.md), a team (.json) or an export (.zip)">${icon("file-plus", { size: 16 })}Import</button>
       <a class="btn btn-ghost" href="/api/export" title="All agents, shared rules and your teams as a .zip">${icon("download", { size: 16 })}Export all</a>
       <a class="btn btn-dark" href="/agents/new">${icon("plus", { size: 16 })}New agent</a></div>
@@ -292,6 +295,7 @@ async function detailView(id) {
         <span style="flex:1"><b style="display:inline">“${esc(a.model)}” isn't a known model.</b> This agent will fail until you pick a valid one.</span>
         ${a.editable ? `<a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">Fix the model</a>` : ""}</div>`}
     </section>
+    ${marketCard("agent", a.market)}
     <div class="grid2">
       <section class="card">
         <h2>${icon("file", { size: 16 })}Instructions<span class="spacer"></span>
@@ -320,6 +324,8 @@ async function detailView(id) {
       ${a.prev ? `<a class="btn btn-ghost btn-sm" href="/agents/${encodeURIComponent(a.prev)}">${icon("arrow-right", { size: 14, cls: "flip" })}Previous agent</a>` : "<span></span>"}
       ${a.next ? `<a class="btn btn-ghost btn-sm" href="/agents/${encodeURIComponent(a.next)}">Next agent${icon("arrow-right", { size: 14 })}</a>` : ""}
     </nav>`;
+  const mk = app.querySelector(".market-card");
+  if (mk) bindMarketCard(mk, "agent", a.id, () => detailView(id));
   $("copyRole").onclick = async () => { try { await navigator.clipboard.writeText(a.role); toast("Instructions copied"); } catch { toast("Copy failed", "err"); } };
   if ($("del")) $("del").onclick = async () => {
     if (!await confirmDialog({ title: `Delete “${a.name}”?`, ok: "Delete", danger: true,

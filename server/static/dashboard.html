@@ -18,6 +18,7 @@
   :root { --chart: var(--sky); }
   .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
   .head .page-title { margin: 0; font-size: clamp(28px, 4vw, 44px); overflow-wrap: anywhere; min-width: 0; }
+  .head-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 
   .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
   .tile { background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 18px 20px; min-width: 0; }
@@ -92,10 +93,10 @@
     <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
     <nav class="links">
       <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
-      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
-      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>My agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>My teams</a>
     </nav>
-    <button class="btn btn-dark" data-new title="New project"><i data-icon="plus" data-size="16"></i>New project</button>
+    <a class="btn btn-dark" href="/projects/new"><i data-icon="plus" data-size="16"></i>New project</a>
   </div>
 </header>
 <main class="wrap page">
@@ -164,7 +165,9 @@ async function load() {
   const waiting = users ? users.filter(u => u.role === "unconfirmed").length : 0;
   document.title = "Dashboard · Agents Atelier";
   app.innerHTML = `
-    <div class="head"><h1 class="page-title">${first ? `Welcome back, ${esc(first)}` : "Welcome back"}</h1></div>
+    <div class="head"><h1 class="page-title">${first ? `Welcome back, ${esc(first)}` : "Welcome back"}</h1>
+      <div class="head-acts"><a class="btn btn-ghost" href="/hire">${icon("users", { size: 16 })}Browse agents</a>
+        <a class="btn btn-dark" href="/projects/new">${icon("plus", { size: 16 })}New project</a></div></div>
 
     <section class="tiles" aria-label="Your numbers">
       <div class="tile"><h2>Projects</h2><b>${counts.all}</b><small>${counts.working ? `${counts.working} building now` : `${counts.built} built`}</small></div>

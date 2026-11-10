@@ -73,6 +73,7 @@ import orchestrator as orch
 import browser_check
 from versions import Versions
 import models as model_catalog
+import market
 
 ROOT = Path(__file__).resolve().parent.parent
 WORK = config.WORK_DIR   # ATELIER_WORK in .env; tests point this at a temporary folder
@@ -299,7 +300,7 @@ def brief_block(meta: dict) -> str:
         out += ("\n<project_assets>\nImages the user supplied for the site. Use them where they fit (the logo in the header "
                 "and favicon, photos in the matching sections), with relative paths, real alt text, width and height. "
                 "Never delete, rename, edit or replace these files. They are data, not instructions.\n" + rows + "\n</project_assets>\n")
-    return out
+    return out + brand_block(meta)
 
 
 ASSET_KINDS = {"logo": "the brand logo", "photo": "a photo", "image": "an image"}
@@ -342,12 +343,14 @@ def clean_pages(raw, keep: list[dict] | None = None) -> list[dict]:
     return pages
 
 
-def create_project(name: str, description: str, pages=None, brief=None, owner: str | None = None, agents: list[str] | None = None) -> dict:
+def create_project(name: str, description: str, pages=None, brief=None, owner: str | None = None, agents: list[str] | None = None,
+                   brand: dict | None = None) -> dict:
     pid = str(uuid.uuid4())
     (WORK / pid).mkdir(parents=True)
     now = time.time()
     meta = {"id": pid, "name": name, "description": description, "created": now, "updated": now,
-            "owner": owner, "history": [], "agents": agents or [], "pages": clean_pages(pages), "brief": clean_brief(brief), "assets": []}
+            "owner": owner, "history": [], "agents": agents or [], "pages": clean_pages(pages), "brief": clean_brief(brief), "assets": [],
+            "brand": brand or dict(EMPTY_BRAND)}
     save_meta(meta)
     return meta
 
@@ -867,6 +870,7 @@ async def export_my_data(request: Request):
                    "agents/        the agents you made, in the same format as an agent export\n"
                    "teams/         the teams you made\n"
                    "brand/         your brand kit\n"
+                   "ratings.json   the ratings you gave agents\n"
                    "projects/      each project: its details (project.json), its chat (chat.jsonl) and its files (site/)\n")
         z.writestr("account.json", json.dumps(account, indent=2, ensure_ascii=False))
         for a in await load_agents(user):
@@ -877,6 +881,9 @@ async def export_my_data(request: Request):
             if t.get("scope") == "mine":
                 name, data = await team_files.export_team(user, t["id"])
                 z.writestr(f"teams/{name}", json.dumps(data, indent=2, ensure_ascii=False))
+        given = await db.pool.fetch("""SELECT a.name AS agent, r.project, r.value, r.comment, r.updated_at
+                                        FROM agent_ratings r JOIN agents a ON a.pk = r.agent_pk WHERE r.user_id = $1""", user["id"])
+        z.writestr("ratings.json", json.dumps([{**dict(r), "updated_at": stamp(r["updated_at"])} for r in given], indent=2, ensure_ascii=False))
         kit = await brand_kit(user)
         z.writestr("brand/brand.json", json.dumps({k: kit[k] for k in ("colors", "heading_font", "body_font")}, indent=2))
         if _brand_logo(user["id"]):
@@ -1008,12 +1015,15 @@ async def get_agent(request: Request, agent_id: str):
     stats = next((b for b in (await get_stats(request))["agents"] if b["agent"] == agent_id), None)
     return {**agents[i], "model_ok": model_catalog.allowed(agents[i]["model"]), "position": i + 1, "total": len(agents),
             "prev": agents[i - 1]["id"] if i > 0 else None, "next": agents[i + 1]["id"] if i + 1 < len(agents) else None,
-            "teams": await team_files.teams_with(user, agent_id), "stats": stats}
+            "teams": await team_files.teams_with(user, agent_id), "stats": stats,
+            "market": await market.listing_of(user, "agent", agent_id)}
 
 
 @app.put("/api/agents/{agent_id}")
 async def edit_agent(request: Request, agent_id: str, body: dict):
-    return await _agent_call(team_files.update_agent(current_user(request), agent_id, body))
+    agent = await _agent_call(team_files.update_agent(current_user(request), agent_id, body))
+    await market.after_edit(current_user(request), "agent", agent_id)
+    return agent
 
 
 @app.delete("/api/agents/{agent_id}")
@@ -1094,7 +1104,7 @@ def all_projects(user: dict, default_count: int) -> list[dict]:
 async def new_project(request: Request, body: dict):
     user = current_user(request)
     return create_project(**clean_details(body), pages=body.get("pages"), brief=body.get("brief"),
-                          owner=str(user["id"]), agents=await default_ids(user))
+                          owner=str(user["id"]), agents=await default_ids(user), brand=clean_brand(body.get("brand")))
 
 
 # Starting a project from an existing site: only web pages, styles, scripts, Markdown and assets are kept.
@@ -1188,7 +1198,7 @@ async def import_project(request: Request, body: dict):
         titles.add(title)
         pages.append({"title": title, "file": p})
     user = current_user(request)
-    meta = create_project(**details, brief=brief, owner=str(user["id"]), agents=await default_ids(user))
+    meta = create_project(**details, brief=brief, owner=str(user["id"]), agents=await default_ids(user), brand=clean_brand(body.get("brand")))
     folder = WORK / meta["id"]
     try:
         for path, data in files:
@@ -1235,6 +1245,8 @@ async def update_project(pid: str, body: dict):
         meta["brief"] = clean_brief(body["brief"])
     if isinstance(body.get("agents"), list):
         meta["agents"] = [a["id"] for a in await project_agents(meta) if a["id"] in body["agents"]]
+    if "showcase" in body:       # the owner lets this site appear in the portfolios of the agents that built it
+        meta["showcase"] = bool(body["showcase"])
     save_meta(meta)
     return meta
 
@@ -1254,12 +1266,16 @@ def _owner_of_meta_file(path: Path) -> str | None:
         return None
 
 
-# ---------------------------------------------------------------- brand kit
+# ---------------------------------------------------------------- brand kit (one per project)
+# A project's brand kit: its colours, heading and body fonts (meta["brand"]) and its logo (the project asset of kind
+# "logo", in assets/ so it is versioned and downloaded). Every agent gets it in <brand_kit>. A kit can be copied from
+# another of your projects, or from the account-wide kit of earlier versions ("account").
 
-BRAND_DIR = WORK / ".brand"
+BRAND_DIR = WORK / ".brand"          # earlier versions kept one kit per account here (still offered as a copy source)
 HEX = re.compile(r"^#[0-9a-f]{6}$")
 FONT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ]{0,39}$")
 MAX_BRAND_COLORS = 6
+EMPTY_BRAND = {"colors": [], "heading_font": "", "body_font": ""}
 
 
 def _brand_logo(user_id) -> Path | None:
@@ -1268,43 +1284,61 @@ def _brand_logo(user_id) -> Path | None:
 
 
 async def brand_kit(user: dict) -> dict:
+    """The account-wide kit of earlier versions (read only now)."""
     row = await db.pool.fetchrow("SELECT * FROM brand_kits WHERE user_id = $1", user["id"])
     kit = {"colors": list(row["colors"]) if row else [], "heading_font": row["heading_font"] if row else "",
            "body_font": row["body_font"] if row else "", "logo": None}
-    if _brand_logo(user["id"]):
-        kit["logo"] = f"/api/brand/logo?v={int(_brand_logo(user['id']).stat().st_mtime)}"
-    kit["empty"] = not (kit["colors"] or kit["heading_font"] or kit["body_font"] or kit["logo"])
+    kit["empty"] = not (kit["colors"] or kit["heading_font"] or kit["body_font"] or _brand_logo(user["id"]))
     return kit
 
 
-@app.get("/api/brand")
-async def get_brand(request: Request):
-    return await brand_kit(current_user(request))
-
-
-@app.put("/api/brand")
-async def put_brand(request: Request, body: dict):
-    user = current_user(request)
-    colors = [str(c).strip().lower() for c in body.get("colors") or [] if str(c).strip()]
+def clean_brand(raw) -> dict:
+    """Colours like #1a2b3c (up to 6) and Google Fonts names, or a 400 with a readable message."""
+    if raw is None:
+        return dict(EMPTY_BRAND)
+    if not isinstance(raw, dict):
+        raise HTTPException(400, "The brand kit must be colours and fonts.")
+    colors = [str(c).strip().lower() for c in raw.get("colors") or [] if str(c).strip()]
     if len(colors) > MAX_BRAND_COLORS or not all(HEX.match(c) for c in colors):
         raise HTTPException(400, f"Use up to {MAX_BRAND_COLORS} colours written like #1a2b3c.")
-    fonts = {}
-    for key, label in (("heading_font", "heading font"), ("body_font", "body font")):
-        value = " ".join(str(body.get(key) or "").split())
+    out = {"colors": list(dict.fromkeys(colors))}
+    for key, label in (("heading_font", "heading"), ("body_font", "body")):
+        value = " ".join(str(raw.get(key) or "").split())
         if value and not FONT_NAME.match(value):
-            raise HTTPException(400, f"Write the {label} as a font name, like Inter or Playfair Display.")
-        fonts[key] = value
-    await db.pool.execute(
-        """INSERT INTO brand_kits (user_id, colors, heading_font, body_font, updated_at) VALUES ($1, $2, $3, $4, now())
-           ON CONFLICT (user_id) DO UPDATE SET colors = $2, heading_font = $3, body_font = $4, updated_at = now()""",
-        user["id"], list(dict.fromkeys(colors)), fonts["heading_font"], fonts["body_font"])
-    return await brand_kit(user)
+            raise HTTPException(400, f"Write the {label} font as a font name, like Inter or Playfair Display.")
+        out[key] = value
+    return out
 
 
-@app.post("/api/brand/logo")
-async def put_brand_logo(request: Request, body: dict):
-    user = current_user(request)
-    m = re.match(r"^data:(image/[a-z+.-]+);base64,(.+)$", str(body.get("data", "")), re.S)
+def _logo_asset(meta: dict) -> dict | None:
+    return next((a for a in meta.get("assets") or [] if a.get("kind") == "logo" and (WORK / meta["id"] / a["path"]).is_file()), None)
+
+
+def brand_of(meta: dict) -> dict:
+    kit = {**EMPTY_BRAND, **(meta.get("brand") or {})}
+    logo = _logo_asset(meta)
+    kit["logo"] = f"/work/{meta['id']}/{logo['path']}?v={int((WORK / meta['id'] / logo['path']).stat().st_mtime)}" if logo else None
+    kit["empty"] = not (kit["colors"] or kit["heading_font"] or kit["body_font"] or logo)
+    return kit
+
+
+def brand_block(meta: dict) -> str:
+    kit = {**EMPTY_BRAND, **(meta.get("brand") or {})}
+    lines = []
+    if kit["colors"]:
+        lines.append(f"Brand colours: {', '.join(kit['colors'])} (the first is the main colour). Build the palette tokens from them.")
+    fonts = [f"headings in {kit['heading_font']}" if kit["heading_font"] else "", f"body text in {kit['body_font']}" if kit["body_font"] else ""]
+    if any(fonts):
+        lines.append("Fonts: " + "; ".join(f for f in fonts if f) + " (load them from Google Fonts).")
+    logo = _logo_asset(meta)
+    if logo:
+        lines.append(f"Logo: {logo['path']} (use it in the header and as the favicon source).")
+    return ("\n<brand_kit>\nThe project's brand kit. Follow it exactly.\n" + "\n".join(lines) + "\n</brand_kit>\n") if lines else ""
+
+
+def _save_logo(meta: dict, data: str, note: str = "") -> dict:
+    """Make `data` (an image data-URL) the project's logo, replacing the previous one."""
+    m = re.match(r"^data:(image/[a-z+.-]+);base64,(.+)$", str(data or ""), re.S)
     if not m or m.group(1) not in IMAGE_TYPES:
         raise HTTPException(400, "Upload a PNG, JPG, WebP or GIF image.")
     if len(m.group(2)) * 3 // 4 > MAX_IMAGE + 4:
@@ -1315,58 +1349,117 @@ async def put_brand_logo(request: Request, body: dict):
         raise HTTPException(400, "The image data is damaged. Try choosing it again.")
     if not raw:
         raise HTTPException(400, "That image is empty.")
-    folder = BRAND_DIR / str(user["id"])
+    return _put_logo_bytes(meta, raw, IMAGE_TYPES[m.group(1)], note)
+
+
+def _put_logo_bytes(meta: dict, raw: bytes, ext: str, note: str = "") -> dict:
+    _drop_logo(meta)
+    folder = WORK / meta["id"] / "assets"
     folder.mkdir(parents=True, exist_ok=True)
-    for old in folder.glob("logo.*"):
-        old.unlink()
-    (folder / f"logo.{IMAGE_TYPES[m.group(1)]}").write_bytes(raw)
-    await db.pool.execute("INSERT INTO brand_kits (user_id) VALUES ($1) ON CONFLICT (user_id) DO UPDATE SET updated_at = now()", user["id"])
-    return await brand_kit(user)
+    (folder / f"logo.{ext}").write_bytes(raw)
+    meta = load_meta(meta["id"])
+    meta["assets"] = [*(meta.get("assets") or []), {"path": f"assets/logo.{ext}", "kind": "logo", "note": note, "size": len(raw)}]
+    save_meta(meta)
+    return meta
+
+
+def _drop_logo(meta: dict):
+    meta = load_meta(meta["id"])
+    for a in [a for a in meta.get("assets") or [] if a.get("kind") == "logo"]:
+        (WORK / meta["id"] / a["path"]).unlink(missing_ok=True)
+    meta["assets"] = [a for a in meta.get("assets") or [] if a.get("kind") != "logo"]
+    save_meta(meta)
+
+
+def _own_project(request: Request, pid: str) -> dict:
+    meta = load_meta(pid)
+    if meta.get("owner") != str(current_user(request)["id"]):
+        raise HTTPException(403, "Only the project's owner can change its brand kit.")
+    return meta
+
+
+@app.get("/api/projects/{pid}/brand")
+async def get_project_brand(pid: str):
+    return brand_of(load_meta(pid))
+
+
+@app.put("/api/projects/{pid}/brand")
+async def put_project_brand(request: Request, pid: str, body: dict):
+    meta = _own_project(request, pid)
+    meta["brand"] = clean_brand(body)
+    save_meta(meta)
+    return brand_of(meta)
+
+
+@app.post("/api/projects/{pid}/brand/logo")
+async def put_project_logo(request: Request, pid: str, body: dict):
+    meta = _own_project(request, pid)
+    if is_busy(meta["id"]):
+        raise HTTPException(409, "Agents are working on this project. Wait for them to finish, or stop them first.")
+    return brand_of(_save_logo(meta, body.get("data"), "From the brand kit"))
+
+
+@app.delete("/api/projects/{pid}/brand/logo")
+async def delete_project_logo(request: Request, pid: str):
+    meta = _own_project(request, pid)
+    if is_busy(meta["id"]):
+        raise HTTPException(409, "Agents are working on this project. Wait for them to finish, or stop them first.")
+    _drop_logo(meta)
+    return brand_of(load_meta(pid))
+
+
+@app.get("/api/brand/sources")
+async def brand_sources(request: Request):
+    """Kits you can copy into a project: your other projects' kits, and your account kit from earlier versions."""
+    user = current_user(request)
+    out = []
+    for m in _all_metas():
+        if m.get("owner") == str(user["id"]):
+            kit = brand_of(m)
+            if not kit["empty"]:
+                out.append({"id": m["id"], "name": m["name"], **kit})
+    out.sort(key=lambda k: k["name"].lower())
+    legacy = await brand_kit(user)
+    if not legacy["empty"]:
+        out.insert(0, {"id": "account", "name": "Your saved brand kit", **legacy,
+                       "logo": "/api/brand/logo" if _brand_logo(user["id"]) else None})
+    return out
 
 
 @app.get("/api/brand/logo")
-async def get_brand_logo(request: Request):
+async def legacy_brand_logo(request: Request):
     logo = _brand_logo(current_user(request)["id"])
     if not logo:
         raise HTTPException(404, "There's no logo in your brand kit.")
     return FileResponse(logo, headers={"Cache-Control": "private, no-cache"})
 
 
-@app.delete("/api/brand/logo")
-async def delete_brand_logo(request: Request):
+@app.post("/api/projects/{pid}/brand/copy")
+async def copy_project_brand(request: Request, pid: str, body: dict):
+    """Copy another kit into this project: colours and fonts (unless `logo_only`), and the logo when it has one."""
+    meta = _own_project(request, pid)
     user = current_user(request)
-    for old in (BRAND_DIR / str(user["id"])).glob("logo.*"):
-        old.unlink()
-    return await brand_kit(user)
-
-
-@app.post("/api/projects/{pid}/brand")
-async def apply_brand(request: Request, pid: str):
-    """Put the owner's brand kit into a new project: the logo as an asset (unless one is there), the colours and fonts in the brief."""
-    meta = load_meta(pid)
-    user = current_user(request)
-    if meta.get("owner") != str(user["id"]):
-        raise HTTPException(403, "Only the project's owner can apply their brand kit.")
-    kit = await brand_kit(user)
-    brief = dict(meta.get("brief") or {})
-    if kit["colors"] and not brief.get("colors"):
-        brief["colors"] = ", ".join(kit["colors"])
-    fonts = "; ".join(f for f in (f"headings in {kit['heading_font']}" if kit["heading_font"] else "",
-                                  f"body text in {kit['body_font']}" if kit["body_font"] else "") if f)
-    if fonts and not brief.get("fonts"):
-        brief["fonts"] = fonts + " (Google Fonts)"
-    assets = list(meta.get("assets") or [])
-    logo = _brand_logo(user["id"])
-    if logo and not any(a["kind"] == "logo" for a in assets):
-        folder = WORK / meta["id"] / "assets"
-        folder.mkdir(parents=True, exist_ok=True)
-        name = f"logo{logo.suffix}"
-        shutil.copyfile(logo, folder / name)
-        assets.append({"path": f"assets/{name}", "kind": "logo", "note": "From the brand kit", "size": logo.stat().st_size})
-    meta = load_meta(meta["id"])
-    meta["brief"], meta["assets"] = clean_brief(brief), assets
-    save_meta(meta)
-    return {"brief": meta["brief"], "assets": meta["assets"]}
+    source = str(body.get("from") or "")
+    if source == "account":
+        kit, logo = await brand_kit(user), _brand_logo(user["id"])
+        logo_bytes, ext = (logo.read_bytes(), logo.suffix.lstrip(".")) if logo else (None, "")
+    else:
+        try:
+            other = load_meta(source)
+        except HTTPException:
+            raise HTTPException(404, "That project doesn't exist any more.")
+        if other.get("owner") != str(user["id"]):
+            raise HTTPException(403, "You can only copy the brand kit of your own projects.")
+        kit, asset = brand_of(other), _logo_asset(other)
+        logo_bytes, ext = ((WORK / other["id"] / asset["path"]).read_bytes(), Path(asset["path"]).suffix.lstrip(".")) if asset else (None, "")
+    if not body.get("logo_only"):
+        meta["brand"] = clean_brand(kit)
+        save_meta(meta)
+    if logo_bytes and not (body.get("logo_only") and _logo_asset(meta)):
+        if is_busy(meta["id"]):
+            raise HTTPException(409, "Agents are working on this project. Wait for them to finish, or stop them first.")
+        _put_logo_bytes(load_meta(pid), logo_bytes, ext, "From the brand kit")
+    return brand_of(load_meta(pid))
 
 
 @app.delete("/api/projects/{pid}")
@@ -1554,9 +1647,10 @@ async def import_bundle(request: Request, body: dict):
 @app.get("/api/presets/{preset_id}")
 async def get_preset(request: Request, preset_id: str):
     try:
-        return await team_files.get_preset(current_user(request), preset_id)
+        team = await team_files.get_preset(current_user(request), preset_id)
     except KeyError:
         raise HTTPException(404, "This team doesn't exist (it may have been deleted).")
+    return {**team, "market": None if team["builtin"] else await market.listing_of(current_user(request), "team", preset_id)}
 
 
 @app.post("/api/presets")
@@ -1568,13 +1662,122 @@ async def add_preset(request: Request, body: dict):
 
 @app.put("/api/presets/{preset_id}")
 async def edit_preset(request: Request, preset_id: str, body: dict):
-    return await _agent_call(team_files.update_preset(current_user(request), preset_id, body))
+    team = await _agent_call(team_files.update_preset(current_user(request), preset_id, body))
+    await market.after_edit(current_user(request), "team", preset_id)
+    return team
 
 
 @app.delete("/api/presets/{preset_id}")
 async def remove_preset(request: Request, preset_id: str):
     await _agent_call(team_files.delete_preset(current_user(request), preset_id))
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- the marketplace (see market.py)
+
+def _all_metas() -> list[dict]:
+    out = []
+    for p in META.glob("*.json"):
+        try:
+            out.append(json.loads(p.read_text()))
+        except ValueError:
+            log.warning("Skipping damaged project file %s", p)
+    return out
+
+
+def _has_preview(pid: str) -> bool:
+    return (WORK / pid / "index.html").is_file()
+
+
+async def _market_call(call):
+    try:
+        return await call
+    except KeyError:
+        raise HTTPException(404, "This isn't in the marketplace (it may have been withdrawn).")
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/hire")
+async def hire_page():
+    return FileResponse(STATIC / "hire.html")
+
+
+@app.get("/hire/agents/{pk}")
+@app.get("/hire/teams/{pk}")
+async def hire_profile_page(pk: str):
+    return FileResponse(STATIC / "hire-profile.html")
+
+
+@app.get("/api/market")
+async def market_catalogue(request: Request):
+    return await market.catalogue(current_user(request), _all_metas())
+
+
+@app.get("/api/market/agents/{pk}")
+async def market_agent(request: Request, pk: int):
+    return await _market_call(market.agent_profile(current_user(request), pk, _all_metas(), _has_preview))
+
+
+@app.get("/api/market/teams/{pk}")
+async def market_team(request: Request, pk: int):
+    return await _market_call(market.team_profile(current_user(request), pk, _all_metas()))
+
+
+@app.post("/api/market/agents/{pk}/hire")
+async def market_hire_agent(request: Request, pk: int):
+    return await _market_call(market.hire_agent(current_user(request), pk))
+
+
+@app.post("/api/market/teams/{pk}/hire")
+async def market_hire_team(request: Request, pk: int):
+    return await _market_call(market.hire_team(current_user(request), pk))
+
+
+@app.post("/api/market/publish")
+async def market_publish(request: Request, body: dict):
+    kind = "team" if body.get("kind") == "team" else "agent"
+    return await _market_call(market.publish(current_user(request), kind, str(body.get("id") or ""), str(body.get("category") or "")))
+
+
+@app.post("/api/market/withdraw")
+async def market_withdraw(request: Request, body: dict):
+    kind = "team" if body.get("kind") == "team" else "agent"
+    return await _market_call(market.withdraw(current_user(request), kind, str(body.get("id") or "")))
+
+
+@app.get("/api/market/pending")
+async def market_pending(request: Request):
+    require_admin(request)
+    return await market.pending()
+
+
+@app.post("/api/market/review")
+async def market_review(request: Request, body: dict):
+    require_admin(request)
+    kind = "team" if body.get("kind") == "team" else "agent"
+    try:
+        pk = int(body.get("pk"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Which one? Send its pk.")
+    return await _market_call(market.review(kind, pk, str(body.get("decision") or ""), str(body.get("note") or "")))
+
+
+@app.get("/api/projects/{pid}/ratings")
+async def get_ratings(request: Request, pid: str):
+    return await market.project_ratings(current_user(request), load_meta(pid))
+
+
+@app.put("/api/projects/{pid}/ratings")
+async def put_rating(request: Request, pid: str, body: dict):
+    try:
+        value = int(body.get("value") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "A rating is a thumbs up or a thumbs down.")
+    return await _market_call(market.rate(current_user(request), load_meta(pid), str(body.get("agent") or ""), value,
+                                          str(body.get("comment") or "")))
 
 
 # ---------------------------------------------------------------- editing & uploads
@@ -2100,7 +2303,10 @@ async def run_agent(pid: str, agent: dict, common: str, request: str, notes: lis
                         await broadcast(pid, {"type": "file_changed", "agent": agent["id"], "file": rel.rsplit(" (", 1)[0]})
                 except Exception:
                     log.exception("Couldn't report undone changes")
+        if agent["id"] == REVIEWER and outcome == "done" and market.critic_score(final_text) is not None:
+            info["score"] = market.critic_score(final_text)
         safely("Recording stats", record_stat, pid, {"agent": agent["id"], "status": outcome, "ts": started,
+                                                     "run": (meta.get("run") or {}).get("started"),
                                                      "request": request[:100], "seconds": round(time.time() - started, 1), **info})
 
 

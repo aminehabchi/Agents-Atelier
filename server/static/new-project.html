@@ -57,8 +57,8 @@
     <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
     <nav class="links">
       <a href="/projects" class="on"><i data-icon="grid" data-size="16"></i>Projects</a>
-      <a href="/agents"><i data-icon="users" data-size="16"></i>Agents</a>
-      <a href="/teams"><i data-icon="layers" data-size="16"></i>Teams</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>My agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>My teams</a>
     </nav>
     <span></span>
   </div>
@@ -78,8 +78,7 @@ host.addEventListener("change", () => { dirty = true; });
 window.addEventListener("beforeunload", (e) => { if (dirty && !saving) e.preventDefault(); });   // long form: don't lose it to a stray click
 
 (async () => {
-const kit = await api("/api/brand").catch(() => null);
-const form = fillProjectForm(host, { allowImport: true, askAssets: true, heading: false, cancelHref: "/projects", brand: kit && !kit.empty ? kit : null }, async (details, e) => {
+const form = fillProjectForm(host, { allowImport: true, askAssets: true, heading: false, cancelHref: "/projects" }, async (details, e) => {
   e.preventDefault();
   const go = host.querySelector('button[value="ok"]');
   if (go.disabled) return;

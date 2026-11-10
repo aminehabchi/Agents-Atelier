@@ -23,7 +23,8 @@ BRIEF = "brief"                         # always runs whenever any agent runs
 FINISHERS = ("qa", "critic")            # run after any change to the code, when switched on
 READ_ONLY = {"brief", "critic", "qa", "research"}   # agents whose choice alone doesn't count as a code change
 # Helpers that may be chosen when the request clearly asks for what they do, even if switched off (never in a fallback).
-ON_REQUEST = {"research", "auditor", "content", "translator", "legal", "dark-theme", "pricing", "gallery", "forms", "conversion", "local", "tidy"}
+ON_REQUEST = {"research", "auditor", "content", "translator", "legal", "dark-theme", "pricing", "gallery", "forms", "conversion", "local", "tidy",
+              "3d-design", "3d-scene", "depth"}
 INTENTS = {"new_build", "change", "redo_agent", "question", "off_topic", "unclear"}
 TALK = {"question", "off_topic", "unclear"}   # intents where no agent runs: the Orchestrator answers in the chat
 # When an agent's work changes, these agents must adapt to it (only added if switched on).
