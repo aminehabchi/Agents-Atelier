@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#0f1117">
 <title>Guide · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
 <script src="/static/i18n.js"></script>
@@ -72,7 +72,7 @@
   pre.code .c { color: var(--stone); }
 
   table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--paper); border-radius: var(--r); overflow: hidden; margin-top: 20px; font-size: 15px; }
-  th, td { text-align: left; padding: 14px 20px; vertical-align: middle; border-bottom: 1px solid var(--line); }
+  th, td { text-align: start; padding: 14px 20px; vertical-align: middle; border-bottom: 1px solid var(--line); }
   th { font-weight: 500; font-size: 13px; color: var(--stone); background: var(--linen); }
   tr:last-child td { border-bottom: 0; }
   td:first-child { white-space: nowrap; width: 1%; }
@@ -142,12 +142,12 @@
     <article>
       <section id="start">
         <h2><span class="num">01</span>Quick start</h2>
-        <p>Agents Atelier builds <b>front ends only</b>: static websites in plain HTML, CSS and JavaScript. It runs on your machine and uses your own Claude Code login, so there's no API key to set up.</p>
+        <p>Agents Atelier works like a freelance platform where every specialist is an AI agent: you describe the job, hire a team, and watch it build the <b>front end</b> of your website in plain HTML, CSS and JavaScript. Every agent runs on Claude Code, so there's no API key to set up.</p>
         <div class="steps">
-          <div class="stepc"><div class="top"><span class="ico"><i data-icon="code" data-size="20"></i></span><span class="n">STEP 1</span></div>
-            <h3>Pick your team</h3><p>The shared agents are ready to use. Duplicate any of them on the <a href="/agents">Agents page</a> to make your own version, or save a team for a kind of job.</p></div>
-          <div class="stepc"><div class="top"><span class="ico"><i data-icon="message" data-size="20"></i></span><span class="n">STEP 2</span></div>
-            <h3>Create a project</h3><p>Click <b>New project</b>, give it a name and a description, then describe the page you want. To improve a site you already have, use <b>Existing site</b> and pick its folder or a .zip (HTML, CSS, JS, Markdown and assets only).</p></div>
+          <div class="stepc"><div class="top"><span class="ico"><i data-icon="message" data-size="20"></i></span><span class="n">STEP 1</span></div>
+            <h3>Describe the job</h3><p>Click <b>New project</b> and give it a name and a short description, like a job post. To improve a site you already have, use <b>Existing site</b> and pick its folder or a .zip (HTML, CSS, JS, Markdown and assets only).</p></div>
+          <div class="stepc"><div class="top"><span class="ico"><i data-icon="users" data-size="20"></i></span><span class="n">STEP 2</span></div>
+            <h3>Hire a team</h3><p>In the studio, pick one of the 20 ready teams or switch agents on yourself. Duplicate any agent on the <a href="/agents">Agents page</a> to make your own version, or save a team for a kind of job.</p></div>
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="eye" data-size="20"></i></span><span class="n">STEP 3</span></div>
             <h3>Watch &amp; refine</h3><p>Agents build it one after another. Ask for changes anytime, then download the .zip.</p></div>
         </div>
@@ -253,7 +253,7 @@
 
       <section id="team">
         <h2><span class="num">05</span>The agent team</h2>
-        <p>Agents run in order, and each one does a single job. Faded agents are off by default; switch them on per project in the Team panel.</p>
+        <p>These are the specialists you can hire. Agents run in order, and each one does a single job. Faded agents are off by default; switch them on per project in the Team panel, or hire them with a ready team.</p>
         <div class="team-list" id="teamList"></div>
       </section>
 
@@ -327,7 +327,7 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
       </section>
 
       <div class="cta">
-        <h2>Ready to build something?</h2>
+        <h2>Ready to hire your first team?</h2>
         <a class="btn btn-dark btn-lg" href="/projects">Go to your projects<i data-icon="arrow-right" data-size="18"></i></a>
       </div>
     </article>

@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#0f1117">
 <title>Dashboard · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
 <script src="/static/i18n.js"></script>
@@ -40,7 +40,7 @@
   .day { position: relative; display: flex; align-items: flex-end; justify-content: center; height: 100%; background: none; border: 0; padding: 0; cursor: default; }
   .day:hover, .day:focus-visible { background: var(--ice); outline-offset: -2px; }
   .day i { display: block; width: min(60%, 18px); min-height: 0; background: var(--chart); border-radius: 4px 4px 0 0; }
-  .tip { position: absolute; bottom: calc(100% + 6px); z-index: 5; display: none; padding: 6px 10px; background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: var(--hard-sm); font-size: 12px; line-height: 1.4; white-space: nowrap; text-align: left; pointer-events: none; }
+  .tip { position: absolute; bottom: calc(100% + 6px); z-index: 5; display: none; padding: 6px 10px; background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: var(--hard-sm); font-size: 12px; line-height: 1.4; white-space: nowrap; text-align: start; pointer-events: none; }
   .day .tip { bottom: auto; top: 8px; left: 50%; transform: translateX(-50%); }
   .day:nth-child(-n+3) .tip { left: 0; transform: none; }
   .day:nth-last-child(-n+3) .tip { left: auto; right: 0; transform: none; }
@@ -54,7 +54,7 @@
   .hbar-top span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hbar-top span:last-child { color: var(--graphite); flex: none; font-feature-settings: "tnum"; }
   .hbar-track { height: 8px; }
-  .hbar-track i { display: block; height: 100%; min-width: 2px; background: var(--chart); border-radius: 0 4px 4px 0; }
+  .hbar-track i { display: block; height: 100%; min-width: 2px; background: var(--t); border-radius: 0 4px 4px 0; }
 
   /* recent projects and shortcuts */
   .rows { display: flex; flex-direction: column; }
@@ -123,7 +123,7 @@ function runsPerDay(times) {
   }
   return days;
 }
-const dayLabel = (d, opts = { day: "numeric", month: "short" }) => d.toLocaleDateString(getLang(), opts);
+const dayLabel = (d, opts = { day: "numeric", month: "short" }) => d.toLocaleDateString(getLocale(), opts);
 
 function runsChart(times) {
   const days = runsPerDay(times), max = Math.max(...days.map(d => d.runs));

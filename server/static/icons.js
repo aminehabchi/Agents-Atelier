@@ -84,7 +84,7 @@
   function icon(name, opts = {}) {
     const size = opts.size || 18;
     const body = ICONS[name] || ICONS.bot;
-    return `<svg class="ic ${opts.cls || ""}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    return `<svg class="ic ic-${name} ${opts.cls || ""}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="${opts.stroke || 1.5}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
   }
 

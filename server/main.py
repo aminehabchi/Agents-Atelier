@@ -512,9 +512,10 @@ def require_admin(request: Request) -> dict:
 async def language_rule(meta: dict) -> str:
     """Agents talk to the project owner in the owner's language. It goes first: the security rules stay last."""
     owner = await owner_of(meta)
-    if not owner or owner.get("language") != "fr":
+    language = {"fr": "French", "ary": "Moroccan Darija, written in Arabic script"}.get((owner or {}).get("language"))
+    if not language:
         return ""
-    return ("Write every message to the user in French. The website's own text keeps following the brief and the "
+    return (f"Write every message to the user in {language}. The website's own text keeps following the brief and the "
             "user's request, so don't translate the site unless they ask.\n\n")
 
 

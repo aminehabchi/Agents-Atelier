@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#0f1117">
 <title>Log in · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <script src="/static/i18n.js"></script>
 <script src="/static/icons.js"></script>
@@ -113,7 +113,7 @@
   </aside>
   <div class="auth-main">
     <div class="corner">
-      <button class="icon-btn lang-btn" type="button" id="lang" data-no-i18n></button>
+      <span id="lang"></span>
       <button class="icon-btn" type="button" data-theme-btn aria-label="Change theme"></button>
     </div>
     <a class="brand m-brand" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
@@ -135,13 +135,7 @@ document.querySelector("[data-theme-btn]").innerHTML = icon(themeIcon(), { size:
 document.querySelector("[data-theme-btn]").title = themeTitle();
 document.querySelector("[data-theme-btn]").onclick = () => cycleTheme();
 
-{
-  const other = getLang() === "fr" ? "en" : "fr", b = $("lang");
-  b.textContent = other.toUpperCase();
-  b.title = other === "fr" ? "Français" : "English";
-  b.setAttribute("aria-label", b.title);
-  b.onclick = () => setLang(other);
-}
+$("lang").replaceWith(languageButton());
 
 api("/api/agents").then(agents => { $("crew").innerHTML = agents.map(a => `<span>${esc(a.name)}</span>`).join(""); }).catch(() => {});
 

@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#0f1117">
 <title>Analytics · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
 <script src="/static/i18n.js"></script>
@@ -43,10 +43,10 @@
   .hbar-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; margin-bottom: 4px; }
   .hbar-top span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hbar-top span:last-child { color: var(--graphite); font-feature-settings: "tnum"; }
-  .hbar-track i { display: block; height: 6px; min-width: 2px; background: var(--chart); border-radius: 0 3px 3px 0; }
+  .hbar-track i { display: block; height: 6px; min-width: 2px; background: var(--t); border-radius: 0 3px 3px 0; }
   .empty-note { margin: 0; padding: 20px 0; color: var(--stone); font-size: 13px; text-align: center; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { padding: 8px 10px; text-align: left; font-weight: 500; color: var(--graphite); border-bottom: 1px solid var(--line-strong); }
+  th { padding: 8px 10px; text-align: start; font-weight: 500; color: var(--graphite); border-bottom: 1px solid var(--line-strong); }
   td { padding: 8px 10px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
   td.num, th.num { text-align: right; font-feature-settings: "tnum"; white-space: nowrap; }
   .table-wrap { overflow-x: auto; }
@@ -83,7 +83,7 @@ const app = document.getElementById("app");
 let days = 30;
 try { days = +localStorage.getItem("analytics-days") || 30; } catch {}
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0) + "%";
-const dayLabel = (iso, opts = { day: "numeric", month: "short" }) => new Date(iso + "T00:00:00Z").toLocaleDateString(getLang(), { timeZone: "UTC", ...opts });
+const dayLabel = (iso, opts = { day: "numeric", month: "short" }) => new Date(iso + "T00:00:00Z").toLocaleDateString(getLocale(), { timeZone: "UTC", ...opts });
 
 function barChart(series, format = (v) => String(v)) {
   const max = Math.max(...series.map(d => d.value));
@@ -99,7 +99,7 @@ function hbars(rows) {
   return `<div class="hbars">${rows.slice(0, 8).map(r => `<div><div class="hbar-top"><span>${esc(r.label)}</span><span>${r.value}</span></div>
     <div class="hbar-track"><i style="width:${(r.value / max) * 100}%"></i></div></div>`).join("")}</div>`;
 }
-const LANG = { en: "English", fr: "Français", "": "Not set" };
+const LANG = { en: "English", fr: "Français", ary: "الدارجة", "": "Not set" };
 const sum = (s) => s.reduce((n, d) => n + d.value, 0);
 
 async function load() {

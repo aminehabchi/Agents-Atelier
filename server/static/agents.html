@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#0f1117">
 <title>Agents · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
 <script src="/static/i18n.js"></script>
@@ -44,7 +44,7 @@
   .rules-row { display: flex; align-items: center; gap: 14px; background: var(--paper); border-radius: var(--r); box-shadow: var(--ring); padding: 14px 18px; text-decoration: none; margin-bottom: 12px; }
   .rules-row:hover { background: var(--linen); }
   .rules-row b { font-weight: 500; } .rules-row small { display: block; color: var(--stone); font-size: 13px; }
-  .rules-row .go { margin-left: auto; color: var(--stone); }
+  .rules-row .go { margin-inline-start: auto; color: var(--stone); }
 
   /* ---------- view ---------- */
   .card { background: var(--paper); border-radius: var(--r); box-shadow: var(--ring); padding: 28px; }
@@ -53,7 +53,7 @@
   .vhead h1 { margin: 0; font-weight: 400; font-size: 40px; letter-spacing: 0; line-height: 1.05; }
   .vhead .sub { font: 12px ui-monospace, monospace; color: var(--stone); margin-top: 6px; }
   .vhead .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-  .vhead .acts { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .vhead .acts { margin-inline-start: auto; display: flex; gap: 8px; flex-wrap: wrap; }
   .vdesc { font-size: 18px; line-height: 1.5; color: var(--graphite); margin: 22px 0 0; max-width: 760px; }
   .grid2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 16px; align-items: start; }
   .card h2 { margin: 0 0 14px; font-weight: 500; font-size: 16px; display: flex; align-items: center; gap: 8px; }
@@ -98,7 +98,7 @@
   .switch input:checked { background: var(--espresso); }
   .switch input:checked::after { transform: translateX(16px); }
   .form-actions { display: flex; gap: 8px; align-items: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
-  .form-actions .status { font-size: 13px; color: var(--stone); margin-right: auto; display: inline-flex; gap: 6px; align-items: center; }
+  .form-actions .status { font-size: 13px; color: var(--stone); margin-inline-end: auto; display: inline-flex; gap: 6px; align-items: center; }
   .note { font-size: 13px; color: var(--stone); margin: 0 0 20px; display: flex; gap: 8px; align-items: flex-start; line-height: 1.5; }
   .note > .ic { margin-top: calc((1lh - 16px) / 2); }
   .note > .ic[width="14"] { margin-top: calc((1lh - 14px) / 2); }
@@ -202,8 +202,8 @@ async function listView() {
         <span class="nm"><b>${esc(a.name)}</b><small>${esc(a.description || "No description")}</small></span>
         <span class="meta">${!a.model_ok ? `<span class="badge mono" style="background:color-mix(in srgb,var(--danger) 12%,var(--paper));color:var(--danger)" title="Not a known model: this agent will fail until you pick a valid one">${icon("alert", { size: 11 })}${esc(a.model)}</span>`
           : a.model ? `<span class="badge mono" title="Model">${esc(a.model)}</span>` : `<span class="badge" title="Server default model">default model</span>`}
-          <span class="badge" title="${a.scope === "shared" ? "Shared with everyone" : "Only you can see it"}">${a.scope === "shared" ? "shared" : "mine"}</span>
-          ${a.default ? `<span class="badge">on</span>` : `<span class="badge">optional</span>`}</span>
+          <span class="badge ${a.scope === "shared" ? "tone-shared" : ""}" title="${a.scope === "shared" ? "Shared with everyone" : "Only you can see it"}">${a.scope === "shared" ? "shared" : "mine"}</span>
+          ${a.default ? `<span class="badge tone-on">on</span>` : `<span class="badge tone-opt">optional</span>`}</span>
         <span class="teams">${usage[a.id]} team${usage[a.id] === 1 ? "" : "s"}</span>
         <span class="go">${icon("arrow-right", { size: 15 })}</span>
       </a>`).join("") || (owner === "mine" && !q && filter === "all"
@@ -287,7 +287,7 @@ async function detailView(id) {
       </div>
       <p class="vdesc">${esc(a.description || "No description yet.")}</p>
       ${a.editable ? "" : `<p class="note">${icon("lock", { size: 14 })}<span>Only an admin can change a shared agent. Duplicate it to make your own version.</span></p>`}
-      ${a.model_ok ? "" : `<div class="err-state" role="alert" style="max-width:none;margin:20px 0 0;padding:16px 18px;text-align:left;display:flex;gap:12px;align-items:center">
+      ${a.model_ok ? "" : `<div class="err-state" role="alert" style="max-width:none;margin:20px 0 0;padding:16px 18px;text-align:start;display:flex;gap:12px;align-items:center">
         <span class="tile" style="margin:0;width:36px;height:36px">${icon("alert", { size: 18 })}</span>
         <span style="flex:1"><b style="display:inline">“${esc(a.model)}” isn't a known model.</b> This agent will fail until you pick a valid one.</span>
         ${a.editable ? `<a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">Fix the model</a>` : ""}</div>`}

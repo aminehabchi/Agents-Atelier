@@ -121,7 +121,7 @@ window.ago = (t) => {
   if (s < 3600) return `${Math.floor(s / 60)} min ago`;
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
   if (s < 86400 * 7) return `${Math.floor(s / 86400)} d ago`;
-  return new Date(t * 1000).toLocaleDateString();
+  return new Date(t * 1000).toLocaleDateString(getLocale());
 };
 
 window.duration = (sec) => {
@@ -698,15 +698,7 @@ window.importFlow = () => new Promise((resolve) => {
       wrap.querySelector("[data-theme-btn]").onclick = () => cycleTheme();
       wrap.querySelector("[data-theme-btn]").title = themeTitle();
       getMe().then(user => {
-        if (!user?.confirmed) {            // no profile page yet: the language button is here
-          const other = getLang() === "fr" ? "en" : "fr";
-          const l = document.createElement("button");
-          l.className = "icon-btn lang-btn"; l.type = "button"; l.textContent = other.toUpperCase();
-          l.title = other === "fr" ? "Français" : "English"; l.setAttribute("aria-label", l.title);
-          l.setAttribute("data-no-i18n", "");
-          l.onclick = () => setLang(other);
-          wrap.prepend(l);
-        }
+        if (!user?.confirmed) wrap.prepend(languageButton());   // no profile page yet: the language button is here
         if (!user) return;
         wrap.append(accountButton(user, { compact: !site }));
         if (user.role === "admin") {
@@ -748,7 +740,8 @@ function siteFooter() {
     <div class="foot-brand">
       <a class="logo" href="/"><span class="mark">${icon("logo", { size: 18 })}</span>Agents Atelier</a>
       <p>A team of AI specialists that builds your website in plain HTML, CSS and JavaScript, while you watch.</p>
-      <button class="foot-lang" type="button" data-no-i18n>${getLang() === "fr" ? "English" : "Français"}</button>
+      <div class="foot-langs" role="group" aria-label="Language" data-no-i18n>${LANGS.map(([k, name]) =>
+        `<button type="button" class="foot-lang ${k === getLang() ? "on" : ""}" data-lang-pick="${k}" lang="${k}" aria-pressed="${k === getLang()}">${name}</button>`).join("")}</div>
     </div>
     <nav class="foot-cols" aria-label="Footer">
       <div><h2>Product</h2><ul>
@@ -767,11 +760,32 @@ function siteFooter() {
     </nav>
   </div>
   <div class="wrap foot-bottom"><span>© ${new Date().getFullYear()} <span class="foot-owner" data-no-i18n>Agents Atelier</span></span><span>Sites built here belong to the people who made them.</span></div>`;
-  f.querySelector(".foot-lang").onclick = () => { const next = getLang() === "fr" ? "en" : "fr"; Promise.resolve(window.savePreferences?.({ language: next })).finally(() => setLang(next)); };
+  f.querySelectorAll("[data-lang-pick]").forEach(b => { b.onclick = () => pickLanguage(b.dataset.langPick); });
   f.querySelector(".foot-cookies").onclick = () => { try { localStorage.removeItem("atelier-cookies-ok"); } catch {} document.querySelector(".cookie-note")?.remove(); cookieNotice(); };
   document.body.append(f);
   fetch("/api/auth/legal").then(r => r.ok ? r.json() : null).then(info => { if (info?.name) f.querySelector(".foot-owner").textContent = info.name; }).catch(() => {});
 }
+
+/* ---------- language: a small menu with the three languages ---------- */
+window.pickLanguage = (next) => {
+  if (next === getLang()) return;
+  Promise.resolve(window.savePreferences?.({ language: next })).finally(() => setLang(next));
+};
+window.languageButton = () => {
+  const box = document.createElement("span");
+  box.className = "lang-pick";
+  const cur = LANGS.find(l => l[0] === getLang()) || LANGS[0];
+  box.innerHTML = `<button class="icon-btn lang-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language: ${cur[1]}" title="${cur[1]}" data-no-i18n>${cur[2]}</button>
+    <span class="lang-menu" role="menu" hidden data-no-i18n>${LANGS.map(([k, name]) =>
+      `<button type="button" role="menuitemradio" aria-checked="${k === cur[0]}" lang="${k}" data-lang-pick="${k}">${name}</button>`).join("")}</span>`;
+  const btn = box.querySelector(".lang-btn"), menu = box.querySelector(".lang-menu");
+  const close = () => { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+  btn.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute("aria-expanded", String(!menu.hidden)); if (!menu.hidden) menu.querySelector("[aria-checked=true]").focus(); };
+  menu.onclick = (e) => { const b = e.target.closest("[data-lang-pick]"); if (b) { close(); pickLanguage(b.dataset.langPick); } };
+  document.addEventListener("click", (e) => { if (!box.contains(e.target)) close(); });
+  box.addEventListener("keydown", (e) => { if (e.key === "Escape") { close(); btn.focus(); } });
+  return box;
+};
 
 /* ---------- the cookie notice: shown once, until dismissed ---------- */
 function cookieNotice() {

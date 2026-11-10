@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#0f1117">
 <title>Teams · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
 <script src="/static/i18n.js"></script>
@@ -46,7 +46,7 @@
   .vhead .big { width: 64px; height: 64px; border-radius: var(--r); background: var(--espresso); color: var(--on-espresso); display: grid; place-items: center; flex: none; }
   .vhead h1 { margin: 0; font-weight: 400; font-size: 40px; letter-spacing: 0; line-height: 1.05; }
   .vhead .sub { font-size: 13px; color: var(--stone); margin-top: 6px; }
-  .vhead .acts { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .vhead .acts { margin-inline-start: auto; display: flex; gap: 8px; flex-wrap: wrap; }
   .vdesc { font-size: 18px; line-height: 1.5; color: var(--graphite); margin: 20px 0 0; max-width: 760px; }
   .kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 22px; }
   .kv div { background: var(--linen); border-radius: var(--r); padding: 14px 16px; }
@@ -77,7 +77,7 @@
   .pitem small { display: block; font-size: 12px; color: var(--stone); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .summary { font-size: 13px; color: var(--graphite); background: var(--linen); border-radius: var(--r); padding: 12px 14px; line-height: 1.5; }
   .form-actions { display: flex; gap: 8px; align-items: center; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
-  .form-actions .status { font-size: 13px; color: var(--stone); margin-right: auto; display: inline-flex; gap: 6px; align-items: center; }
+  .form-actions .status { font-size: 13px; color: var(--stone); margin-inline-end: auto; display: inline-flex; gap: 6px; align-items: center; }
 
   @media (max-width: 760px) {
     .kv { grid-template-columns: 1fr; }
@@ -91,7 +91,7 @@
   .starter-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
   .starter-head small { flex: 1; min-width: 200px; color: var(--stone); font-size: 12px; }
   .starter-text { margin: 0; white-space: pre-wrap; font-family: var(--font); font-size: 15px; line-height: 1.6; color: var(--ink); }
-  .starter-text mark { background: rgb(0 99 225 / .16); color: inherit; padding: 0 2px; border-radius: 3px; }
+  .starter-text mark { background: rgb(var(--sky-rgb) / .16); color: inherit; padding: 0 2px; border-radius: 3px; }
   #f-prompt { resize: vertical; min-height: 120px; line-height: 1.5; }
 </style>
 <link rel="stylesheet" href="/static/theme.css">

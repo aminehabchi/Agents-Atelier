@@ -1,45 +1,50 @@
 /* Shared tokens and components for every Agents Atelier page. */
-/* Style: a dark control room. Black floor, panels defined by a faint inset line, one blue for actions (see theme.css). */
+/* Style: a dark control room. Black floor, panels defined by a faint inset line, Majorelle blue, saffron and zellige green (see theme.css). */
 /* Light is the default; [data-theme="dark"] is set by ui.js (from the toggle or the system setting). */
 :root {
-  --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font: "Inter", "IBM Plex Sans Arabic", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", "IBM Plex Mono", "IBM Plex Sans Arabic", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --r: 8px; --r-card: 16px; --r-pill: 59px;
   /* light theme: the same shapes on a pale floor */
-  --ink: #0d0d0d; --espresso: #0d0d0d; --ash: #6b6b6b; --graphite: #555555; --stone: #6b6b6b; --charcoal: #0d0d0d;
-  --paper: #ffffff; --linen: #f4f4f5; --bone: #ececee; --mist: #f8f8f9; --field: #f1f1f3; --steel: #e4e4e7;
-  --fg-rgb: 0 0 0;
+  /* Majorelle trio on neutral floors: blue for actions, saffron for highlights, zellige green for success */
+  --ink: #14161f; --espresso: #14161f; --ash: #626877; --graphite: #4a4f5c; --stone: #626877; --charcoal: #14161f;
+  --paper: #ffffff; --linen: #f3f4f8; --bone: #e8eaf1; --mist: #f8f9fb; --field: #eef0f5; --steel: #dfe2ea;
+  --fg-rgb: 20 22 31;
   --line: rgb(var(--fg-rgb) / .1); --line-strong: rgb(var(--fg-rgb) / .14);
   --ring: inset 0 0 0 1px rgb(var(--fg-rgb) / .12);
-  --sky: #0063e1; --on-sky: #ffffff; --ice: #ececee;      /* the one colour: actions */
-  --canary: var(--steel); --on-accent: #0d0d0d; --orange: var(--steel); --peach-blush: var(--bone); --pale: var(--bone); --wet: var(--stone);
+  --sky: #4f5bd5; --sky-rgb: 79 91 213; --on-sky: #ffffff; --on-sky-rgb: 255 255 255; --ice: #e9ebf8;   /* 1. Majorelle blue: actions */
+  --saffron: #94600a; --saffron-fill: #f2b632; --saffron-rgb: 242 182 50; --on-saffron: #1a1205;           /* 2. saffron: highlights */
+  --zellige: #137a57; --zellige-rgb: 31 169 122;                                                          /* 3. zellige green: success */
+  --canary: var(--steel); --on-accent: #14161f; --orange: var(--steel); --peach-blush: var(--bone); --pale: var(--bone); --wet: var(--stone);
   --crayons: var(--stone);
-  --shadow-c: transparent; --hard: 0 12px 32px rgb(0 0 0 / .12); --hard-sm: none;
-  --danger: #c0392b;
+  --shadow-c: transparent; --hard: 0 12px 32px rgb(20 22 31 / .10); --hard-sm: none;
+  --danger: #c4232b;
   --on-espresso: #ffffff; --on-espresso-rgb: 255 255 255;
   --knob: #ffffff;
-  --scrim: rgba(0, 0, 0, .45);
-  --ok: #1f8a5b;
-  --add-bg: #e3f6ee; --add-fg: #1d5a40; --del-bg: #fde8e5; --del-fg: #8a2a20;
+  --scrim: rgba(10, 12, 20, .45);
+  --ok: #137a57;
+  --add-bg: #e1f4ec; --add-fg: #0f5a40; --del-bg: #fde6e7; --del-fg: #8a1f25;
   color-scheme: light;
   font-family: var(--font);
 }
 :root[data-theme="dark"] {
-  /* Obsidian floor, Graphite cards, Iron fields, Steel for hover and raised things */
-  --ink: #ffffff; --espresso: #ffffff; --ash: #858585; --graphite: #979797; --stone: #858585; --charcoal: #ffffff;
-  --paper: #0d0d0d; --linen: #000000; --bone: #1f1f1f; --mist: #040910; --field: #1f1f1f; --steel: #2b2c2e;
-  --fg-rgb: 255 255 255;
+  /* Night floor, slate cards; the same three colours, lighter where they are text */
+  --ink: #eef0f6; --espresso: #eef0f6; --ash: #949aab; --graphite: #b4b9c6; --stone: #949aab; --charcoal: #eef0f6;
+  --paper: #181b24; --linen: #0f1117; --bone: #222634; --mist: #12141b; --field: #222634; --steel: #2a2f3e;
+  --fg-rgb: 238 240 246;
   --line: rgb(var(--fg-rgb) / .1); --line-strong: rgb(var(--fg-rgb) / .14);
   --ring: inset 0 0 0 1px rgb(var(--fg-rgb) / .12);
-  --sky: #0063e1; --on-sky: #ffffff; --ice: #1f1f1f;
+  --sky: #5b67e0; --sky-rgb: 91 103 224; --on-sky: #ffffff; --on-sky-rgb: 255 255 255; --ice: #222634;
+  --saffron: #f2b632; --saffron-fill: #f2b632; --saffron-rgb: 242 182 50; --on-saffron: #1a1205;
+  --zellige: #3cc293; --zellige-rgb: 60 194 147;
   --on-accent: #ffffff;
   --hard: none;
-  --danger: #ff6b5e;
+  --danger: #ff6b70;
   --on-espresso: #000000; --on-espresso-rgb: 0 0 0;
-  --knob: #000000;
+  --knob: #0f1117;
   --scrim: rgba(0, 0, 0, .7);
-  --ok: #8fd9b6;
-  --add-bg: #15301f; --add-fg: #a6e8bb; --del-bg: #3a1a1a; --del-fg: #f5b5b5;
+  --ok: #3cc293;
+  --add-bg: #12301f; --add-fg: #a6e8c8; --del-bg: #3a1a1e; --del-fg: #f5b5b9;
   color-scheme: dark;
 }
 
@@ -181,7 +186,7 @@ dialog.project-modal { width: min(680px, calc(100vw - 32px)); max-height: calc(1
 
 /* ---------- header tools (search + theme), added by ui.js ---------- */
 .hdr-tools { display: inline-flex; gap: 6px; align-items: center; }
-header.top .hdr-tools { margin-left: auto; margin-right: -12px; }
+header.top .hdr-tools { margin-inline-start: auto; margin-right: -12px; }
 .links + .hdr-tools { margin-left: 0; }
 
 /* ---------- command palette ---------- */
@@ -192,7 +197,7 @@ dialog.palette::backdrop { background: var(--scrim); backdrop-filter: blur(2px);
 .pal-input input { flex: 1; border: 0; outline: none; background: transparent; color: var(--ink); font: inherit; font-size: 16px; }
 .pal-list { max-height: min(60vh, 460px); overflow-y: auto; padding: 6px; }
 .pal-group { font-size: 11px; letter-spacing: .08em; color: var(--stone); padding: 10px 12px 4px; }
-.pal-item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: none; border: 0; padding: 9px 12px; border-radius: var(--r); color: var(--graphite); }
+.pal-item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: start; background: none; border: 0; padding: 9px 12px; border-radius: var(--r); color: var(--graphite); }
 .pal-item span { min-width: 0; }
 .pal-item b { display: block; font-weight: 500; color: var(--ink); font-size: 14px; }
 .pal-item small { display: block; font-size: 12px; color: var(--stone); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 520px; }
@@ -291,7 +296,7 @@ main:focus { outline: 0; }
 .acct-head small { color: var(--stone); font-size: 12px; }
 .acct-head .badge { margin-top: 6px; }
 .acct-links { border-top: 1.5px solid var(--line); padding: 6px; }
-.acct-links a, .acct-links button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; background: none; border: 0; border-radius: var(--r); color: inherit; text-decoration: none; text-align: left; font-size: 14px; }
+.acct-links a, .acct-links button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; background: none; border: 0; border-radius: var(--r); color: inherit; text-decoration: none; text-align: start; font-size: 14px; }
 .acct-links a:hover, .acct-links button:hover, .acct-links a:focus-visible, .acct-links button:focus-visible { background: var(--ice); }
 .lang-btn { font-size: 12px; font-weight: 600; letter-spacing: 0; }
 dialog.modal .acct-row { flex-wrap: wrap; }

@@ -1,7 +1,7 @@
 /* The look, loaded last on every page: dark panels, a faint inset line instead of shadows, pill buttons and one blue. */
 
 body { background: var(--linen); color: var(--ink); font-family: var(--font); letter-spacing: -0.007em; font-feature-settings: "case"; }
-::selection { background: var(--sky); color: #fff; }
+::selection { background: var(--sky); color: var(--on-sky); }
 :focus-visible { outline-color: var(--sky); }
 h1, h2, h3 { font-weight: 400; letter-spacing: -0.03em; }
 code, kbd, pre, .editor { font-family: var(--mono); letter-spacing: 0; }
@@ -48,7 +48,19 @@ header.top { background: var(--linen); border-bottom: 1px solid var(--line); }
 .newcard .tile { background: var(--steel); color: var(--ink); box-shadow: none; }
 
 /* one chromatic voice: agents are told apart by icon and name, not by colour */
-.tile, .ico, .agent-tile .tile, .who .tile, .head .tile, .tm .tile, .feature .ico, .card .ico { background: var(--bone) !important; color: var(--ink) !important; border: 0 !important; box-shadow: none; border-radius: var(--r); }
+/* Three colours take turns on icon tiles, cards in a list and chart bars: Majorelle blue, saffron, zellige green.
+   --t is the tone; an item's position in its list picks it. */
+:root { --t: var(--sky); --t-rgb: var(--sky-rgb); }
+:is(li, .arow, .tcard, .pcard, .feature, .tip, .stepc, .kpi, .stat, .tm, .card, .rules-row, .urow, .agent-tile, .tiles > .tile, .stat-tile, .proj, .uc, .usecase, .hrow, .hbar, .row, .vrow, .hbars > div, .part, .advice-card):nth-child(3n+2) { --t: var(--saffron); --t-rgb: var(--saffron-rgb); }
+:is(li, .arow, .tcard, .pcard, .feature, .tip, .stepc, .kpi, .stat, .tm, .card, .rules-row, .urow, .agent-tile, .tiles > .tile, .stat-tile, .proj, .uc, .usecase, .hrow, .hbar, .row, .vrow, .hbars > div, .part, .advice-card):nth-child(3n+3) { --t: var(--zellige); --t-rgb: var(--zellige-rgb); }
+.tile, .ico, .agent-tile .tile, .who .tile, .head .tile, .tm .tile, .feature .ico, .card .ico { background: rgb(var(--t-rgb) / .15) !important; color: var(--t) !important; border: 0 !important; box-shadow: none; border-radius: var(--r); }
+.agent-tile.s-working .tile { background: rgb(var(--on-sky-rgb) / .2) !important; color: var(--on-sky) !important; }
+.agent-tile.s-off .tile { background: var(--bone) !important; color: var(--stone) !important; }
+/* status tags: on = green, optional = saffron, shared = blue */
+.badge.tone-on { background: rgb(var(--zellige-rgb) / .16); color: var(--zellige); }
+.badge.tone-opt { background: rgb(var(--saffron-rgb) / .18); color: var(--saffron); }
+.badge.tone-shared { background: rgb(var(--sky-rgb) / .16); color: var(--sky); }
+[data-theme="dark"] .badge.tone-shared { color: #a9b0ff; }
 
 /* ---------- forms ---------- */
 .input, select.input, textarea.input, .pgrid select.input { background: var(--field); color: var(--ink); border: 0; border-radius: var(--r); box-shadow: 0 0 1px 0 rgb(var(--fg-rgb) / .2); }
@@ -63,7 +75,7 @@ header.top { background: var(--linen); border-bottom: 1px solid var(--line); }
 .eyebrow, .sec-title { font-family: var(--mono); font-size: 12px; font-weight: 400; letter-spacing: .03em; color: var(--stone); }
 .fchip, .chip { border: 0; border-radius: var(--r-pill); background: transparent; box-shadow: var(--ring); color: var(--graphite); }
 .fchip:hover { color: var(--ink); background: var(--ice); }
-.fchip.on { background: var(--ink); color: var(--linen); box-shadow: none; }
+.fchip.on { background: var(--sky); color: var(--on-sky); box-shadow: none; }
 .seg { border: 0; border-radius: var(--r-pill); background: transparent; box-shadow: var(--ring); padding: 3px; }
 .seg button { border-radius: var(--r-pill); color: var(--stone); }
 .seg button.on, .seg button[aria-pressed="true"] { background: var(--steel); color: var(--ink); box-shadow: none; }
@@ -86,8 +98,8 @@ dialog.modal .input, dialog.palette .input, .acct-menu .input { background: var(
 /* ---------- switches ---------- */
 .switch input:checked + span, .toggle.on { background: var(--sky); }
 
-/* the dashboard's number tiles are cards, not icon tiles */
-.tiles .tile { background: var(--paper) !important; box-shadow: var(--ring); border-radius: var(--r-card); }
+/* the dashboard's number tiles are cards, not icon tiles: a coloured line on top says which tone */
+.tiles .tile { background: var(--paper) !important; color: var(--ink) !important; box-shadow: var(--ring), inset 0 3px 0 var(--t); border-radius: var(--r-card); }
 
 /* phones: the navigation stays icons only (this file loads last, so it has to say so again) */
 @media (max-width: 760px) {
@@ -105,7 +117,7 @@ dialog.modal .input, dialog.palette .input, .acct-menu .input { background: var(
 .foot-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
 .foot-cols h2 { margin: 0 0 14px; font-family: var(--mono); font-size: 12px; font-weight: 400; letter-spacing: .03em; color: var(--stone); }
 .foot-cols ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.foot-cols a, .foot-cookies { color: var(--graphite); text-decoration: none; text-align: left; }
+.foot-cols a, .foot-cookies { color: var(--graphite); text-decoration: none; text-align: start; }
 .foot-cols a:hover, .foot-cookies:hover { color: var(--ink); }
 .foot-bottom { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; position: relative; margin-top: 48px; padding-top: 20px; font-size: 12px; color: var(--stone); }
 .foot-bottom::before { content: ""; position: absolute; top: 0; left: 24px; right: 24px; border-top: 1px solid var(--line); }
@@ -113,3 +125,63 @@ dialog.modal .input, dialog.palette .input, .acct-menu .input { background: var(
   .site-footer > .wrap:first-child { grid-template-columns: minmax(0, 1fr); gap: 32px; }
   .foot-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------- language menu ---------- */
+.lang-pick { position: relative; display: inline-flex; }
+.lang-menu { position: absolute; top: calc(100% + 8px); inset-inline-end: 0; z-index: 70; display: flex; flex-direction: column; min-width: 160px; padding: 6px; border-radius: 12px; background: var(--steel); box-shadow: var(--ring), 0 16px 40px rgb(0 0 0 / .3); }
+[data-theme="light"] .lang-menu { background: var(--paper); }
+.lang-menu[hidden] { display: none; }
+.lang-menu button { padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; font-size: 14px; text-align: start; cursor: pointer; }
+.lang-menu button:hover, .lang-menu button:focus-visible { background: var(--ice); }
+.lang-menu button[aria-checked="true"] { font-weight: 600; }
+.foot-langs { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.foot-lang.on { background: var(--steel); }
+
+/* ---------- right to left (Darija) ---------- */
+[dir="rtl"] body { letter-spacing: 0; }
+[dir="rtl"] h1, [dir="rtl"] h2, [dir="rtl"] h3, [dir="rtl"] .page-title { letter-spacing: 0; }
+/* arrows and other direction icons turn around */
+[dir="rtl"] .ic-arrow-right, [dir="rtl"] .ic-log-out, [dir="rtl"] .ic-play, [dir="rtl"] .ic-file-plus { transform: scaleX(-1); }
+[dir="rtl"] .ic.flip { transform: none; }
+/* code, paths, emails and passwords stay left to right */
+[dir="rtl"] code, [dir="rtl"] pre, [dir="rtl"] kbd, [dir="rtl"] .editor, [dir="rtl"] .mono, [dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="password"], [dir="rtl"] input[type="url"], [dir="rtl"] .code-input, [dir="rtl"] .files { direction: ltr; unicode-bidi: isolate; }
+[dir="rtl"] .files { text-align: left; }
+/* things placed on one side move to the other */
+[dir="rtl"] .cookie-note { right: auto; left: 16px; }
+[dir="rtl"] .acct-menu { right: auto; left: 0; }
+[dir="rtl"] .skip-link { left: auto; right: 8px; }
+[dir="rtl"] .corner { right: auto; left: 16px; }
+[dir="rtl"] header.top .hdr-tools { margin-right: 0; margin-left: -12px; }
+[dir="rtl"] .pw .input { padding-right: 14px; padding-left: 46px; }
+[dir="rtl"] .pw button { right: auto; left: 0; }
+[dir="rtl"] .search .ic { left: auto; right: 12px; }
+[dir="rtl"] .search .input { padding-left: 14px; padding-right: 38px; }
+[dir="rtl"] ul.plain li { padding-left: 0; padding-right: 16px; }
+[dir="rtl"] ul.plain li::before { left: auto; right: 0; }
+[dir="rtl"] .foot-bottom::before { left: 24px; right: 24px; }
+
+/* Text people wrote (names, descriptions, prompts) keeps its own direction inside a right-to-left page */
+/* (i18n.js gives it dir="auto"; this covers the moment before) */
+[dir="rtl"] [data-no-i18n] > *, [dir="rtl"] .msg .text { unicode-bidi: plaintext; }
+[dir="rtl"] .hero-block h1 .line { unicode-bidi: normal; }   /* our own split headline, not user text */
+/* Arabic letters join: spacing them out breaks the words */
+[dir="rtl"] *, [dir="rtl"] *::before, [dir="rtl"] *::after { letter-spacing: 0 !important; }
+[dir="rtl"] .model-badge, [dir="rtl"] .pid, [dir="rtl"] .url { direction: ltr; }
+
+/* Cards with an icon, everywhere: the icon and the title share the first row, the text runs the full width below.
+     [icon] Title
+     Text…            */
+:is(.feature, .card, .part, .advice-card, .uc-item > a):has(> .ico) {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: none; align-items: center; align-content: start;
+  column-gap: 12px; row-gap: 10px;
+}
+.advice-card > div { display: contents; }
+:is(.feature, .card, .part, .advice-card, .uc-item > a):has(> .ico) > .ico { grid-row: auto; grid-column: 1; flex: none; display: grid; place-items: center; }
+:is(.feature, .card, .part, .advice-card, .uc-item > a):has(> .ico) > :is(h3, b) { grid-column: 2; margin: 0; align-self: center; }
+:is(.feature, .card, .part, .advice-card, .uc-item > a):has(> .ico) > :not(.ico, h3, b),
+.advice-card > div > p { grid-column: 1 / -1; margin: 0; }
+.advice-card > div > h3 { grid-column: 2; margin: 0; }
+/* feature cards keep their tag at the bottom */
+.feature:has(> .ico) { grid-template-rows: auto auto 1fr; }
+.feature:has(> .ico) > .tag { align-self: end; justify-self: start; }

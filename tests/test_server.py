@@ -543,6 +543,16 @@ class T06Runs(unittest.TestCase):
                 self.assertLess(system.index("in French"), system.index("SECURITY") if "SECURITY" in system else len(system))
         finally:
             call("PATCH", "/api/auth/preferences", {"language": "en"})
+        call("PATCH", "/api/auth/preferences", {"language": "ary"})
+        try:
+            before = len(log_calls())
+            self.run_prompt(make_project_for_language(), "Make a page")
+            prompts = [c["argv"][c["argv"].index("--append-system-prompt") + 1] for c in log_calls()[before:] if "--append-system-prompt" in c["argv"]]
+            self.assertTrue(prompts)
+            for system in prompts:
+                self.assertIn("Moroccan Darija", system.split("\n")[0])
+        finally:
+            call("PATCH", "/api/auth/preferences", {"language": "en"})
         before = len(log_calls())
         self.run_prompt(make_project_for_language(), "Make a page")
         for c in log_calls()[before:]:
@@ -1687,10 +1697,24 @@ class T14Preferences(unittest.TestCase):
         call("POST", "/api/auth/register", {"name": "Ann Lee", "email": other, "password": "correct horse", "language": "klingon"}, cookie=None)
         self.assertIn("Hello", [m for m in map(json.loads, OUTBOX.read_text().splitlines()) if m["to"] == other][-1]["text"])
 
+    def test_darija_is_a_language(self):
+        cookie = register(self.email())
+        self.assertEqual(call("PATCH", "/api/auth/preferences", {"language": "ary"}, cookie=cookie)[0], 200)
+        self.assertEqual(call("GET", "/api/auth/me", cookie=cookie)[1]["user"]["language"], "ary")
+        email = self.email()
+        s, r, _ = call("POST", "/api/auth/register", {"name": "Ann Lee", "email": email, "password": "correct horse", "language": "ary"}, cookie=None)
+        self.assertEqual(s, 200, r)
+        mail = [m for m in map(json.loads, OUTBOX.read_text().splitlines()) if m["to"] == email][-1]
+        self.assertIn("السلام", mail["text"])
+        self.assertIn(mail["code"], mail["subject"])
+        s, js, _ = call("GET", "/static/i18n-ary.js", cookie=None)
+        self.assertEqual(s, 200)
+        self.assertIn("window.I18N.ary", js)
+
     def test_home_is_a_dashboard_only_for_confirmed_accounts(self):
         page = lambda cookie: call("GET", "/", cookie=cookie)[1]
-        self.assertIn("Describe a page", page(None))
-        self.assertIn("Describe a page", page(register(self.email(), confirm=False)))
+        self.assertIn("Hire a team of agents", page(None))
+        self.assertIn("Hire a team of agents", page(register(self.email(), confirm=False)))
         self.assertIn("<title>Dashboard", page(register(self.email())))
         for cookie in (None, register(self.email())):      # it changes on login, so a browser must not reuse a copy
             self.assertEqual(call("GET", "/", cookie=cookie)[2]["cache-control"], "no-store")

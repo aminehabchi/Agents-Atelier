@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#0f1117">
 <title>Profile · Agents Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/site.css">
 <script src="/static/i18n.js"></script>
@@ -74,7 +74,7 @@
   @media (max-width: 760px) { .brand-grid { grid-template-columns: minmax(0, 1fr); } }
   .danger-zone { border-color: var(--danger); }
   .danger-zone h2 { color: var(--danger); }
-  dialog.modal .pf { text-align: left; }
+  dialog.modal .pf { text-align: start; }
 
   @media (max-width: 900px) {
     .layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
@@ -167,7 +167,7 @@ async function load() {
           <h2>Preferences</h2>
           <p>Saved on your account, so they follow you to your other devices.</p>
           <div class="prefs">
-            ${seg("lang", "Language", "lang-label", getLang(), [["en", "English", "", true], ["fr", "Français", "", true]])}
+            ${seg("lang", "Language", "lang-label", getLang(), [["en", "English", "", true], ["fr", "Français", "", true], ["ary", "الدارجة", "", true]])}
             ${seg("pref-theme", "Appearance", "theme-label", getTheme(), [["system", "System", "monitor"], ["light", "Light", "sun"], ["dark", "Dark", "moon"]])}
           </div>
         </section>
@@ -323,7 +323,7 @@ async function load() {
     refreshBrand();
   });
   $("swatches").addEventListener("click", (e) => {
-    if (e.target.closest("#add-color")) { colors.push(["#0063e1", "#111111", "#f4f4f5", "#e5a823", "#2f855a", "#c53030"][colors.length] || "#888888"); paintColors(); }
+    if (e.target.closest("#add-color")) { colors.push(["#4f5bd5", "#f2b632", "#1fa97a", "#14161f", "#f3f4f8", "#e5484d"][colors.length] || "#888888"); paintColors(); }
     const del = e.target.closest("[data-del]");
     if (del) { colors.splice(+del.dataset.del, 1); paintColors(); }
   });
