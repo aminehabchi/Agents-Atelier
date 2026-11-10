@@ -7,7 +7,8 @@ __pycache__/
 .pytest_cache/
 
 # Your files: agents' instructions and every project's site, versions, uploads and screenshots (local data, can be large)
-storage/
+storage/*
+!storage/.gitkeep
 # The folder of earlier versions (imported into storage/ on the first start; delete it once you've checked the import)
 work/
 

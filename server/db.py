@@ -44,6 +44,7 @@ async def init():
     async with pool.acquire() as con:
         applied = await migrate.apply_all(con)
         import storage                    # agents' instructions live in files: move any a migration just wrote
+        storage.check_writable()
         moved = await storage.export_instructions(con)
         await storage.forget_deleted_agents(con)
     if moved:

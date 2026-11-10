@@ -74,6 +74,20 @@ def _hash_file(p: Path) -> str:
     return h.hexdigest()
 
 
+def check_writable():
+    """Make the folders, or stop with a message that says how to fix their owner (a folder Docker created belongs to root)."""
+    import os
+    try:
+        for d in (ROOT, AGENTS, WORKS):
+            d.mkdir(parents=True, exist_ok=True)
+        probe = ROOT / ".write-test"
+        probe.write_text("ok")
+        probe.unlink()
+    except PermissionError:
+        raise SystemExit(f"Can't write to {ROOT} (STORAGE_DIR). It probably belongs to root because Docker created it. "
+                         f"Fix it with:  sudo chown -R {os.getuid()}:{os.getgid()} {ROOT}")
+
+
 class Store:
     def __init__(self):
         self.pool = None
@@ -87,9 +101,7 @@ class Store:
 
     async def start(self, pool):
         self.pool = pool
-        ROOT.mkdir(parents=True, exist_ok=True)
-        AGENTS.mkdir(exist_ok=True)
-        WORKS.mkdir(exist_ok=True)
+        check_writable()
         self.projects, self.versions, self.seq = {}, {}, {}
         async with pool.acquire() as con:
             for r in await con.fetch("SELECT * FROM projects"):
