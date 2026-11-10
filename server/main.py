@@ -1423,7 +1423,8 @@ async def delete_project(pid: str):
 @app.get("/api/projects/{pid}/files")
 async def list_files(pid: str):
     """Every file with its size. Text content is included only for files small enough to edit."""
-    folder = site_dir(load_meta(pid)["id"])
+    pid = load_meta(pid)["id"]
+    folder = site_dir(pid)
     files = []
     for p in sorted(folder.rglob("*")) if folder.exists() else []:
         if not p.is_file() or p.relative_to(folder).parts[0] == browser_check.CHECK_DIR:
@@ -1432,7 +1433,7 @@ async def list_files(pid: str):
         item = {"path": str(p.relative_to(folder)), "size": size, "content": None,
                 "kind": "image" if p.suffix.lower() in IMAGE_EXT else "text" if p.suffix.lower() in TEXT_EXT else "other"}
         if item["kind"] == "image":
-            item["url"] = f"/work/{folder.name}/{item['path']}"
+            item["url"] = f"/work/{pid}/{item['path']}"   # the folder is works/<pid>/site, so not folder.name
         elif size > MAX_EDIT:
             item["too_large"] = True
         else:
@@ -1962,8 +1963,9 @@ async def get_stats(request: Request, project: str | None = None, page: int | No
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
-@app.get("/work/{pid}")
-@app.get("/work/{pid}/{path:path}")
+# HEAD too: the studio asks with HEAD whether a page exists before loading it in the preview.
+@app.api_route("/work/{pid}", methods=["GET", "HEAD"])
+@app.api_route("/work/{pid}/{path:path}", methods=["GET", "HEAD"])
 async def serve_site(request: Request, pid: str, path: str = ""):
     """A project's website (works/<pid>/site/), reached by its unguessable id and always sandboxed (see no_cache)."""
     try:

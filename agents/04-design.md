@@ -17,11 +17,13 @@ Read: ## Brief and ## Structure in plan.md, and style.css if it exists.
    - A fluid type scale with clamp(): --text-sm, --text-base, --text-lg, --text-xl, --text-2xl, --text-3xl, --text-display. --text-base is at least 16px and --text-sm at least 14px.
    - Typography hierarchy: --leading-tight (headings) and --leading-body, --weight-regular/medium/bold, and in ## Design tokens which size and weight go to headings, subtitles, body text and labels.
    - Spacing: --space-1 … --space-8 on a 4px or 8px rhythm (largest step no more than 64px), plus --section-y: clamp(48px, 8vw, 96px) for section padding.
+   - Spacing roles, so every agent uses the same gap in the same situation: --gap-inline (icon to text, between badges or chips: 8px), --gap-stack (label to field, heading to its text: 8–12px), --gap-group (between items in a list, nav links, form rows: 16px), --gap-grid (between cards and columns: 24px), --gap-block (heading block to the content below it: 32–40px). Each is a var() of a --space-* step.
+   - Layout sizes: --card-min (the smallest card width before a grid drops a column, about 240–280px), --measure (65ch, the widest a text block may be) and --header-h (the header height on desktop, for sticky offsets).
    - Icon sizes: --icon-sm (16px), --icon-md (20px), --icon-lg (24px).
    - --radius-sm/md/lg/pill, and state which one buttons, inputs and cards use (each component type always uses the same one).
    - --shadow-sm/md only: subtle and soft. No decorative gradients; at most one, only if the brand truly needs it.
    - --container (max width), --ease-out, --dur-fast (150ms) / --dur-base (250ms) / --dur-slow (400ms).
 2. Below it, add only a minimal base: box-sizing, body font, color and background, img { max-width: 100% }.
-3. In ## Design tokens in plan.md, summarise the choices and why they fit the tone, and give the exact Google Fonts <link> URL for the HTML agent.
+3. In ## Design tokens in plan.md, summarise the choices and why they fit the tone, list which spacing role each kind of element uses, and give the exact Google Fonts <link> URL for the HTML agent.
 
 Do not style components. Do not invent extra colours later agents will need to guess at.

@@ -78,7 +78,10 @@ host.addEventListener("change", () => { dirty = true; });
 window.addEventListener("beforeunload", (e) => { if (dirty && !saving) e.preventDefault(); });   // long form: don't lose it to a stray click
 
 (async () => {
-const form = fillProjectForm(host, { allowImport: true, askAssets: true, heading: false, cancelHref: "/projects" }, async (details, e) => {
+// The brand kit section only shows when it gets its sources (your other projects' kits to copy from): [] still shows it.
+let brandSources = [];
+try { brandSources = await api("/api/brand/sources"); } catch {}
+const form = fillProjectForm(host, { allowImport: true, askAssets: true, heading: false, cancelHref: "/projects", brandSources }, async (details, e) => {
   e.preventDefault();
   const go = host.querySelector('button[value="ok"]');
   if (go.disabled) return;

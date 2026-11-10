@@ -17,6 +17,15 @@ Write the styles below the :root block in style.css, in this order: base element
 - Clear hierarchy: size, weight and spacing do the work; even, compact vertical rhythm (sections use --section-y, nothing larger). Sections, the hero included, fit their content: no vh/dvh heights or min-heights, no scroll-snap. No empty bands or big blank areas.
 - Icon + text pairs (buttons, nav items, feature lists, badges, contact lines): one shared pattern, e.g. `.icon-text { display: inline-flex; align-items: center; gap: var(--space-2); }` and `.icon-text svg, .icon { width: var(--icon-md); height: var(--icon-md); flex-shrink: 0; display: block; }`. Apply it everywhere an icon sits next to text.
 - Grids of cards: `align-items: stretch`, cards as flex columns with the action pushed down (`margin-top: auto`) so buttons line up.
+- Layout recipes for busy areas (use them, don't improvise):
+  - Card grids: `display: grid; grid-template-columns: repeat(auto-fit, minmax(min(var(--card-min), 100%), 1fr)); gap: var(--gap-grid);`. Count the items: if the last row would hold a single card on desktop, pick a fixed column count that divides them (e.g. 3 for 6, 2 or 4 for 4, 3 for 7 with the last item spanning) instead of auto-fit.
+  - Header: logo, nav and actions in one flex row (`align-items: center; gap: var(--gap-group)`), the nav taking the free space. The header never wraps onto two rows: if the links don't fit at a width, the Responsive agent's menu button takes over there. Hide secondary header buttons before the nav gets cramped.
+  - Rows of small items (badges, chips, prices with labels, contact lines, room facts): `display: flex; flex-wrap: wrap; gap: var(--gap-inline) var(--gap-group);`, each item an inline-flex unit that never breaks inside (`white-space: nowrap` on short labels only).
+  - Media + text splits: `display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap-grid); align-items: center;`. The image fills its cell (`width: 100%; height: 100%; object-fit: cover`) so neither side leaves a blank band; on phones it becomes one column.
+  - Forms: a grid with `gap: var(--gap-group)`. Short related fields (dates, guests, phone) share a row via `grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr))`; every field is a label-above-input stack with `gap: var(--gap-stack)`.
+  - Footer: an auto-fit grid of columns, then one full-width bottom row for credits and legal links.
+  - Every flex/grid child that holds text gets `min-width: 0`; long words wrap with `overflow-wrap: anywhere`.
+- Text width: paragraphs use `max-width: var(--measure)`, but the section around them is not left half empty; pair a short text block with an image, a list or a second column.
 - Interaction states, all with tokens:
   - Buttons: default, :hover, :active, :disabled / [aria-disabled="true"], and loading ([aria-busy="true"]: a small spinner, label kept, no width jump).
   - Inputs: default, :focus-visible, error ([aria-invalid="true"]), success, :disabled. Errors show an icon and text next to the field, never colour alone.

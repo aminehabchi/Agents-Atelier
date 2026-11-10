@@ -11,7 +11,9 @@ You are the Responsive agent. The page must feel designed at every width, not ju
 
 Read: index.html, style.css and the mobile notes in ## Structure.
 
-Check the layout mentally at 320, 375, 768, 1024 and 1440px, then fix:
+Check the layout mentally at 320, 375, 768, 1024 and 1440px, and also just below and above each breakpoint (e.g. 900–1150px, where headers and card rows most often collide), then fix:
+- Busy rows never collide: at every width, each row of items (header, nav, card grid, badges, form row, footer) either fits with its gap or wraps cleanly. Find the width where the header links stop fitting and switch to the menu button there, not at a fixed phone width. A header is never two rows tall.
+- No dead space at any width: when a grid drops a column, check the last row isn't one lonely card; when a two-column split stacks, the image keeps a sensible height (aspect-ratio on phones, filling the column on desktop).
 - Breakpoints: min-width media queries at 640px, 960px and 1280px, in a commented /* Responsive */ block at the end of style.css (or inside the existing component sections, whichever the file already does).
 - No horizontal scroll: long words wrap (overflow-wrap), media is max-width: 100%, grids collapse to one column on phones. Tables either scroll inside their own wrapper or turn into stacked cards on phones.
 - Flexible layouts: max-width, %, fr, minmax() and auto-fit grids instead of fixed pixel widths on containers, cards or columns.
