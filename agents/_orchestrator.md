@@ -56,7 +56,16 @@ Rules:
   - content: "write a blog post", "add an FAQ", "write the About page", longer text in general.
   - pricing: "add a pricing table", "show our plans", "add the menu with prices". With html and css only if the page is new.
   - gallery: "add a photo gallery", "show our photos", "lightbox".
-  - local: "show our hours and address", "add a map link", "local SEO", "click to call".
+  - local: "show our hours and address", "add a map link", "local SEO".
+  - whatsapp: "add a WhatsApp button", "a form that sends to WhatsApp", "contact us on WhatsApp".
+  - email: "add our email", "an email contact form", "let people email us".
+  - call: "click to call", "a call button", "make the phone number tappable".
+  - telegram: "add Telegram", "a Telegram contact form".
+  These four need a real contact detail. When you choose one and its detail (WhatsApp number, email address, phone
+  number, Telegram username) is not in the request, <project_brief> or <project_state>, don't choose any agent yet:
+  answer with "unclear" and a form with one "text" question per missing detail, with a "placeholder" showing the format
+  (e.g. "+212 6 12 34 56 78", "@clinique_alamal"). Once the user answered, choose the agents. If they skipped it,
+  choose them anyway: the agents leave the detail empty and hide that button until the owner adds it.
   - 3d-design, 3d-scene, depth: "add 3D", "a 3D logo", "a rotating product", "make it interactive in 3D", "tilting cards",
     "parallax". 3d-design plans first; 3d-scene builds a real 3D object (WebGL); depth adds CSS 3D effects (tilt, parallax,
     flip). For a light touch ("make the cards tilt") choose depth alone.

@@ -1770,3 +1770,17 @@ Object.assign(window.I18N.ary, {
   "This plan is no longer waiting. Send your request again.": "هاد الخطة ما بقاتش كتسنى. عاود صيفط الطلب ديالك.",
   "These questions are no longer open. Send your request again.": "هاد الأسئلة ما بقاوش مفتوحين. عاود صيفط الطلب ديالك.",
 });
+
+/* Contact agents: WhatsApp, Email contact, Click-to-call, Telegram, and the Contact options team */
+Object.assign(window.I18N.ary, {
+  "WhatsApp": "واتساب", "Email contact": "التواصل بالإيميل", "Click-to-call": "عيّط بكليكة", "Telegram": "تيليغرام",
+  "Adds a WhatsApp button and a short form that opens WhatsApp with the visitor's message already written.": "كيزيد بوطونة ديال واتساب وفورمولير قصير كيحل واتساب والرسالة ديال الزائر مكتوبة من قبل.",
+  "Adds email contact: a mailto link and a short form that opens the visitor's email app with the message ready, plus a copy button.": "كيزيد التواصل بالإيميل: ليان mailto وفورمولير قصير كيحل تطبيق الإيميل ديال الزائر والرسالة واجدة، وبوطونة باش ينسخ العنوان.",
+  "Makes every phone number tappable, adds a clear call button on phones and a copy option on computers.": "كيخلّي كل نمرة تيليفون تتكليكا، كيزيد بوطونة ديال التعيط باينة فالتيليفون، واختيار باش تنسخ النمرة فالكمبيوتر.",
+  "Adds a Telegram button and a short form that prepares the visitor's message, copies it and opens the Telegram chat.": "كيزيد بوطونة ديال تيليغرام وفورمولير قصير كيوجّد الرسالة ديال الزائر، كينسخها وكيحل الشات ديال تيليغرام.",
+  "Contact options": "طرق التواصل",
+  "WhatsApp, email, Telegram and call buttons, with short forms that open each app with the message ready.": "بوطونات ديال واتساب، الإيميل، تيليغرام والتعيط، مع فورموليرات قصيرة كتحل كل تطبيق والرسالة واجدة.",
+  "Add ways to contact us: [WhatsApp / email / Telegram / phone].": "زيد طرق باش يتواصلو معانا: [واتساب / إيميل / تيليغرام / تيليفون].",
+  "WhatsApp number: [+212 6…]. Email: [hello@…]. Telegram username: [@…]. Phone: [05 22 …].": "نمرة واتساب: [+212 6…]. الإيميل: [hello@…]. سمية تيليغرام: [@…]. التيليفون: [05 22 …].",
+  "Put the contact forms on the [Contact] page, and the buttons in the footer of every page.": "حط الفورموليرات ديال التواصل فصفحة [Contact]، والبوطونات فالتحت ديال كل صفحة.",
+});

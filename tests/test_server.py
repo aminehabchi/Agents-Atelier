@@ -860,6 +860,17 @@ class T06bOrchestrator(unittest.TestCase):
         self.assertNotIn("run_start", types(events))
         self.assertEqual(self.answer(pid, {"action": "confirm"})[-1]["type"], "error")
 
+    def test_contact_agents_can_be_picked_even_if_off(self):
+        pid = self.built()
+        plan = self.prompt(pid, "add whatsapp, email, call and telegram buttons [[orch:whatsapp,email,call,telegram]]")[2]
+        self.assertEqual(plan["agents"], ["brief", "whatsapp", "email", "call", "telegram", "qa", "critic"])
+        agents = {a["id"]: a for a in call("GET", "/api/agents")[1]}
+        for i in ("whatsapp", "email", "call", "telegram"):
+            self.assertFalse(agents[i]["default"], i)                                   # helpers: off until needed
+            self.assertIn("CONTACT", call("GET", f"/api/agents/{i}")[1]["role"], i)        # one shared place for the details
+        teams = {t["id"]: t for t in call("GET", "/api/presets")[1]}
+        self.assertEqual(teams["contact-options"]["agents"][:4], ["whatsapp", "email", "call", "telegram"])
+
     def test_broken_answer_falls_back_to_the_whole_team(self):
         pid = self.built()
         events = self.prompt(pid, "do something [[orch-garbage]]")

@@ -24,7 +24,7 @@ FINISHERS = ("qa", "critic")            # run after any change to the code, when
 READ_ONLY = {"brief", "critic", "qa", "research"}   # agents whose choice alone doesn't count as a code change
 # Helpers that may be chosen when the request clearly asks for what they do, even if switched off (never in a fallback).
 ON_REQUEST = {"research", "auditor", "content", "translator", "legal", "dark-theme", "pricing", "gallery", "forms", "conversion", "local", "tidy",
-              "3d-design", "3d-scene", "depth"}
+              "3d-design", "3d-scene", "depth", "whatsapp", "email", "call", "telegram"}
 INTENTS = {"new_build", "change", "redo_agent", "question", "off_topic", "unclear", "confirm"}
 TALK = {"question", "off_topic", "unclear"}   # intents where no agent runs: the Orchestrator answers in the chat
 # "confirm": the agents are chosen but wait until the user says yes (a big or ambiguous request). "unclear" may carry a

@@ -282,6 +282,21 @@
     "prompt": "Add a [contact / booking / quote request] form to the [Contact] page.\nFields: [name, email, phone, date, number of guests, message].\nAfter sending, tell visitors: [what happens next, e.g. \"we reply within a day\"]."
   },
   {
+    "id": "contact-options",
+    "name": "Contact options",
+    "description": "WhatsApp, email, Telegram and call buttons, with short forms that open each app with the message ready.",
+    "agents": [
+      "whatsapp",
+      "email",
+      "call",
+      "telegram",
+      "responsive",
+      "a11y",
+      "qa"
+    ],
+    "prompt": "Add ways to contact us: [WhatsApp / email / Telegram / phone].\nWhatsApp number: [+212 6…]. Email: [hello@…]. Telegram username: [@…]. Phone: [05 22 …].\nPut the contact forms on the [Contact] page, and the buttons in the footer of every page."
+  },
+  {
     "id": "boost-conversions",
     "name": "Boost conversions",
     "description": "More visitors take the main action: clearer offer, real proof, less friction.",

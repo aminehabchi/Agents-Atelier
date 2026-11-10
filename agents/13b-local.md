@@ -20,3 +20,5 @@ Add or improve, with the existing classes and tokens:
 - The city or area in the <title>, the meta description and the main heading or subheading where it reads naturally.
 
 On phones, the call and directions actions are easy to tap and visible early on the page.
+
+If the WhatsApp, Email contact, Click-to-call or Telegram agent worked on this site, keep their buttons, forms and the `CONTACT` details at the top of script.js: use the same numbers and address, add to their `.contact-channels` list instead of making a second one, and never add a second floating button.

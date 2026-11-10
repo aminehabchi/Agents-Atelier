@@ -1047,3 +1047,17 @@ Object.assign(window.I18N.fr, {
   "This plan is no longer waiting. Send your request again.": "Ce plan n'est plus en attente. Renvoyez votre demande.",
   "These questions are no longer open. Send your request again.": "Ces questions ne sont plus ouvertes. Renvoyez votre demande.",
 });
+
+/* Contact agents: WhatsApp, Email contact, Click-to-call, Telegram, and the Contact options team */
+Object.assign(window.I18N.fr, {
+  "WhatsApp": "WhatsApp", "Email contact": "Contact par e-mail", "Click-to-call": "Appel en un clic", "Telegram": "Telegram",
+  "Adds a WhatsApp button and a short form that opens WhatsApp with the visitor's message already written.": "Ajoute un bouton WhatsApp et un court formulaire qui ouvre WhatsApp avec le message du visiteur déjà écrit.",
+  "Adds email contact: a mailto link and a short form that opens the visitor's email app with the message ready, plus a copy button.": "Ajoute le contact par e-mail : un lien mailto et un court formulaire qui ouvre l'application e-mail du visiteur avec le message prêt, plus un bouton pour copier l'adresse.",
+  "Makes every phone number tappable, adds a clear call button on phones and a copy option on computers.": "Rend chaque numéro cliquable, ajoute un bouton d'appel visible sur téléphone et une option pour copier sur ordinateur.",
+  "Adds a Telegram button and a short form that prepares the visitor's message, copies it and opens the Telegram chat.": "Ajoute un bouton Telegram et un court formulaire qui prépare le message du visiteur, le copie et ouvre la discussion Telegram.",
+  "Contact options": "Moyens de contact",
+  "WhatsApp, email, Telegram and call buttons, with short forms that open each app with the message ready.": "Boutons WhatsApp, e-mail, Telegram et appel, avec de courts formulaires qui ouvrent chaque application avec le message prêt.",
+  "Add ways to contact us: [WhatsApp / email / Telegram / phone].": "Ajoute des moyens de nous contacter : [WhatsApp / e-mail / Telegram / téléphone].",
+  "WhatsApp number: [+212 6…]. Email: [hello@…]. Telegram username: [@…]. Phone: [05 22 …].": "Numéro WhatsApp : [+212 6…]. E-mail : [bonjour@…]. Nom d'utilisateur Telegram : [@…]. Téléphone : [05 22 …].",
+  "Put the contact forms on the [Contact] page, and the buttons in the footer of every page.": "Mets les formulaires de contact sur la page [Contact], et les boutons dans le pied de page de chaque page.",
+});
