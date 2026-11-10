@@ -25,6 +25,8 @@ The Orchestrator (its system prompt starts "You are the Orchestrator") answers w
 markers inside <user_request>:
   [[orch:css,js]]   picks those agents (default: css)
   [[orch-talk]]     no agent: asks the user a question
+  [[orch-form]]     no agent: asks a short form (once answered, picks css)
+  [[orch-confirm]]  picks design + css, but waits for the user's yes
   [[orch-garbage]]  replies with text that isn't JSON (the server falls back to the whole team)
 
 Every call is appended to $FAKE_CLAUDE_LOG as one JSON line: {"argv": [...], "cwd": "..."}.
@@ -83,6 +85,14 @@ if role.startswith("You are the Orchestrator"):
     pick = re.search(r"\[\[orch:([a-z0-9,-]+)\]\]", req)
     if "[[orch-garbage]]" in req:
         answer = "I think the CSS agent should do it."
+    elif "[[orch-form]]" in req and "My answers to your questions" not in req:
+        answer = json.dumps({"intent": "unclear", "agents": [], "reason": "", "reply": "A few details first:",
+                             "questions": [{"text": "Which page?", "kind": "single", "options": ["Home", "About"]},
+                                           {"text": "Which colours?", "kind": "multi", "options": ["Blue", "Green", "Red"]},
+                                           {"text": "The business name?", "kind": "text", "placeholder": "e.g. Al Amal"}]})
+    elif "[[orch-confirm]]" in req:
+        answer = json.dumps({"intent": "confirm", "agents": ["design", "css"], "notes": {"css": "note for css"},
+                             "reason": "A full redesign.", "reply": "The team will redesign every page. Go ahead?"})
     elif "[[orch-talk]]" in req:
         answer = json.dumps({"intent": "unclear", "agents": [], "reason": "", "reply": "Which section should change?"})
     else:

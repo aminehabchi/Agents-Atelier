@@ -754,7 +754,7 @@ class T06bOrchestrator(unittest.TestCase):
         async def script(sock, recv):
             await sock.send(send({"type": "prompt", "text": text, "agents": pool or self.POOL}))
             events = await recv(until)
-            if events[-1]["type"] == "plan" and events[-1]["agents"]:
+            if events[-1]["type"] == "plan" and events[-1]["agents"] and not events[-1].get("confirm"):
                 events += await recv(("run_done", "error", "run_stopped"))
             return events
         return ws(pid, script)
@@ -804,6 +804,61 @@ class T06bOrchestrator(unittest.TestCase):
         self.prompt(pid, "the header [[orch:css]]")
         orch_prompt = log_calls()[0]["argv"][log_calls()[0]["argv"].index("-p") + 1]
         self.assertIn("Which section should change?", orch_prompt)             # the next prompt can answer it
+
+    def answer(self, pid, msg, until=("run_done", "error", "run_stopped", "plan")):
+        """Answer the Orchestrator in the chat; collect events until the run ends or it replies again."""
+        async def script(sock, recv):
+            await sock.send(send({"type": "answer", **msg}))
+            events = await recv(until)
+            if events[-1]["type"] == "plan" and events[-1]["agents"] and not events[-1].get("confirm"):
+                events += await recv(("run_done", "error", "run_stopped"))
+            return events
+        return ws(pid, script)
+
+    def test_form_questions_are_answered_then_the_team_runs(self):
+        pid = self.built()
+        events = self.prompt(pid, "add a section [[orch-form]]")
+        plan = events[-1]
+        self.assertEqual((plan["type"], plan["agents"], plan["intent"]), ("plan", [], "unclear"))
+        self.assertEqual([(q["id"], q["kind"]) for q in plan["questions"]], [("q1", "single"), ("q2", "multi"), ("q3", "text")])
+        self.assertNotIn("run_start", types(events))
+        events = self.answer(pid, {"action": "answers", "answers": {"q1": "About", "q2": ["Blue", "Teal"]}})
+        user = events[0]
+        self.assertEqual(user["type"], "user")
+        self.assertEqual(user["answers"], [{"question": "Which page?", "answer": "About"},
+                                           {"question": "Which colours?", "answer": "Blue, Teal"},
+                                           {"question": "The business name?", "answer": "No preference: decide for me"}])
+        self.assertIn("My answers to your questions:\n- Which page? About", user["text"])
+        self.assertEqual(events[-1]["type"], "run_done")
+        meta = call("GET", f"/api/projects/{pid}")[1]
+        self.assertIn("- Which colours? Blue, Teal", meta["history"][-1])        # the agents read the answers
+        again = self.answer(pid, {"action": "answers", "answers": {"q1": "Home"}})
+        self.assertEqual(again[-1]["type"], "error")                             # the form is closed once answered
+
+    def test_big_change_waits_for_a_yes(self):
+        pid = self.built()
+        events = self.prompt(pid, "redesign everything [[orch-confirm]]")
+        plan = events[-1]
+        self.assertEqual(plan["type"], "plan")
+        self.assertTrue(plan["confirm"])
+        self.assertEqual(plan["agents"], ["brief", "css", "qa", "critic"])         # design is switched off
+        self.assertEqual(plan["reply"], "The team will redesign every page. Go ahead?")
+        self.assertNotIn("run_start", types(events))
+        self.assertFalse(call("GET", f"/api/projects/{pid}")[1]["busy"])
+        LOG.write_text("")
+        events = self.answer(pid, {"action": "confirm"}, until=("run_done", "error", "run_stopped"))
+        self.assertEqual((events[0]["type"], events[0]["action"]), ("answer", "confirm"))
+        self.assertEqual([e["agent"] for e in events if e["type"] == "agent_done"], ["brief", "css", "qa", "critic"])
+        self.assertFalse([c for c in log_calls() if "You are the Orchestrator" in json.dumps(c["argv"])])   # no second Orchestrator call
+        self.assertEqual(self.answer(pid, {"action": "confirm"})[-1]["type"], "error")         # nothing waits any more
+
+    def test_a_plan_can_be_cancelled(self):
+        pid = self.built()
+        self.prompt(pid, "redesign everything [[orch-confirm]]")
+        events = self.answer(pid, {"action": "cancel"}, until=("answer", "error"))
+        self.assertEqual((events[-1]["type"], events[-1]["action"]), ("answer", "cancel"))
+        self.assertNotIn("run_start", types(events))
+        self.assertEqual(self.answer(pid, {"action": "confirm"})[-1]["type"], "error")
 
     def test_broken_answer_falls_back_to_the_whole_team(self):
         pid = self.built()

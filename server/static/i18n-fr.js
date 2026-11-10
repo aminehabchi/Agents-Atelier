@@ -1032,3 +1032,18 @@ window.I18N_FR = {
 window.I18N = window.I18N || {};
 window.I18N.fr = window.I18N_FR;
 (window.I18N_PATTERNS = window.I18N_PATTERNS || {}).fr = window.I18N_FR_PATTERNS;
+
+/* The Orchestrator's questions and plans to confirm (studio chat) */
+Object.assign(window.I18N.fr, {
+  "<b>Orchestrator:</b> a plan to confirm": "<b>Orchestrateur :</b> un plan à confirmer",
+  "<b>Orchestrator:</b> one question before the team starts": "<b>Orchestrateur :</b> une question avant que l'équipe commence",
+  "<b>Orchestrator:</b> a few questions before the team starts": "<b>Orchestrateur :</b> quelques questions avant que l'équipe commence",
+  "Yes, start": "Oui, commencer", "Or write what to change below.": "Ou écrivez ci-dessous ce qu'il faut changer.",
+  "Send answers": "Envoyer les réponses", "Skip, let the team decide": "Passer, l'équipe décide",
+  "You can leave any question blank.": "Vous pouvez laisser une question sans réponse.",
+  "Or type your own answer": "Ou écrivez votre propre réponse", "Type your answer": "Écrivez votre réponse", "Your own answer": "Votre propre réponse",
+  "Answered": "Répondu", "You sent a new message instead": "Vous avez envoyé un nouveau message à la place",
+  "Confirmed: the team is starting": "Confirmé : l'équipe commence", "Cancelled: nothing ran": "Annulé : rien ne s'est exécuté",
+  "This plan is no longer waiting. Send your request again.": "Ce plan n'est plus en attente. Renvoyez votre demande.",
+  "These questions are no longer open. Send your request again.": "Ces questions ne sont plus ouvertes. Renvoyez votre demande.",
+});

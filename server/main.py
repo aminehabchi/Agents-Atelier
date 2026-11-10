@@ -2609,11 +2609,15 @@ async def run_prompt(pid: str, request: str, pool: list[str], images: list[str])
             plan = orch.decide(None, pool, order)
     await broadcast(pid, {"type": "plan", **plan})
     meta = load_meta(pid)
-    # The Orchestrator answered or asked a question: keep that exchange (not in the history the agents read),
-    # so the user's next prompt can simply answer it. A run that starts clears it.
-    meta["last_exchange"] = None if plan["agents"] else {"request": request[:1000], "reply": plan["reply"]}
+    # The Orchestrator answered, asked (a question or a short form) or wants a yes first: keep that exchange (not in the
+    # history the agents read), so the user's next prompt or the form's answers can simply follow it. A run clears it.
+    waiting = not plan["agents"] or plan.get("confirm")
+    asked = plan.get("reply") or "\n".join(q["text"] for q in plan.get("questions") or [])
+    meta["last_exchange"] = {"request": request[:PROMPT_LIMIT], "reply": asked, "questions": plan.get("questions") or [],
+                             "images": images} if waiting else None
+    meta["pending"] = {"request": request, "plan": plan, "images": images} if plan.get("confirm") else None
     save_meta(meta)
-    if plan["agents"]:
+    if plan["agents"] and not plan.get("confirm"):
         await run_chain(pid, request, plan["agents"], images=images, plan=plan)
 
 
@@ -2728,9 +2732,61 @@ async def ws_endpoint(ws: WebSocket, pid: str):
         st["clients"].discard(ws)
 
 
+async def handle_answer(ws: WebSocket, pid: str, st: dict, msg: dict):
+    """The user answered the Orchestrator in the chat:
+      {action: "confirm"}                 start the plan it proposed (no new Orchestrator call)
+      {action: "cancel"}                  drop that plan
+      {action: "answers", answers: {...}} its short form, answered: the request + answers go back to the Orchestrator"""
+    if is_busy(pid):
+        await ws.send_json({"type": "error", "text": "Agents are already working. Stop them first."})
+        return
+    meta = load_meta(pid)
+    action = msg.get("action")
+    if action in ("confirm", "cancel"):
+        pending = meta.get("pending")
+        if not pending:
+            await ws.send_json({"type": "error", "text": "This plan is no longer waiting. Send your request again."})
+            return
+        meta["pending"] = None
+        if action == "cancel":
+            save_meta(meta)
+            await broadcast(pid, {"type": "answer", "action": "cancel"})
+            return
+        valid = {a["id"] for a in await project_agents(meta)}
+        plan = {**pending["plan"], "confirm": False}
+        plan["agents"] = [i for i in plan["agents"] if i in valid]
+        if not plan["agents"]:
+            save_meta(meta)
+            await ws.send_json({"type": "error", "text": "None of the planned agents exist any more. Send your request again."})
+            return
+        meta["last_exchange"] = None
+        save_meta(meta)
+        await broadcast(pid, {"type": "answer", "action": "confirm"})
+        st["task"] = asyncio.create_task(run_chain(pid, pending["request"], plan["agents"], images=pending.get("images") or [],
+                                                   plan=plan))
+        return
+    if action != "answers" or not isinstance(msg.get("answers"), dict):
+        await ws.send_json({"type": "error", "text": "The server couldn't read those answers."})
+        return
+    ex = meta.get("last_exchange") or {}
+    if not ex.get("questions"):
+        await ws.send_json({"type": "error", "text": "These questions are no longer open. Send your request again."})
+        return
+    text, pairs = orch.answers_text(ex["request"], ex["questions"], msg["answers"])
+    text = text[:PROMPT_LIMIT]
+    meta["pending"] = None
+    save_meta(meta)
+    await broadcast(pid, {"type": "user", "text": text, "answers": pairs, "images": []})
+    st["task"] = asyncio.create_task(run_prompt(pid, text, meta.get("agents") or await default_ids(await owner_of(meta)),
+                                                ex.get("images") or []))
+
+
 async def handle_ws_message(ws: WebSocket, pid: str, st: dict, msg: dict):
-    """One message from the studio: prompt, stop, continue, restart or retry."""
+    """One message from the studio: prompt, answer (to the Orchestrator's form or plan), stop, continue, restart or retry."""
     kind = msg.get("type")
+    if kind == "answer":
+        await handle_answer(ws, pid, st, msg)
+        return
     if kind not in ("prompt", "stop", "continue", "restart", "retry"):
         await ws.send_json({"type": "error", "text": f"Unknown message type “{clean_text(kind, 40)}”."})
         return

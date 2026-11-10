@@ -326,6 +326,35 @@
   .msg.orch .picks span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 8px; border-radius: var(--r); box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink); }
   .msg.orch .picks svg { flex-shrink: 0; display: block; }
   .msg.orch .note { margin: 8px 0 0; font-size: 12px; color: var(--stone); }
+  /* The Orchestrator asks: a short form, or a plan waiting for a yes */
+  .msg.orch.asking { box-shadow: inset 0 0 0 1.5px rgb(var(--sky-rgb) / .55); }
+  .ask { display: grid; gap: 16px; margin-top: 14px; }
+  .ask fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 8px; }
+  .ask legend { display: flex; align-items: baseline; gap: 8px; padding: 0; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--ink); line-height: 1.4; }
+  .ask legend .num { flex-shrink: 0; min-width: 20px; height: 20px; display: inline-grid; place-items: center; border-radius: var(--r-pill); background: var(--ice); color: var(--sky); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .ask .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ask .opt { position: relative; display: inline-flex; min-width: 0; }
+  .ask .opt input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .ask .opt span { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 12px; border-radius: var(--r-pill); background: var(--paper);
+                   box-shadow: var(--ring); font-size: 13px; line-height: 1.3; color: var(--ink); transition: background .15s, box-shadow .15s; }
+  .ask .opt span svg { width: 14px; height: 14px; flex-shrink: 0; display: none; color: var(--sky); }
+  .ask .opt:hover span { background: var(--ice); }
+  .ask .opt input:checked + span { background: var(--ice); box-shadow: inset 0 0 0 1.5px var(--sky); }
+  .ask .opt input:checked + span svg { display: block; }
+  .ask .opt input:focus-visible + span { outline: 2px solid var(--sky); outline-offset: 2px; }
+  .ask .free { width: 100%; min-width: 0; height: 36px; padding: 0 12px; border: 0; border-radius: var(--r-field); background: var(--field); color: var(--ink); font: inherit; font-size: 13px; }
+  .ask .free:focus-visible { outline: 2px solid var(--sky); outline-offset: 1px; }
+  .ask .ask-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 4px; }
+  .ask .ask-bar .hint { margin-inline-start: auto; font-size: 12px; color: var(--stone); }
+  .ask .btn[aria-busy="true"] { opacity: .7; pointer-events: none; }
+  .ask .done { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--stone); }
+  .ask .done svg { width: 14px; height: 14px; flex-shrink: 0; display: block; color: var(--ok); }
+  .msg.orch.answered .ask fieldset { opacity: .55; }
+  .msg.orch.answered .ask .opt input { cursor: default; }
+  .msg.user .qa { display: grid; gap: 6px; margin: 0; white-space: normal; }
+  .msg.user .qa dt { font-size: 12px; opacity: .7; }
+  .msg.user .qa dd { margin: 0 0 4px; }
+  @media (max-width: 640px) { .ask .ask-bar .hint { margin-inline-start: 0; flex-basis: 100%; } }
   .msg.sendback { align-self: stretch; background: var(--paper); box-shadow: var(--ring); border-radius: var(--r); padding: 14px 16px; }
   .msg.sendback .head { display: flex; gap: 10px; align-items: center; font-size: 14px; }
   .msg.sendback .head b { font-weight: 500; }
@@ -725,8 +754,14 @@ function handle(ev) {
       editDetails({ required: true, note: ev.text });
       break;
     case "user":
+      closeAsks(ev.answers ? "Answered" : "You sent a new message instead");
       addMsg(`<div class="msg user">${(ev.images || []).length ? `<div class="imgs">${ev.images.map(i =>
-        `<a href="${esc(mediaUrl(i))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(i))}" loading="lazy" decoding="async" alt="Reference image"></a>`).join("")}</div>` : ""}${esc(ev.text)}</div>`);
+        `<a href="${esc(mediaUrl(i))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(i))}" loading="lazy" decoding="async" alt="Reference image"></a>`).join("")}</div>` : ""}${
+        ev.answers ? `<dl class="qa">${ev.answers.map(p => `<dt>${esc(p.question)}</dt><dd>${esc(p.answer)}</dd>`).join("")}</dl>` : esc(ev.text)}</div>`);
+      break;
+    case "answer":
+      closeAsks(ev.action === "confirm" ? "Confirmed: the team is starting" : "Cancelled: nothing ran");
+      if (ev.action === "confirm") setBusy(true);
       break;
     case "run_start":
       setBusy(true);
@@ -805,6 +840,10 @@ function handle(ev) {
       break;
     case "error":
       setBusy(false); run = null; markStopped();
+      document.querySelectorAll(".msg.orch.asking [aria-busy]").forEach(b => {   // the answer didn't go through: let them try again
+        b.removeAttribute("aria-busy");
+        b.closest(".ask").querySelectorAll("button").forEach(x => x.disabled = false);
+      });
       addMsg(`<div class="msg error">${icon("alert", { size: 16 })}<span>${esc(ev.text)}</span></div>`);
       paused = ev.run?.resumable ? ev.run : paused;
       if (ev.run?.resumable) addResumeCard(ev.run);
@@ -1039,11 +1078,101 @@ function showPlan(ev) {
     card.insertAdjacentHTML("beforeend", `<div class="picks">${agents.map(a =>
       `<span title="${esc((ev.notes || {})[a.id] || a.description || "")}"><span style="color:${esc(a.color)}">${icon(a.icon, { size: 14 })}</span>${esc(a.name)}</span>`).join("")}</div>`);
   }
+  const asks = (ev.questions || []).length;
+  if (ev.confirm && head) head.innerHTML = `<b>Orchestrator:</b> a plan to confirm`;
+  else if (asks && head) head.innerHTML = `<b>Orchestrator:</b> ${asks === 1 ? "one question" : "a few questions"} before the team starts`;
+  if (why && (ev.confirm || asks)) { why.textContent = ev.reply || ""; why.setAttribute("data-no-i18n", ""); }
+  if (ev.confirm && !card.querySelector(".picks")) {
+    card.insertAdjacentHTML("beforeend", `<div class="picks">${agents.map(a =>
+      `<span title="${esc((ev.notes || {})[a.id] || a.description || "")}"><span style="color:${esc(a.color)}">${icon(a.icon, { size: 14 })}</span>${esc(a.name)}</span>`).join("")}</div>`);
+  }
   if (ev.fallback) card.insertAdjacentHTML("beforeend", `<p class="note">The Orchestrator couldn't decide, so every agent that's switched on runs.</p>`);
+  else if (ev.confirm) addConfirm(card);
+  else if (asks) addQuestions(card, ev.questions);
   else if (!agents.length) card.insertAdjacentHTML("beforeend", `<p class="note">No agent ran. Reply here to go on.</p>`);
   orchCard = null;
-  if (!agents.length) { setBusy(false); renderTeam(); }
+  if (!agents.length || ev.confirm) { setBusy(false); renderTeam(); }
   if (!replaying) scrollDown();
+}
+
+/* ---------- the Orchestrator's questions ----------
+   A plan to confirm (Yes, start / Cancel) or a short form (pick one, pick several, or type), answered in the chat.
+   A card closes as soon as the user answers, cancels or simply writes a new message. */
+function addConfirm(card) {
+  card.classList.add("asking");
+  card.insertAdjacentHTML("beforeend", `<div class="ask"><div class="ask-bar">
+    <button class="btn btn-dark btn-sm" type="button" data-ask="confirm">${icon("play", { size: 14 })}Yes, start</button>
+    <button class="btn btn-ghost btn-sm" type="button" data-ask="cancel">Cancel</button>
+    <span class="hint">Or write what to change below.</span></div></div>`);
+  card.querySelectorAll("[data-ask]").forEach(b => b.onclick = () => {
+    if (busy) return toast("Agents are already working. Stop them first.", "err");
+    card.querySelectorAll("[data-ask]").forEach(x => x.disabled = true);
+    b.setAttribute("aria-busy", "true");
+    if (!wsSend({ type: "answer", action: b.dataset.ask })) card.querySelectorAll("[data-ask]").forEach(x => { x.disabled = false; x.removeAttribute("aria-busy"); });
+  });
+}
+function addQuestions(card, questions) {
+  card.classList.add("asking");
+  const n = card.dataset.ask = `ask${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
+  const field = (q, i) => {
+    const name = `${n}-${q.id}`, type = q.kind === "multi" ? "checkbox" : "radio";
+    const opts = q.kind === "text" ? "" : `<div class="opts" role="${type === "radio" ? "radiogroup" : "group"}">${q.options.map(o =>
+      `<label class="opt"><input type="${type}" name="${esc(name)}" value="${esc(o)}"><span data-no-i18n>${icon("check", { size: 14 })}${esc(o)}</span></label>`).join("")}</div>`;
+    const free = q.kind === "text" || q.other
+      ? `<input class="free" type="text" maxlength="300" name="${esc(name)}-free" aria-label="${esc(q.kind === "text" ? q.text : "Your own answer")}"
+           placeholder="${esc(q.kind === "text" ? (q.placeholder || "Type your answer") : "Or type your own answer")}"${q.kind === "text" && q.placeholder ? " data-no-i18n" : ""}>` : "";
+    return `<fieldset data-q="${esc(q.id)}" data-kind="${esc(q.kind)}"><legend><span class="num">${i + 1}</span><span data-no-i18n>${esc(q.text)}</span></legend>${opts}${free}</fieldset>`;
+  };
+  card.insertAdjacentHTML("beforeend", `<form class="ask" novalidate>${questions.map(field).join("")}
+    <div class="ask-bar">
+      <button class="btn btn-dark btn-sm" type="submit" disabled>${icon("arrow-up", { size: 14 })}Send answers</button>
+      <button class="btn btn-ghost btn-sm" type="button" data-skip>Skip, let the team decide</button>
+      <span class="hint">You can leave any question blank.</span>
+    </div></form>`);
+  const form = card.querySelector("form.ask"), send = form.querySelector('[type="submit"]');
+  const collect = () => {
+    const out = {};
+    form.querySelectorAll("fieldset[data-q]").forEach(fs => {
+      const picked = [...fs.querySelectorAll("input:checked")].map(x => x.value);
+      const typed = fs.querySelector(".free")?.value.trim();
+      const values = fs.dataset.kind === "multi" ? [...picked, ...(typed ? [typed] : [])] : (typed ? [typed] : picked);
+      if (values.length) out[fs.dataset.q] = fs.dataset.kind === "multi" ? values : values[0];
+    });
+    return out;
+  };
+  form.addEventListener("input", (e) => {
+    const fs = e.target.closest("fieldset");
+    // in a pick-one question, typing your own answer replaces the chosen option, and choosing one clears what you typed
+    if (fs?.dataset.kind === "single") {
+      if (e.target.classList.contains("free") && e.target.value.trim()) fs.querySelectorAll("input:checked").forEach(x => x.checked = false);
+      if (e.target.type === "radio") { const f = fs.querySelector(".free"); if (f) f.value = ""; }
+    }
+    send.disabled = !Object.keys(collect()).length;
+  });
+  const submit = (answers) => {
+    if (busy) return toast("Agents are already working. Stop them first.", "err");
+    form.querySelectorAll("button").forEach(x => x.disabled = true);
+    send.setAttribute("aria-busy", "true");
+    if (!wsSend({ type: "answer", action: "answers", answers })) {
+      form.querySelectorAll("button").forEach(x => x.disabled = false);
+      send.removeAttribute("aria-busy");
+      send.disabled = !Object.keys(collect()).length;
+    }
+  };
+  form.onsubmit = (e) => { e.preventDefault(); const a = collect(); if (Object.keys(a).length) submit(a); };
+  form.querySelector("[data-skip]").onclick = () => submit({});
+  if (!replaying) setTimeout(() => form.querySelector("input")?.focus({ preventScroll: true }), 50);
+}
+function closeAsks(label) {
+  document.querySelectorAll(".msg.orch.asking").forEach(card => {
+    card.classList.remove("asking");
+    card.classList.add("answered");
+    const ask = card.querySelector(".ask");
+    if (!ask) return;
+    ask.querySelectorAll("input, button").forEach(x => x.disabled = true);
+    ask.querySelector(".ask-bar")?.replaceChildren();
+    ask.querySelector(".ask-bar")?.insertAdjacentHTML("beforeend", `<span class="done">${icon("check", { size: 14 })}${esc(label)}</span>`);
+  });
 }
 
 function tick() {

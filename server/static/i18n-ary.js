@@ -1755,3 +1755,18 @@ window.I18N.ary = {
     [/^([^ ]+(?: [^ ]+)?) agent$/, (_, a) => `الوكيل ${tr(a)}`],
   ];
 })();
+
+/* The Orchestrator's questions and plans to confirm (studio chat) */
+Object.assign(window.I18N.ary, {
+  "<b>Orchestrator:</b> a plan to confirm": "<b>المنسّق:</b> خطة خاصها التأكيد",
+  "<b>Orchestrator:</b> one question before the team starts": "<b>المنسّق:</b> سؤال واحد قبل ما يبدا الفريق",
+  "<b>Orchestrator:</b> a few questions before the team starts": "<b>المنسّق:</b> شي أسئلة قبل ما يبدا الفريق",
+  "Yes, start": "إيه، بدا", "Or write what to change below.": "ولا كتب لتحت شنو خاصو يتبدّل.",
+  "Send answers": "صيفط الأجوبة", "Skip, let the team decide": "دوز، خلّي الفريق يقرّر",
+  "You can leave any question blank.": "تقدر تخلّي أي سؤال بلا جواب.",
+  "Or type your own answer": "ولا كتب الجواب ديالك", "Type your answer": "كتب الجواب ديالك", "Your own answer": "الجواب ديالك",
+  "Answered": "تجاوب", "You sent a new message instead": "صيفطتي رسالة جديدة فبلاصتو",
+  "Confirmed: the team is starting": "تأكّد: الفريق بدا", "Cancelled: nothing ran": "تلغى: حتى حاجة ما خدمات",
+  "This plan is no longer waiting. Send your request again.": "هاد الخطة ما بقاتش كتسنى. عاود صيفط الطلب ديالك.",
+  "These questions are no longer open. Send your request again.": "هاد الأسئلة ما بقاوش مفتوحين. عاود صيفط الطلب ديالك.",
+});
