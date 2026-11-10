@@ -71,6 +71,7 @@ team strip below. (Light theme: [docs/screenshots/studio-light.png](docs/screens
 - [Sharing agents and teams](#sharing-agents-and-teams)
 - [Languages, theme and colours](#languages-theme-and-colours)
 - [Accounts, privacy and protection](#accounts-privacy-and-protection)
+- [Where things are kept](#where-things-are-kept)
 - [Good to know](#good-to-know)
 - [FAQ](#faq)
 - [Tests](#tests)
@@ -212,6 +213,44 @@ Postgres with Docker (`database/docker-compose.yaml`) and applies the database m
 second. Stop the server with `Ctrl+C`; Postgres keeps running until you run
 `docker compose -f database/docker-compose.yaml down`.
 
+### Run it with Docker
+
+Docker runs everything: the app, Postgres, Claude Code (which every agent runs on) and Chromium (for the browser
+checks). Only Docker is needed on the machine.
+
+```bash
+cp .env.example .env                 # then set ADMIN_EMAIL (and SMTP_* to send real email)
+docker compose up -d --build         # http://localhost:8001
+```
+
+**Log Claude Code in once**, with one of these (the login is kept in the `claude` volume):
+
+| How | Do this |
+|---|---|
+| Your Claude subscription, interactively | `docker compose exec app claude`, type `/login`, open the link and paste the code back |
+| Your Claude subscription, with a token | run `claude setup-token` on any machine, put `CLAUDE_CODE_OAUTH_TOKEN=…` in `.env`, then `docker compose up -d` |
+| An Anthropic API key (billed per use) | put `ANTHROPIC_API_KEY=…` in `.env`, then `docker compose up -d` |
+
+| Command | What it does |
+|---|---|
+| `docker compose logs -f app` | Follow the server log (without SMTP, sign-up codes are printed here) |
+| `docker compose exec app python manage.py make-admin you@example.com` | Make an account admin |
+| `docker compose exec app python manage.py migrations` | List the database migrations |
+| `docker compose down` | Stop (data stays in the `pgdata` and `claude` volumes and the `storage/` folder; `-v` deletes the volumes) |
+| `docker compose up -d --build` | Update after pulling new code (migrations run on start) |
+
+- The app is published on `127.0.0.1:8001` only (`APP_PORT` in `.env` changes the port). To go public, put a reverse
+  proxy with HTTPS in front, set `TRUST_PROXY=true`, `COOKIE_SECURE=true` and `ATELIER_HOSTS=your.domain`.
+- The container settings (database address, storage folder, Chromium) are set in `docker-compose.yml` and win over
+  `.env`, so the same `.env` works with `./run.sh` and with Docker.
+- **Coming from an earlier version** with a `work/` folder: uncomment the `./work:/data/work:ro` line in
+  `docker-compose.yml` before the first start; its projects are imported into the `storage` volume once.
+- **Your data is shared with `./run.sh`:** the database is the same `pgdata` volume as `database/docker-compose.yaml`,
+  and files are the project's `storage/` folder, so you can switch between Docker and `./run.sh` (one at a time).
+  The container runs as user id 1000; if your user id differs, `sudo chown -R 1000 storage`.
+- **Backups:** `docker compose exec db pg_dump -U atelier atelier > backup.sql`, and the `storage/` folder.
+- Run one app container only: it keeps each project's live state (running agents, the write queue) in memory.
+
 ### Your admin account
 
 1. In `.env`, set `ADMIN_EMAIL` to your email, then start the server.
@@ -239,7 +278,8 @@ command line wins over the file: `AGENT_MODEL=sonnet PORT=9000 ./run.sh`. Restar
 | `HOST` / `PORT` | `127.0.0.1` / `8001` | Address and port the server listens on |
 | `ATELIER_HOSTS` | *(empty)* | Extra host names allowed to reach the server, comma-separated |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING` or `ERROR` |
-| `ATELIER_WORK` / `ATELIER_AGENTS` | `work` / `agents` | Folders for projects and for the agent files |
+| `STORAGE_DIR` | `storage` | Where every file is kept (see [Where things are kept](#where-things-are-kept)) |
+| `ATELIER_WORK` / `ATELIER_AGENTS` | `work` / `agents` | The old projects folder (imported once) and the source of the shared agents |
 | **Claude Code** | | |
 | `CLAUDE_BIN` | `claude` | Path to the Claude Code executable |
 | `AGENT_MODEL` | your Claude Code model | Model for agents that don't set their own (e.g. `sonnet`) |
@@ -526,6 +566,39 @@ choose **Keep both** (imported as a copy), **Replace mine** or **Keep mine**.
   email domains refused (`server/disposable_domains.txt`). Behind a reverse proxy, set `TRUST_PROXY=true`.
 - When you serve it publicly, use HTTPS and set `COOKIE_SECURE=true`.
 
+## Where things are kept
+
+Files are on disk, in one folder (`STORAGE_DIR`, default `storage/`); everything about them is in Postgres.
+
+```text
+storage/
+├── agents/
+│   └── <agent-uuid>/instructions.md        each agent's instructions
+└── works/
+    └── <project-uuid>/
+        ├── site/                           the website the agents edit (served at /work/<project-uuid>/)
+        ├── versions/<version-uuid>/        a full copy of site/ at one moment
+        ├── uploads/<file-uuid>.png         reference images attached to prompts
+        └── checks/<check-uuid>/            the latest browser-check screenshots
+```
+
+| In Postgres | What |
+|---|---|
+| `projects` | name, description, owner, pages, project answers, brand kit, images, agents switched on, the current run |
+| `project_requests` | every request sent to the team |
+| `agent_runs` | every agent run: time, cost, tokens, model, the Critic's score |
+| `project_events` | the chat, replayed by the studio |
+| `versions` | each saved version: number, label, agent, size |
+| `files` | every file in `storage/`, each with its own uuid, size and SHA-256 |
+| `agents`, `teams`, … | accounts, agents (instructions in `storage/agents/`), teams, marketplace, ratings |
+
+Agents work inside `site/` and are given read access to `uploads/` and `checks/` for the images of a run. Reference
+images and screenshots are served at `/media/<project-uuid>/…`, only to who can open the project.
+
+**Upgrading from an earlier version:** on the first start, every project in the old `work/` folder (`ATELIER_WORK`) is
+copied into `storage/` and Postgres (data, chat, versions, stats, uploads). The old folder isn't changed; delete it once
+you've checked your projects. Back up two things: the Postgres database and the `storage/` folder.
+
 ## Good to know
 
 - **Time and cost:**
@@ -534,7 +607,7 @@ choose **Keep both** (imported as a copy), **Replace mine** or **Keep mine**.
   - The Cost & time panel shows an API-equivalent estimate. On a Claude subscription you aren't billed per call.
 - **Nothing is lost.** A version is saved before each run and after every agent, and restoring one saves the current
   code first. Stopped runs can be continued, even after a server restart.
-- **Your files are yours.** They live in `work/<project-id>/`, so you can open and edit them in any editor. The next
+- **Your files are yours.** They live in `storage/works/<project-id>/site/`, so you can open and edit them in any editor. The next
   prompt's agents read the current files first.
 - **Safety and prompt injection.** Agents read text you didn't write yourself: earlier agents' notes, `plan.md`,
   the page, text inside images. So they're treated as untrusted:
@@ -588,7 +661,7 @@ Yes, in the Code tab or in any editor. The agents read the current files on the 
 
 The suite (`tests/test_server.py`, about 150 tests in roughly 80 seconds) needs Postgres running
 (`docker compose -f database/docker-compose.yaml up -d`, or set `TEST_DATABASE_URL`). It starts its own server on a free
-port, with a throwaway database, a temporary copy of `agents/` and an empty `work/` folder, so your data is never
+port, with a throwaway database, a temporary copy of `agents/` and a temporary storage folder, so your data is never
 touched. It uses a **fake Claude CLI** (`tests/fake-claude`), so no model is called and nothing is spent. It covers:
 - every page and API error path, and who may see what (guest, unconfirmed, user, admin)
 - accounts: sign-up, codes, password reset and change, sessions, preferences, deletion, data export
@@ -626,7 +699,10 @@ Set `KEEP_TEST_FILES=1` to keep the temporary folder for inspection.
 .
 ├── README.md            this file
 ├── doc.md               technical documentation
-├── run.sh               start the server
+├── run.sh               start the server (without Docker)
+├── Dockerfile           the app image: server, Claude Code, Chromium
+├── docker-compose.yml   the app and Postgres with Docker
+├── requirements.txt     the server's Python packages
 ├── .env.example         every setting, documented (copy it to .env)
 ├── docs/screenshots/    screenshots used in this README
 ├── agents/              the shared agents' source files, shared rules, Orchestrator instructions, use-case teams
@@ -636,5 +712,6 @@ Set `KEEP_TEST_FILES=1` to keep the temporary folder for inspection.
 │   ├── static/          the web pages, styles, icons and translations (i18n-fr.js, i18n-ary.js)
 │   └── manage.py        make-admin, migrate, migrations, make-agents-migration
 ├── tests/               automated tests and a fake Claude CLI
-└── work/                your projects, chat history and versions (created at first run, not in git)
+├── storage/             every file: agents' instructions and projects (created at first run, not in git)
+└── work/                the projects folder of earlier versions, imported into storage/ once (safe to delete after)
 ```

@@ -72,7 +72,10 @@ ALLOWED_HOSTS = set(filter(None, (h.strip() for h in os.environ.get("ATELIER_HOS
 LOG_LEVEL = (os.environ.get("LOG_LEVEL", "").strip() or "INFO").upper()
 
 # ---- folders
-WORK_DIR = _path("ATELIER_WORK", ROOT / "work")
+# Every file the app keeps: agents/<agent-uuid>/ and works/<project-uuid>/ (see storage.py). Metadata is in Postgres.
+STORAGE_DIR = _path("STORAGE_DIR", ROOT / "storage")
+# The folder of earlier versions (one JSON file per project). Imported into STORAGE_DIR and Postgres once, then left alone.
+LEGACY_WORK_DIR = _path("ATELIER_WORK", ROOT / "work")
 AGENTS_DIR = _path("ATELIER_AGENTS", ROOT / "agents")
 
 # ---- Claude Code
@@ -130,6 +133,7 @@ DISPOSABLE_DOMAINS_FILE = _path("DISPOSABLE_DOMAINS_FILE", Path()) if os.environ
 # ---- real browser checks before the QA agent and the Critic (needs Chrome or Chromium on the server)
 BROWSER_CHECKS = _yes("BROWSER_CHECKS", True)
 CHROME_BIN = os.environ.get("CHROME_BIN", "").strip()          # empty = look for google-chrome / chromium
+CHROME_NO_SANDBOX = _yes("CHROME_NO_SANDBOX", False)        # inside a container, where Chrome's own sandbox can't start
 
 # ---- legal pages (shown on /terms and /privacy)
 LEGAL_NAME = os.environ.get("LEGAL_NAME", "").strip()          # who runs this service, e.g. "Atelier SARL"

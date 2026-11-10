@@ -16,6 +16,7 @@ import uuid
 
 import agents as store
 import db
+import storage
 
 AGENT_CATEGORIES = ("planning", "writing", "design", "code", "growth", "quality")
 TEAM_CATEGORIES = ("build", "improve", "add")
@@ -60,7 +61,7 @@ def _is_admin(user: dict | None) -> bool:
 # ---------------------------------------------------------------- who ran what
 
 async def _agent_rows() -> list:
-    return await db.pool.fetch("""SELECT a.pk, a.owner_id, a.slug, a.name, a.icon, a.color, a.description, a.model, a.tools,
+    return await db.pool.fetch("""SELECT a.pk, a.uuid, a.owner_id, a.slug, a.name, a.icon, a.color, a.description, a.model, a.tools,
                                          a.role, a.is_default, a.listing, a.category, a.listing_note, a.listed_at, a.hired_from,
                                          a.created_at, a.updated_at, u.name AS owner_name
                                   FROM agents a LEFT JOIN users u ON u.id = a.owner_id""")
@@ -266,7 +267,7 @@ async def agent_profile(user: dict, pk: int, metas: list[dict], has_preview) -> 
              and r["slug"] in t["agents"] and (t["owner_id"] is None or t["owner_id"] == r["owner_id"])]
     copy_of = next((x for x in rows if x["pk"] == r["hired_from"]), None) if r["hired_from"] else None
     mine_copy = next((x["slug"] for x in rows if x["hired_from"] == pk and x["owner_id"] == user["id"]), None)
-    return {**item, "role": r["role"], "teams": teams, "portfolio": portfolio[:200], "reviews": reviews,
+    return {**item, "role": storage.read_instructions(r["uuid"], r["role"]), "teams": teams, "portfolio": portfolio[:200], "reviews": reviews,
             "hired_as": mine_copy, "copy_of": {"pk": copy_of["pk"], "name": copy_of["name"]} if copy_of else None,
             "note": r["listing_note"] if item["mine"] else ""}
 
@@ -342,7 +343,7 @@ async def after_edit(user: dict, kind: str, slug: str):
 
 
 async def pending() -> dict:
-    agents = await db.pool.fetch("""SELECT a.pk, a.slug, a.name, a.icon, a.color, a.description, a.role, a.model, a.tools, a.category,
+    agents = await db.pool.fetch("""SELECT a.pk, a.uuid, a.slug, a.name, a.icon, a.color, a.description, a.role, a.model, a.tools, a.category,
                                            a.updated_at, u.name AS owner_name, u.email
                                     FROM agents a JOIN users u ON u.id = a.owner_id WHERE a.listing = 'pending' ORDER BY a.updated_at""")
     teams = await db.pool.fetch("""SELECT t.pk, t.slug, t.name, t.description, t.prompt, t.agents, t.category, t.updated_at,
@@ -351,7 +352,8 @@ async def pending() -> dict:
     pack = lambda r: {**{k: (v.timestamp() if hasattr(v, "timestamp") else list(v) if isinstance(v, list) else v)
                          for k, v in dict(r).items() if k not in ("owner_name", "email")},
                       "by": f"{r['owner_name'] or 'A member'} ({r['email']})"}
-    return {"agents": [pack(r) for r in agents], "teams": [pack(r) for r in teams]}
+    agents = [{**dict(r), "role": storage.read_instructions(r["uuid"], r["role"])} for r in agents]
+    return {"agents": [{k: v for k, v in pack(r).items() if k != "uuid"} for r in agents], "teams": [pack(r) for r in teams]}
 
 
 async def review(kind: str, pk: int, decision: str, note: str = "") -> dict:
@@ -389,7 +391,10 @@ async def _copy_agent(user: dict, r) -> str:
     await db.pool.execute(
         """INSERT INTO agents (owner_id, slug, name, icon, color, is_default, description, model, tools, role, position, hired_from)
            VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, $9, $10, $11)""",
-        user["id"], slug, r["name"], r["icon"], r["color"], r["description"], r["model"], r["tools"], r["role"], pos, r["pk"])
+        user["id"], slug, r["name"], r["icon"], r["color"], r["description"], r["model"], r["tools"],
+        storage.read_instructions(r["uuid"], r["role"]), pos, r["pk"])
+    async with db.pool.acquire() as con:
+        await storage.export_instructions(con)
     return slug
 
 

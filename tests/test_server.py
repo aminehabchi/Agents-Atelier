@@ -21,6 +21,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -38,6 +39,40 @@ AGENT_TIMEOUT = 6
 OUTBOX = TMP / "outbox.jsonl"
 ADMIN_EMAIL = "admin@example.com"
 ADMIN = None            # the admin's session cookie: what every request uses unless a test says otherwise
+STORAGE = TMP / "storage"          # STORAGE_DIR of the test server
+LEGACY = TMP / "legacy"            # an old-style work/ folder, imported when the server starts
+OLD_PID = "22222222-2222-4222-8222-222222222222"   # a project from an earlier version (no description, a chat, a version)
+
+
+def SITE(pid):
+    """The folder of a project's website."""
+    return STORAGE / "works" / pid / "site"
+
+
+def META(pid, cookie=...):
+    """A project's data, as the API returns it (the admin can open every project)."""
+    return call("GET", f"/api/projects/{pid}", cookie=cookie)[1]
+
+
+def make_legacy_folder():
+    """work/ as earlier versions wrote it: one JSON file per project, a chat log, versions, uploads in the site."""
+    site = LEGACY / OLD_PID
+    (site / "uploads").mkdir(parents=True)
+    (site / "index.html").write_text("<!doctype html><title>Old</title><h1>Old site</h1>")
+    (site / "uploads" / "sketch.png").write_bytes(b"png")
+    (LEGACY / ".projects").mkdir()
+    (LEGACY / ".projects" / f"{OLD_PID}.json").write_text(json.dumps({
+        "id": OLD_PID, "name": "Old project", "description": "", "created": 1700000000, "updated": 1700000100, "owner": None,
+        "history": ["Make an old page"], "agents": ["html"], "pages": [{"title": "Home", "file": "index.html"}], "brief": {},
+        "assets": [], "stats": [{"agent": "html", "status": "done", "ts": 1700000050, "request": "Make an old page", "seconds": 3.5, "cost": 0.01}]}))
+    (LEGACY / ".projects" / f"{OLD_PID}.events.jsonl").write_text(
+        json.dumps({"type": "user", "text": "Make an old page", "images": ["uploads/sketch.png"], "seq": 1, "ts": 1700000040}) + "\n"
+        + json.dumps({"type": "agent_done", "agent": "html", "text": "Done.", "seq": 2, "ts": 1700000060}) + "\n")
+    (LEGACY / ".versions" / OLD_PID / "0001").mkdir(parents=True)
+    (LEGACY / ".versions" / OLD_PID / "0001" / "index.html").write_text("<h1>v1</h1>")
+    (LEGACY / ".versions" / OLD_PID / "index.json").write_text(json.dumps([
+        {"n": 1, "label": "After HTML", "kind": "agent", "agent": "html", "request": "Make an old page", "ts": 1700000060,
+         "files": 1, "size": 11, "hash": "abc"}]))
 # The server under test gets its own throwaway database on the Postgres of database/docker-compose.yaml.
 PG_URL = os.environ.get("TEST_DATABASE_URL") or "postgresql://atelier:atelier@127.0.0.1:5432/atelier"
 TEST_DB = f"atelier_test_{os.getpid()}_{int(time.time())}"
@@ -80,10 +115,10 @@ def setUpModule():
         text = f.read_text()
         f.write_text("\n".join(l for l in text.split("\n") if not l.startswith("model:")))
     (TMP / "agents" / "_presets.json").write_text("[]")
-    (TMP / "work").mkdir()
+    make_legacy_folder()
     PORT = free_port()
     BASE = f"http://127.0.0.1:{PORT}"
-    env = {**os.environ, "ATELIER_WORK": str(TMP / "work"), "ATELIER_AGENTS": str(TMP / "agents"),
+    env = {**os.environ, "STORAGE_DIR": str(STORAGE), "ATELIER_WORK": str(LEGACY), "ATELIER_AGENTS": str(TMP / "agents"),
            "CLAUDE_BIN": str(ROOT / "tests" / "fake-claude"), "AGENT_TIMEOUT": str(AGENT_TIMEOUT),
            "FAKE_CLAUDE_LOG": str(LOG), "ATELIER_ENV_FILE": str(TMP / "no.env"),   # ignore your own .env
            "DATABASE_URL": TEST_DB_URL, "ADMIN_EMAIL": ADMIN_EMAIL, "EMAIL_OUTBOX": str(OUTBOX), "SMTP_HOST": "",
@@ -323,18 +358,20 @@ class T02Projects(unittest.TestCase):
         self.assertEqual(r["per_page"], 96)
         self.assertEqual(r["page"], r["pages"])
 
-    def test_damaged_project_file_is_skipped_and_named(self):
-        bad = "11111111-1111-4111-8111-111111111111"
-        (TMP / "work" / ".projects" / f"{bad}.json").write_text('{"broken": ')
-        try:
-            s, r, _ = call("GET", "/api/projects")
-            self.assertEqual(s, 200)
-            self.assertNotIn(bad, [p["id"] for p in r])
-            s, r, _ = call("GET", f"/api/projects/{bad}")
-            self.assertEqual(s, 500)
-            self.assertIn("damaged", r["detail"])
-        finally:
-            (TMP / "work" / ".projects" / f"{bad}.json").unlink()
+    def test_projects_from_the_old_folder_are_imported(self):
+        meta = META(OLD_PID)
+        self.assertEqual((meta["name"], meta["history"]), ("Old project", ["Make an old page"]))
+        self.assertEqual([e["type"] for e in meta["events"]], ["user", "agent_done"], "the chat came along")
+        self.assertEqual(meta["stats"][0]["seconds"], 3.5)
+        self.assertEqual([v["label"] for v in call("GET", f"/api/projects/{OLD_PID}/versions")[1]], ["After HTML"])
+        self.assertIn("Old site", call("GET", f"/work/{OLD_PID}/")[1])
+        self.assertTrue((STORAGE / "works" / OLD_PID / "uploads" / "sketch.png").is_file(), "uploads move next to the site")
+        self.assertFalse((SITE(OLD_PID) / "uploads").exists())
+        self.assertEqual(call("GET", f"/media/{OLD_PID}/uploads/sketch.png")[0], 200)
+        self.assertTrue((page_redirect(f"/media/{OLD_PID}/uploads/sketch.png")[1] or "").startswith("/login"), "media needs a login")
+        stranger = register(f"media-{time.time_ns()}@example.com")
+        self.assertEqual(call("GET", f"/media/{OLD_PID}/uploads/sketch.png", cookie=stranger)[0], 404, "and access to the project")
+        self.assertTrue((LEGACY / ".projects" / f"{OLD_PID}.json").is_file(), "the old folder is left as it was")
 
     def test_stats_pagination(self):
         s, data, _ = call("GET", "/api/stats?page=1&per_page=5")
@@ -375,7 +412,7 @@ class T03Files(unittest.TestCase):
 
     def test_listing_reports_kinds_and_sizes(self):
         self.put("index.html", "<h1>hi</h1>")
-        folder = TMP / "work" / self.pid
+        folder = SITE(self.pid)
         (folder / "huge.css").write_text("a" * (600 * 1024))
         (folder / "blob.bin").write_bytes(bytes(range(256)))
         s, files, _ = call("GET", f"/api/projects/{self.pid}/files")
@@ -389,7 +426,10 @@ class T03Files(unittest.TestCase):
         png = base64.b64encode(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")).decode()
         s, r, _ = call("POST", f"/api/projects/{self.pid}/uploads", {"name": "Sketch 1.png", "data": "data:image/png;base64," + png})
         self.assertEqual(s, 200, r)
-        self.assertTrue(r["path"].startswith("uploads/sketch-1-"))
+        self.assertRegex(r["path"], r"^uploads/[0-9a-f-]{36}\.png$")          # every file is named by its uuid
+        self.assertTrue((STORAGE / "works" / self.pid / r["path"]).is_file(), "next to the site, not inside it")
+        self.assertEqual(r["url"], f"/media/{self.pid}/{r['path']}")
+        self.assertEqual(call("GET", r["url"])[0], 200)
         for data, code in [("data:text/plain;base64,aGk=", 400), ("data:image/png;base64,@@@@", 400),
                            ("data:image/png;base64," + "A" * (7 * 1024 * 1024), 413), ("not a data url", 400)]:
             self.assertEqual(call("POST", f"/api/projects/{self.pid}/uploads", {"name": "x", "data": data})[0], code, data[:30])
@@ -406,7 +446,7 @@ class T03Files(unittest.TestCase):
         s, r, _ = call("POST", f"/api/projects/{self.pid}/versions/{v1['n']}/restore")
         self.assertEqual(s, 200)
         self.assertIsNotNone(r["backup"])
-        self.assertIn("one", (TMP / "work" / self.pid / "index.html").read_text())
+        self.assertIn("one", (SITE(self.pid) / "index.html").read_text())
         for path in ["/versions/999/diff", "/versions/999/download"]:
             self.assertEqual(call("GET", f"/api/projects/{self.pid}{path}")[0], 404, path)
         self.assertEqual(call("POST", f"/api/projects/{self.pid}/versions/999/restore")[0], 404)
@@ -520,9 +560,7 @@ class T05WebSocket(unittest.TestCase):
             ws(pid, lambda s, r: r(), origin="https://evil.example")
 
     def test_missing_description_blocks_the_run(self):
-        pid = new_project()
-        meta = TMP / "work" / ".projects" / f"{pid}.json"
-        m = json.loads(meta.read_text()); m["description"] = ""; meta.write_text(json.dumps(m))
+        pid = OLD_PID                       # imported from an earlier version, with no description
 
         async def script(sock, recv):
             await sock.send(send({"type": "prompt", "text": "hello", "agents": ["html"]}))
@@ -584,7 +622,7 @@ class T06Runs(unittest.TestCase):
                      "--exclude-dynamic-system-prompt-sections"]:                # prompt-cache reuse across projects
             self.assertIn(flag, argv)
         self.assertEqual(argv[argv.index("--tools") + 1], "Read,Write,Edit,Glob,Grep")
-        self.assertEqual(Path(calls[0]["cwd"]).resolve(), (TMP / "work" / pid).resolve())
+        self.assertEqual(Path(calls[0]["cwd"]).resolve(), SITE(pid).resolve())
         prompt = argv[argv.index("-p") + 1]
         system = argv[argv.index("--append-system-prompt") + 1]
         self.assertIn("<user_request>", prompt)
@@ -1068,7 +1106,8 @@ class T08bSiteImport(unittest.TestCase):
                                     {"path": "/etc/x.html", "data": b64("x")}])
         self.assertEqual(s, 200, p)
         self.assertNotIn("evil.html", {f["path"] for f in call("GET", f"/api/projects/{p['id']}/files")[1]})
-        self.assertFalse((TMP / "work" / "evil.html").exists())
+        self.assertFalse((STORAGE / "works" / "evil.html").exists())
+        self.assertFalse((SITE(p["id"]).parent / "evil.html").exists())
 
     def test_renaming_pages_keeps_imported_files(self):
         s, p, _ = self.start(zip=self.make_zip({"index.html": "<title>Home</title>", "contact-us.html": "<title>Reach us</title>"}))
@@ -1101,7 +1140,7 @@ class T03bBriefAndAssets(unittest.TestCase):
         self.assertEqual(b["path"], "assets/terrace.png")
         s, c, _ = call("POST", f"/api/projects/{pid}/assets", {"name": "logo.png", "data": self.PNG, "kind": "logo"})
         self.assertEqual(c["path"], "assets/logo-2.png")                        # never overwrites
-        self.assertTrue((TMP / "work" / pid / "assets" / "logo.png").is_file())
+        self.assertTrue((SITE(pid) / "assets" / "logo.png").is_file())
         for body, code in [({"data": self.PNG, "kind": "banner"}, 400), ({"data": "data:image/svg+xml;base64,PHN2Zz4=", "kind": "logo"}, 400),
                            ({"data": self.PNG, "kind": "photo", "note": "n" * 121}, 400)]:
             self.assertEqual(call("POST", f"/api/projects/{pid}/assets", body)[0], code, body)
@@ -1849,13 +1888,13 @@ class T16BrandKit(unittest.TestCase):
         self.assertEqual(call("POST", f"/api/projects/{pid}/brand/logo", {"data": "data:text/html;base64,PGI+"}, cookie=cookie)[0], 400)
         self.assertTrue(call("POST", f"/api/projects/{pid}/brand/logo", {"data": PNG}, cookie=cookie)[1]["logo"])
         call("POST", f"/api/projects/{pid}/brand/logo", {"data": PNG}, cookie=cookie)
-        assets = json.loads((TMP / "work" / ".projects" / f"{pid}.json").read_text())["assets"]
+        assets = META(pid)["assets"]
         self.assertEqual([a["kind"] for a in assets], ["logo"], "a new logo replaces the old one")
-        self.assertTrue((TMP / "work" / pid / "assets" / "logo.png").is_file())
+        self.assertTrue((SITE(pid) / "assets" / "logo.png").is_file())
         self.assertEqual(call("PUT", f"/api/projects/{pid}/brand", {"colors": []})[0], 403, "only the owner, not even an admin")
         self.assertEqual(call("GET", f"/api/projects/{pid}/brand", cookie=register(f"other-{time.time_ns()}@example.com"))[0], 404)
         self.assertTrue(call("DELETE", f"/api/projects/{pid}/brand/logo", cookie=cookie)[1]["logo"] is None)
-        self.assertFalse((TMP / "work" / pid / "assets" / "logo.png").exists())
+        self.assertFalse((SITE(pid) / "assets" / "logo.png").exists())
         self.assertEqual(call("GET", "/api/brand", cookie=cookie)[0], 404, "the account-wide kit is gone")
 
     def test_agents_get_the_kit_and_kits_can_be_copied(self):
@@ -1866,7 +1905,7 @@ class T16BrandKit(unittest.TestCase):
         self.assertEqual([k["id"] for k in sources], [a])
         b = self.project(cookie)
         self.assertEqual(call("POST", f"/api/projects/{b}/brand/copy", {"from": a}, cookie=cookie)[1]["colors"], ["#123456"])
-        self.assertTrue((TMP / "work" / b / "assets" / "logo.png").is_file(), "the logo is copied too")
+        self.assertTrue((SITE(b) / "assets" / "logo.png").is_file(), "the logo is copied too")
         stranger = register(f"brand-{time.time_ns()}@example.com")
         c = self.project(stranger)
         self.assertEqual(call("POST", f"/api/projects/{c}/brand/copy", {"from": a}, cookie=stranger)[0], 403)
@@ -1909,8 +1948,8 @@ class T17AdminAndData(unittest.TestCase):
         cookie = register(email)
         pid = call("POST", "/api/projects", {"name": "My export", "description": "x"}, cookie=cookie)[1]["id"]
         call("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": "<h1>hi</h1>"}, cookie=cookie)
-        (TMP / "work" / pid / ".checks").mkdir(exist_ok=True)
-        (TMP / "work" / pid / ".checks" / "index-phone.png").write_bytes(b"x")
+        (STORAGE / "works" / pid / "checks" / "c1").mkdir(parents=True, exist_ok=True)
+        (STORAGE / "works" / pid / "checks" / "c1" / "index-phone.png").write_bytes(b"x")
         call("POST", "/api/agents", {"id": "mine-export", "name": "Mine", "role": "You help with everything on this website, carefully and in plain words."}, cookie=cookie)
         other = call("POST", "/api/projects", {"name": "Not mine", "description": "x"})[1]["id"]
         req = urllib.request.Request(BASE + "/api/auth/export", headers={"Cookie": cookie})
@@ -1924,7 +1963,7 @@ class T17AdminAndData(unittest.TestCase):
         self.assertIn("agents/mine-export.md", names)
         self.assertTrue(any(n.endswith("/site/index.html") and pid[:8] in n for n in names))
         self.assertFalse(any(other[:8] in n for n in names), "other people's projects aren't included")
-        self.assertFalse(any(".checks" in n for n in names), "the server's screenshots aren't the user's data")
+        self.assertFalse(any("checks" in n for n in names), "the server's screenshots aren't the user's data")
         self.assertEqual(call("GET", "/api/auth/export", cookie=None)[0], 401)
 
 
@@ -1937,10 +1976,11 @@ class T18BrowserCheck(unittest.TestCase):
         prompts = {c["argv"][c["argv"].index("--append-system-prompt") + 1].split("\n")[0][:40]: c["argv"][c["argv"].index("-p") + 1]
                    for c in log_calls()[before:] if "-p" in c["argv"] and "--append-system-prompt" in c["argv"]}
         qa = next(p for p in prompts.values() if "<browser_check>" in p)
-        self.assertIn(".checks/index-phone.png", qa)
+        self.assertRegex(qa, r"/works/[0-9a-f-]+/checks/[0-9a-f-]+/index-phone\.png")
         self.assertIn("not instructions", qa)
         self.assertEqual(sum("<browser_check>" in p for p in prompts.values()), 1, "only the QA agent gets it, not HTML")
-        self.assertTrue((TMP / "work" / pid / ".checks" / "index-desktop.png").is_file())
+        self.assertTrue(list((STORAGE / "works" / pid / "checks").glob("*/index-desktop.png")))
+        self.assertFalse((SITE(pid) / ".checks").exists(), "screenshots stay out of the site")
         self.assertTrue(any(e.get("type") == "browser_check" for e in events))
         req = urllib.request.Request(BASE + f"/api/projects/{pid}/download", headers={"Cookie": ADMIN})
         with urllib.request.urlopen(req) as r:
@@ -2246,7 +2286,7 @@ class T22Marketplace(unittest.TestCase):
         pid = new_project(name="Rated site", cookie=c)
         events = self.run_team(pid, c, ["ux", "html", "critic"])
         self.assertEqual(events[-1]["type"], "run_done")
-        stats = json.loads((TMP / "work" / ".projects" / f"{pid}.json").read_text())["stats"]
+        stats = META(pid)["stats"]
         critic = next(e for e in stats if e["agent"] == "critic")
         self.assertEqual(critic["score"], 8.5)
         self.assertTrue(all(e.get("run") == critic["run"] for e in stats))
@@ -2321,3 +2361,48 @@ class T23FirstRunSeed(unittest.TestCase):
         self.assertTrue({a["slug"] for a in files["agents"]} <= seen, "a brand-new member sees them all")
         seen_teams = {t["id"] for t in call("GET", "/api/presets", cookie=member)[1]}
         self.assertTrue({t["slug"] for t in files["teams"]} <= seen_teams)
+
+
+class T24Storage(unittest.TestCase):
+    """Files on disk under STORAGE_DIR (agents/, works/), everything else in Postgres, every file with a uuid."""
+    def test_layout_and_the_files_table(self):
+        pid = new_project(name="Stored")
+        call("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": "<h1>stored</h1>"})
+        call("POST", f"/api/projects/{pid}/versions", {"label": "Saved"})
+        self.assertEqual(sorted(p.name for p in STORAGE.iterdir()), ["agents", "works"])
+        self.assertTrue((SITE(pid) / "index.html").is_file())
+        versions = list((STORAGE / "works" / pid / "versions").iterdir())
+        self.assertEqual(len(versions), 1)
+        uuid.UUID(versions[0].name)                               # each version's folder is its id
+        self.assertTrue((versions[0] / "index.html").is_file())
+        time.sleep(0.5)                                           # the files are recorded in the background
+        rows = asyncio.run(_db(f"SELECT id, area, path, sha256 FROM files WHERE project_id = '{pid}' ORDER BY area"))
+        self.assertEqual({(r["area"], r["path"]) for r in rows}, {("site", "index.html"), ("version", "index.html")})
+        self.assertTrue(all(len(r["sha256"]) == 64 for r in rows))
+        self.assertEqual(len({r["id"] for r in rows}), 2, "each file has its own id")
+        meta = asyncio.run(_db(f"SELECT name FROM projects WHERE id = '{pid}'"))
+        self.assertEqual(meta[0]["name"], "Stored", "project data is in Postgres")
+        self.assertFalse(any(STORAGE.rglob("*.json")), "no metadata files on disk")
+
+    def test_agents_instructions_are_files(self):
+        row = asyncio.run(_db("SELECT uuid, role FROM agents WHERE owner_id IS NULL AND slug = 'css'"))[0]
+        self.assertEqual(row["role"], "", "the instructions are not kept in the database")
+        text = (STORAGE / "agents" / str(row["uuid"]) / "instructions.md").read_text()
+        self.assertEqual(call("GET", "/api/agents/css")[1]["role"], text)
+        s, a, _ = call("POST", "/api/agents", {"id": f"stor-{time.time_ns() % 10**8}", "name": "Stored", "role": "You keep things tidy and in order."})
+        self.assertEqual(s, 200, a)
+        u = asyncio.run(_db(f"SELECT uuid FROM agents WHERE slug = '{a['id']}'"))[0]["uuid"]
+        self.assertEqual((STORAGE / "agents" / str(u) / "instructions.md").read_text(), "You keep things tidy and in order.")
+        call("DELETE", f"/api/agents/{a['id']}")
+        self.assertFalse((STORAGE / "agents" / str(u)).exists(), "a deleted agent's folder goes too")
+        files = asyncio.run(_db("SELECT count(*) AS n FROM files WHERE area = 'agent'"))[0]["n"]
+        self.assertGreaterEqual(files, 30)
+
+    def test_deleting_a_project_removes_its_folder_and_rows(self):
+        pid = new_project(name="Gone")
+        call("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": "<h1>x</h1>"})
+        self.assertEqual(call("DELETE", f"/api/projects/{pid}")[0], 200)
+        time.sleep(0.5)
+        self.assertFalse((STORAGE / "works" / pid).exists())
+        for table, col in (("projects", "id"), ("files", "project_id"), ("project_events", "project_id")):
+            self.assertEqual(asyncio.run(_db(f"SELECT count(*) AS n FROM {table} WHERE {col} = '{pid}'"))[0]["n"], 0, table)

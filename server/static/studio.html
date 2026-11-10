@@ -726,7 +726,7 @@ function handle(ev) {
       break;
     case "user":
       addMsg(`<div class="msg user">${(ev.images || []).length ? `<div class="imgs">${ev.images.map(i =>
-        `<a href="/work/${PID}/${esc(i)}" target="_blank" rel="noopener"><img src="/work/${PID}/${esc(i)}" loading="lazy" decoding="async" alt="Reference image"></a>`).join("")}</div>` : ""}${esc(ev.text)}</div>`);
+        `<a href="${esc(mediaUrl(i))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(i))}" loading="lazy" decoding="async" alt="Reference image"></a>`).join("")}</div>` : ""}${esc(ev.text)}</div>`);
       break;
     case "run_start":
       setBusy(true);
@@ -812,7 +812,7 @@ function handle(ev) {
       break;
     case "browser_check_start": break;
     case "browser_check": {
-      const shots = (ev.screenshots || []).map(f => `<a href="/work/${PID}/${encodeURI(f)}" target="_blank" rel="noopener"><img loading="lazy" src="/work/${PID}/${encodeURI(f)}?v=${Date.now()}" alt="${esc(f.includes("phone") ? "Phone screenshot" : "Desktop screenshot")}"></a>`).join("");
+      const shots = (ev.screenshots || []).map(f => `<a href="${mediaUrl(f)}" target="_blank" rel="noopener"><img loading="lazy" src="${mediaUrl(f)}?v=${Date.now()}" alt="${esc(f.includes("phone") ? "Phone screenshot" : "Desktop screenshot")}"></a>`).join("");
       addMsg(`<div class="msg bcheck ${ev.problems ? "warn" : ""}"><div class="head">${icon(ev.problems ? "alert" : "check", { size: 16 })}<span>${esc(ev.text)}</span></div>${shots ? `<div class="shots">${shots}</div>` : ""}</div>`);
       break;
     }
@@ -1369,6 +1369,11 @@ $("teamHead").addEventListener("click", (e) => {
 // ================================================================ preview
 let currentPage = "index.html", builtPages = new Set();
 const workUrl = () => `/work/${PID}/${currentPage}`;
+/* reference images (uploads/…) and browser-check screenshots (checks/…) live next to the site: /media/<project>/… */
+function mediaUrl(path) {
+  const p = String(path || "").replace(/^\.checks\//, "checks/legacy/");     // screenshots saved by earlier versions
+  return `/media/${PID}/${p.split("/").map(encodeURIComponent).join("/")}`;
+}
 
 /* The page switcher lists the planned pages (project.pages) plus any other .html file the agents made. */
 function renderPages() {

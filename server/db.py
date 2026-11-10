@@ -8,6 +8,8 @@ Tables
   brand_kits   an account's logo, colours and fonts, reused in new projects
   agents       every agent: owner_id NULL = shared (only admins change it), otherwise that user's own agent
   teams        saved teams, same ownership rule (the built-in teams are computed, not stored)
+  projects, project_requests, agent_runs, project_events, versions, files   everything about projects and files;
+               the files themselves are in STORAGE_DIR (see storage.py)
 
   shared_removed  shared agents and teams an admin deleted (agent migrations don't bring them back)
   schema_migrations  the migrations applied so far
@@ -41,6 +43,11 @@ async def init():
                          "or set DATABASE_URL in .env.")
     async with pool.acquire() as con:
         applied = await migrate.apply_all(con)
+        import storage                    # agents' instructions live in files: move any a migration just wrote
+        moved = await storage.export_instructions(con)
+        await storage.forget_deleted_agents(con)
+    if moved:
+        log.info("Wrote the instructions of %d agents to %s", moved, storage.AGENTS)
     if applied:
         log.info("Database migrated: %s", ", ".join(applied))
 

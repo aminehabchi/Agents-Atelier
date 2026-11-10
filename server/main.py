@@ -74,13 +74,15 @@ import browser_check
 from versions import Versions
 import models as model_catalog
 import market
+import storage
+import legacy
 
 ROOT = Path(__file__).resolve().parent.parent
-WORK = config.WORK_DIR   # ATELIER_WORK in .env; tests point this at a temporary folder
-META = WORK / ".projects"
 STATIC = Path(__file__).resolve().parent / "static"
-META.mkdir(parents=True, exist_ok=True)
-VERS = Versions(WORK)
+store = storage.store          # every project's data, in Postgres (cached in memory); files are in STORAGE_DIR
+site_dir = storage.site_dir    # works/<project>/site: the website the agents edit
+work_dir = storage.work_dir    # works/<project>: site/, versions/, uploads/, checks/
+VERS = Versions(store)
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL, logging.INFO), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("agents-atelier")
 
@@ -103,7 +105,13 @@ MODEL = config.AGENT_MODEL  # e.g. "sonnet" for faster runs; default = your Clau
 @contextlib.asynccontextmanager
 async def lifespan(_app):
     await db.init()
+    await store.start(db.pool)
+    imported = legacy.import_work_folder(config.LEGACY_WORK_DIR, store)     # once per project, from the old work/ folder
+    if imported:
+        log.info("Imported %d projects from %s into %s", imported, config.LEGACY_WORK_DIR, storage.ROOT)
+    mark_interrupted_runs()
     yield
+    await store.stop()
     await db.close()
 
 
@@ -213,10 +221,6 @@ def check_id(pid: str) -> str:
         raise HTTPException(404, "Unknown project")
 
 
-def meta_path(pid: str) -> Path:
-    return META / f"{pid}.json"
-
-
 def display_path(p: Path) -> str:
     """A short path for messages: relative to the app folder when possible."""
     try:
@@ -226,19 +230,17 @@ def display_path(p: Path) -> str:
 
 
 def load_meta(pid: str) -> dict:
-    p = meta_path(check_id(pid))
-    if not p.exists():
+    """A project's data (a copy: change it, then save_meta)."""
+    meta = store.get(check_id(pid))
+    if meta is None:
         raise HTTPException(404, "This project doesn't exist (it may have been deleted).")
-    try:
-        return json.loads(p.read_text())
-    except ValueError:
-        log.exception("Damaged project file %s", p)
-        raise HTTPException(500, f"This project's data file is damaged ({display_path(p)}). Restore it or delete the project.")
+    return meta
 
 
-def save_meta(meta: dict):
-    meta["updated"] = time.time()
-    write_json(meta_path(meta["id"]), meta)
+def save_meta(meta: dict, touch: bool = True):
+    if touch:
+        meta["updated"] = time.time()
+    store.put(meta)
 
 
 def clean_details(body: dict, *, partial: bool = False) -> dict:
@@ -293,7 +295,7 @@ def brief_block(meta: dict) -> str:
     brief = meta.get("brief") or {}
     lines = [f"{BRIEF_FIELDS[k][0]}: {clean_text(v, BRIEF_FIELDS[k][1])}" for k, v in brief.items() if k in BRIEF_FIELDS]
     out = f"\n<project_brief>\n" + "\n".join(lines) + "\n</project_brief>\n" if lines else ""
-    assets = [a for a in meta.get("assets") or [] if (WORK / meta["id"] / a["path"]).is_file()]
+    assets = [a for a in meta.get("assets") or [] if (site_dir(meta["id"]) / a["path"]).is_file()]
     if assets:
         rows = "\n".join(f"- {a['path']} — {ASSET_KINDS.get(a['kind'], 'image')}"
                          + (f": {clean_text(a['note'], 120)}" if a.get("note") else "") for a in assets)
@@ -346,7 +348,7 @@ def clean_pages(raw, keep: list[dict] | None = None) -> list[dict]:
 def create_project(name: str, description: str, pages=None, brief=None, owner: str | None = None, agents: list[str] | None = None,
                    brand: dict | None = None) -> dict:
     pid = str(uuid.uuid4())
-    (WORK / pid).mkdir(parents=True)
+    site_dir(pid).mkdir(parents=True)
     now = time.time()
     meta = {"id": pid, "name": name, "description": description, "created": now, "updated": now,
             "owner": owner, "history": [], "agents": agents or [], "pages": clean_pages(pages), "brief": clean_brief(brief), "assets": [],
@@ -355,55 +357,25 @@ def create_project(name: str, description: str, pages=None, brief=None, owner: s
     return meta
 
 
-def events_file(pid: str) -> Path:
-    return META / f"{pid}.events.jsonl"
-
-
 def log_event(pid: str, event: dict):
     """Number every event and save chat-relevant ones, so the chat can be restored later."""
-    st = live(pid)
-    if "seq" not in st:
-        f = events_file(pid)
-        st["seq"] = len(f.read_text().splitlines()) if f.exists() else 0
     if event["type"] == "file_changed":
-        event["seq"] = st["seq"]  # not saved; shares the last number
+        event["seq"] = store.last_seq(pid)  # not saved; shares the last number
         return
-    st["seq"] += 1
-    event["seq"] = st["seq"]
+    event["seq"] = store.next_seq(pid)
     event["ts"] = time.time()
-    with open(events_file(pid), "a") as f:
-        f.write(json.dumps(event) + "\n")
+    store.add_event(pid, event)
 
-
-def migrate_old_layout():
-    """Move files from the old single-project layout (work/index.html...) into a project."""
-    old = [p for p in WORK.iterdir() if p.is_file()]
-    if not old:
-        return
-    meta = create_project("My first project", "Moved here from the old single-project layout.")
-    for p in old:
-        shutil.move(str(p), WORK / meta["id"] / p.name)
-
-
-migrate_old_layout()
 
 RESUMABLE = ("stopped", "error", "interrupted")
 
 
 def mark_interrupted_runs():
     """A run that was 'running' when the server stopped can't still be running: mark it interrupted."""
-    for p in META.glob("*.json"):
-        try:
-            m = json.loads(p.read_text())
-        except ValueError:
-            log.warning("Skipping damaged project file %s", p)
-            continue
+    for m in store.all():
         if (m.get("run") or {}).get("status") == "running":
             m["run"]["status"] = "interrupted"
-            write_json(p, m)
-
-
-mark_interrupted_runs()
+            save_meta(m, touch=False)
 
 
 def update_run(pid: str, **changes) -> dict:
@@ -444,7 +416,7 @@ def _origin_ok(request_host: str, origin: str | None) -> bool:
 
 # ---- who may do what. Everything is private unless listed here.
 PUBLIC_PAGES = {"/", "/login", "/register", "/forgot", "/confirm", "/terms", "/privacy", "/favicon.ico"}
-PROJECT_PATH = re.compile(r"^/(?:api/projects|p)/([^/]+)")
+PROJECT_PATH = re.compile(r"^/(?:api/projects|p|media)/([^/]+)")
 
 
 def is_public(path: str, method: str = "GET") -> bool:
@@ -466,8 +438,8 @@ def _project_of_path(path: str) -> dict | None:
     if not m:
         return None
     try:
-        return json.loads(meta_path(str(uuid.UUID(m.group(1)))).read_text())
-    except (ValueError, OSError):
+        return store.get(str(uuid.UUID(m.group(1))))
+    except ValueError:
         return None
 
 
@@ -682,11 +654,7 @@ async def analytics(request: Request, days: int = 30):
     emails = {str(u["id"]): u["email"] for u in users}
     projects_new, runs, cost, failed = {}, {}, {}, {}
     per_user, total = {}, {"projects": 0, "runs": 0, "failed": 0, "cost": 0.0, "seconds": 0.0}
-    for path in META.glob("*.json"):
-        try:
-            m = json.loads(path.read_text())
-        except ValueError:
-            continue
+    for m in store.all():
         owner = m.get("owner") or ""
         total["projects"] += 1
         u = per_user.setdefault(owner, {"email": emails.get(owner, "(no owner)"), "projects": 0, "runs": 0, "cost": 0.0, "last": 0})
@@ -842,7 +810,7 @@ async def delete_account(request: Request, body: dict):
     """Your account, your private agents and teams, and your projects with their files. It can't be undone."""
     user = _confirmed_user(request)
     await auth.check_can_delete(user, body.get("password"))
-    owned = [p.stem for p in META.glob("*.json") if _owner_of_meta_file(p) == str(user["id"])]
+    owned = [m["id"] for m in store.all() if m.get("owner") == str(user["id"])]
     if any(is_busy(pid) for pid in owned):
         raise HTTPException(409, "Agents are working on one of your projects. Stop them first.")
     await auth.delete_user(user)
@@ -888,19 +856,19 @@ async def export_my_data(request: Request):
         z.writestr("brand/brand.json", json.dumps({k: kit[k] for k in ("colors", "heading_font", "body_font")}, indent=2))
         if _brand_logo(user["id"]):
             z.write(_brand_logo(user["id"]), f"brand/{_brand_logo(user['id']).name}")
-        for path in sorted(META.glob("*.json")):
-            if _owner_of_meta_file(path) != str(user["id"]):
+        for meta in sorted(store.all(), key=lambda m: m["created"]):
+            if meta.get("owner") != str(user["id"]):
                 continue
-            meta = json.loads(path.read_text())
             slug = re.sub(r"[^a-z0-9]+", "-", meta["name"].lower()).strip("-")[:40] or "project"
             root = f"projects/{slug}-{meta['id'][:8]}"
             z.writestr(f"{root}/project.json", json.dumps(meta, indent=2, ensure_ascii=False))
-            if events_file(meta["id"]).exists():
-                z.write(events_file(meta["id"]), f"{root}/chat.jsonl")
-            folder = WORK / meta["id"]
-            for f in sorted(folder.rglob("*")) if folder.exists() else []:
-                if f.is_file() and f.relative_to(folder).parts[0] != browser_check.CHECK_DIR:
-                    z.write(f, f"{root}/site/{f.relative_to(folder)}")
+            chat = await store.events(meta["id"])
+            if chat:
+                z.writestr(f"{root}/chat.jsonl", "".join(json.dumps(e, ensure_ascii=False) + "\n" for e in chat))
+            for sub_name, folder in (("site", site_dir(meta["id"])), ("uploads", storage.uploads_dir(meta["id"]))):
+                for f in sorted(folder.rglob("*")) if folder.exists() else []:
+                    if f.is_file():
+                        z.write(f, f"{root}/{sub_name}/{f.relative_to(folder)}")
     buf.seek(0)
     return StreamingResponse(buf, media_type="application/zip",
                              headers={"Content-Disposition": 'attachment; filename="agents-atelier-my-data.zip"'})
@@ -1078,16 +1046,10 @@ async def list_projects(request: Request, page: int | None = None, per_page: int
 def all_projects(user: dict, default_count: int) -> list[dict]:
     """The projects `user` can open."""
     projects = []
-    for p in META.glob("*.json"):
-        try:
-            m = json.loads(p.read_text())
-            m["id"], m["name"]
-        except (ValueError, KeyError, TypeError):
-            log.warning("Skipping damaged project file %s", p)
-            continue
+    for m in store.all():
         if not can_access(user, m):
             continue
-        folder = WORK / m["id"]
+        folder = site_dir(m["id"])
         files = [f for f in folder.rglob("*") if f.is_file()] if folder.exists() else []
         projects.append({"id": m["id"], "owner": m.get("owner"), "name": m["name"], "description": m.get("description", ""), "created": m["created"],
                          "updated": m["updated"], "busy": is_busy(m["id"]),
@@ -1199,21 +1161,21 @@ async def import_project(request: Request, body: dict):
         pages.append({"title": title, "file": p})
     user = current_user(request)
     meta = create_project(**details, brief=brief, owner=str(user["id"]), agents=await default_ids(user), brand=clean_brand(body.get("brand")))
-    folder = WORK / meta["id"]
+    folder = site_dir(meta["id"])
     try:
         for path, data in files:
             target = safe_path(meta["id"], path)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
     except (OSError, HTTPException) as e:
-        shutil.rmtree(folder, ignore_errors=True)
-        meta_path(meta["id"]).unlink(missing_ok=True)
+        _remove_project_files(meta["id"])
         if isinstance(e, HTTPException):
             raise
         raise HTTPException(507 if e.errno == errno.ENOSPC else 500, f"Couldn't save the imported files: {e.strerror or e}.")
     meta["pages"] = pages
     meta["imported"] = {"files": len(files), "skipped": len(skipped)}
     save_meta(meta)
+    store.index_site(meta["id"])
     safely("Snapshot", VERS.snapshot, meta["id"], "Imported site", kind="manual")
     return {**meta, "skipped": skipped[:50]}
 
@@ -1221,13 +1183,7 @@ async def import_project(request: Request, body: dict):
 @app.get("/api/projects/{pid}")
 async def get_project(pid: str):
     meta = load_meta(pid)
-    f = events_file(meta["id"])
-    events = []
-    for line in (f.read_text().splitlines() if f.exists() else []):
-        try:
-            events.append(json.loads(line))
-        except ValueError:
-            log.warning("Skipping a damaged chat line in %s", f)
+    events = await store.events(meta["id"])
     if not meta.get("agents"):
         meta["agents"] = await default_ids(await owner_of(meta))
     meta.setdefault("description", "")
@@ -1252,18 +1208,9 @@ async def update_project(pid: str, body: dict):
 
 
 def _remove_project_files(pid: str):
-    shutil.rmtree(WORK / pid, ignore_errors=True)
-    meta_path(pid).unlink(missing_ok=True)
-    events_file(pid).unlink(missing_ok=True)
-    VERS.delete_all(pid)
+    """The project, its chat, versions and files: its rows in Postgres and its folder works/<pid>/."""
+    store.delete(pid)
     runs.pop(pid, None)
-
-
-def _owner_of_meta_file(path: Path) -> str | None:
-    try:
-        return json.loads(path.read_text()).get("owner")
-    except (OSError, ValueError):
-        return None
 
 
 # ---------------------------------------------------------------- brand kit (one per project)
@@ -1271,7 +1218,7 @@ def _owner_of_meta_file(path: Path) -> str | None:
 # "logo", in assets/ so it is versioned and downloaded). Every agent gets it in <brand_kit>. A kit can be copied from
 # another of your projects, or from the account-wide kit of earlier versions ("account").
 
-BRAND_DIR = WORK / ".brand"          # earlier versions kept one kit per account here (still offered as a copy source)
+BRAND_DIR = config.LEGACY_WORK_DIR / ".brand"   # earlier versions kept one kit per account here (still offered as a copy source)
 HEX = re.compile(r"^#[0-9a-f]{6}$")
 FONT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ]{0,39}$")
 MAX_BRAND_COLORS = 6
@@ -1311,13 +1258,13 @@ def clean_brand(raw) -> dict:
 
 
 def _logo_asset(meta: dict) -> dict | None:
-    return next((a for a in meta.get("assets") or [] if a.get("kind") == "logo" and (WORK / meta["id"] / a["path"]).is_file()), None)
+    return next((a for a in meta.get("assets") or [] if a.get("kind") == "logo" and (site_dir(meta["id"]) / a["path"]).is_file()), None)
 
 
 def brand_of(meta: dict) -> dict:
     kit = {**EMPTY_BRAND, **(meta.get("brand") or {})}
     logo = _logo_asset(meta)
-    kit["logo"] = f"/work/{meta['id']}/{logo['path']}?v={int((WORK / meta['id'] / logo['path']).stat().st_mtime)}" if logo else None
+    kit["logo"] = f"/work/{meta['id']}/{logo['path']}?v={int((site_dir(meta['id']) / logo['path']).stat().st_mtime)}" if logo else None
     kit["empty"] = not (kit["colors"] or kit["heading_font"] or kit["body_font"] or logo)
     return kit
 
@@ -1354,21 +1301,23 @@ def _save_logo(meta: dict, data: str, note: str = "") -> dict:
 
 def _put_logo_bytes(meta: dict, raw: bytes, ext: str, note: str = "") -> dict:
     _drop_logo(meta)
-    folder = WORK / meta["id"] / "assets"
+    folder = site_dir(meta["id"]) / "assets"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / f"logo.{ext}").write_bytes(raw)
     meta = load_meta(meta["id"])
     meta["assets"] = [*(meta.get("assets") or []), {"path": f"assets/logo.{ext}", "kind": "logo", "note": note, "size": len(raw)}]
     save_meta(meta)
+    store.index_site(meta["id"])
     return meta
 
 
 def _drop_logo(meta: dict):
     meta = load_meta(meta["id"])
     for a in [a for a in meta.get("assets") or [] if a.get("kind") == "logo"]:
-        (WORK / meta["id"] / a["path"]).unlink(missing_ok=True)
+        (site_dir(meta["id"]) / a["path"]).unlink(missing_ok=True)
     meta["assets"] = [a for a in meta.get("assets") or [] if a.get("kind") != "logo"]
     save_meta(meta)
+    store.index_site(meta["id"])
 
 
 def _own_project(request: Request, pid: str) -> dict:
@@ -1451,7 +1400,7 @@ async def copy_project_brand(request: Request, pid: str, body: dict):
         if other.get("owner") != str(user["id"]):
             raise HTTPException(403, "You can only copy the brand kit of your own projects.")
         kit, asset = brand_of(other), _logo_asset(other)
-        logo_bytes, ext = ((WORK / other["id"] / asset["path"]).read_bytes(), Path(asset["path"]).suffix.lstrip(".")) if asset else (None, "")
+        logo_bytes, ext = ((site_dir(other["id"]) / asset["path"]).read_bytes(), Path(asset["path"]).suffix.lstrip(".")) if asset else (None, "")
     if not body.get("logo_only"):
         meta["brand"] = clean_brand(kit)
         save_meta(meta)
@@ -1474,7 +1423,7 @@ async def delete_project(pid: str):
 @app.get("/api/projects/{pid}/files")
 async def list_files(pid: str):
     """Every file with its size. Text content is included only for files small enough to edit."""
-    folder = WORK / load_meta(pid)["id"]
+    folder = site_dir(load_meta(pid)["id"])
     files = []
     for p in sorted(folder.rglob("*")) if folder.exists() else []:
         if not p.is_file() or p.relative_to(folder).parts[0] == browser_check.CHECK_DIR:
@@ -1500,7 +1449,7 @@ async def download(pid: str):
     meta = load_meta(pid)
     if is_busy(meta["id"]):
         raise HTTPException(409, "Agents are still working on this project. Download it when they finish.")
-    folder = WORK / meta["id"]
+    folder = site_dir(meta["id"])
     buf = io.BytesIO()
     slug = re.sub(r"[^a-z0-9]+", "-", meta["name"].lower()).strip("-")[:40] or "project"
     root = f"{slug}-{meta['id'][:8]}"
@@ -1676,17 +1625,11 @@ async def remove_preset(request: Request, preset_id: str):
 # ---------------------------------------------------------------- the marketplace (see market.py)
 
 def _all_metas() -> list[dict]:
-    out = []
-    for p in META.glob("*.json"):
-        try:
-            out.append(json.loads(p.read_text()))
-        except ValueError:
-            log.warning("Skipping damaged project file %s", p)
-    return out
+    return store.all()
 
 
 def _has_preview(pid: str) -> bool:
-    return (WORK / pid / "index.html").is_file()
+    return (site_dir(pid) / "index.html").is_file()
 
 
 async def _market_call(call):
@@ -1783,7 +1726,7 @@ async def put_rating(request: Request, pid: str, body: dict):
 # ---------------------------------------------------------------- editing & uploads
 
 def safe_path(pid: str, rel: str) -> Path:
-    folder = (WORK / pid).resolve()
+    folder = site_dir(pid).resolve()
     target = (folder / rel).resolve()
     if folder not in target.parents:
         raise HTTPException(400, "That path is outside the project.")
@@ -1812,7 +1755,8 @@ async def save_file(pid: str, body: dict):
     except OSError as e:
         raise HTTPException(507 if e.errno == errno.ENOSPC else 500, f"Couldn't save {target.name}: {e.strerror or e}.")
     meta = load_meta(pid); save_meta(meta)  # bump "updated"
-    return {"ok": True, "path": str(target.relative_to((WORK / pid).resolve())), "saved": time.time()}
+    store.index_site(pid)
+    return {"ok": True, "path": str(target.relative_to(site_dir(pid).resolve())), "saved": time.time()}
 
 
 @app.post("/api/projects/{pid}/uploads")
@@ -1830,15 +1774,15 @@ async def upload_image(pid: str, body: dict):
         raise HTTPException(400, "The image data is damaged. Try attaching it again.")
     if not raw:
         raise HTTPException(400, "That image is empty.")
-    stem = re.sub(r"[^a-z0-9]+", "-", Path(str(body.get("name") or "image")).stem.lower()).strip("-")[:40] or "image"
-    name = f"{stem}-{secrets.token_hex(3)}.{IMAGE_TYPES[m.group(1)]}"
-    folder = WORK / pid / "uploads"
+    name = f"{uuid.uuid4()}.{IMAGE_TYPES[m.group(1)]}"
+    folder = storage.uploads_dir(pid)
     folder.mkdir(parents=True, exist_ok=True)
     try:
         (folder / name).write_bytes(raw)
     except OSError as e:
         raise HTTPException(507 if e.errno == errno.ENOSPC else 500, f"Couldn't save the image: {e.strerror or e}.")
-    return {"path": f"uploads/{name}", "url": f"/work/{pid}/uploads/{name}", "size": len(raw)}
+    store.index_files(pid, "upload", folder)
+    return {"path": f"uploads/{name}", "url": f"/media/{pid}/uploads/{name}", "size": len(raw)}
 
 
 @app.post("/api/projects/{pid}/assets")
@@ -1869,7 +1813,7 @@ async def upload_asset(pid: str, body: dict):
         raise HTTPException(400, "The image data is damaged. Try choosing it again.")
     if not raw:
         raise HTTPException(400, "That image is empty.")
-    folder = WORK / meta["id"] / "assets"
+    folder = site_dir(meta["id"]) / "assets"
     stem = "logo" if kind == "logo" else (re.sub(r"[^a-z0-9]+", "-", Path(str(body.get("name") or kind)).stem.lower()).strip("-")[:40] or kind)
     ext = IMAGE_TYPES[m.group(1)]
     name, n = f"{stem}.{ext}", 2
@@ -1884,6 +1828,7 @@ async def upload_asset(pid: str, body: dict):
     meta = load_meta(meta["id"])
     meta["assets"] = [*(meta.get("assets") or []), entry]
     save_meta(meta)
+    store.index_site(meta["id"])
     return {**entry, "url": f"/work/{meta['id']}/assets/{name}"}
 
 
@@ -1964,11 +1909,7 @@ async def download_version(pid: str, n: int):
 # ---------------------------------------------------------------- stats
 
 def record_stat(pid: str, entry: dict):
-    meta = load_meta(pid)
-    stats = meta.setdefault("stats", [])
-    stats.append(entry)
-    del stats[:-500]
-    write_json(meta_path(pid), meta)   # keep "updated" as is
+    store.add_stat(pid, entry)
 
 
 @app.get("/api/stats")
@@ -1979,14 +1920,7 @@ async def get_stats(request: Request, project: str | None = None, page: int | No
         if not can_access(user, metas[0]):
             raise HTTPException(404, "This project doesn't exist (it may have been deleted).")
     else:
-        metas = []
-        for p in META.glob("*.json"):
-            try:
-                m = json.loads(p.read_text())
-                if can_access(user, m) and (not mine or m.get("owner") == str(user["id"])):
-                    metas.append(m)
-            except ValueError:
-                log.warning("Skipping damaged project file %s", p)
+        metas = [m for m in store.all() if can_access(user, m) and (not mine or m.get("owner") == str(user["id"]))]
     entries = [dict(e, project=m["id"], project_name=m["name"]) for m in metas for e in m.get("stats", [])]
     entries.sort(key=lambda e: e["ts"])
     visible = await load_agents(user)
@@ -2026,7 +1960,39 @@ async def get_stats(request: Request, project: str | None = None, page: int | No
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
-app.mount("/work", StaticFiles(directory=WORK, html=True), name="work")
+
+
+@app.get("/work/{pid}")
+@app.get("/work/{pid}/{path:path}")
+async def serve_site(request: Request, pid: str, path: str = ""):
+    """A project's website (works/<pid>/site/), reached by its unguessable id and always sandboxed (see no_cache)."""
+    try:
+        pid = str(uuid.UUID(pid))
+    except ValueError:
+        raise HTTPException(404, "This page or file doesn't exist.")
+    root = site_dir(pid).resolve()
+    target = (root / path).resolve()
+    if target != root and root not in target.parents:
+        raise HTTPException(404, "This page or file doesn't exist.")
+    if target.is_dir():
+        if not request.url.path.endswith("/"):        # so the page's relative links (style.css…) resolve inside it
+            return RedirectResponse(f"/work/{pid}/{path}/" if path else f"/work/{pid}/")
+        target = target / "index.html"
+    if not target.is_file():
+        raise HTTPException(404, "This page or file doesn't exist.")
+    return FileResponse(target)
+
+
+@app.get("/media/{pid}/{area}/{path:path}")
+async def project_media(pid: str, area: str, path: str):
+    """A project's reference images (uploads/) and browser-check screenshots (checks/): only for who can open the project."""
+    if area not in ("uploads", "checks"):
+        raise HTTPException(404, "This page or file doesn't exist.")
+    root = (work_dir(check_id(pid)) / area).resolve()
+    target = (root / path).resolve()
+    if root not in target.parents or not target.is_file():
+        raise HTTPException(404, "This page or file doesn't exist.")
+    return FileResponse(target, headers={"Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"})
 
 
 # ---------------------------------------------------------------- agents
@@ -2118,7 +2084,7 @@ def sync_pages(pid: str) -> list[dict] | None:
     known = {p["file"] for p in pages}
     titles = {p["title"] for p in pages}
     added = False
-    for f in sorted((WORK / pid).glob("*.html")):
+    for f in sorted(site_dir(pid).glob("*.html")):
         if len(pages) >= MAX_PAGES:
             break
         if f.name in known or not PAGE_FILE.match(f.name) or not f.is_file():
@@ -2225,8 +2191,12 @@ def _undo_site_changes(folder: Path, before: dict[str, bytes]) -> list[str]:
 async def run_agent(pid: str, agent: dict, common: str, request: str, notes: list[str], meta: dict,
                     images: list[str] = (), extra: str = "") -> str:
     """Run one agent as a `claude -p` process inside the project folder and stream what it does."""
-    folder = WORK / pid
-    prompt = build_prompt(meta, request, notes, images, extra)
+    folder = site_dir(pid)
+    # images are uploads/… and checks/… in works/<pid>/, next to the site: give full paths and access to those folders
+    image_paths = [str((work_dir(pid) / i).resolve()) for i in images]
+    prompt = build_prompt(meta, request, notes, image_paths, extra.replace("](checks/", f"]({work_dir(pid).resolve()}/checks/")
+                                                                 .replace("- checks/", f"- {work_dir(pid).resolve()}/checks/"))
+    extra_dirs = [d for d in (storage.uploads_dir(pid), storage.checks_dir(pid)) if images and d.exists()]
     web = agent.get("tools") == "web"
     language = await language_rule(meta)
     tools = ["Read", "Write", "Edit", "Glob", "Grep"] + (["WebSearch", "WebFetch"] if web else [])
@@ -2240,6 +2210,7 @@ async def run_agent(pid: str, agent: dict, common: str, request: str, notes: lis
         "--allowedTools", *tools,
         "--disallowedTools", "Bash", "Task", *([] if web else ["WebFetch", "WebSearch"]),
         "--permission-mode", "acceptEdits",
+        *[arg for d in extra_dirs for arg in ("--add-dir", str(d.resolve()))],
         # Prompt caching: each agent's system prompt is byte-identical for every project and run (no project data
         # in it), and this flag moves per-machine parts (cwd, env, git status) out of it, so its cache is reused
         # across projects. The server's rules stay last so they override everything before them.
@@ -2305,6 +2276,7 @@ async def run_agent(pid: str, agent: dict, common: str, request: str, notes: lis
                     log.exception("Couldn't report undone changes")
         if agent["id"] == REVIEWER and outcome == "done" and market.critic_score(final_text) is not None:
             info["score"] = market.critic_score(final_text)
+        store.index_site(pid)                     # every file the agent left, with its uuid
         safely("Recording stats", record_stat, pid, {"agent": agent["id"], "status": outcome, "ts": started,
                                                      "run": (meta.get("run") or {}).get("started"),
                                                      "request": request[:100], "seconds": round(time.time() - started, 1), **info})
@@ -2437,7 +2409,11 @@ async def safe_browser_check(pid: str) -> dict | None:
     meta = load_meta(pid)
     pages = [p["file"] for p in meta.get("pages") or []] or ["index.html"]
     try:
-        return await asyncio.wait_for(browser_check.check_site(WORK / pid, pages), 90)
+        check = str(uuid.uuid4())                 # works/<pid>/checks/<check>/: only the latest check is kept
+        shutil.rmtree(storage.checks_dir(pid), ignore_errors=True)
+        report = await asyncio.wait_for(browser_check.check_site(site_dir(pid), pages, storage.checks_dir(pid) / check, f"checks/{check}"), 90)
+        store.index_files(pid, "check", storage.checks_dir(pid))
+        return report
     except Exception as e:
         log.warning("Browser check failed for %s: %s", pid, e)
         return None
@@ -2466,7 +2442,7 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
 
     await broadcast(pid, {"type": "run_start", "request": request, "name": meta["name"],
                           "agents": meta["run"]["agents"], "pool": meta.get("agents") or [], "done": done, "resumed": resume})
-    seen_findings = set(safely("Scan", scan_site, WORK / pid) or [])
+    seen_findings = set(safely("Scan", scan_site, site_dir(pid)) or [])
     if safely("Snapshot", VERS.snapshot, pid, f"Before: {request[:60]}", kind="before", request=request):
         await broadcast(pid, {"type": "versions"})
     try:
@@ -2538,7 +2514,7 @@ class OrchestratorUnavailable(RuntimeError):
 
 async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict) -> dict | None:
     """Ask the Orchestrator (read-only `claude -p`) which agents to run. Returns its parsed JSON, or None."""
-    folder = WORK / pid
+    folder = site_dir(pid)
     role, model = orch.load_prompt()
     model = model if model and model_catalog.allowed(model) else MODEL
     prompt = orch.build_prompt(meta, request, team, folder, clean_text, site_pages(meta), brief_block(meta))
@@ -2611,7 +2587,7 @@ async def run_prompt(pid: str, request: str, pool: list[str], images: list[str])
     meta = load_meta(pid)
     agents = await project_agents(meta)
     order = [a["id"] for a in agents]
-    if orch.is_fresh(meta, WORK / pid):
+    if orch.is_fresh(meta, site_dir(pid)):
         everyone = [i for i in order if i in set(pool) | {orch.BRIEF}]
         plan = {"intent": "new_build", "agents": everyone, "notes": {}, "reply": None, "fallback": False, "first": True,
                 "reason": "First build: the whole team works on it."}
@@ -2641,7 +2617,7 @@ async def run_prompt(pid: str, request: str, pool: list[str], images: list[str])
 
 async def report_scan(pid: str, agent: dict, seen: set):
     """Warn in the chat when an agent's work added something the rules forbid."""
-    found = safely("Scan", scan_site, WORK / pid) or []
+    found = safely("Scan", scan_site, site_dir(pid)) or []
     new = [f for f in found if f not in seen]
     seen.update(found)
     if new:
@@ -2670,7 +2646,7 @@ async def run_retry(pid: str, agent: dict, request: str, note: str):
     await broadcast(pid, {"type": "run_start", "request": request, "name": meta["name"], "agents": [agent["id"]],
                           "retry": True, "note": note})
     safely("Snapshot", VERS.snapshot, pid, f"Before retrying {agent['name']}", kind="before", request=request)
-    found_before = safely("Scan", scan_site, WORK / pid) or []
+    found_before = safely("Scan", scan_site, site_dir(pid)) or []
     try:
         await broadcast(pid, {"type": "agent_start", "agent": agent["id"], "retry": True})
         summary = await run_agent(pid, agent, load_common(), full, notes, meta, run.get("images", []),
@@ -2779,8 +2755,8 @@ async def handle_ws_message(ws: WebSocket, pid: str, st: dict, msg: dict):
         valid = {a["id"] for a in await load_agents(owner)}
         agent_ids = [i for i in msg.get("agents") or [] if i in valid] or await default_ids(owner)
         images = [i for i in (msg.get("images") or [])[:6]
-                  if isinstance(i, str) and i.startswith("uploads/") and (WORK / pid / i).is_file()
-                  and (WORK / pid).resolve() in (WORK / pid / i).resolve().parents]
+                  if isinstance(i, str) and i.startswith("uploads/") and (work_dir(pid) / i).is_file()
+                  and storage.uploads_dir(pid).resolve() in (work_dir(pid) / i).resolve().parents]
         if details.get("agents") != agent_ids:   # the switches = the agents the Orchestrator may use
             details["agents"] = agent_ids
             save_meta(details)

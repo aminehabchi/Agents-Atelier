@@ -38,6 +38,7 @@ from pathlib import Path
 
 import config
 import db
+import storage
 
 AGENTS_DIR = config.AGENTS_DIR
 COMMON_FILE = AGENTS_DIR / "_common.md"
@@ -132,7 +133,7 @@ def _agent(row, user: dict | None) -> dict:
     shared = row["owner_id"] is None
     return {"id": row["slug"], "name": row["name"], "icon": row["icon"], "color": row["color"],
             "default": row["is_default"], "description": row["description"], "model": row["model"],
-            "tools": row["tools"] if row["tools"] in TOOL_SETS else "", "role": row["role"],
+            "tools": row["tools"] if row["tools"] in TOOL_SETS else "", "role": storage.read_instructions(row["uuid"], row["role"]),
             "scope": "shared" if shared else "mine", "editable": is_admin(user) if shared else True,
             "updated": row["updated_at"].timestamp()}
 
@@ -230,6 +231,8 @@ async def create_agent(user: dict, data: dict, position: int | None = None) -> d
         agent["description"], agent["model"], agent["tools"], agent["role"], pos)
     if shared:
         await db.pool.execute("DELETE FROM shared_removed WHERE kind = 'agent' AND slug = $1", agent["id"])
+    async with db.pool.acquire() as con:
+        await storage.export_instructions(con)
     if position is not None:
         ids = [a["id"] for a in await load_agents(user) if a["id"] != agent["id"]]
         ids.insert(max(0, min(int(position), len(ids))), agent["id"])
@@ -248,6 +251,8 @@ async def update_agent(user: dict, agent_id: str, data: dict) -> dict:
            WHERE slug = $1 AND owner_id IS NOT DISTINCT FROM $2""",
         agent_id, None if target["scope"] == "shared" else user["id"], clean["name"], clean["icon"], clean["color"],
         clean["default"], clean["description"], clean["model"], clean["tools"], clean["role"])
+    async with db.pool.acquire() as con:
+        await storage.export_instructions(con)
     return await _find(user, agent_id)
 
 
@@ -259,6 +264,8 @@ async def delete_agent(user: dict, agent_id: str):
         raise ValueError("Keep at least one shared agent.")
     await db.pool.execute("DELETE FROM agents WHERE slug = $1 AND owner_id IS NOT DISTINCT FROM $2",
                           agent_id, None if target["scope"] == "shared" else user["id"])
+    async with db.pool.acquire() as con:
+        await storage.forget_deleted_agents(con)
     if target["scope"] == "shared":          # agent migrations won't bring it back
         await db.pool.execute("INSERT INTO shared_removed (kind, slug) VALUES ('agent', $1) ON CONFLICT DO NOTHING", agent_id)
 

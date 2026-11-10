@@ -81,7 +81,8 @@ class _Chrome:
         self.proc = await asyncio.create_subprocess_exec(
             chrome_path(), "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
             "--hide-scrollbars", "--mute-audio", "--remote-debugging-port=0", f"--user-data-dir={self.profile}",
-            "--allow-file-access-from-files", "about:blank",
+            "--allow-file-access-from-files",
+            *(["--no-sandbox", "--disable-dev-shm-usage"] if config.CHROME_NO_SANDBOX else []), "about:blank",
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
         port_file = Path(self.profile) / "DevToolsActivePort"
         for _ in range(100):
@@ -203,15 +204,17 @@ async def _check_page(chrome: _Chrome, folder: Path, page: str, viewport, shot: 
             "images_without_alt": int(probe.get("alt") or 0)}
 
 
-async def check_site(folder: Path, pages: list[str] | None = None) -> dict | None:
-    """Open each page at desktop and phone width. Returns {"pages": [...], "screenshots": [...]} or None without Chrome."""
+async def check_site(folder: Path, pages: list[str] | None = None, shots_dir: Path | None = None, prefix: str | None = None) -> dict | None:
+    """Open each page at desktop and phone width. Returns {"pages": [...], "screenshots": [...]} or None without Chrome.
+    Screenshots go to `shots_dir` (default: folder/.checks) and are listed as `prefix/<name>.png`."""
     if not available():
         return None
     folder = Path(folder)
     pages = [p for p in (pages or ["index.html"]) if (folder / p).is_file()][:MAX_PAGES]
     if not pages:
         return {"pages": [], "screenshots": []}
-    shots_dir = folder / CHECK_DIR
+    prefix = prefix or CHECK_DIR
+    shots_dir = shots_dir or folder / CHECK_DIR
     shutil.rmtree(shots_dir, ignore_errors=True)
     shots_dir.mkdir(parents=True, exist_ok=True)
     results, shots = [], []
@@ -221,7 +224,7 @@ async def check_site(folder: Path, pages: list[str] | None = None) -> dict | Non
                 shot = None
                 if page == pages[0]:          # the home page at both widths is enough to see the design
                     shot = shots_dir / f"{Path(page).stem}-{vp[0]}.png"
-                    shots.append(f"{CHECK_DIR}/{shot.name}")
+                    shots.append(f"{prefix}/{shot.name}")
                 results.append(await _check_page(chrome, folder, page, vp, shot))
     # A missing file or a dead link is the same at both widths: keep it on the desktop entry only.
     seen = {}
