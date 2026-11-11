@@ -272,8 +272,7 @@ async function detailView(id) {
   });
   $("del")?.addEventListener("click", async () => {
     if (!await confirmDialog({ title: `Delete “${t.name}”?`, text: "The team is removed. Its agents and your projects are not changed.", ok: "Delete", danger: true })) return;
-    try { await api(`/api/presets/${encodeURIComponent(t.id)}`, { method: "DELETE" }); toast("Team deleted"); go("/teams"); }
-    catch (err) { toast(err.message, "err"); }
+    await withBusy($("del"), async () => { await api(`/api/presets/${encodeURIComponent(t.id)}`, { method: "DELETE" }); toast("Team deleted"); go("/teams"); });
   });
 }
 
@@ -342,18 +341,20 @@ async function formView(id) {
   $("defA").onclick = () => { draft.agents = new Set(base.agents.filter(a => a.default).map(a => a.id)); draw(); };
   $("noneA").onclick = () => { draft.agents = new Set(); draw(); };
   $("save").onclick = async () => {
+    $("f-name").removeAttribute("aria-invalid");
+    if (!draft.name.trim()) { statusError($("status"), "Give the team a name (max 40 characters)."); $("f-name").setAttribute("aria-invalid", "true"); return $("f-name").focus(); }
+    if (!draft.agents.size) { statusError($("status"), "Pick at least one agent."); return $("pick").querySelector("input")?.focus(); }
     const body = { name: draft.name, description: draft.description, prompt: draft.prompt, agents: [...draft.agents] };
     if (askScope && !$("f-shared").checked) body.scope = "mine";
-    $("save").disabled = true;
-    try {
+    await withBusy($("save"), async () => {
       const t = isNew ? await api("/api/presets", { method: "POST", body: JSON.stringify(body) })
                       : await api(`/api/presets/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) });
       toast(isNew ? `Team “${t.name}” created` : "Team saved"); go(`/teams/${encodeURIComponent(t.id)}`);
-    } catch (err) { toast(err.message, "err"); $("save").disabled = false; }
+    }, { onError: (err) => { statusError($("status"), `Not saved: ${err.message}`); toast(err.message, "err"); } });
   };
 }
 
-route();
+Promise.resolve().then(route).catch(err => showError(app, err, () => location.reload(), "Something went wrong on this page"));   // a bug must not leave "Loading…" forever
 </script>
 </body>
 </html>

@@ -33,6 +33,7 @@ import plans
 log = logging.getLogger("agents-atelier.billing")
 
 PLAN_IDS = {"pro": config.PAYPAL_PLAN_PRO, "agency": config.PAYPAL_PLAN_AGENCY}
+YEARLY_IDS = {"pro": config.PAYPAL_PLAN_PRO_YEARLY, "agency": config.PAYPAL_PLAN_AGENCY_YEARLY}   # optional
 ACTIVE = {"ACTIVE"}
 ENDED = {"CANCELLED", "SUSPENDED", "EXPIRED"}
 _token: dict = {"value": "", "until": 0.0}
@@ -48,8 +49,17 @@ def enabled() -> bool:
     return bool(config.PAYPAL_CLIENT_ID and config.PAYPAL_CLIENT_SECRET and all(PLAN_IDS.values()))
 
 
-def plan_of_paypal(plan_id: str) -> str | None:
-    return next((k for k, v in PLAN_IDS.items() if v and v == plan_id), None)
+def yearly_enabled() -> bool:
+    return enabled() and all(YEARLY_IDS.values())
+
+
+def plan_of_paypal(plan_id: str) -> tuple[str | None, str]:
+    """(our plan, monthly|yearly) for a PayPal plan id."""
+    for ids, period in ((PLAN_IDS, "monthly"), (YEARLY_IDS, "yearly")):
+        found = next((k for k, v in ids.items() if v and v == plan_id), None)
+        if found:
+            return found, period
+    return None, "monthly"
 
 
 # ------------------------------------------------------------ PayPal's REST API
@@ -84,10 +94,13 @@ async def _access_token() -> str:
             return json.loads(r.read())
     try:
         data = await asyncio.to_thread(get)
+        _token.update(value=str(data["access_token"]), until=time.time() + int(data.get("expires_in") or 300))
     except (urllib.error.URLError, OSError, ValueError) as e:
         log.error("PayPal login failed: %s", e)
         raise BillingError("PayPal can't be reached right now. Try again in a moment.", 502)
-    _token.update(value=data["access_token"], until=time.time() + int(data.get("expires_in") or 300))
+    except (KeyError, TypeError, AttributeError) as e:
+        log.error("PayPal login answered without a token: %s", e)
+        raise BillingError("PayPal refused the server's login. Try again later, or contact the administrator.", 502)
     return _token["value"]
 
 
@@ -96,18 +109,18 @@ async def paypal(method: str, path: str, body=None, ok=(200, 201, 204)) -> dict:
     try:
         status, data = await asyncio.to_thread(_http, method, path, body, {"Authorization": f"Bearer {token}",
                                                                             "PayPal-Request-Id": str(uuid.uuid4())})
-    except (urllib.error.URLError, OSError) as e:
+    except (urllib.error.URLError, OSError, ValueError) as e:     # ValueError: an answer that isn't JSON
         log.error("PayPal %s %s failed: %s", method, path, e)
         raise BillingError("PayPal can't be reached right now. Try again in a moment.", 502)
     if status not in ok:
         log.error("PayPal %s %s answered %s: %s", method, path, status, str(data)[:500])
         raise BillingError("PayPal refused the request. Try again, or contact the administrator.", 502)
-    return data
+    return data if isinstance(data, dict) else {}
 
 
 # ------------------------------------------------------------ the member's side
 
-async def subscribe(user: dict, plan: str, base_url: str) -> dict:
+async def subscribe(user: dict, plan: str, base_url: str, period: str = "monthly") -> dict:
     """Start a subscription; the member approves it on PayPal's page (the `approve` link)."""
     if not enabled():
         raise BillingError("Online payment isn't set up on this server.", 404)
@@ -115,18 +128,23 @@ async def subscribe(user: dict, plan: str, base_url: str) -> dict:
         raise BillingError("Admins already have every feature.")
     if plan not in PLAN_IDS:
         raise BillingError("Pick Pro or Agency.")
-    if plan == (user.get("plan") or plans.DEFAULT) and user.get("billing_subscription"):
-        raise BillingError(f"You're already on {plans.PLANS[plan]['name']}.")
+    if period not in plans.PERIODS:
+        raise BillingError("Pick monthly or yearly.")
+    if period == "yearly" and not yearly_enabled():
+        raise BillingError("Paying by the year isn't available on this server yet. Pick monthly.")
+    if (plan == (user.get("plan") or plans.DEFAULT) and user.get("billing_subscription")
+            and period == (user.get("billing_period") or "monthly")):
+        raise BillingError(f"You're already on {plans.PLANS[plan]['name']}, paid {period}.")
     base = config.PUBLIC_URL or base_url.rstrip("/")
     sub = await paypal("POST", "/v1/billing/subscriptions", {
-        "plan_id": PLAN_IDS[plan], "custom_id": str(user["id"]),
+        "plan_id": (YEARLY_IDS if period == "yearly" else PLAN_IDS)[plan], "custom_id": str(user["id"]),
         "application_context": {"brand_name": "Agents Atelier", "user_action": "SUBSCRIBE_NOW", "shipping_preference": "NO_SHIPPING",
                                 "locale": {"fr": "fr-FR", "ary": "fr-MA"}.get(user.get("language") or "", "en-US"),
                                 "return_url": f"{base}/billing/paypal/return", "cancel_url": f"{base}/profile?paid=cancelled#plan"}})
     approve = next((l["href"] for l in sub.get("links") or [] if l.get("rel") == "approve"), None)
     if not sub.get("id") or not approve:
         raise BillingError("PayPal didn't return a payment page. Try again.", 502)
-    await _save_subscription(sub["id"], user["id"], plan, sub.get("status") or "APPROVAL_PENDING")
+    await _save_subscription(sub["id"], user["id"], plan, sub.get("status") or "APPROVAL_PENDING", period=period)
     return {"approve": approve, "id": sub["id"]}
 
 
@@ -164,12 +182,13 @@ async def _cancel_at_paypal(sub_id: str, reason: str):
 
 # ------------------------------------------------------------ keeping plans in step with PayPal
 
-async def _save_subscription(sub_id: str, user_id, plan: str, status: str, next_billing: float | None = None):
+async def _save_subscription(sub_id: str, user_id, plan: str, status: str, next_billing: float | None = None, period: str = "monthly"):
     now = time.time()
-    await db.pool.execute("""INSERT INTO billing_subscriptions (id, user_id, plan, status, created, updated, next_billing)
-                             VALUES ($1, $2, $3, $4, $5, $5, $6)
-                             ON CONFLICT (id) DO UPDATE SET status = $4, updated = $5, next_billing = coalesce($6, billing_subscriptions.next_billing)""",
-                          sub_id, uuid.UUID(str(user_id)) if user_id else None, plan, status, now, next_billing)
+    await db.pool.execute("""INSERT INTO billing_subscriptions (id, user_id, plan, status, created, updated, next_billing, period)
+                             VALUES ($1, $2, $3, $4, $5, $5, $6, $7)
+                             ON CONFLICT (id) DO UPDATE SET status = $4, updated = $5,
+                               next_billing = coalesce($6, billing_subscriptions.next_billing), period = $7""",
+                          sub_id, uuid.UUID(str(user_id)) if user_id else None, plan, status, now, next_billing, period)
 
 
 def _ts(value) -> float | None:
@@ -180,12 +199,12 @@ def _ts(value) -> float | None:
         return None
 
 
-async def _set_plan(user_id, plan: str, sub_id: str) -> dict | None:
+async def _set_plan(user_id, plan: str, sub_id: str, period: str = "monthly") -> dict | None:
     before = await db.pool.fetchrow("SELECT plan, role FROM users WHERE id = $1", user_id)
     if not before:
         return None
-    row = await db.pool.fetchrow("""UPDATE users SET plan = $2, billing_subscription = $3, plan_request = '', plan_request_at = NULL
-                                    WHERE id = $1 RETURNING *""", user_id, plan, sub_id)
+    row = await db.pool.fetchrow("""UPDATE users SET plan = $2, billing_subscription = $3, billing_period = $4, plan_request = '',
+                                    plan_request_at = NULL WHERE id = $1 RETURNING *""", user_id, plan, sub_id, period)
     await auth._plan_event(user_id, before["plan"], plan, by_admin=False)
     return dict(row)
 
@@ -193,18 +212,19 @@ async def _set_plan(user_id, plan: str, sub_id: str) -> dict | None:
 async def apply(sub: dict) -> dict | None:
     """Bring a member's plan in line with one of their PayPal subscriptions. Returns the updated user when it changed."""
     sub_id, status = sub.get("id") or "", sub.get("status") or ""
-    plan = plan_of_paypal(sub.get("plan_id") or "")
-    row = await db.pool.fetchrow("SELECT user_id, plan FROM billing_subscriptions WHERE id = $1", sub_id)
+    plan, period = plan_of_paypal(sub.get("plan_id") or "")
+    row = await db.pool.fetchrow("SELECT user_id, plan, period FROM billing_subscriptions WHERE id = $1", sub_id)
     try:
         user_id = uuid.UUID(sub.get("custom_id") or (str(row["user_id"]) if row and row["user_id"] else ""))
     except ValueError:
         log.warning("PayPal subscription %s has no member", sub_id)
         return None
-    plan = plan or (row["plan"] if row else None)
+    if not plan and row:
+        plan, period = row["plan"], row["period"]
     if not plan:
         log.warning("PayPal subscription %s is for an unknown plan %s", sub_id, sub.get("plan_id"))
         return None
-    await _save_subscription(sub_id, user_id, plan, status, _ts((sub.get("billing_info") or {}).get("next_billing_time")))
+    await _save_subscription(sub_id, user_id, plan, status, _ts((sub.get("billing_info") or {}).get("next_billing_time")), period)
     user = await db.pool.fetchrow("SELECT id, email, plan, billing_subscription FROM users WHERE id = $1", user_id)
     if not user:
         return None
@@ -212,8 +232,8 @@ async def apply(sub: dict) -> dict | None:
         old = user["billing_subscription"]
         if user["plan"] == plan and old == sub_id:
             return None
-        changed = await _set_plan(user_id, plan, sub_id)
-        log.info("%s is on %s through PayPal (%s)", user["email"], plan, sub_id)
+        changed = await _set_plan(user_id, plan, sub_id, period)
+        log.info("%s is on %s (%s) through PayPal (%s)", user["email"], plan, period, sub_id)
         if old and old != sub_id:                    # an upgrade or a switch: one subscription at a time
             try:
                 await _cancel_at_paypal(old, "Replaced by a new plan")
@@ -250,23 +270,35 @@ async def webhook(headers, raw: bytes) -> dict:
         event = json.loads(raw)
     except ValueError:
         raise BillingError("Not JSON.")
+    if not isinstance(event, dict):
+        raise BillingError("A webhook event is a JSON object.")
     if not enabled() or not await verify_webhook(headers, event):
         raise BillingError("This webhook couldn't be verified.", 401)
     event_id, kind, res = str(event.get("id") or ""), str(event.get("event_type") or ""), event.get("resource") or {}
+    res = res if isinstance(res, dict) else {}
     first = await db.pool.fetchval("INSERT INTO billing_events (id, type, ts) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING id",
                                    event_id, kind, time.time())
     if not first:
         return {"duplicate": True}
     changed = None
-    if kind.startswith("BILLING.SUBSCRIPTION."):
-        changed = await apply(res)
-    elif kind in ("PAYMENT.SALE.COMPLETED", "PAYMENT.SALE.REFUNDED", "PAYMENT.SALE.REVERSED"):
-        await record_payment(kind, res)
+    try:
+        if kind.startswith("BILLING.SUBSCRIPTION."):
+            changed = await apply(res)
+        elif kind in ("PAYMENT.SALE.COMPLETED", "PAYMENT.SALE.REFUNDED", "PAYMENT.SALE.REVERSED"):
+            await record_payment(kind, res)
+    except Exception:
+        # not handled after all: forget it, so PayPal's next delivery of this event is handled instead of skipped
+        log.exception("PayPal webhook %s (%s) failed; PayPal will send it again", event_id, kind)
+        try:
+            await db.pool.execute("DELETE FROM billing_events WHERE id = $1", event_id)
+        except Exception:
+            log.exception("Couldn't forget PayPal webhook %s: handle it by hand", event_id)
+        raise
     return {"type": kind, "plan_changed": bool(changed), "user": str(changed["id"]) if changed else None}
 
 
 async def record_payment(kind: str, res: dict):
-    amount = res.get("amount") or {}
+    amount = res.get("amount") if isinstance(res.get("amount"), dict) else {}
     try:
         value = float(amount.get("total") or amount.get("value") or 0)
     except (TypeError, ValueError):
@@ -295,16 +327,17 @@ async def received(since: float) -> dict:
 # ------------------------------------------------------------ manage.py paypal-setup
 
 async def setup_plans() -> dict:
-    """Create the PayPal product and one monthly plan per paid plan in plans.py. Returns the ids to put in .env."""
+    """Create the PayPal product and a monthly and a yearly plan per paid plan in plans.py. Returns the ids for .env."""
     product = await paypal("POST", "/v1/catalogs/products", {"name": "Agents Atelier", "type": "SERVICE", "category": "SOFTWARE",
                                                              "description": "AI agents that build websites"})
     out = {}
     for key in ("pro", "agency"):
         p = plans.PLANS[key]
-        plan = await paypal("POST", "/v1/billing/plans", {
-            "product_id": product["id"], "name": f"Agents Atelier {p['name']}", "status": "ACTIVE",
-            "billing_cycles": [{"frequency": {"interval_unit": "MONTH", "interval_count": 1}, "tenure_type": "REGULAR", "sequence": 1,
-                                "total_cycles": 0, "pricing_scheme": {"fixed_price": {"value": f"{p['price']:.2f}", "currency_code": "USD"}}}],
-            "payment_preferences": {"auto_bill_outstanding": True, "payment_failure_threshold": 2}})
-        out[f"PAYPAL_PLAN_{key.upper()}"] = plan["id"]
+        for unit, price, suffix, label in (("MONTH", p["price"], "", ""), ("YEAR", p["price_yearly"], "_YEARLY", " (yearly)")):
+            plan = await paypal("POST", "/v1/billing/plans", {
+                "product_id": product["id"], "name": f"Agents Atelier {p['name']}{label}", "status": "ACTIVE",
+                "billing_cycles": [{"frequency": {"interval_unit": unit, "interval_count": 1}, "tenure_type": "REGULAR", "sequence": 1,
+                                    "total_cycles": 0, "pricing_scheme": {"fixed_price": {"value": f"{price:.2f}", "currency_code": "USD"}}}],
+                "payment_preferences": {"auto_bill_outstanding": True, "payment_failure_threshold": 2}})
+            out[f"PAYPAL_PLAN_{key.upper()}{suffix}"] = plan["id"]
     return out

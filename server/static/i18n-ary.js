@@ -2512,3 +2512,66 @@ Object.assign(window.I18N.ary, {
   "<b>Starter</b> (free): one project, the official agents and ready teams. You see what each agent does, its stats, projects and ratings; its instructions are shown from Pro.": "<b>Starter</b> (فابور): مشروع واحد، الوكلاء الرسميين والفرق الواجدين. كتشوف شنو كيدير كل وكيل، الإحصائيات، المشاريع والتقييمات ديالو؛ التعليمات ديالو كيبانو من Pro لفوق.",
   "<b>Pro</b>: unlimited projects, every agent's instructions, your own agents and teams, exports, web research, more checks and versions.": "<b>Pro</b>: مشاريع بلا حدود، التعليمات ديال كل وكيل، الوكلاء والفرق ديالك، التصدير، البحث فالويب، فحوصات ونسخ كثر.",
 });
+/* log in with Google or GitHub, rate limits */
+Object.assign(window.I18N.ary, {
+ "or with your email": "ولا بالإيميل ديالك",
+ "You log in with Google or GitHub, so your account has no password yet. Set one to also log in with your email.": "كتدخل ب Google ولا GitHub، داكشي علاش الحساب ديالك ما عندوش كلمة السر باقي. دير وحدة باش تقدر تدخل حتى بالإيميل ديالك.",
+ "This way of logging in isn't available.": "هاد الطريقة ديال الدخول ماشي متاحة.",
+ "We couldn't reach the provider. Try again in a moment.": "ما قدرناش نوصلو للخدمة. عاود من بعد شوية.",
+ "The provider didn't confirm the login. Try again.": "الخدمة ما أكداتش الدخول. عاود.",
+ "The provider didn't say who you are. Try again.": "الخدمة ما قالتش شكون نتا. عاود.",
+ "You cancelled the login, or the provider refused it.": "لغيتي الدخول، ولا الخدمة رفضاتو.",
+ "This login link expired or didn't start here. Try again.": "هاد الرابط ديال الدخول سالا ولا ما بداش من هنا. عاود."
+});
+window.I18N_PATTERNS.ary.push(
+  [/^Continue with (.+)$/, "كمل ب $1"],
+  [/^By continuing with (.+), you accept the <a href="\/terms" target="_blank" rel="noopener">Terms of use<\/a> and the <a href="\/privacy" target="_blank" rel="noopener">Privacy policy<\/a>\.$/,
+   (m, p) => `إلا كملتي ب ${p.replace(" or ", " ولا ")}، راك كتقبل <a href="/terms" target="_blank" rel="noopener">شروط الاستعمال</a> و<a href="/privacy" target="_blank" rel="noopener">سياسة الخصوصية</a>.`],
+  [/^Linked with (.+)$/, "مربوط ب $1"],
+  [/^Your (.+) account has no verified email address\. Verify one there, or sign up with your email and a password\.$/,
+   "الحساب ديالك ف $1 ما عندوش إيميل مأكد. أكد واحد تما، ولا تسجل بالإيميل ديالك وكلمة السر."],
+  [/^Too many requests\. Slow down and try again in (\d+) seconds\.$/, "بزاف ديال الطلبات. شوية بشوية وعاود من بعد $1 ثانية."],
+  [/^Too many (invitations|share links|payment attempts|comments) from your network\. Try again in (.+)\.$/,
+   (m, w, t) => `بزاف ديال ${({ "invitations": "الدعوات", "share links": "روابط البارطاج", "payment attempts": "محاولات الخلاص", "comments": "التعليقات" })[w]} من الشبكة ديالك. عاود من بعد ${t.replace(/minutes?/, "دقيقة")}.`],
+  [/^You've started a lot of runs this hour\. Try again in (.+)\.$/, (m, t) => `بديتي بزاف ديال الخدمات هاد الساعة. عاود من بعد ${t.replace(/minutes?/, "دقيقة")}.`],
+);
+window.I18N_PATTERNS.ary.push([/^You've made a lot of (invitations|share links|payment attempts) recently\. Try again in (.+)\.$/,
+  (m, w, t) => `درتي بزاف ديال ${({ "invitations": "الدعوات", "share links": "روابط البارطاج", "payment attempts": "محاولات الخلاص" })[w]} مؤخرا. عاود من بعد ${t.replace(/minutes?/, "دقيقة")}.`]);
+/* yearly billing, project details in the Project tab */
+Object.assign(window.I18N.ary, {
+ "Monthly": "بالشهر",
+ "Yearly": "بالعام",
+ "2 months free": "جوج شهور فابور",
+ "Billing period": "مدة الخلاص",
+ "Pay yearly instead": "خلص بالعام",
+ "Pay monthly instead": "خلص بالشهر",
+ "Paid with PayPal · yearly": "مخلص بـ PayPal · بالعام",
+ "Project details": "تفاصيل المشروع",
+ "Save details": "سجل التفاصيل",
+ "The name, description, pages and brief every agent reads with each request.": "السمية، الوصف، الصفحات والبريف اللي كيقراهم كل وكيل مع كل طلب.",
+ "The name, description, pages and brief every agent reads with each request. Changes apply from the next request.": "السمية، الوصف، الصفحات والبريف اللي كيقراهم كل وكيل مع كل طلب. التبديلات كتطبق من الطلب الجاي.",
+ "Paying by the year isn't available on this server yet. Pick monthly.": "الخلاص بالعام ماشي متاح ف هاد السيرفر باقي. ختار بالشهر.",
+ "Pick monthly or yearly.": "ختار بالشهر ولا بالعام."
+});
+window.I18N_PATTERNS.ary.push(
+  [/^Pay with PayPal · yearly · save (\d+)%$/, "خلص بـ PayPal · بالعام · وفر $1%"],
+  [/^Billed \$(\d+) a year · you save \$(\d+)$/, "كتخلص $1 دولار ف العام · كتوفر $2 دولار"],
+  [/^\$(\d+) \/ year$/, "$1 دولار / العام"],
+  [/^or \$(\d+) a year: two months free$/, "ولا $1 دولار ف العام: جوج شهور فابور"],
+  [/^(Starter|Pro|Agency) is \$(\d+) a year \(\$([\d.]+) a month\), paid with PayPal\. (.+)$/,
+    (_, p, y, mo, rest) => window.t(`${p} is $0 a month, paid with PayPal. ${rest}`).replace(/بـ 0 دولار ف الشهر/, `بـ ${y} دولار ف العام (${mo} دولار ف الشهر)`)],
+  [/^Pro and Agency are PayPal subscriptions(, paid monthly or yearly \(two months free\)|, paid monthly): pay with a card or your PayPal balance\. The features change as soon as PayPal confirms\. (Moving to Starter applies at once and cancels your subscription\.|Moving to Starter applies at once\.)$/,
+    (_, per, end) => `Pro و الوكالة اشتراكات ديال PayPal${per.includes("yearly") ? "، كتخلصهم بالشهر ولا بالعام (جوج شهور فابور)" : "، كتخلصهم بالشهر"}: خلص بالكارطة ولا بالرصيد ديال PayPal. المميزات كتبدل غير PayPal يأكد. ${end.includes("cancels") ? "الرجوع لـ Starter كيطبق دغيا وكيلغي الاشتراك ديالك." : "الرجوع لـ Starter كيطبق دغيا."}`],
+);
+/* yearly prices on the landing page and in upgrade requests */
+Object.assign(window.I18N.ary, {
+ "Pro and Agency are subscriptions paid with PayPal, monthly or yearly.": "Pro و الوكالة اشتراكات كتخلصهم بـ PayPal، بالشهر ولا بالعام.",
+ "Sent as a request, yearly: an admin confirms it": "تصيفط كطلب، بالعام: أدمين كيأكدو"
+});
+window.I18N_PATTERNS.ary.push(
+  [/^Billed monthly\. Or \$(\d+) a year: two months free$/, "كتخلص بالشهر. ولا $1 دولار ف العام: جوج شهور فابور"],
+  [/^You asked for (Starter|Pro|Agency), paid (yearly|monthly)$/, (_, p, per) => `طلبتي ${p === "Agency" ? "الوكالة" : p}، ${per === "yearly" ? "بالعام" : "بالشهر"}`],
+  [/^You asked for (Starter|Pro|Agency), paid (yearly|monthly) · (.+)$/, (_, p, per, when) => `طلبتي ${p === "Agency" ? "الوكالة" : p}، ${per === "yearly" ? "بالعام" : "بالشهر"} · ${window.t(when)}`],
+  [/^(Starter|Pro|Agency) is \$(\d+) a year \(\$([\d.]+) a month\)\. (.+)$/,
+    (_, p, y, mo, rest) => window.t(`${p} is $0 a month. ${rest}`).replace(/بـ 0 دولار ف الشهر/, `بـ ${y} دولار ف العام (${mo} دولار ف الشهر)`)],
+);

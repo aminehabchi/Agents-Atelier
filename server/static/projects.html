@@ -454,19 +454,23 @@ document.addEventListener("click", async (e) => {
       if (!p.busy) location.href = `/api/projects/${p.id}/download`;
       break;
     case "edit": {
-      const details = await projectDialog({ title: "Project details", ok: "Save", name: p.name === "Untitled project" ? "" : p.name, description: p.description, pages: p.pages, brief: p.brief || {} });
-      if (!details) return;
-      try { await api(`/api/projects/${p.id}`, { method: "PATCH", body: JSON.stringify(details) }); toast("Project details saved"); signature = ""; load(); }
-      catch (err) { toast(err.message, "err"); }
+      // if saving fails, the dialog opens again with what was typed and says why
+      let values = { name: p.name === "Untitled project" ? "" : p.name, description: p.description, pages: p.pages, brief: p.brief || {} }, error = "";
+      for (;;) {
+        const details = await projectDialog({ title: "Project details", ok: "Save", ...values, error });
+        if (!details) return;
+        try { await api(`/api/projects/${p.id}`, { method: "PATCH", body: JSON.stringify(details) }); toast("Project details saved"); signature = ""; load(); break; }
+        catch (err) { toast(err.message, "err"); values = details; error = `Not saved: ${err.message}`; }
+      }
       break;
     }
     case "del":
       if (!await confirmDialog({ title: "Delete project?", text: `“${p.name}” and all its files will be removed. This cannot be undone.`, ok: "Delete", danger: true })) return;
-      try {
+      await withBusy(btn, async () => {
         await api(`/api/projects/${p.id}`, { method: "DELETE" }); toast("Project deleted");
         if (data.items.length === 1 && state.page > 1) state.page--;
         signature = ""; load();
-      } catch (err) { toast(err.message, "err"); }
+      });
       break;
   }
 });
@@ -482,7 +486,7 @@ document.addEventListener("keydown", (e) => {
 window.addEventListener("scroll", () => document.querySelector("header.top").classList.toggle("scrolled", scrollY > 4));
 
 syncControls();
-load();
+load().catch(err => showError($("results"), err, () => location.reload(), "Something went wrong on this page"));
 setInterval(() => !document.hidden && load({ quiet: true }), 5000);
 if (url.searchParams.get("new")) location.replace("/projects/new");
 </script>

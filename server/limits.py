@@ -41,6 +41,19 @@ class Limit:
 SIGNUP = Limit(config.SIGNUPS_PER_HOUR, 3600)
 LOGIN = Limit(config.LOGINS_PER_15_MIN, 900)
 RESET = Limit(config.RESETS_PER_HOUR, 3600)
+# the rest of the app: keyed by member ("u:<id>") or by address ("ip:<address>"), see key_for
+API = Limit(config.API_REQUESTS_PER_MINUTE, 60)
+RUNS = Limit(config.RUNS_PER_HOUR, 3600)
+INVITES = Limit(config.INVITES_PER_HOUR, 3600)
+SHARE_LINKS = Limit(config.SHARE_LINKS_PER_HOUR, 3600)
+COMMENTS = Limit(config.COMMENTS_PER_HOUR, 3600)
+CHECKOUTS = Limit(config.CHECKOUTS_PER_HOUR, 3600)
+
+
+def key_for(request, user: dict | None = None) -> str:
+    """Count a logged-in member's requests together wherever they come from; anyone else by address."""
+    user = user if user is not None else getattr(getattr(request, "state", None), "user", None)
+    return f"u:{user['id']}" if user else f"ip:{client_ip(request)}"
 
 
 def client_ip(request) -> str:

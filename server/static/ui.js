@@ -45,9 +45,14 @@ const authStateOf = (user) => !user ? "guest" : user.confirmed ? "member" : "unc
 const authState = () => document.documentElement.dataset.auth;
 try { document.documentElement.dataset.auth = localStorage.getItem("atelier-auth") || "guest"; }
 catch { document.documentElement.dataset.auth = "guest"; }
+/* <html data-own-agents="no">: a Starter member, who has no My agents and My teams pages (base.css hides every link to
+   them; the server sends those pages to the marketplace). Remembered like data-auth, so the links don't flash. */
+const ownAgentsOf = (user) => !user?.confirmed || user.role === "admin" || ["pro", "agency"].includes(user.plan) ? "yes" : "no";
+try { document.documentElement.dataset.ownAgents = localStorage.getItem("atelier-own-agents") || "yes"; } catch {}
 function rememberAuth(user) {
   document.documentElement.dataset.auth = authStateOf(user);
-  try { localStorage.setItem("atelier-auth", authStateOf(user)); } catch {}
+  document.documentElement.dataset.ownAgents = ownAgentsOf(user);
+  try { localStorage.setItem("atelier-auth", authStateOf(user)); localStorage.setItem("atelier-own-agents", ownAgentsOf(user)); } catch {}
   if (user?.confirmed) {       // the account's choices follow you to any device
     if (user.theme && user.theme !== getTheme()) setTheme(user.theme, false);
     if (user.language && user.language !== getLang()) setLang(user.language);
@@ -64,52 +69,161 @@ window.getMe = () => mePromise ||= fetch("/api/auth/me").then(r => r.ok ? r.json
 const initialsOf = (user) => (user.name || user.email).trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
 const PUBLIC_PAGES = ["/", "/login", "/register", "/forgot", "/confirm", "/terms", "/privacy"];
 
-/* fetch JSON from the server. Always throws an ApiError with a readable message:
-   server down, timeout, HTML error page, validation errors… */
+/* Seconds to wait, from a Retry-After header (seconds or an HTTP date). */
+const retryAfterOf = (res) => {
+  const v = res.headers.get("Retry-After");
+  if (!v) return 0;
+  const n = /^\d+$/.test(v.trim()) ? +v : Math.ceil((Date.parse(v) - Date.now()) / 1000);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+/* "45 seconds", "2 minutes", "1 hour" */
+window.waitText = (sec) => sec < 60 ? `${sec} second${sec === 1 ? "" : "s"}`
+  : sec < 3600 ? `${Math.ceil(sec / 60)} minute${Math.ceil(sec / 60) === 1 ? "" : "s"}`
+  : `${Math.ceil(sec / 3600)} hour${Math.ceil(sec / 3600) === 1 ? "" : "s"}`;
+/* Pages where a 401 is an answer to show, not a reason to go to the login page. */
+const noLoginRedirect = () => PUBLIC_PAGES.includes(location.pathname) || location.pathname.startsWith("/s/");
+const OFFLINE_MSG = "You're offline. Check your connection, then try again.";
+
+/* fetch JSON from the server. Always throws an ApiError with a readable message, `status` (0 when nothing came back),
+   `upgrade` (the plan a 403 asks for) and, when known, `retryAfter` (seconds), `ref` (the server log reference),
+   `offline`, `timeout`. A 401 on a private page goes to the login page instead of throwing.
+   opts: fetch options plus `timeout` (ms, default 30 s; uploads pass more) and an optional `signal` to cancel. */
 window.api = async (path, opts = {}) => {
-  const { timeout = 30000, ...init } = opts;
+  const { timeout = 30000, signal, ...init } = opts;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeout);
-  let res;
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, timeout);
+  const onAbort = () => ctrl.abort();
+  signal?.addEventListener("abort", onAbort);
+  const fail = (msg, status = 0, extra = {}) => Object.assign(new ApiError(msg, status, extra.upgrade || ""), extra);
+  let res, text;
   try {
     res = await fetch(path, { headers: { "Content-Type": "application/json" }, signal: ctrl.signal, ...init });
+    text = await res.text();
   } catch (e) {
-    throw new ApiError(e.name === "AbortError"
-      ? "The server took too long to answer. Try again in a moment."
-      : "Can't reach the server. Check that it's running (./run.sh), then try again.");
-  } finally { clearTimeout(timer); }
-  const text = await res.text();
+    if (signal?.aborted) throw e;                     // cancelled by the page itself: not an error to show
+    if (timedOut) throw fail("The server took too long to answer. Try again in a moment.", 0, { timeout: true });
+    if (navigator.onLine === false) throw fail(OFFLINE_MSG, 0, { offline: true });
+    throw fail("Can't reach the server. Check your connection, then try again in a moment.", 0, { network: true });
+  } finally { clearTimeout(timer); signal?.removeEventListener("abort", onAbort); }
   let data = null;
   try { data = text ? JSON.parse(text) : {}; } catch { data = null; }
+  // A login page instead of JSON: the session ended while the page was open.
+  const toLogin = res.status === 401 || (res.redirected && /^\/login\b/.test(new URL(res.url, location.href).pathname) && data === null);
+  if (toLogin && !noLoginRedirect() && !path.startsWith("/api/auth/")) {
+    location.href = `/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`;
+    return new Promise(() => {});                     // the page is leaving: nothing to show meanwhile
+  }
   if (!res.ok) {
-    // Private pages go to the right account page; public pages and the account forms show the message instead.
-    if (!PUBLIC_PAGES.includes(location.pathname) && !path.startsWith("/api/auth/")) {
-      if (res.status === 401) location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
-      if (res.status === 403 && data?.detail === "Confirm your email first.") location.href = "/confirm";
+    if (res.status === 403 && data?.detail === "Confirm your email first." && !noLoginRedirect()) {
+      location.href = "/confirm";
+      return new Promise(() => {});
     }
     let msg = data?.detail;
     if (Array.isArray(msg)) msg = msg.map(d => d.msg || JSON.stringify(d)).join("; ");
     else if (msg && typeof msg !== "string") msg = JSON.stringify(msg);
-    if (!msg) msg = res.status === 413 ? "That's too large for the server to accept."
-      : res.status >= 500 ? `The server had a problem (${res.status}). Check the server log.`
-      : `Request failed (${res.status} ${res.statusText}).`;
-    if (res.status === 403 && data?.upgrade) planPrompt(msg, data.upgrade);    // a feature of a higher plan
-    throw new ApiError(msg, res.status, data?.upgrade || "");
+    const wait = retryAfterOf(res), ref = typeof data?.ref === "string" ? data.ref : "";
+    const s = res.status;
+    if (!msg) msg = s === 401 ? "Your session ended. Log in again."
+      : s === 403 ? "You don't have access to this."
+      : s === 404 ? "This doesn't exist any more. It may have been deleted or moved."
+      : s === 409 ? "That's busy right now. Try again in a moment."
+      : s === 413 ? "That's too large for the server to accept."
+      : s === 429 ? (wait ? `Too many requests. Try again in ${waitText(wait)}.` : "Too many requests. Wait a moment, then try again.")
+      : s === 502 || s === 503 || s === 504 ? "The server is unavailable right now. Try again in a moment."
+      : s >= 500 ? "The server had a problem. Try again in a moment."
+      : `Request failed (${s} ${res.statusText}).`.replace(" )", ")");
+    if (ref && !msg.includes(ref)) msg += ` (ref ${ref})`;
+    if (s === 403 && data?.upgrade) planPrompt(msg, data.upgrade);    // a feature of a higher plan
+    throw fail(msg, s, { upgrade: data?.upgrade || "", retryAfter: wait, ref });
   }
-  if (data === null) throw new ApiError("The server sent an unexpected answer.", res.status);
+  if (data === null) throw fail("The server sent an unexpected answer. Try again in a moment.", res.status);
   return data;
+};
+
+/* Run `fn` while `btn` shows it's working: disabled, aria-busy, and its label kept. Errors go to `onError`
+   (default: a toast) and are not re-thrown, so a click handler never leaves an unhandled rejection.
+   Returns fn's result, or undefined when it failed. */
+window.withBusy = async (btn, fn, { onError = (err) => toast(errorText(err), "err"), label = "" } = {}) => {
+  if (btn?.dataset.busy) return;
+  const prev = btn ? { disabled: btn.disabled, html: btn.innerHTML } : null;
+  if (btn) { btn.dataset.busy = "1"; btn.disabled = true; btn.setAttribute("aria-busy", "true"); if (label) btn.textContent = label; }
+  try { return await fn(); }
+  catch (err) { if (err?.name !== "AbortError") onError(err); }
+  finally {
+    if (btn && btn.isConnected) { btn.disabled = prev.disabled; btn.removeAttribute("aria-busy"); if (label) btn.innerHTML = prev.html; }
+    if (btn) delete btn.dataset.busy;
+  }
+};
+
+/* A save button's status line turned into an error, read out at once. */
+window.statusError = (el, text) => {
+  if (!el) return;
+  el.innerHTML = `<span class="status-err" role="alert">${icon("alert", { size: 14 })}<span>${esc(text)}</span></span>`;
+};
+
+/* Show a form error under its field (an element [data-for=name] or the given box) and move focus to the field. */
+window.fieldError = (form, name, text) => {
+  const field = form.elements?.[name] || form.querySelector(`[name="${name}"]`);
+  const box = form.querySelector(`[data-for="${name}"]`);
+  if (box) { box.textContent = text; box.setAttribute("role", "alert"); }
+  if (field) {
+    field.setAttribute("aria-invalid", text ? "true" : "false");
+    if (box?.id) field.setAttribute("aria-describedby", box.id);
+    if (text) field.focus();
+  }
+  return !!box;
 };
 
 window.fmtSize = (n = 0) => n < 1024 ? `${n} B` : n < 1024 ** 2 ? `${(n / 1024).toFixed(n < 10240 ? 1 : 0)} KB` : `${(n / 1024 ** 2).toFixed(1)} MB`;
 
 /* An inline "couldn't load" block with a Try again button. */
+/* The words to show for an error: ours are written for people; a bug's own message (TypeError…) is not. */
+const BUG_ERRORS = ["TypeError", "ReferenceError", "SyntaxError", "RangeError", "URIError", "EvalError"];
+window.errorText = (err) => {
+  if (!err) return "Something went wrong on this page. Reload it if something looks wrong.";
+  if (BUG_ERRORS.includes(err.name)) { console.error(err); return "Something went wrong on this page. Reload it if something looks wrong."; }
+  return err.message || String(err);
+};
 window.showError = (el, err, onRetry, title = "Couldn't load this") => {
   if (!el) return;
   el.innerHTML = `<div class="err-state" role="alert"><span class="tile">${icon("alert", { size: 22 })}</span>
-    <b>${esc(title)}</b><p>${esc(err?.message || String(err))}</p>
+    <b>${esc(title)}</b><p>${esc(errorText(err))}</p>
     ${onRetry ? `<button class="btn btn-ghost btn-sm" type="button" data-retry-load>${icon("refresh", { size: 14 })}Try again</button>` : ""}</div>`;
-  el.querySelector("[data-retry-load]")?.addEventListener("click", (e) => { e.stopPropagation(); onRetry(); });
+  el.removeAttribute("aria-busy");
+  el.querySelector("[data-retry-load]")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const b = e.currentTarget;
+    b.disabled = true; b.setAttribute("aria-busy", "true");
+    try { await onRetry(); }
+    catch (err2) { if (b.isConnected) showError(el, err2, onRetry, title); }   // a retry that fails again says so
+    finally { if (b.isConnected) { b.disabled = false; b.removeAttribute("aria-busy"); } }
+  });
 };
+
+/* ---------- offline / back online: a small banner on every page ---------- */
+(() => {
+  let box = null, hideTimer = 0;
+  const show = (offline) => {
+    clearTimeout(hideTimer);
+    if (!document.body) return;
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "net-banner";
+      box.setAttribute("role", "status");
+      box.setAttribute("aria-live", "polite");
+      document.body.append(box);
+    }
+    box.classList.toggle("ok", !offline);
+    box.innerHTML = offline
+      ? `${icon("alert", { size: 16 })}<span>You're offline. What you've typed stays on this page; save it once you're back online.</span>`
+      : `${icon("check", { size: 16 })}<span>You're back online.</span>`;
+    if (!offline) hideTimer = setTimeout(() => { box?.remove(); box = null; }, 3000);
+  };
+  window.addEventListener("offline", () => show(true));
+  window.addEventListener("online", () => { if (box) show(false); });
+  document.addEventListener("DOMContentLoaded", () => { if (navigator.onLine === false) show(true); });
+})();
 
 /* Last line of defence: nothing fails silently. Throttled so one problem shows one toast. */
 let lastGlobalError = 0;
@@ -119,7 +233,7 @@ function reportGlobal(err) {
   const now = Date.now();
   if (now - lastGlobalError < 4000) return;
   lastGlobalError = now;
-  if (document.body) toast(err.message || "Something went wrong on this page.", "err");
+  if (document.body) toast(errorText(err), "err");
 }
 window.addEventListener("unhandledrejection", (e) => reportGlobal(e.reason));
 window.addEventListener("error", (e) => reportGlobal(e.error));
@@ -171,11 +285,17 @@ window.toast = (text, kind = "") => {
   if (kind === "err" && text === planPromptShown.text && Date.now() - planPromptShown.at < 4000) return;
   let box = document.querySelector(".toasts");
   if (!box) { box = document.createElement("div"); box.className = "toasts"; document.body.append(box); }
+  // the same error twice in a row (a double click, two failing panels) shows once
+  const last = box.lastElementChild;
+  if (kind === "err" && last?.classList.contains("err") && last.dataset.text === String(text)) return;
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
+  el.dataset.text = String(text);
+  // errors are announced at once and stay long enough to be read
+  el.setAttribute("role", kind === "err" ? "alert" : "status");
   el.innerHTML = `${icon(kind === "err" ? "alert" : "check", { size: 16 })}<span>${esc(text)}</span>`;
   box.append(el);
-  setTimeout(() => el.remove(), 2600);
+  setTimeout(() => el.remove(), kind === "err" ? Math.min(9000, 4000 + String(text).length * 40) : 2600);
 };
 
 /* The account button in the header: your initials and first name, opening a menu with your pages and Log out.
@@ -379,11 +499,12 @@ window.bindBrandFields = (root, kit = {}, { sources = [], live = null } = {}) =>
 
 /* The project form, in a dialog (edit details) or on a page (/projects/new). `d` is the element to fill; onSubmit gets the
    checked answers. Returns the images chosen so far, so the caller can release their previews. */
-window.fillProjectForm = (d, { title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true, allowImport = false, brief = {}, askAssets = false, cancelHref = "", heading = true, brandSources = null } = {}, onSubmit) => {
+window.fillProjectForm = (d, { title = "New project", ok = "Create project", name = "", description = "", pages = ["Home"], note = "", cancellable = true, allowImport = false, brief = {}, askAssets = false, cancelHref = "", heading = true, brandSources = null, error = "" } = {}, onSubmit) => {
     d.innerHTML = `
       <form method="dialog" novalidate>
         ${heading ? `<h3>${esc(title)}</h3>
         <p>${esc(note || "Every project has a name and a short description. The agents read both, so be specific.")}</p>` : ""}
+        ${error ? `<p class="form-err start" role="alert">${esc(error)}</p>` : ""}
         <div class="pf-main">
         <label class="pfield"><span>Name</span>
           <input class="input" name="name" maxlength="80" required placeholder="e.g. Bean There coffee shop" value="${esc(name)}">
@@ -613,7 +734,8 @@ window.createProject = async (details) => {
       else if (brand_from) await api(`/api/projects/${p.id}/brand/copy`, { method: "POST", body: JSON.stringify({ from: brand_from, logo_only: true }) });
     } catch (err) { sessionStorage.setItem("atelier-import-note", `The brand kit's logo wasn't added: ${err.message}`); }
     location.href = `/p/${p.id}`;
-  } catch (err) { toast(err.message, "err"); }
+    return null;
+  } catch (err) { toast(err.message, "err"); return err; }    // the caller keeps the form as it was
 };
 
 /* Ask for a short text. Resolves to the string (may be empty if `optional`) or null when cancelled. */
@@ -657,7 +779,8 @@ window.importFlow = () => new Promise((resolve) => {
   input.onchange = async () => {
     const file = input.files[0]; if (!file) return resolve(false);
     if (file.size > 6 * 1024 * 1024) { toast("That file is larger than 6 MB", "err"); return resolve(false); }
-    const data = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(",")[1] || ""); fr.readAsDataURL(file); });
+    let data;
+    try { data = await fileBase64(file); } catch (err) { toast(err.message, "err"); return resolve(false); }
     let policy = "rename";
     const plan = async () => api("/api/import", { method: "POST", body: JSON.stringify({ name: file.name, data, on_conflict: policy }) });
     let p;
@@ -740,18 +863,21 @@ window.importFlow = () => new Promise((resolve) => {
     { open: true, group: "Go to", icon: "briefcase", title: "Hire agents", run: () => location.href = "/hire" },
     { group: "Go to", icon: "grid", title: "Projects", run: () => location.href = "/projects" },
     { group: "Go to", icon: "user", title: "Profile and password", run: () => location.href = "/profile" },
+    ...(document.documentElement.dataset.ownAgents === "no" ? [] : [
     { group: "Go to", icon: "users", title: "My agents", run: () => location.href = "/agents" },
-    { group: "Go to", icon: "layers", title: "My teams", run: () => location.href = "/teams" },
+    { group: "Go to", icon: "layers", title: "My teams", run: () => location.href = "/teams" }]),
     { group: "Go to", icon: "book", title: "Guide", run: () => location.href = "/guide" },
     { group: "Go to", icon: "file", title: "Shared rules", run: () => location.href = "/agents/rules" },
     { group: "Create", icon: "plus", title: "New project", run: () => newProject() },
+    ...(document.documentElement.dataset.ownAgents === "no" ? [] : [
     { group: "Create", icon: "plus", title: "New agent", run: () => location.href = "/agents/new" },
-    { group: "Create", icon: "plus", title: "New team", run: () => location.href = "/teams/new" },
+    { group: "Create", icon: "plus", title: "New team", run: () => location.href = "/teams/new" }]),
     { group: "Agents & teams", icon: "download", title: "Export all agents and teams (.zip)", run: async () => {
       if (seesInstructions(await getMe())) location.href = "/api/export";
       else planPrompt("Exports contain the agents' instructions, which come with the Pro plan.", "pro");
     } },
-    { group: "Agents & teams", icon: "file-plus", title: "Import agents or teams…", run: async () => { if (await importFlow()) location.reload(); } },
+    ...(document.documentElement.dataset.ownAgents === "no" ? [] : [
+    { group: "Agents & teams", icon: "file-plus", title: "Import agents or teams…", run: async () => { if (await importFlow()) location.reload(); } }]),
     { open: true, group: "Appearance", icon: "sun", title: "Theme: light", run: () => setTheme("light") },
     { open: true, group: "Appearance", icon: "moon", title: "Theme: dark", run: () => setTheme("dark") },
     { open: true, group: "Appearance", icon: "monitor", title: "Theme: follow the system", run: () => setTheme("system") },

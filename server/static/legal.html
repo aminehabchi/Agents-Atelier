@@ -73,12 +73,11 @@
     <p class="unset" id="unset" hidden>The operator of this service hasn't filled in their details yet (LEGAL_NAME in the server settings).</p>
     <h1 id="doc-title">Privacy policy</h1>
     <p class="updated">Last updated: <span class="date" data-no-i18n></span></p>
-    <div class="who" id="who"></div>
   </header>
   <div class="layout">
     <nav class="toc" id="toc" aria-label="On this page"><p>On this page</p></nav>
     <article class="doc" id="doc">
-      <section id="terms" hidden data-who='<p><b data-no-i18n class="legal-name"></b> runs this service. Contact: <a class="legal-email" data-no-i18n></a><span class="legal-address" data-no-i18n></span></p>'>
+      <section id="terms" hidden>
         <div class="legal-part" id="terms-1">
         <h2>What the service does</h2>
       <p>Agents Atelier lets you describe a website and have AI agents build its front end in HTML, CSS and JavaScript. You can review, change and download the result.</p>
@@ -111,7 +110,7 @@
       <p>We may suspend accounts that break these terms. You can download your data and delete your account from your profile at any time.</p>
         </div>
       </section>
-      <section id="privacy" hidden data-who='<p><b data-no-i18n class="legal-name"></b> is responsible for your data. Contact: <a class="legal-email" data-no-i18n></a><span class="legal-address" data-no-i18n></span></p>'>
+      <section id="privacy" hidden>
         <div class="legal-part" id="privacy-1">
         <h2>What we collect</h2>
       <ul>
@@ -171,7 +170,6 @@ const kind = location.pathname.startsWith("/terms") ? "terms" : "privacy";
 const section = document.getElementById(kind);
 section.hidden = false;
 document.getElementById("doc-title").textContent = kind === "terms" ? "Terms of use" : "Privacy policy";
-document.getElementById("who").innerHTML = section.dataset.who;
 /* number the parts and list them in the contents */
 const toc = document.getElementById("toc");
 section.querySelectorAll(".legal-part").forEach((part, i) => {

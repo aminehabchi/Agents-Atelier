@@ -173,7 +173,7 @@ async function load() {
     app.insertAdjacentHTML("beforeend", `<p class="p-back"><a class="lnk" href="${isTeam ? "/hire?tab=teams" : "/hire"}">Back to the marketplace</a></p>`);
   }
 }
-load();
+load().catch(err => showError(app, err, () => location.reload(), "Something went wrong on this page"));   // a bug must not leave "Loading…" forever
 </script>
 </body>
 </html>

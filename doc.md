@@ -53,6 +53,7 @@ server/
 ├── collab.py         people on a project: owner, editors, viewers, invitations (in memory, Postgres-backed)
 ├── share.py          share links (read-only site for people without an account) and pinned comments
 ├── billing.py        PayPal subscriptions: checkout, return, webhooks, cancellation, payments received
+├── oauth.py          log in or sign up with Google or GitHub (authorization code flow, verified emails only)
 ├── limits.py         per-IP limits and throwaway email domains
 ├── agents.py         agents and teams: parser, validation, ordering, export and import
 ├── orchestrator.py   the Orchestrator's prompt, its decision rules, forms, confirmations and template blanks
@@ -426,6 +427,9 @@ publishing the Agency plan: otherwise `403 {"detail", "upgrade"}`, which `ui.js`
 | GET | `/billing/paypal/return?subscription_id=` | PayPal sends the member back here: the server reads the subscription, checks it's theirs and active, switches the plan, redirects to `/profile?paid=active\|pending\|cancelled\|error#plan` |
 | POST | `/api/billing/paypal/webhook` | public; the signature is checked with PayPal (`PAYPAL_WEBHOOK_ID`), each event handled once (`billing_events`). `BILLING.SUBSCRIPTION.*` keeps the plan in step (active → the plan, cancelled/suspended/expired → Starter, the old subscription is cancelled after a switch); `PAYMENT.SALE.COMPLETED/REFUNDED/REVERSED` go to `billing_payments` |
 | GET | `/api/auth/export` | a .zip of everything about you |
+| GET | `/api/auth/oauth/<google\|github>/start?next=` | redirect to the provider with a random `state` (base64 JSON in the `atelier_oauth` cookie, 10 minutes) |
+| GET | `/api/auth/oauth/<provider>/callback` | checks the state, exchanges the code, reads the **verified** email: the linked account (`user_identities`), else the account with that email (linked and confirmed), else a new confirmed account with no password; starts a session and redirects to `next` (a path on this site only). Errors go back to `/login?oauth_error=` |
+| GET | `/api/auth/identities` | the providers linked to your account |
 | POST | `/api/auth/delete` | `{password}`: deactivates the account, ends every session; `{delete_after, days}` |
 
 ### Admin
@@ -627,6 +631,12 @@ A failed run is saved as `error`, so it can be continued.
 - **Members' API keys** are encrypted with Fernet (`KEY_SECRET`, or a generated key in `storage/.secrets/`, mode 600),
   never returned to the browser (only `sk-ant-…` plus the last four characters), never logged, and scrubbed from every
   error message.
+- **Rate limits** (`limits.py`): per address for sign-ups, logins (also Google/GitHub), resets and share-link comments; per
+  member (`limits.key_for`, per address when logged out) for every `/api/` call (`API_REQUESTS_PER_MINUTE`, in the
+  middleware; PayPal's webhook is exempt), runs started over the WebSocket (`RUNS_PER_HOUR`, an `error` event with
+  `rate_limited`), invitations, share links and PayPal checkouts. Counters live in memory, per server process.
+- **Accounts without a password** (made with Google or GitHub, `password_hash` empty, `has_password: false`): their
+  password login always fails; changing the password or deleting the account doesn't ask for a current one.
 - **Plans** are enforced on the server (`plans.need`, `check_project_limit`, the run pipeline); the pages only explain them.
 - **Agents' instructions** (`plans` feature `instructions`, `sees_instructions` in `main.py`): on Starter, `/api/agents?full=1`,
   `/api/agents/<id>` and the marketplace profiles answer `role: ""` with `instructions_locked: true` (name, description,

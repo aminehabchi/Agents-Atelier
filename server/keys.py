@@ -129,6 +129,7 @@ async def check(key: str, user_id: str, timeout: int = 90) -> dict:
         data = json.loads(text.strip().splitlines()[-1])
     except (ValueError, IndexError):
         data = {}
+    data = data if isinstance(data, dict) else {}
     if not data or data.get("is_error"):
         raise KeyError_(explain(errors) or f"Claude couldn't use this key: {scrub(str(data.get('result') or errors), key).strip()[-200:] or 'no answer'}")
     return {"cost": data.get("total_cost_usd") or 0}

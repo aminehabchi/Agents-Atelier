@@ -198,20 +198,24 @@ class _Chrome:
             "--allow-file-access-from-files",
             *(["--no-sandbox", "--disable-dev-shm-usage"] if config.CHROME_NO_SANDBOX else []), "about:blank",
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
-        port_file = Path(self.profile) / "DevToolsActivePort"
-        for _ in range(100):
-            if port_file.exists() and port_file.read_text().strip():
-                break
-            await asyncio.sleep(.1)
-        else:
-            raise RuntimeError("Chrome didn't start")
-        port, path = port_file.read_text().split()[:2]
-        browser = await websockets.connect(f"ws://127.0.0.1:{port}{path}", max_size=None)
-        self.ws = browser
-        target = await self._call("Target.createTarget", url="about:blank")
-        self.session = (await self._call("Target.attachToTarget", targetId=target["targetId"], flatten=True))["sessionId"]
-        for domain in ("Page", "Runtime", "Network", "Log"):
-            await self.cmd(f"{domain}.enable")
+        try:
+            port_file = Path(self.profile) / "DevToolsActivePort"
+            for _ in range(100):
+                if port_file.exists() and port_file.read_text().strip():
+                    break
+                await asyncio.sleep(.1)
+            else:
+                raise RuntimeError("Chrome didn't start")
+            port, path = port_file.read_text().split()[:2]
+            browser = await asyncio.wait_for(websockets.connect(f"ws://127.0.0.1:{port}{path}", max_size=None), 15)
+            self.ws = browser
+            target = await self._call("Target.createTarget", url="about:blank")
+            self.session = (await self._call("Target.attachToTarget", targetId=target["targetId"], flatten=True))["sessionId"]
+            for domain in ("Page", "Runtime", "Network", "Log"):
+                await self.cmd(f"{domain}.enable")
+        except BaseException:              # `async with` doesn't call __aexit__ when __aenter__ fails: don't leave Chrome running
+            await self.__aexit__(None, None, None)
+            raise
         return self
 
     async def __aexit__(self, *exc):

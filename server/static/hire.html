@@ -103,7 +103,7 @@ document.addEventListener("click", (e) => {
   if (unset) { const k = unset.dataset.unset; if (k === "q") $("q").value = ""; state[k] = k === "source" ? "all" : ""; reset(); return; }
   if (e.target.closest("[data-clear]")) { $("q").value = ""; Object.assign(state, { q: "", cat: "", source: "all" }); reset(); }
   const rv = e.target.closest("[data-review]");
-  if (rv) review(rv.dataset.kind, rv.dataset.pk, rv.dataset.review);
+  if (rv) review(rv.dataset.kind, rv.dataset.pk, rv.dataset.review, rv);
 });
 document.querySelector(".mk-tabs").addEventListener("keydown", (e) => {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
@@ -198,7 +198,15 @@ function render() {
 }
 
 async function loadReview() {
-  const p = await api("/api/market/pending");
+  let p;
+  try { p = await api("/api/market/pending"); }
+  catch (err) {          // the marketplace itself loaded: only the review list says it couldn't
+    $("review").innerHTML = `<section class="m-review"><h2>Waiting for review</h2><div class="panel-err" role="alert">${icon("alert", { size: 15 })}
+      <span><b>The listings to review couldn't load.</b> ${esc(err.message)}</span>
+      <button type="button" class="btn btn-ghost btn-sm" data-review-retry>${icon("refresh", { size: 13 })}Try again</button></div></section>`;
+    $("review").querySelector("[data-review-retry]").onclick = (e) => withBusy(e.currentTarget, loadReview);
+    return;
+  }
   const rows = [...p.agents.map(a => ({ ...a, kind: "agent" })), ...p.teams.map(t => ({ ...t, kind: "team" }))];
   const rpg = paginate(rows, reviewPage, 5);
   reviewPage = rpg.page;
@@ -216,17 +224,20 @@ async function loadReview() {
   </section>` : "";
   $("reviewPager")?.addEventListener("click", (e) => { const b = e.target.closest("[data-page]"); if (b && !b.disabled) { reviewPage = +b.dataset.page; loadReview(); } });
 }
-async function review(kind, pk, decision) {
+async function review(kind, pk, decision, btn) {
   let note = "";
   if (decision === "reject") {
     note = await promptDialog({ title: "Reject this listing?", label: "Tell the member why", placeholder: "e.g. The instructions ask for external scripts", ok: "Reject", optional: true });
     if (note === null) return;
   }
-  try {
+  const row = btn?.closest(".m-acts");
+  row?.querySelectorAll("button").forEach(b => { if (b !== btn) b.disabled = true; });
+  await withBusy(btn, async () => {
     await api("/api/market/review", { method: "POST", body: JSON.stringify({ kind, pk: +pk, decision, note }) });
     toast(decision === "approve" ? "Listed in the marketplace" : "Rejected");
     await load();
-  } catch (err) { toast(err.message, "err"); }
+  });
+  if (row?.isConnected) row.querySelectorAll("button").forEach(b => { b.disabled = false; });
 }
 
 async function load() {
@@ -244,7 +255,7 @@ async function load() {
     showError($("grid").firstElementChild, err, load, "Couldn't load the marketplace");
   }
 }
-load();
+load().catch(err => showError($("grid"), err, () => location.reload(), "Something went wrong on this page"));   // a bug must not leave "Loading…" forever
 </script>
 </body>
 </html>

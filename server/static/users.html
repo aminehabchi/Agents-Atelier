@@ -66,7 +66,7 @@ function draw() {
       <td class="key"><span class="cl">Claude key</span>${u.claude_key?.set ? `<span class="badge listed" title="Runs on their own Claude account">${icon("check", { size: 12 })}Added</span>` : `<span class="muted">None</span>`}</td>
       <td class="pl"><span class="cl">Plan</span>${u.role === "admin" ? `<span class="muted">Every feature</span>` : `<select class="input" data-plan="${esc(u.id)}" aria-label="Plan of ${esc(u.email)}">
         ${Object.keys(PLAN).map(r => `<option value="${r}" ${r === u.plan ? "selected" : ""}>${PLAN[r]}</option>`).join("")}
-      </select>${u.plan_request ? `<div class="ask"><span class="badge req">${icon("clock", { size: 12 })}Asks for ${esc(PLAN[u.plan_request] || u.plan_request)}${u.plan_request_at ? ` · ${esc(ago(u.plan_request_at))}` : ""}</span>
+      </select>${u.plan_request ? `<div class="ask"><span class="badge req">${icon("clock", { size: 12 })}Asks for ${esc(PLAN[u.plan_request] || u.plan_request)}${u.plan_request_period === "yearly" ? " · yearly" : " · monthly"}${u.plan_request_at ? ` · ${esc(ago(u.plan_request_at))}` : ""}</span>
         <span class="ask-acts"><button class="btn btn-dark btn-sm" type="button" data-approve="${esc(u.id)}" data-to="${esc(u.plan_request)}">Approve</button>
         <button class="btn btn-ghost btn-sm" type="button" data-decline="${esc(u.id)}">Decline</button></span></div>` : ""}`}</td>
       <td class="rl"><span class="cl">Role</span><select class="input" data-id="${esc(u.id)}" aria-label="Role of ${esc(u.email)}" ${u.id === me.id ? 'disabled title="You can\'t change your own role"' : ""}>
@@ -86,29 +86,35 @@ async function load() {
 }
 bindPager($pager, (p) => { page = p; draw(); list.scrollIntoView({ block: "nearest", behavior: "smooth" }); },
   (n) => { perPage = n; savePerPage("users", n); page = 1; draw(); });
-list.addEventListener("click", async (e) => {
+list.addEventListener("click", (e) => {
   const ok = e.target.closest("[data-approve]"), no = e.target.closest("[data-decline]");
   if (!ok && !no) return;
   const body = ok ? { plan: ok.dataset.to } : { decline_request: true };
-  try {
+  ok?.parentElement.querySelectorAll("button").forEach(x => { if (x !== ok) x.disabled = true; });
+  no?.parentElement.querySelectorAll("button").forEach(x => { if (x !== no) x.disabled = true; });
+  withBusy(ok || no, async () => {
     const u = await api(`/api/users/${(ok || no).dataset[ok ? "approve" : "decline"]}`, { method: "PATCH", body: JSON.stringify(body) });
     Object.assign(users.find(x => x.id === u.id), u); draw();
     toast(ok ? `${u.email} is now on ${PLAN[u.plan]}` : "Request declined");
-  } catch (err) { toast(err.message, "err"); load(); }
+  }, { onError: (err) => { toast(err.message, "err"); (ok || no).parentElement.querySelectorAll("button").forEach(x => { x.disabled = false; }); } });
 });
-list.addEventListener("change", async (e) => {
-  const plan = e.target.closest("select[data-plan]");
-  if (plan) {
-    try { const u = await api(`/api/users/${plan.dataset.plan}`, { method: "PATCH", body: JSON.stringify({ plan: plan.value }) }); Object.assign(users.find(x => x.id === u.id), u); toast(`${u.email} is now on ${PLAN[u.plan]}`); }
-    catch (err) { toast(err.message, "err"); load(); }
-    return;
-  }
-  const sel = e.target.closest("select[data-id]");
+/* A plan or role change: the select is locked while it saves, and goes back to the saved value if it fails. */
+list.addEventListener("change", (e) => {
+  const sel = e.target.closest("select[data-plan], select[data-id]");
   if (!sel) return;
-  try { const u = await api(`/api/users/${sel.dataset.id}`, { method: "PATCH", body: JSON.stringify({ role: sel.value }) }); Object.assign(users.find(x => x.id === u.id), u); toast(`${u.email} is now: ${LABEL[u.role]}`); }
-  catch (err) { toast(err.message, "err"); load(); }
+  const isPlan = sel.matches("[data-plan]"), id = isPlan ? sel.dataset.plan : sel.dataset.id;
+  const body = isPlan ? { plan: sel.value } : { role: sel.value };
+  withBusy(sel, async () => {
+    const u = await api(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+    Object.assign(users.find(x => x.id === u.id), u);
+    toast(isPlan ? `${u.email} is now on ${PLAN[u.plan]}` : `${u.email} is now: ${LABEL[u.role]}`);
+  }, { onError: (err) => {
+    const u = users.find(x => x.id === id);
+    if (u) sel.value = isPlan ? u.plan : u.role;      // nothing changed on the server
+    toast(err.message, "err");
+  } });
 });
-load();
+load().catch(err => showError(list, err, () => location.reload(), "Something went wrong on this page"));   // a bug must not leave "Loading…" forever
 </script>
 <style>
   .utable .ask { display: grid; gap: 6px; margin-top: 8px; }

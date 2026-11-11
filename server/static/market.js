@@ -114,7 +114,7 @@ window.startJobDialog = (kind, id, name) => JOB_FOR ? sendToProject(kind, id) : 
              <button class="btn btn-dark btn-sm" type="button" data-new-with>${icon("plus", { size: 15 })}New project</button></div>`;
       pager.innerHTML = pagerHTML({ page: r.page, pages: r.pages, total: r.total, perPage: 6 }, { sizes: [6], noun: "projects" });
       lazyEach(list);
-    } catch (err) { list.innerHTML = `<p class="jp-note">${esc(err.message)}</p>`; }
+    } catch (err) { pager.innerHTML = ""; showError(list, err, load, "Couldn't load your projects"); }
   }
   // a new project instead: the studio applies the agent or team when that new project first opens
   d.addEventListener("click", (e) => {
@@ -191,6 +191,6 @@ window.bindMarketCard = (root, kind, id, reload) => root.addEventListener("click
       await api("/api/market/withdraw", { method: "POST", body: JSON.stringify({ kind, id }) });
       toast("Withdrawn from the marketplace");
     }
-    reload();
+    await reload();
   } catch (err) { toast(err.message, "err"); b.disabled = false; }
 });

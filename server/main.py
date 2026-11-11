@@ -53,6 +53,7 @@ import logging
 import secrets
 import re
 import zipfile
+import zlib
 import os
 import shutil
 import time
@@ -60,6 +61,7 @@ import urllib.parse
 import uuid
 from pathlib import Path
 
+import asyncpg
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
@@ -87,6 +89,7 @@ import legacy
 import collab
 import share
 import billing
+import oauth
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = Path(__file__).resolve().parent / "static"
@@ -174,13 +177,29 @@ def _error_page(status: int, title: str, text: str) -> HTMLResponse:
 <a class="btn btn-dark" href="/projects">Go to your projects</a> <a class="btn btn-ghost" href="/">Home</a></div></body></html>""")
 
 
+def _methods_for(path: str) -> list[str]:
+    """Every method some route answers at this path (Starlette's own Allow header only lists the first route's)."""
+    found = set()
+    for route in app.routes:
+        regex, methods = getattr(route, "path_regex", None), getattr(route, "methods", None)
+        if regex is not None and methods and regex.match(path):
+            found |= set(methods)
+    return sorted(found - {"HEAD"})
+
+
 @app.exception_handler(StarletteHTTPException)
 async def http_error(request: Request, exc: StarletteHTTPException):
     detail = exc.detail if isinstance(exc.detail, str) else "Request failed."
+    headers = getattr(exc, "headers", None)
     if exc.status_code == 404 and detail == "Not Found":
-        detail = "This page or file doesn't exist."
+        detail = ("There's nothing at this address. Check the URL." if request.url.path.startswith("/api/")
+                  else "This page or file doesn't exist.")
+    elif exc.status_code == 405 and detail == "Method Not Allowed":
+        allowed = _methods_for(request.url.path)
+        detail = (f"This address doesn't accept {request.method} requests" + (f" (it accepts {', '.join(allowed)})." if allowed else "."))
+        headers = {**(headers or {}), **({"Allow": ", ".join(allowed)} if allowed else {})}
     if _wants_json(request):
-        return JSONResponse({"detail": detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None))
+        return JSONResponse({"detail": detail}, status_code=exc.status_code, headers=headers)
     return _error_page(exc.status_code, "Not found" if exc.status_code == 404 else "Something's not right", detail)
 
 
@@ -202,31 +221,71 @@ async def plan_error(request: Request, exc: plans.PlanError):
     return JSONResponse({"detail": str(exc), "upgrade": exc.needs}, status_code=403)
 
 
+def _field(loc) -> str:
+    return " → ".join(str(x) for x in loc if x not in ("body", "query", "path", "header", "cookie"))
+
+
+def validation_text(errors: list) -> str:
+    """FastAPI's first validation error as one sentence a person can act on."""
+    first = errors[0] if errors else {}
+    kind, loc, where = first.get("type", ""), tuple(first.get("loc") or ()), _field(first.get("loc") or ())
+    if kind == "json_invalid":
+        return "The request body isn't valid JSON."
+    if loc == ("body",) and kind == "missing":
+        return "This request needs a JSON body."
+    if loc == ("body",) and kind in ("dict_type", "model_attributes_type"):
+        return "Send the details as a JSON object, like {\"name\": \"…\"}."
+    if where and kind == "missing":
+        return f"“{where}” is required."
+    if where and kind in ("int_parsing", "int_type", "int_from_float"):
+        return f"“{where}” must be a whole number."
+    if where and kind in ("float_parsing", "float_type"):
+        return f"“{where}” must be a number."
+    if where and kind in ("bool_parsing", "bool_type"):
+        return f"“{where}” must be true or false."
+    if where and kind in ("string_type", "string_too_long"):
+        return f"“{where}” must be text" + (" (shorter)." if kind == "string_too_long" else ".")
+    return f"Invalid {where or 'request'}: {first.get('msg', 'check the values you sent')}."
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, exc: RequestValidationError):
-    errors = exc.errors()
-    first = errors[0] if errors else {}
-    if first.get("type") == "json_invalid":
-        msg = "The request body isn't valid JSON."
-    else:
-        where = " → ".join(str(x) for x in first.get("loc", []) if x not in ("body", "query", "path"))
-        msg = f"Invalid {where or 'request'}: {first.get('msg', 'check the values you sent')}."
-    return JSONResponse({"detail": msg}, status_code=422)
+    return JSONResponse({"detail": validation_text(exc.errors())}, status_code=422)
+
+
+def explain_exception(exc: BaseException, ref: str) -> tuple[int, str, dict]:
+    """(status, message, headers) for an exception no route turned into an HTTPException.
+    Postgres down or too slow → 503; a value Postgres refuses → 400; a full disk or a file error → 500 with what
+    happened; anything else is a bug → 500 with the ref of the traceback in the server log."""
+    if db.unavailable(exc):
+        return 503, db.UNAVAILABLE, {"Retry-After": "30"}
+    if db.bad_value(exc):
+        return 400, db.BAD_VALUE, {}
+    if isinstance(exc, OSError) and exc.errno == errno.ENOSPC:
+        return 507, "The disk is full, so the server couldn't save. Free some space and try again.", {}
+    if isinstance(exc, OSError) and not isinstance(exc, (ConnectionError, TimeoutError)):
+        return 500, f"The server couldn't read or write a file ({exc.strerror or 'input/output error'}). [ref {ref}]", {}
+    return 500, f"Something went wrong on the server. Details are in the server log under ref {ref}.", {}
 
 
 @app.exception_handler(Exception)
+@app.exception_handler(asyncpg.PostgresError)     # these three are also registered by class, so a route's database or
+@app.exception_handler(asyncpg.InterfaceError)    # file error is answered here without uvicorn logging a second traceback
+@app.exception_handler(OSError)
 async def server_error(request: Request, exc: Exception):
     ref = secrets.token_hex(3)
-    log.exception("Unhandled error [ref %s] on %s %s", ref, request.method, request.url.path)
-    if isinstance(exc, OSError) and exc.errno == errno.ENOSPC:
-        detail = "The disk is full, so the server couldn't save. Free some space and try again."
-    elif isinstance(exc, OSError):
-        detail = f"The server couldn't read or write a file ({exc.strerror or exc}). [ref {ref}]"
+    status, detail, headers = explain_exception(exc, ref)
+    if status == 503:
+        log.error("Database unavailable [ref %s] on %s %s: %s: %s", ref, request.method, request.url.path,
+                  exc.__class__.__name__, keys.scrub(str(exc), "")[:200])
+    elif status == 400:
+        log.warning("Value refused by the database [ref %s] on %s %s: %s", ref, request.method, request.url.path,
+                    keys.scrub(str(exc), "")[:200])
     else:
-        detail = f"Something went wrong on the server. Details are in the server log under ref {ref}."
+        log.exception("Unhandled error [ref %s] on %s %s", ref, request.method, request.url.path)
     if _wants_json(request):
-        return JSONResponse({"detail": detail, "ref": ref}, status_code=500)
-    return _error_page(500, "Something went wrong", detail)
+        return JSONResponse({"detail": detail, "ref": ref}, status_code=status, headers=headers)
+    return _error_page(status, "Not available right now" if status == 503 else "Something went wrong", detail)
 
 # Live state per project: running task, claude process, connected browser tabs.
 runs: dict[str, dict] = {}
@@ -251,11 +310,14 @@ def is_busy(pid: str) -> bool:
 
 # ---------------------------------------------------------------- storage
 
+PROJECT_GONE = "This project doesn't exist (it may have been deleted)."
+
+
 def check_id(pid: str) -> str:
     try:
-        return str(uuid.UUID(pid))
+        return str(uuid.UUID(str(pid)))
     except ValueError:
-        raise HTTPException(404, "Unknown project")
+        raise HTTPException(404, PROJECT_GONE)
 
 
 def display_path(p: Path) -> str:
@@ -270,7 +332,7 @@ def load_meta(pid: str) -> dict:
     """A project's data (a copy: change it, then save_meta)."""
     meta = store.get(check_id(pid))
     if meta is None:
-        raise HTTPException(404, "This project doesn't exist (it may have been deleted).")
+        raise HTTPException(404, PROJECT_GONE)
     return meta
 
 
@@ -361,7 +423,7 @@ def clean_pages(raw, keep: list[dict] | None = None) -> list[dict]:
         return list(DEFAULT_PAGES)
     if not isinstance(raw, list):
         raise HTTPException(400, "Pages must be a list of page names.")
-    titles = [" ".join(str(t.get("title") if isinstance(t, dict) else t).split()) for t in raw]
+    titles = [" ".join(str((t.get("title") if isinstance(t, dict) else t) or "").split()) for t in raw]
     titles = [t for t in titles if t]
     if not titles:
         raise HTTPException(400, "A site needs at least one page.")
@@ -475,6 +537,9 @@ def can_access(user: dict | None, meta: dict) -> bool:
     (projects with no owner are admins' only)."""
     return collab.role_of(user, meta) is not None
 
+
+# API calls the general rate limit leaves alone: PayPal's webhooks (they come from PayPal, retried by it).
+RATE_FREE = {"/api/billing/paypal/webhook"}
 
 # Changes a viewer may still make: leaving the project.
 VIEWER_WRITES = re.compile(r"^/api/projects/[^/]+/membership$")
@@ -605,6 +670,11 @@ async def no_cache(request, call_next):
     denied = await _check_access(request)
     if denied:
         return denied
+    if request.url.path.startswith("/api/") and request.url.path not in RATE_FREE:
+        wait = limits.API.wait(limits.key_for(request))
+        if wait:
+            return JSONResponse({"detail": f"Too many requests. Slow down and try again in {wait} seconds."}, status_code=429,
+                                headers={"Retry-After": str(wait)})
     response = await call_next(request)
     if request.url.path.startswith("/work") or re.match(r"^/s/[^/]+/site(?:/|$)", request.url.path):
         response.headers["Cache-Control"] = "no-store"
@@ -652,16 +722,23 @@ async def projects_page():
     return FileResponse(STATIC / "projects.html")
 
 
+def _own_agents_page(request: Request, page: str):
+    """My agents and My teams are for plans with your own agents (Pro, Agency): Starter members hire from the marketplace."""
+    if not plans.of(current_user(request)).get("custom_agents"):
+        return RedirectResponse("/hire", status_code=303)
+    return FileResponse(STATIC / page)
+
+
 @app.get("/agents")
 @app.get("/agents/{rest:path}")
-async def agents_page(rest: str = ""):
-    return FileResponse(STATIC / "agents.html")
+async def agents_page(request: Request, rest: str = ""):
+    return _own_agents_page(request, "agents.html")
 
 
 @app.get("/teams")
 @app.get("/teams/{rest:path}")
-async def teams_page(rest: str = ""):
-    return FileResponse(STATIC / "teams.html")
+async def teams_page(request: Request, rest: str = ""):
+    return _own_agents_page(request, "teams.html")
 
 
 @app.get("/guide")
@@ -793,14 +870,16 @@ async def revenue(request: Request, days: int = 30):
     days = max(7, min(days, 365))
     span, since = _day_span(days)
     price = {k: v["price"] for k, v in plans.PLANS.items()}
-    users = await db.pool.fetch("SELECT id, email, name, role, plan, plan_request, plan_request_at, deactivated_at, created_at FROM users")
+    users = await db.pool.fetch("SELECT id, email, name, role, plan, billing_period, plan_request, plan_request_at, deactivated_at, created_at FROM users")
+    worth = lambda u: plans.monthly_value(u["plan"], u["billing_period"])      # a yearly plan counts a twelfth of its price
     members = [u for u in users if u["role"] == "user" and not u["deactivated_at"]]
     events = await db.pool.fetch("""SELECT e.user_id, e.from_plan, e.to_plan, e.by_admin, e.ts, u.email
                                     FROM plan_events e JOIN users u ON u.id = e.user_id ORDER BY e.ts""")
     counted = {u["id"] for u in members}
-    mrr = sum(price.get(u["plan"], 0) for u in members)
+    mrr = round(sum(worth(u) for u in members), 2)
     by_plan = [{"id": k, "name": v["name"], "price": v["price"], "members": sum(u["plan"] == k for u in members),
-                "mrr": sum(price.get(u["plan"], 0) for u in members if u["plan"] == k)} for k, v in plans.PLANS.items()]
+                "yearly": sum(u["plan"] == k and u["billing_period"] == "yearly" for u in members),
+                "mrr": round(sum(worth(u) for u in members if u["plan"] == k), 2)} for k, v in plans.PLANS.items()]
     paying = sum(u["plan"] != "starter" for u in members)
     pending = [u for u in members if u["plan_request"]]
 
@@ -917,13 +996,89 @@ def _with_session(user: dict, token: str | None = None) -> JSONResponse:
 
 @app.get("/api/auth/options")
 async def auth_options():
-    return {**auth.PROFILE_OPTIONS, "email_enabled": bool(config.SMTP_HOST)}
+    return {**auth.PROFILE_OPTIONS, "email_enabled": bool(config.SMTP_HOST), "oauth": oauth.enabled()}
 
 
-def _limited(limit: limits.Limit, request: Request, what: str):
-    wait = limit.wait(limits.client_ip(request))
+def _oauth_back(error: str, next_path: str = "/") -> RedirectResponse:
+    """Back to the login page with a message (the page shows ?oauth_error=)."""
+    q = urllib.parse.urlencode({"oauth_error": error, **({"next": next_path} if next_path != "/" else {})})
+    res = RedirectResponse(f"/login?{q}", status_code=303)
+    res.delete_cookie(oauth.STATE_COOKIE, path="/api/auth/oauth")
+    return res
+
+
+@app.get("/api/auth/oauth/{provider}/start")
+async def oauth_start(request: Request, provider: str, next: str = "/"):
+    """Send the browser to Google or GitHub; it comes back to the callback below."""
+    try:
+        _limited(limits.LOGIN, request, "login attempts")
+        url, state = oauth.start(provider, str(request.base_url), next)
+    except oauth.OAuthError as e:
+        return _oauth_back(str(e), oauth.safe_next(next))
+    except HTTPException as e:
+        return _oauth_back(e.detail, oauth.safe_next(next))
+    res = RedirectResponse(url, status_code=303)
+    res.set_cookie(oauth.STATE_COOKIE, state, max_age=oauth.STATE_SECONDS, httponly=True, samesite="lax",
+                   secure=config.COOKIE_SECURE, path="/api/auth/oauth")
+    return res
+
+
+@app.get("/api/auth/oauth/{provider}/callback")
+async def oauth_callback(request: Request, provider: str, code: str = "", state: str = "", error: str = ""):
+    """Back from the provider: check the state, then log in (or create) the account and start a session."""
+    saved = oauth.read_state(request.cookies.get(oauth.STATE_COOKIE))
+    next_path = oauth.safe_next(saved.get("next"))
+    if error:
+        return _oauth_back("You cancelled the login, or the provider refused it.", next_path)
+    try:
+        started = float(saved.get("at") or 0)
+    except (TypeError, ValueError, OverflowError):
+        started = 0.0
+    if (not saved.get("state") or not secrets.compare_digest(str(saved.get("state")).encode(), state.encode())
+            or saved.get("provider") != provider or time.time() - started > oauth.STATE_SECONDS):
+        return _oauth_back("This login link expired or didn't start here. Try again.", next_path)
+    try:
+        _limited(limits.LOGIN, request, "login attempts")
+        who = await oauth.identity(provider, code, str(request.base_url))
+        user = await oauth.account_for(provider, who, request.cookies.get("atelier_lang") or "")
+        collab.note_user(user)
+        await collab.claim_invites(user)           # projects someone invited this email to
+        session = await auth.create_session(user["id"])
+    except oauth.OAuthError as e:
+        return _oauth_back(str(e), next_path)
+    except auth.AuthError as e:
+        return _oauth_back(str(e), next_path)
+    except HTTPException as e:
+        return _oauth_back(e.detail, next_path)
+    except Exception as e:                         # the browser is mid-redirect: send it back to the login page, not to JSON
+        ref = secrets.token_hex(3)
+        status, detail, _ = explain_exception(e, ref)
+        if status == 503:
+            log.error("OAuth login with %s: database unavailable [ref %s]: %s", provider, ref, e.__class__.__name__)
+        else:
+            log.exception("OAuth login with %s failed [ref %s]", provider, ref)
+        return _oauth_back(detail if status in (400, 503) else
+                           f"Logging in with {oauth.PROVIDERS[provider]['name']} failed on our side (ref {ref}). Try again in a minute.",
+                           next_path)
+    res = RedirectResponse(next_path + ("&" if "?" in next_path else "?") + "welcome=back" if user.get("reactivated") else next_path,
+                           status_code=303)
+    res.set_cookie(auth.COOKIE, session, max_age=config.SESSION_DAYS * 86400, httponly=True,
+                   samesite="lax", secure=config.COOKIE_SECURE, path="/")
+    res.delete_cookie(oauth.STATE_COOKIE, path="/api/auth/oauth")
+    return res
+
+
+@app.get("/api/auth/identities")
+async def my_identities(request: Request):
+    return await oauth.identities(_confirmed_user(request)["id"])
+
+
+def _limited(limit: limits.Limit, request: Request, what: str, per_member: bool = False):
+    """Refuse with 429 past `limit`: per address (sign-up, login…), or per member when logged in (per_member)."""
+    wait = limit.wait(limits.key_for(request) if per_member else limits.client_ip(request))
     if wait:
-        raise HTTPException(429, f"Too many {what} from your network. Try again in {limits.wait_text(wait)}.",
+        raise HTTPException(429, (f"You've made a lot of {what} recently. Try again in {limits.wait_text(wait)}." if per_member else
+                                  f"Too many {what} from your network. Try again in {limits.wait_text(wait)}."),
                             headers={"Retry-After": str(wait)})
 
 
@@ -1055,11 +1210,21 @@ async def purge_loop():
     while True:
         try:
             for user in await auth.due_for_deletion():
-                await erase_account(user)
+                try:
+                    await erase_account(user)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:           # one account that can't be erased doesn't keep the others
+                    if db.unavailable(e):
+                        raise
+                    log.exception("Deleting the expired account %s failed; trying again next round", user.get("email"))
         except asyncio.CancelledError:
             raise
-        except Exception:
-            log.exception("Deleting expired accounts failed")
+        except Exception as e:
+            if db.unavailable(e):
+                log.error("Deleting expired accounts: the database isn't reachable (%s); trying again later", e.__class__.__name__)
+            else:
+                log.exception("Deleting expired accounts failed; trying again later")
         await asyncio.sleep(config.ACCOUNT_PURGE_SECONDS)
 
 
@@ -1156,7 +1321,8 @@ async def users_set_role(request: Request, user_id: str, body: dict):
 @app.get("/api/plans")
 async def list_plans(request: Request):
     """The plans, and for a logged-in member what they use of theirs."""
-    out = {"plans": plans.public(), "keys": config.CLAUDE_KEYS, "payment": "paypal" if billing.enabled() else "request"}
+    out = {"plans": plans.public(), "keys": config.CLAUDE_KEYS, "payment": "paypal" if billing.enabled() else "request",
+           "yearly": billing.yearly_enabled()}
     user = request.state.user
     if user:
         out["usage"] = {"projects": sum(m.get("owner") == str(user["id"]) for m in store.all())}
@@ -1167,7 +1333,9 @@ async def list_plans(request: Request):
 @app.post("/api/billing/paypal/subscribe")
 async def paypal_subscribe(request: Request, body: dict):
     """Start paying for a plan with PayPal: the answer's `approve` is the PayPal page to send the member to."""
-    return await billing.subscribe(_confirmed_user(request), str(body.get("plan") or ""), str(request.base_url))
+    _limited(limits.CHECKOUTS, request, "payment attempts", per_member=True)
+    return await billing.subscribe(_confirmed_user(request), str(body.get("plan") or ""), str(request.base_url),
+                                   str(body.get("period") or "monthly"))
 
 
 @app.get("/billing/paypal/return")
@@ -1198,7 +1366,7 @@ async def change_my_plan(request: Request, body: dict):
         raise HTTPException(400, "Paid plans are paid with PayPal: use the plan's button on your profile.")
     if plan == plans.DEFAULT and me.get("billing_subscription"):
         await billing.cancel(me)                  # moving to Starter: stop paying at PayPal first
-    user = await auth.change_my_plan(me, plan)
+    user = await auth.change_my_plan(me, plan, str(body.get("period") or "monthly"))
     await collab.refresh_user(me["id"])
     return {"user": user}
 
@@ -1296,7 +1464,7 @@ async def check_model(request: Request, body: dict):
     try:
         return await model_catalog.check(str(body.get("model") or ""), env=env)
     except ValueError as e:
-        raise HTTPException(400, keys.scrub(str(e), ""))
+        raise HTTPException(400, scrub_paths(keys.scrub(str(e), "")))
 
 
 @app.get("/api/agents/common")
@@ -1317,7 +1485,7 @@ async def put_common(request: Request, body: dict):
 
 @app.post("/api/agents/order")
 async def order_agents(request: Request, body: dict):
-    await _agent_call(team_files.reorder_agents(current_user(request), list(body.get("ids") or [])))
+    await _agent_call(team_files.reorder_agents(current_user(request), body.get("ids")))
     return await list_agents(request, full=True)
 
 
@@ -1470,7 +1638,7 @@ def _site_files(body: dict) -> tuple[list[tuple[str, bytes]], list[str]]:
     if body.get("zip"):
         try:
             z = zipfile.ZipFile(io.BytesIO(b64(body["zip"], "the .zip")))
-        except zipfile.BadZipFile:
+        except ZIP_ERRORS:
             raise HTTPException(400, "That isn't a valid .zip file.")
         entries = [(i.filename, i.file_size, (lambda i=i: z.read(i))) for i in z.infolist() if not i.is_dir()]
     elif isinstance(body.get("files"), list):
@@ -1499,12 +1667,23 @@ def _site_files(body: dict) -> tuple[list[tuple[str, bytes]], list[str]]:
     for path, _, read in keep:
         if path.lower().endswith(".htm"):
             path = path[:-4] + ".html"
-        files[path] = read()
+        files[path] = _unzip(read, path)
     if not any(p.lower().endswith(".html") for p in files):
         raise HTTPException(400, "No web pages (.html) were found. Choose the folder or .zip that holds your site.")
     if "index.html" not in files:
         raise HTTPException(400, "Your site needs an index.html (the home page) at its top level.")
     return sorted(files.items()), skipped
+
+
+ZIP_ERRORS = (zipfile.BadZipFile, zipfile.LargeZipFile, RuntimeError, NotImplementedError, EOFError, OSError, ValueError, zlib.error)
+
+
+def _unzip(read, name: str) -> bytes:
+    """One file out of an uploaded .zip, or a 400 when it's damaged, password-protected or uses an unknown compression."""
+    try:
+        return read()
+    except ZIP_ERRORS:
+        raise HTTPException(400, f"“{name[:80]}” couldn't be read from the .zip (it may be damaged or password-protected).")
 
 
 def _page_title(html: bytes, path: str) -> str:
@@ -1620,7 +1799,10 @@ def clean_brand(raw) -> dict:
         return dict(EMPTY_BRAND)
     if not isinstance(raw, dict):
         raise HTTPException(400, "The brand kit must be colours and fonts.")
-    colors = [str(c).strip().lower() for c in raw.get("colors") or [] if str(c).strip()]
+    raw_colors = raw.get("colors") or []
+    if not isinstance(raw_colors, list):
+        raise HTTPException(400, f"Use up to {MAX_BRAND_COLORS} colours written like #1a2b3c.")
+    colors = [str(c).strip().lower() for c in raw_colors if str(c).strip()]
     if len(colors) > MAX_BRAND_COLORS or not all(HEX.match(c) for c in colors):
         raise HTTPException(400, f"Use up to {MAX_BRAND_COLORS} colours written like #1a2b3c.")
     out = {"colors": list(dict.fromkeys(colors))}
@@ -1773,6 +1955,8 @@ async def copy_project_brand(request: Request, pid: str, body: dict):
         except HTTPException:
             raise HTTPException(404, "That project doesn't exist any more.")
         if other.get("owner") != str(user["id"]):
+            if not can_access(user, other):         # someone else's project: as if it didn't exist
+                raise HTTPException(404, "That project doesn't exist any more.")
             raise HTTPException(403, "You can only copy the brand kit of your own projects.")
         kit, asset = brand_of(other), _logo_asset(other)
         logo_bytes, ext = ((site_dir(other["id"]) / asset["path"]).read_bytes(), Path(asset["path"]).suffix.lstrip(".")) if asset else (None, "")
@@ -1927,7 +2111,7 @@ def _import_items(name: str, raw: bytes) -> list[dict]:
                 "id": str(a.get("id") or "").strip().lower(), "name": str(a.get("name") or ""), "icon": str(a.get("icon") or "bot"),
                 "color": str(a.get("color") or "#766a7c"), "default": a.get("default") is True,
                 "description": str(a.get("description") or ""), "model": str(a.get("model") or ""), "role": str(a.get("role") or "")}}
-                for a in data.get("agents", []) if isinstance(a, dict)]
+                for a in (data.get("agents") if isinstance(data.get("agents"), list) else []) if isinstance(a, dict)]
             return agents + [{"kind": "team", "team": data.get("team") or {}}]
         if isinstance(data, list):           # _presets.json: saved teams
             return [{"kind": "team", "team": t} for t in data if isinstance(t, dict)]
@@ -1943,7 +2127,7 @@ def _import_items(name: str, raw: bytes) -> list[dict]:
     if lower.endswith(".zip"):
         try:
             z = zipfile.ZipFile(io.BytesIO(raw))
-        except zipfile.BadZipFile:
+        except ZIP_ERRORS:
             raise HTTPException(400, f"{name} isn't a valid .zip file.")
         infos = [i for i in z.infolist() if not i.is_dir() and not i.filename.startswith("__MACOSX")]
         if len(infos) > MAX_IMPORT_FILES or sum(i.file_size for i in infos) > MAX_IMPORT_BYTES:
@@ -1952,12 +2136,12 @@ def _import_items(name: str, raw: bytes) -> list[dict]:
         for i in infos:
             base = Path(i.filename).name
             if base == "_common.md":
-                items.append({"kind": "rules", "text": team_files._parse_text(text(z.read(i), base))[1]})   # body only
+                items.append({"kind": "rules", "text": team_files._parse_text(text(_unzip(lambda: z.read(i), base), base))[1]})   # body only
             elif base.endswith(".md") and not base.startswith(("_", ".")) and base.lower() != "readme.md":
-                items.append({"kind": "agent", "agent": team_files.parse_agent_text(text(z.read(i), base), base)})
+                items.append({"kind": "agent", "agent": team_files.parse_agent_text(text(_unzip(lambda: z.read(i), base), base), base)})
             elif base == "_presets.json" or (base.endswith(".json") and base != "manifest.json"):
                 try:
-                    items += from_json(json.loads(text(z.read(i), base)), base)
+                    items += from_json(json.loads(text(_unzip(lambda: z.read(i), base), base)), base)
                 except (ValueError, HTTPException):
                     pass
         if not items:
@@ -1987,7 +2171,7 @@ async def import_bundle(request: Request, body: dict):
         return {"applied": 0, "items": [{k: v for k, v in p.items() if k != "data"} for p in plan["items"]], "summary": plan["summary"]}
     if any(p["kind"] == "agent" for p in plan["items"]) and any(is_busy(pid) for pid in list(runs)):
         raise HTTPException(409, "Agents are working in a project. Import when they finish.")
-    return {**await team_files.apply_import(current_user(request), plan), "summary": plan["summary"]}
+    return {**await _agent_call(team_files.apply_import(current_user(request), plan)), "summary": plan["summary"]}
 
 
 @app.get("/api/presets/{preset_id}")
@@ -2003,7 +2187,7 @@ async def get_preset(request: Request, preset_id: str):
 async def add_preset(request: Request, body: dict):
     plans.need(current_user(request), "custom_agents", "Making and editing your own agents and teams comes with the Pro plan. "
                                                      "The official agents and ready teams are yours to use.")
-    return await _agent_call(team_files.save_preset(current_user(request), body.get("name", ""), list(body.get("agents") or []),
+    return await _agent_call(team_files.save_preset(current_user(request), body.get("name", ""), body.get("agents"),
                                                     str(body.get("description") or ""), body.get("scope"),
                                                     str(body.get("prompt") or "")))
 
@@ -2060,15 +2244,25 @@ async def market_catalogue(request: Request):
     return await market.catalogue(current_user(request), _all_metas())
 
 
+PK_MAX = 2 ** 63 - 1       # the largest id Postgres stores (bigint)
+
+
+def _market_pk(pk: int) -> int:
+    """An id from the URL: one that can't exist is simply not in the marketplace (instead of a database error)."""
+    if not 0 < pk <= PK_MAX:
+        raise HTTPException(404, "This isn't in the marketplace (it may have been withdrawn).")
+    return pk
+
+
 @app.get("/api/market/agents/{pk}")
 async def market_agent(request: Request, pk: int):
-    profile = await _market_call(market.agent_profile(current_user(request), pk, _all_metas(), _has_preview))
+    profile = await _market_call(market.agent_profile(current_user(request), _market_pk(pk), _all_metas(), _has_preview))
     return profile if sees_instructions(current_user(request)) else without_instructions(profile)
 
 
 @app.get("/api/market/teams/{pk}")
 async def market_team(request: Request, pk: int):
-    profile = await _market_call(market.team_profile(current_user(request), pk, _all_metas()))
+    profile = await _market_call(market.team_profile(current_user(request), _market_pk(pk), _all_metas()))
     if not sees_instructions(current_user(request)) and isinstance(profile, dict):
         profile = {**profile, "instructions_locked": True,
                    "agents": [without_instructions(a) if isinstance(a, dict) else a for a in profile.get("agents") or []]}
@@ -2077,12 +2271,12 @@ async def market_team(request: Request, pk: int):
 
 @app.post("/api/market/agents/{pk}/hire")
 async def market_hire_agent(request: Request, pk: int):
-    return await _market_call(market.hire_agent(current_user(request), pk))
+    return await _market_call(market.hire_agent(current_user(request), _market_pk(pk)))
 
 
 @app.post("/api/market/teams/{pk}/hire")
 async def market_hire_team(request: Request, pk: int):
-    return await _market_call(market.hire_team(current_user(request), pk))
+    return await _market_call(market.hire_team(current_user(request), _market_pk(pk)))
 
 
 @app.post("/api/market/publish")
@@ -2109,8 +2303,8 @@ async def market_review(request: Request, body: dict):
     require_admin(request)
     kind = "team" if body.get("kind") == "team" else "agent"
     try:
-        pk = int(body.get("pk"))
-    except (TypeError, ValueError):
+        pk = _market_pk(int(body.get("pk")))
+    except (TypeError, ValueError, OverflowError):
         raise HTTPException(400, "Which one? Send its pk.")
     return await _market_call(market.review(kind, pk, str(body.get("decision") or ""), str(body.get("note") or "")))
 
@@ -2124,7 +2318,7 @@ async def get_ratings(request: Request, pid: str):
 async def put_rating(request: Request, pid: str, body: dict):
     try:
         value = int(body.get("value") or 0)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         raise HTTPException(400, "A rating is a thumbs up or a thumbs down.")
     return await _market_call(market.rate(current_user(request), load_meta(pid), str(body.get("agent") or ""), value,
                                           str(body.get("comment") or "")))
@@ -2151,6 +2345,7 @@ async def project_people(request: Request, pid: str):
 @app.post("/api/projects/{pid}/people")
 async def invite_person(request: Request, pid: str, body: dict):
     meta = _managed(request, pid)
+    _limited(limits.INVITES, request, "invitations", per_member=True)
     out = await collab.invite(meta, current_user(request), body.get("email"), body.get("role") or "editor")
     await notify(meta["id"], {"type": "people"})
     return out
@@ -2207,6 +2402,7 @@ async def list_share_links(request: Request, pid: str):
 @app.post("/api/projects/{pid}/share")
 async def create_share_link(request: Request, pid: str, body: dict):
     meta = _editable(request, pid)
+    _limited(limits.SHARE_LINKS, request, "share links", per_member=True)
     return await share.create(meta["id"], current_user(request), body)
 
 
@@ -2238,7 +2434,6 @@ async def delete_comment(request: Request, pid: str, comment_id: str):
 
 
 SHARE_GONE = ("This link has expired or was turned off. Ask the person who sent it for a new one.")
-COMMENT_LIMIT = limits.Limit(30, 3600)        # comments per visitor address per hour
 
 
 async def _share_link(token: str) -> tuple[dict, dict]:
@@ -2277,7 +2472,7 @@ async def share_comments(token: str):
 @app.post("/s/{token}/comments")
 async def share_add_comment(request: Request, token: str, body: dict):
     link, meta = await _share_link(token)
-    _limited(COMMENT_LIMIT, request, "comments")
+    _limited(limits.COMMENTS, request, "comments")
     pages = [p["file"] for p in meta.get("pages") or DEFAULT_PAGES]
     comment = await share.add_comment(link, body, pages)
     await notify(meta["id"], {"type": "comment", "comment": comment, "new": True})
@@ -2292,6 +2487,8 @@ PIN_SCRIPT = b'<script src="/static/share-pin.js"></script>'
 async def share_site(request: Request, token: str, path: str = ""):
     """The project's site through a share link: sandboxed like /work/<pid>/ (see no_cache), web pages with the pin script."""
     link, meta = await _share_link(token)
+    if "\x00" in path:
+        raise HTTPException(404, "This page or file doesn't exist.")
     root = site_dir(meta["id"]).resolve()
     target = (root / path).resolve()
     if (target != root and root not in target.parents) or (path.split("/")[0] == browser_check.CHECK_DIR):
@@ -2312,6 +2509,8 @@ async def share_site(request: Request, token: str, path: str = ""):
 
 def safe_path(pid: str, rel: str) -> Path:
     folder = site_dir(pid).resolve()
+    if "\x00" in rel or len(rel) > 1000:
+        raise HTTPException(400, "That file name isn't valid.")
     target = (folder / rel).resolve()
     if folder not in target.parents:
         raise HTTPException(400, "That path is outside the project.")
@@ -2332,11 +2531,15 @@ async def save_file(pid: str, body: dict):
     size = len(content.encode())
     if size > MAX_EDIT:
         raise HTTPException(413, f"This file would be {human_size(size)}; files edited here are limited to {human_size(MAX_EDIT)}.")
+    if target.is_dir():
+        raise HTTPException(400, f"“{body.get('path')}” is a folder, not a file.")
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         tmp = target.with_name(target.name + ".tmp")
         tmp.write_text(content)
         os.replace(tmp, target)
+    except (NotADirectoryError, IsADirectoryError):
+        raise HTTPException(400, "That path goes through a file, not a folder. Pick another name.")
     except OSError as e:
         raise HTTPException(507 if e.errno == errno.ENOSPC else 500, f"Couldn't save {target.name}: {e.strerror or e}.")
     meta = load_meta(pid); save_meta(meta)  # bump "updated"
@@ -2588,6 +2791,8 @@ async def serve_site(request: Request, pid: str, path: str = ""):
         pid = str(uuid.UUID(pid))
     except ValueError:
         raise HTTPException(404, "This page or file doesn't exist.")
+    if "\x00" in path:
+        raise HTTPException(404, "This page or file doesn't exist.")
     root = site_dir(pid).resolve()
     target = (root / path).resolve()
     if target != root and root not in target.parents:
@@ -2604,7 +2809,7 @@ async def serve_site(request: Request, pid: str, path: str = ""):
 @app.get("/media/{pid}/{area}/{path:path}")
 async def project_media(pid: str, area: str, path: str):
     """A project's reference images (uploads/) and browser-check screenshots (checks/): only for who can open the project."""
-    if area not in ("uploads", "checks"):
+    if area not in ("uploads", "checks") or "\x00" in path:
         raise HTTPException(404, "This page or file doesn't exist.")
     root = (work_dir(check_id(pid)) / area).resolve()
     target = (root / path).resolve()
@@ -2619,9 +2824,7 @@ async def notify(pid: str, event: dict):
     """Tell the studios open on this project about something that isn't part of the chat (comments, people)."""
     event["project"] = pid
     for ws in list(live(pid)["clients"]):
-        try:
-            await ws.send_json(event)
-        except Exception:
+        if not await ws_send(ws, event):
             live(pid)["clients"].discard(ws)
 
 
@@ -2630,9 +2833,7 @@ async def broadcast(pid: str, event: dict):
     log_event(pid, event)
     st = live(pid)
     for ws in list(st["clients"]):
-        try:
-            await ws.send_json(event)
-        except Exception:
+        if not await ws_send(ws, event):         # a closed or stuck tab is dropped; it catches up when it reconnects
             st["clients"].discard(ws)
 
 
@@ -2928,9 +3129,53 @@ async def run_agent(pid: str, agent: dict, common: str, request: str, notes: lis
                                                      "request": request[:100], "seconds": round(time.time() - started, 1), **info})
 
 
+def scrub_paths(text: str) -> str:
+    """No server path in a message: the app's folder, the storage folder and the home folder become "…"."""
+    for folder in sorted({str(ROOT), str(Path(config.STORAGE_DIR).resolve()), str(Path.home())}, key=len, reverse=True):
+        if len(folder) > 1:
+            text = text.replace(folder, "…")
+    return text
+
+
+def run_error_text(e: BaseException, where: str) -> str:
+    """What the studio shows when a run, a retry or a plan fails. Our own explained failures (RuntimeError, HTTPException)
+    are shown as they are, without keys or server paths; anything else is logged with a ref and explained."""
+    if isinstance(e, HTTPException):
+        return str(e.detail)
+    if isinstance(e, RuntimeError) and str(e):
+        return scrub_paths(keys.scrub(str(e), ""))
+    ref = secrets.token_hex(3)
+    status, detail, _ = explain_exception(e, ref)
+    if status == 500 and not isinstance(e, OSError):
+        log.exception("%s failed [ref %s]", where[:1].upper() + where[1:], ref)
+        return (f"The run stopped because of a problem on the server (ref {ref}). Press Continue to try again; "
+                "if it keeps happening, tell the administrator.")
+    log.error("%s failed [ref %s]: %s: %s", where[:1].upper() + where[1:], ref, e.__class__.__name__,
+              scrub_paths(keys.scrub(str(e), ""))[:200])
+    return detail + (" Press Continue when it's back." if status == 503 else "")
+
+
+async def guarded_run(pid: str, what: str, coro):
+    """Run a project's background job (a prompt, a run, a retry, a plan). Whatever escapes it is logged with its context
+    and shown in the studio, and a run left "running" is marked as failed: nothing dies silently or keeps the studio waiting."""
+    try:
+        await coro
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        text = run_error_text(e, f"{what} on project {pid}")
+        try:
+            run = None
+            if ((store.get(pid) or {}).get("run") or {}).get("status") == "running":
+                run = update_run(pid, status="error", running=[], current=None, error=text[-500:])
+            await broadcast(pid, {"type": "error", "text": text, **({"run": run_summary(run)} if run else {})})
+        except Exception:
+            log.exception("Couldn't report the failure of %s on project %s", what, pid)
+
+
 def explain_failure(text: str) -> str:
     """Turn Claude Code's raw error output into something actionable."""
-    text = keys.scrub(text, "")                      # never show an API key, even one echoed in an error
+    text = scrub_paths(keys.scrub(text, ""))         # never show an API key or a server path, even one echoed in an error
     low = text.lower()
     if keys.USER_MODE and keys.explain(text):
         return keys.explain(text)
@@ -2949,58 +3194,68 @@ async def _stream_agent(pid: str, agent: dict, proc, folder: Path, pending_edits
     async for raw in proc.stdout:
         try:
             ev = json.loads(raw)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             continue
-        kind = ev.get("type")
-
-        if kind == "system" and ev.get("model"):
-            info["model"] = ev["model"]
-        elif kind == "assistant":
-            for block in ev["message"].get("content", []):
-                if block.get("type") == "text" and block["text"].strip():
-                    final_text = block["text"].strip()
-                    await broadcast(pid, {"type": "agent_text", "agent": agent["id"], "text": final_text})
-                elif block.get("type") == "tool_use":
-                    inp = block.get("input", {})
-                    if inp.get("file_path"):
-                        target = short_path(inp["file_path"], folder)
-                    else:   # Glob/Grep pattern, WebSearch query, WebFetch url
-                        target = clean_text(inp.get("pattern") or inp.get("path") or inp.get("query") or inp.get("url") or "", 160)
-                    if block["name"] in ("Write", "Edit"):
-                        pending_edits[block["id"]] = target
-                    await broadcast(pid, {"type": "tool", "agent": agent["id"],
-                                          "tool": block["name"], "target": target})
-
-        elif kind == "user":
-            for block in ev["message"].get("content", []):
-                if block.get("type") == "tool_result" and block.get("tool_use_id") in pending_edits:
-                    await broadcast(pid, {"type": "file_changed", "agent": agent["id"],
-                                          "file": pending_edits.pop(block["tool_use_id"])})
-
-        elif kind == "result":
-            usage = ev.get("usage") or {}
-            denied = [{"tool": d.get("tool_name"), "target": clean_text((d.get("tool_input") or {}).get("file_path")
-                       or (d.get("tool_input") or {}).get("path") or (d.get("tool_input") or {}).get("pattern") or "", 160)}
-                      for d in (ev.get("permission_denials") or [])]
-            if denied:
-                info["denied"] = denied
-                await broadcast(pid, {"type": "security", "agent": agent["id"],
-                                      "text": f"The {agent['name']} agent tried something it isn't allowed to do, and it was blocked.",
-                                      "items": [f"{d['tool']}: {d['target']}" for d in denied[:8]]})
-            info.update(cost=round(ev.get("total_cost_usd") or 0, 5), turns=ev.get("num_turns"),
-                        api_seconds=round((ev.get("duration_api_ms") or 0) / 1000, 1),
-                        tokens_in=(usage.get("input_tokens") or 0) + (usage.get("cache_creation_input_tokens") or 0)
-                                  + (usage.get("cache_read_input_tokens") or 0),
-                        tokens_out=usage.get("output_tokens") or 0)
-            if ev.get("result"):
-                final_text = ev["result"].strip()
-            if ev.get("is_error"):
-                raise RuntimeError(explain_failure(final_text or "The agent reported an error."))
+        if not isinstance(ev, dict):
+            continue
+        try:
+            final_text = await _agent_event(pid, agent, ev, folder, pending_edits, info, final_text)
+        except (AttributeError, KeyError, TypeError) as e:     # a line in a shape we don't know: skip it, keep the run going
+            log.warning("Skipped an unexpected line from the %s agent on %s: %s", agent["id"], pid, e)
 
     await proc.wait()
     if proc.returncode != 0:
         err = (await stderr_task).decode(errors="replace")
         raise RuntimeError(explain_failure(err or f"Claude Code exited with code {proc.returncode}."))
+    return final_text
+
+
+async def _agent_event(pid: str, agent: dict, ev: dict, folder: Path, pending_edits: dict, info: dict, final_text: str) -> str:
+    """One line of an agent's stream-json output: broadcast what it did. Returns the latest text of its reply."""
+    kind = ev.get("type")
+    if kind == "system" and ev.get("model"):
+        info["model"] = ev["model"]
+    elif kind == "assistant":
+        for block in ev["message"].get("content", []):
+            if block.get("type") == "text" and block["text"].strip():
+                final_text = block["text"].strip()
+                await broadcast(pid, {"type": "agent_text", "agent": agent["id"], "text": final_text})
+            elif block.get("type") == "tool_use":
+                inp = block.get("input", {})
+                if inp.get("file_path"):
+                    target = short_path(inp["file_path"], folder)
+                else:   # Glob/Grep pattern, WebSearch query, WebFetch url
+                    target = clean_text(inp.get("pattern") or inp.get("path") or inp.get("query") or inp.get("url") or "", 160)
+                if block["name"] in ("Write", "Edit"):
+                    pending_edits[block["id"]] = target
+                await broadcast(pid, {"type": "tool", "agent": agent["id"],
+                                      "tool": block["name"], "target": target})
+
+    elif kind == "user":
+        for block in ev["message"].get("content", []):
+            if block.get("type") == "tool_result" and block.get("tool_use_id") in pending_edits:
+                await broadcast(pid, {"type": "file_changed", "agent": agent["id"],
+                                      "file": pending_edits.pop(block["tool_use_id"])})
+
+    elif kind == "result":
+        usage = ev.get("usage") or {}
+        denied = [{"tool": d.get("tool_name"), "target": clean_text((d.get("tool_input") or {}).get("file_path")
+                   or (d.get("tool_input") or {}).get("path") or (d.get("tool_input") or {}).get("pattern") or "", 160)}
+                  for d in (ev.get("permission_denials") or [])]
+        if denied:
+            info["denied"] = denied
+            await broadcast(pid, {"type": "security", "agent": agent["id"],
+                                  "text": f"The {agent['name']} agent tried something it isn't allowed to do, and it was blocked.",
+                                  "items": [f"{d['tool']}: {d['target']}" for d in denied[:8]]})
+        info.update(cost=round(ev.get("total_cost_usd") or 0, 5), turns=ev.get("num_turns"),
+                    api_seconds=round((ev.get("duration_api_ms") or 0) / 1000, 1),
+                    tokens_in=(usage.get("input_tokens") or 0) + (usage.get("cache_creation_input_tokens") or 0)
+                              + (usage.get("cache_read_input_tokens") or 0),
+                    tokens_out=usage.get("output_tokens") or 0)
+        if ev.get("result"):
+            final_text = ev["result"].strip()
+        if ev.get("is_error"):
+            raise RuntimeError(explain_failure(final_text or "The agent reported an error."))
     return final_text
 
 
@@ -3205,11 +3460,12 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
         await broadcast(pid, {"type": "run_done"})
     except asyncio.CancelledError:
         kill_procs(st)
-        run = update_run(pid, status="stopped", running=[])
-        await broadcast(pid, {"type": "run_stopped", "run": run_summary(run)})
+        run = safely("Saving the stopped run", update_run, pid, status="stopped", running=[])
+        await broadcast(pid, {"type": "run_stopped", "run": run_summary(run or {})})
     except Exception as e:
-        run = update_run(pid, status="error", running=[], error=str(e)[-500:])
-        await broadcast(pid, {"type": "error", "text": str(e), "run": run_summary(run)})
+        text = run_error_text(e, f"a run on project {pid}")
+        run = safely("Saving the failed run", update_run, pid, status="error", running=[], error=text[-500:])
+        await broadcast(pid, {"type": "error", "text": text, "run": run_summary(run or {})})
     finally:
         kill_procs(st)
         if schedule is not None and not schedule.done():
@@ -3255,7 +3511,9 @@ async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict,
         async for raw in proc.stdout:
             try:
                 ev = json.loads(raw)
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                continue
+            if not isinstance(ev, dict):
                 continue
             if ev.get("type") == "system" and ev.get("model"):
                 info["model"] = ev["model"]
@@ -3430,81 +3688,149 @@ async def run_retry(pid: str, agent: dict, request: str, note: str):
         kill_procs(st)
         await broadcast(pid, {"type": "run_stopped", "retry": True, "run": run_summary(load_meta(pid).get("run"))})
     except Exception as e:
-        await broadcast(pid, {"type": "error", "text": str(e), "retry": True})
+        await broadcast(pid, {"type": "error", "text": run_error_text(e, f"a retry on project {pid}"), "retry": True})
     finally:
         kill_procs(st)
 
 
+WS_MAX_MESSAGE = 256 * 1024      # a prompt is at most PROMPT_LIMIT characters: nothing the studio sends comes close
+WS_SEND_TIMEOUT = 10              # seconds: a tab that stops reading is dropped instead of holding up a run
+UNREADABLE = "The server couldn't read that message."
+RUN_ACTIONS = ("prompt", "continue", "restart", "retry")
+
+
+async def ws_send(ws: WebSocket, event: dict) -> bool:
+    """Send one event to one tab, with a time limit. False when that tab is gone or stuck."""
+    try:
+        await asyncio.wait_for(ws.send_json(event), WS_SEND_TIMEOUT)
+        return True
+    except asyncio.CancelledError:
+        raise
+    except asyncio.TimeoutError:              # stuck: close it, so the studio reconnects and catches up on what it missed
+        task = asyncio.create_task(_close_quietly(ws))
+        _closing.add(task)
+        task.add_done_callback(_closing.discard)
+        return False
+    except Exception:
+        return False
+
+
+_closing: set[asyncio.Task] = set()
+
+
+async def _close_quietly(ws: WebSocket):
+    with contextlib.suppress(Exception):
+        await asyncio.wait_for(ws.close(code=1013), 5)
+
+
+async def _ws_read(ws: WebSocket) -> tuple[dict | None, str]:
+    """The next message as a dict, or (None, why it can't be used). Raises WebSocketDisconnect when the tab closes."""
+    message = await ws.receive()
+    if message["type"] == "websocket.disconnect":
+        raise WebSocketDisconnect(message.get("code", 1000))
+    text = message.get("text")
+    if text is None:
+        return None, "Send messages as JSON text, like {\"type\": \"prompt\", \"text\": \"…\"}."
+    if len(text) > WS_MAX_MESSAGE:
+        return None, f"That message is {human_size(len(text.encode()))}; the limit is {human_size(WS_MAX_MESSAGE)}."
+    try:
+        msg = json.loads(text)
+    except ValueError:
+        return None, UNREADABLE
+    if not isinstance(msg, dict):
+        return None, UNREADABLE
+    return msg, ""
+
+
+def _ws_error_text(e: Exception, where: str) -> str:
+    """What a tab is told when handling its message failed unexpectedly (the details go to the log)."""
+    ref = secrets.token_hex(3)
+    status, detail, _ = explain_exception(e, ref)
+    if status == 500 and not isinstance(e, OSError):
+        log.exception("WebSocket message failed on %s [ref %s]", where, ref)
+        return f"Something went wrong on the server (ref {ref}). Try again; if it keeps happening, tell the administrator."
+    log.error("WebSocket message failed on %s [ref %s]: %s: %s", where, ref, e.__class__.__name__, keys.scrub(str(e), "")[:200])
+    return detail
+
+
 @app.websocket("/ws/{pid}")
 async def ws_endpoint(ws: WebSocket, pid: str):
+    """One studio tab. Every problem with a message is answered with {"type": "error", "text"} and the socket stays
+    open; it is closed only when the tab may no longer use the project (4401 logged out, 4403 another site, 4404 gone)."""
     await ws.accept()
+    st = None
     try:
-        pid = load_meta(pid)["id"]
-    except HTTPException:
-        await ws.close(code=4404)
-        return
-    if not _host_ok(ws.headers.get("host", "")) or not _origin_ok(ws.headers.get("host", ""), ws.headers.get("origin")):
-        await ws.close(code=4403)
-        return
-    token = ws.cookies.get(auth.COOKIE)
-
-    async def allowed() -> bool:
-        user = await auth.user_for_token(token)     # checked again on every message: logout and role changes apply at once
         try:
-            return bool(user) and user["role"] != "unconfirmed" and can_access(user, load_meta(pid))
-        except HTTPException:                       # the project was deleted meanwhile
-            return False
-
-    user = await auth.user_for_token(token)
-    if not user or user["role"] == "unconfirmed":
-        await ws.close(code=4401)
-        return
-    if not can_access(user, load_meta(pid)):
-        await ws.close(code=4404)                   # the same answer as a project that doesn't exist
-        return
-    st = live(pid)
-    st["clients"].add(ws)
-    await ws.send_json({"type": "hello", "busy": is_busy(pid)})
-    try:
+            pid = load_meta(pid)["id"]
+        except HTTPException:
+            await ws.close(code=4404, reason="This project doesn't exist.")
+            return
+        if not _host_ok(ws.headers.get("host", "")) or not _origin_ok(ws.headers.get("host", ""), ws.headers.get("origin")):
+            await ws.close(code=4403)
+            return
+        token = ws.cookies.get(auth.COOKIE)
+        user = await auth.user_for_token(token)
+        if not user or user["role"] == "unconfirmed":
+            await ws.close(code=4401, reason="Log in first.")
+            return
+        if not can_access(user, load_meta(pid)):
+            await ws.close(code=4404, reason="This project doesn't exist.")   # the same answer as a project that doesn't exist
+            return
+        st = live(pid)
+        st["clients"].add(ws)
+        await ws.send_json({"type": "hello", "busy": is_busy(pid)})
         while True:
-            try:
-                msg = await ws.receive_json()
-            except WebSocketDisconnect:
-                raise
-            except (ValueError, KeyError, RuntimeError):
-                await ws.send_json({"type": "error", "text": "The server couldn't read that message."})
+            msg, problem = await _ws_read(ws)
+            if msg is None:
+                await ws.send_json({"type": "error", "text": problem})
                 continue
-            if not isinstance(msg, dict):
-                await ws.send_json({"type": "error", "text": "The server couldn't read that message."})
-                continue
-            if not await allowed():
-                st["clients"].discard(ws)
-                await ws.close(code=4401)
+            # checked again on every message: logout, role changes and a deleted project apply at once
+            me_now = await auth.user_for_token(token)
+            if not me_now or me_now["role"] == "unconfirmed":
+                await ws.close(code=4401, reason="Log in first.")
                 return
-            if msg.get("type") in ("prompt", "continue", "restart", "retry", "answer", "stop") \
-                    and not collab.can_edit(await auth.user_for_token(token), load_meta(pid)):
-                await ws.send_json({"type": "error", "viewer": True,
-                                    "text": "You can watch this project but not run its agents. Ask its owner to make you an editor."})
-                continue
-            if msg.get("type") in ("prompt", "continue", "restart", "retry", "answer") and not is_busy(pid):
-                me_now, meta_now = await auth.user_for_token(token), load_meta(pid)
-                if keys.USER_MODE and not meta_now.get("owner") and me_now["role"] == "admin":
-                    meta_now["owner"] = str(me_now["id"])     # an older project (admins only) becomes the admin's own:
-                    save_meta(meta_now)                      # it then runs on their key, like any project
-                problem = await key_problem(meta_now, me_now)
-                if problem:                         # nothing runs without a Claude API key: the studio shows how to add one
-                    await ws.send_json({"type": "needs_key", **problem})
-                    continue
+            meta_now = store.get(pid)
+            if meta_now is None or not can_access(me_now, meta_now):
+                await ws.send_json({"type": "error", "gone": True, "text": PROJECT_GONE})
+                await ws.close(code=4404, reason="This project doesn't exist.")
+                return
             try:
+                kind = msg.get("type")
+                if kind in (*RUN_ACTIONS, "answer", "stop") and not collab.can_edit(me_now, meta_now):
+                    await ws.send_json({"type": "error", "viewer": True,
+                                        "text": "You can watch this project but not run its agents. Ask its owner to make you an editor."})
+                    continue
+                if kind in RUN_ACTIONS and not is_busy(pid):
+                    wait = limits.RUNS.wait(f"u:{user['id']}")   # every run spends real money on someone's Claude key
+                    if wait:
+                        await ws.send_json({"type": "error", "rate_limited": True,
+                                            "text": f"You've started a lot of runs this hour. Try again in {limits.wait_text(wait)}."})
+                        continue
+                if kind in (*RUN_ACTIONS, "answer") and not is_busy(pid):
+                    if keys.USER_MODE and not meta_now.get("owner") and me_now["role"] == "admin":
+                        meta_now["owner"] = str(me_now["id"])     # an older project (admins only) becomes the admin's own:
+                        save_meta(meta_now)                      # it then runs on their key, like any project
+                    problem = await key_problem(meta_now, me_now)
+                    if problem:                         # nothing runs without a Claude API key: the studio shows how to add one
+                        await ws.send_json({"type": "needs_key", **problem})
+                        continue
                 await handle_ws_message(ws, pid, st, msg)
             except HTTPException as e:
                 await ws.send_json({"type": "error", "text": e.detail})
-            except Exception:
-                ref = secrets.token_hex(3)
-                log.exception("WebSocket message failed [ref %s]", ref)
-                await ws.send_json({"type": "error", "text": f"Something went wrong on the server (ref {ref})."})
+            except (WebSocketDisconnect, asyncio.CancelledError):
+                raise
+            except Exception as e:
+                await ws.send_json({"type": "error", "text": _ws_error_text(e, f"project {pid}")})
     except WebSocketDisconnect:
-        st["clients"].discard(ws)
+        pass
+    except Exception as e:                          # e.g. the database went away while checking the session
+        text = _ws_error_text(e, f"the socket of project {pid}")
+        with contextlib.suppress(Exception):
+            await ws.send_json({"type": "error", "text": text})
+            await ws.close(code=1011)
+    finally:
+        if st is not None:
+            st["clients"].discard(ws)
 
 
 async def handle_answer(ws: WebSocket, pid: str, st: dict, msg: dict):
@@ -3537,7 +3863,7 @@ async def handle_answer(ws: WebSocket, pid: str, st: dict, msg: dict):
         meta["last_exchange"] = None
         save_meta(meta)
         await broadcast(pid, {"type": "answer", "action": "confirm"})
-        st["task"] = asyncio.create_task(start_plan(pid, pending["request"], plan, pending.get("images") or []))
+        st["task"] = asyncio.create_task(guarded_run(pid, "a confirmed plan", start_plan(pid, pending["request"], plan, pending.get("images") or [])))
         return
     if action != "answers" or not isinstance(msg.get("answers"), dict):
         await ws.send_json({"type": "error", "text": "The server couldn't read those answers."})
@@ -3559,7 +3885,7 @@ async def handle_answer(ws: WebSocket, pid: str, st: dict, msg: dict):
         meta["pending"], meta["last_exchange"] = None, None
         save_meta(meta)
         await broadcast(pid, {"type": "user", "text": "Contact details", "answers": pairs, "images": []})
-        st["task"] = asyncio.create_task(start_plan(pid, pending["request"], pending["plan"], pending.get("images") or []))
+        st["task"] = asyncio.create_task(guarded_run(pid, "a plan after contact details", start_plan(pid, pending["request"], pending["plan"], pending.get("images") or [])))
         return
     if ex.get("blanks"):                        # a team template's [blanks], filled in
         text, pairs = orch.fill_blanks(ex["request"], ex["blanks"], ex["questions"], msg["answers"])
@@ -3569,8 +3895,8 @@ async def handle_answer(ws: WebSocket, pid: str, st: dict, msg: dict):
     meta["pending"] = None
     save_meta(meta)
     await broadcast(pid, {"type": "user", "text": text, "answers": pairs, "images": []})
-    st["task"] = asyncio.create_task(run_prompt(pid, text, meta.get("agents") or await default_ids(await owner_of(meta)),
-                                                ex.get("images") or []))
+    st["task"] = asyncio.create_task(guarded_run(pid, "a prompt with answers", run_prompt(
+        pid, text, meta.get("agents") or await default_ids(await owner_of(meta)), ex.get("images") or [])))
 
 
 async def handle_ws_message(ws: WebSocket, pid: str, st: dict, msg: dict):
@@ -3579,9 +3905,16 @@ async def handle_ws_message(ws: WebSocket, pid: str, st: dict, msg: dict):
     if kind == "answer":
         await handle_answer(ws, pid, st, msg)
         return
+    if not kind or not isinstance(kind, str):
+        await ws.send_json({"type": "error", "text": "Every message needs a type, like {\"type\": \"prompt\", \"text\": \"…\"}."})
+        return
     if kind not in ("prompt", "stop", "continue", "restart", "retry"):
         await ws.send_json({"type": "error", "text": f"Unknown message type “{clean_text(kind, 40)}”."})
         return
+    for field in ("agents", "images"):
+        if msg.get(field) is not None and not isinstance(msg.get(field), list):
+            await ws.send_json({"type": "error", "text": f"“{field}” must be a list."})
+            return
     if kind == "prompt" and not isinstance(msg.get("text"), str):
         await ws.send_json({"type": "error", "text": "The prompt must be text."})
         return
@@ -3603,7 +3936,7 @@ async def handle_ws_message(ws: WebSocket, pid: str, st: dict, msg: dict):
         text = msg["text"].strip()
         owner = await owner_of(details)
         valid = {a["id"] for a in await load_agents(owner)}
-        agent_ids = [i for i in msg.get("agents") or [] if i in valid] or await default_ids(owner)
+        agent_ids = [i for i in msg.get("agents") or [] if isinstance(i, str) and i in valid] or await default_ids(owner)
         images = [i for i in (msg.get("images") or [])[:6]
                   if isinstance(i, str) and i.startswith("uploads/") and (work_dir(pid) / i).is_file()
                   and storage.uploads_dir(pid).resolve() in (work_dir(pid) / i).resolve().parents]
@@ -3622,7 +3955,7 @@ async def handle_ws_message(ws: WebSocket, pid: str, st: dict, msg: dict):
             meta["last_exchange"] = {"request": text, "reply": reply, "questions": qs, "images": images, "blanks": found}
             save_meta(meta)
             return
-        st["task"] = asyncio.create_task(run_prompt(pid, text, agent_ids, images))
+        st["task"] = asyncio.create_task(guarded_run(pid, "a prompt", run_prompt(pid, text, agent_ids, images)))
     elif msg.get("type") in ("continue", "restart"):
         mode = msg["type"]
         if is_busy(pid):
@@ -3648,19 +3981,23 @@ async def handle_ws_message(ws: WebSocket, pid: str, st: dict, msg: dict):
             return
         await broadcast(pid, {"type": "resume", "mode": mode, "request": run["request"],
                               "from": summary["next"] if mode == "continue" else agent_ids[0]})
-        st["task"] = asyncio.create_task(run_chain(pid, run["request"], agent_ids, resume=mode == "continue",
-                                                   images=run.get("images", [])))
+        st["task"] = asyncio.create_task(guarded_run(pid, f"a run ({mode})", run_chain(pid, run["request"], agent_ids,
+                                                                                         resume=mode == "continue",
+                                                                                         images=run.get("images", []))))
     elif msg.get("type") == "retry":
         if is_busy(pid):
             await ws.send_json({"type": "error", "text": "Agents are already working."})
             return
         details = load_meta(pid)
         agent = next((a for a in await project_agents(details) if a["id"] == msg.get("agent")), None)
+        if msg.get("agent") and not agent:
+            await ws.send_json({"type": "error", "text": f"There's no agent called “{clean_text(msg.get('agent'), 40)}” on this project."})
+            return
         request = (details.get("run") or {}).get("request") or (details.get("history") or [None])[-1]
         if not agent or not request:
             await ws.send_json({"type": "error", "text": "Nothing to retry yet. Send a prompt first."})
             return
         note = " ".join(str(msg.get("note") or "").split())[:500]
-        st["task"] = asyncio.create_task(run_retry(pid, agent, request, note))
+        st["task"] = asyncio.create_task(guarded_run(pid, "a retry", run_retry(pid, agent, request, note)))
     elif msg.get("type") == "stop" and is_busy(pid):
         st["task"].cancel()

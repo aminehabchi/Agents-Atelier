@@ -85,6 +85,11 @@
   .plan .badge.req { background: var(--linen, var(--mist)); color: var(--graphite); }
   .plan .price b { font-size: 26px; font-weight: 500; }
   .plan .price span { font-size: 13px; color: var(--stone); margin-inline-start: 4px; }
+  .plan .price .billed { display: block; margin-top: 4px; font-size: 12px; color: var(--ok); }
+  .period { display: inline-flex; gap: 2px; padding: 3px; margin: 0 0 14px; border-radius: var(--r); background: var(--linen, var(--mist)); }
+  .period button { border: 0; background: none; font: inherit; font-size: 13px; padding: 7px 14px; border-radius: var(--r); color: var(--graphite); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+  .period button[aria-checked="true"] { background: var(--paper); color: var(--ink); box-shadow: var(--ring); }
+  .period .save { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: var(--r-pill); background: var(--add-bg); color: var(--add-fg); }
   .plan ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; line-height: 1.45; flex: 1; align-content: start; }
   .plan li { display: grid; grid-template-columns: 14px 1fr; gap: 8px; align-items: start; color: var(--graphite); }
   .plan li svg { margin-top: 3px; color: var(--ok); }
@@ -125,6 +130,7 @@
   .prefs .seg button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 6px; white-space: nowrap; }
 
   .hero-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .linked { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
   .hchip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-pill, 999px); font-size: 12px; text-decoration: none;
     background: var(--mist); color: var(--graphite); border: 1px solid var(--line); }
   a.hchip:hover { border-color: var(--line-strong); color: var(--ink); }
@@ -249,8 +255,7 @@ function wireKey() {
   $("key-remove")?.addEventListener("click", async () => {
     if (!await confirmDialog({ title: "Remove your API key?", ok: "Remove", danger: true,
       text: "The agents can't work until you add a key again. Your projects stay as they are." })) return;
-    try { me = (await api("/api/auth/claude-key", { method: "DELETE" })).user; paintKey(); paintPlan(); toast("API key removed"); }
-    catch (err) { toast(err.message, "err"); }
+    await withBusy($("key-remove"), async () => { me = (await api("/api/auth/claude-key", { method: "DELETE" })).user; paintKey(); paintPlan(); toast("API key removed"); });
   });
   const form = $("key-form"); if (!form) return;
   form.onsubmit = async (e) => {
@@ -262,7 +267,7 @@ function wireKey() {
     try {
       me = (await send("/api/auth/claude-key", "PUT", { key })).user;
       paintKey(); paintPlan(); $("toc").querySelector(".dot")?.remove(); toast("API key saved: your agents are ready");
-    } catch (err) { $("key-err").textContent = err.message; $("key-saved").textContent = ""; $("key-go").disabled = false; }
+    } catch (err) { $("key-err").textContent = err.message; $("key-saved").textContent = ""; $("key-go").disabled = false; $("key-input").focus(); }
   };
 }
 
@@ -294,6 +299,12 @@ const PLAN_FEATURES = (p) => [
   [p.credit ? "Downloads carry a small “Made with Agents Atelier” line" : "Downloads without the credit line", !p.credit],
 ];
 const RANK = { starter: 0, pro: 1, agency: 2 };
+let billPeriod = "yearly";       // the plans show yearly prices first when the server offers them (paintPlan)
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("#plan-box [data-period]"); if (!b) return;
+  billPeriod = b.dataset.period; paintPlan();
+  document.querySelector(`#plan-box [data-period="${billPeriod}"]`)?.focus();
+});
 function paintPlan() {
   const box = $("plan-box"); if (!box) return;
   const isAdmin = me.role === "admin", byKey = planInfo.keys === "user";
@@ -304,29 +315,39 @@ function paintPlan() {
   const max = isAdmin ? 1000 : cur.run_limit_max, fixed = !isAdmin && cur.run_limit === cur.run_limit_max;
   const meter = cur.projects == null || isAdmin ? "" : `<span class="meter" aria-hidden="true"><i style="width:${Math.min(100, used / cur.projects * 100)}%" class="${used >= cur.projects ? "full" : ""}"></i></span>`;
   const paypal = planInfo.payment === "paypal";
+  /* monthly or yearly (two months free): the switch shows when the server has PayPal's yearly plans */
+  const yearlyOn = !isAdmin && (paypal ? planInfo.yearly : true);   // with PayPal, only when its yearly plans are set up
+  if (!yearlyOn) billPeriod = "monthly";
+  const yearly = (p) => yearlyOn && billPeriod === "yearly" && p.price_yearly;
+  const perMonth = (p) => yearly(p) ? (p.price_yearly / 12).toFixed(2) : p.price;
+  const saving = (p) => p.price_yearly ? Math.round((1 - p.price_yearly / (p.price * 12)) * 100) : 0;
+  const myPeriod = me.billing_period || "monthly";
   /* the button of each plan card, and one line under it saying how the move happens */
   const how = (p, text, ic, cls = "") => `<p class="plan-how ${cls}" id="plan-how-${p.id}">${icon(ic, { size: 13 })}<span>${text}</span></p>`;
   const action = (p) => {
     if (isAdmin) return "";
-    if (p.id === me.plan) return `<div class="plan-act"><button class="btn btn-ghost" type="button" disabled>${icon("check", { size: 15 })}Current plan</button>
-      ${me.paid_online && p.price ? how(p, "Paid with PayPal · monthly", "check", "paid") : ""}</div>`;
+    const samePeriod = !yearlyOn || !me.paid_online || !p.price || myPeriod === billPeriod;
+    if (p.id === me.plan && samePeriod) return `<div class="plan-act"><button class="btn btn-ghost" type="button" disabled>${icon("check", { size: 15 })}Current plan</button>
+      ${me.paid_online && p.price ? how(p, myPeriod === "yearly" ? "Paid with PayPal · yearly" : "Paid with PayPal · monthly", "check", "paid") : ""}</div>`;
+    if (p.id === me.plan) return `<div class="plan-act"><button class="btn btn-dark" type="button" data-plan="${p.id}" aria-describedby="plan-how-${p.id}">${icon("refresh", { size: 15 })}${billPeriod === "yearly" ? "Pay yearly instead" : "Pay monthly instead"}</button>
+      ${how(p, billPeriod === "yearly" ? `Pay with PayPal · yearly · save ${saving(p)}%` : "Pay with PayPal · monthly", "lock")}</div>`;
     if (p.id === me.plan_request) return `<div class="plan-act"><button class="btn btn-ghost" type="button" data-cancel-request aria-describedby="plan-how-${p.id}">${icon("x", { size: 15 })}Cancel request</button>
       ${how(p, "Waiting for an admin", "clock")}</div>`;
     const up = RANK[p.id] > RANK[me.plan];
     const line = !p.price ? how(p, me.paid_online ? "Cancels your PayPal subscription" : "Applies at once", me.paid_online ? "x" : "check")
-      : paypal ? how(p, "Pay with PayPal · monthly", "lock")
-      : how(p, up ? "Sent as a request: an admin confirms it" : "Applies at once", up ? "clock" : "check");
+      : paypal ? how(p, yearly(p) ? `Pay with PayPal · yearly · save ${saving(p)}%` : "Pay with PayPal · monthly", "lock")
+      : how(p, up ? (yearly(p) ? "Sent as a request, yearly: an admin confirms it" : "Sent as a request: an admin confirms it") : "Applies at once", up ? "clock" : "check");
     const label = up ? `${icon(paypal && p.price ? "external" : "sparkles", { size: 15 })}Upgrade to ${esc(p.name)}` : `Switch to ${esc(p.name)}`;
     return `<div class="plan-act"><button class="btn ${up ? "btn-dark" : "btn-ghost"}" type="button" data-plan="${p.id}" aria-describedby="plan-how-${p.id}">${label}</button>${line}</div>`;
   };
   const payNote = isAdmin ? "Admins have every feature. Members' plans are set on the Users page."
-    : paypal ? `Pro and Agency are monthly PayPal subscriptions: pay with a card or your PayPal balance. The features change as soon as PayPal confirms. ${me.paid_online ? "Moving to Starter applies at once and cancels your subscription." : "Moving to Starter applies at once."}`
+    : paypal ? `Pro and Agency are PayPal subscriptions${yearlyOn ? ", paid monthly or yearly (two months free)" : ", paid monthly"}: pay with a card or your PayPal balance. The features change as soon as PayPal confirms. ${me.paid_online ? "Moving to Starter applies at once and cancels your subscription." : "Moving to Starter applies at once."}`
     : "Online payment isn't available yet: when you upgrade, an admin confirms it with you. Moving to a lower plan applies at once.";
   box.innerHTML = `
     <div class="plan-now">
       <div class="pn-name"><span class="pn-label">${isAdmin ? "Admin" : "Your plan"}</span><b>${isAdmin ? "Every feature" : esc(cur.name)}</b>
-        <span class="pn-price">${isAdmin ? "No limits" : cur.price ? `$${cur.price} / month` : "Free"}</span>
-        ${!isAdmin && me.paid_online && cur.price ? `<span class="pn-paid">${icon("check", { size: 13 })}<span>Paid with PayPal · monthly</span></span>` : ""}</div>
+        <span class="pn-price">${isAdmin ? "No limits" : !cur.price ? "Free" : me.paid_online && myPeriod === "yearly" ? `$${cur.price_yearly} / year` : `$${cur.price} / month`}</span>
+        ${!isAdmin && me.paid_online && cur.price ? `<span class="pn-paid">${icon("check", { size: 13 })}<span>${myPeriod === "yearly" ? "Paid with PayPal · yearly" : "Paid with PayPal · monthly"}</span></span>` : ""}</div>
       <div class="pn-stats">
         <div class="pn-stat"><b>${isAdmin || cur.projects == null ? used : `${used} / ${cur.projects}`}</b><span>${cur.projects == null || isAdmin ? "projects" : "projects used"}</span>${meter}</div>
         ${byKey ? `<div class="pn-stat"><b>${me.claude_key?.set ? "Added" : "Missing"}</b><span>Claude API key</span>${me.claude_key?.set ? "" : `<a href="#claude-key">Add it</a>`}</div>
@@ -334,15 +355,19 @@ function paintPlan() {
       </div>
     </div>
     ${asked ? `<div class="pn-request" role="status">${icon("clock", { size: 18 })}
-      <div><b>You asked for ${esc(asked.name)}${me.plan_request_at ? ` · ${esc(ago(me.plan_request_at))}` : ""}</b>
+      <div><b>You asked for ${esc(asked.name)}${me.plan_request_period === "yearly" ? ", paid yearly" : ", paid monthly"}${me.plan_request_at ? ` · ${esc(ago(me.plan_request_at))}` : ""}</b>
         <span>An admin confirms the upgrade with you, then the new features turn on. You'll see it here.</span></div>
       <button class="btn btn-ghost btn-sm" type="button" data-cancel-request>Cancel request</button></div>` : ""}
     ${byKey && !isAdmin ? `<div class="plan-ai">${icon("zap", { size: 18 })}<div><b>The AI is billed on your own Claude key</b>
       <span>A plan pays for the studio and its features. What the agents use is paid to Anthropic on your own Claude account, at their prices: about $1.50–2 for a full site.</span>
       <a href="#claude-key">${me.claude_key?.set ? "Your Claude key" : "Add your Claude key"}</a></div></div>` : ""}
+    ${yearlyOn ? `<div class="period" role="radiogroup" aria-label="Billing period">
+      <button type="button" role="radio" data-period="monthly" aria-checked="${billPeriod === "monthly"}">Monthly</button>
+      <button type="button" role="radio" data-period="yearly" aria-checked="${billPeriod === "yearly"}">Yearly <span class="save">2 months free</span></button></div>` : ""}
     <div class="plans">${planInfo.plans.map(p => `<article class="plan ${p.id === me.plan && !isAdmin ? "on" : ""} ${p.id === want && p.id !== me.plan ? "want" : ""}" id="plan-${p.id}" aria-labelledby="plan-name-${p.id}">
       <header><h3 id="plan-name-${p.id}">${esc(p.name)}</h3>${p.id === "pro" ? `<span class="badge pop">Most popular</span>` : ""}${p.id === me.plan && !isAdmin ? `<span class="badge">Your plan</span>` : ""}${p.id === me.plan_request ? `<span class="badge req">Requested</span>` : ""}</header>
-      <div class="price"><b>${p.price ? `$${p.price}` : "Free"}</b>${p.price ? "<span>/ month</span>" : "<span>forever</span>"}</div>
+      <div class="price"><b>${p.price ? `$${perMonth(p)}` : "Free"}</b>${p.price ? "<span>/ month</span>" : "<span>forever</span>"}
+        ${yearly(p) ? `<small class="billed">Billed $${p.price_yearly} a year · you save $${p.price * 12 - p.price_yearly}</small>` : ""}</div>
       <ul>${PLAN_FEATURES(p).map(([text, ok]) => `<li class="${ok ? "" : "no"}">${icon(ok ? "check" : "x", { size: 14 })}<span>${ok ? "" : `<span class="sr-only">Not included: </span>`}${esc(text)}</span></li>`).join("")}</ul>
       ${action(p)}
     </article>`).join("")}</div>
@@ -365,8 +390,8 @@ function paintLimit() {
   $("limit-form").onsubmit = async (e) => {
     e.preventDefault();
     $("limit-err").textContent = "";
-    try { me = (await send("/api/auth/run-limit", "PUT", { limit: $("limit-input").value })).user; paintLimit(); paintChips(); $("limit-saved").textContent = "Saved"; }
-    catch (err) { $("limit-err").textContent = err.message; }
+    await withBusy($("limit-go"), async () => { me = (await send("/api/auth/run-limit", "PUT", { limit: $("limit-input").value })).user; paintLimit(); paintChips(); $("limit-saved").textContent = "Saved"; },
+      { onError: (err) => { $("limit-err").textContent = err.message; $("limit-input").focus(); } });
   };
 }
 /* what a move between plans changes, in words */
@@ -379,41 +404,40 @@ document.addEventListener("click", async (e) => {
   const b = e.target.closest("#plan-box [data-plan]");
   if (b) {
     const from = planInfo.plans.find(p => p.id === me.plan), to = planInfo.plans.find(p => p.id === b.dataset.plan);
-    const up = RANK[to.id] > RANK[from.id], { gain, lose } = planChange(from, to);
+    const up = RANK[to.id] >= RANK[from.id], { gain, lose } = planChange(from, to);
     const used = planInfo.usage?.projects ?? 0;
     if (planInfo.payment === "paypal" && to.price && me.role !== "admin") {   // paid plans: a PayPal subscription
       const ok = await confirmDialog({
         title: `${up ? "Upgrade" : "Switch"} to ${to.name}?`, ok: "Continue to PayPal",
-        text: `${to.name} is $${to.price} a month, paid with PayPal. ${up ? `You get: ${gain.join(" · ") || "every feature of " + to.name}.` : `You lose: ${lose.join(" · ")}.`}`
+        text: `${billPeriod === "yearly" && to.price_yearly ? `${to.name} is $${to.price_yearly} a year ($${(to.price_yearly / 12).toFixed(2)} a month), paid with PayPal.` : `${to.name} is $${to.price} a month, paid with PayPal.`} ${up ? `You get: ${gain.join(" · ") || "every feature of " + to.name}.` : `You lose: ${lose.join(" · ")}.`}`
           + `${me.paid_online ? " Your current subscription is cancelled once the new one is active." : ""} The features change as soon as PayPal confirms.`,
       });
       if (!ok) return;
       const label = b.innerHTML;
       b.disabled = true; b.classList.add("busy"); b.innerHTML = `${icon("external", { size: 15 })}<span>Opening PayPal…</span>`;
-      try { location.href = (await send("/api/billing/paypal/subscribe", "POST", { plan: to.id })).approve; }
+      try { location.href = (await send("/api/billing/paypal/subscribe", "POST", { plan: to.id, period: billPeriod })).approve; }
       catch (err) { b.disabled = false; b.classList.remove("busy"); b.innerHTML = label; toast(err.message, "err"); }
       return;
     }
+    const yearlyAsk = billPeriod === "yearly" && !!to.price_yearly && me.role !== "admin";
     const ok = await confirmDialog(up ? {
       title: `Upgrade to ${to.name}?`, ok: "Send my request",
-      text: `${to.name} is $${to.price} a month. You get: ${gain.join(" · ") || "every feature of " + to.name}. An admin confirms the upgrade and how you pay, then the features turn on.`,
+      text: `${yearlyAsk ? `${to.name} is $${to.price_yearly} a year ($${(to.price_yearly / 12).toFixed(2)} a month).` : `${to.name} is $${to.price} a month.`} You get: ${gain.join(" · ") || "every feature of " + to.name}. An admin confirms the upgrade and how you pay, then the features turn on.`,
     } : {
       title: `Switch to ${to.name}?`, ok: `Switch to ${to.name}`, danger: true,
       text: `It applies at once. You lose: ${lose.join(" · ")}.${me.paid_online && !to.price ? " Your PayPal subscription is cancelled at once, so you won't be charged again." : ""}${to.projects != null && used > to.projects ? ` You keep your ${used} projects, but can't start a new one while you have ${to.projects} or more.` : ""}`,
     });
     if (!ok) return;
-    try {
-      me = (await send("/api/auth/plan", "POST", { plan: to.id })).user;
+    await withBusy(b, async () => {
+      me = (await send("/api/auth/plan", "POST", { plan: to.id, period: up && yearlyAsk ? "yearly" : "monthly" })).user;
       updateAccountButton(me);
       paintPlan();
       toast(up ? `Request sent: an admin will confirm your ${to.name} plan` : `You're on ${to.name} now`);
-    } catch (err) { toast(err.message, "err"); }
+    });
     return;
   }
-  if (e.target.closest("#plan-box [data-cancel-request]")) {
-    try { me = (await api("/api/auth/plan-request", { method: "DELETE" })).user; paintPlan(); toast("Request cancelled"); }
-    catch (err) { toast(err.message, "err"); }
-  }
+  const cancel = e.target.closest("#plan-box [data-cancel-request]");
+  if (cancel) await withBusy(cancel, async () => { me = (await api("/api/auth/plan-request", { method: "DELETE" })).user; paintPlan(); toast("Request cancelled"); });
 });
 
 async function load() {
@@ -507,9 +531,12 @@ async function load() {
         <header class="grp-head"><h2>Security</h2><p>Your password and where you're logged in.</p></header>
         <section class="sect" id="password-section">
           <h2>Password</h2>
-          <p>Changing it logs out your other devices, and we email you a notice. Forgot it? Log out and use “Forgot your password?”.</p>
+          ${me.has_password === false
+            ? `<p>You log in with Google or GitHub, so your account has no password yet. Set one to also log in with your email.</p>`
+            : `<p>Changing it logs out your other devices, and we email you a notice. Forgot it? Log out and use “Forgot your password?”.</p>`}
+          <div class="linked" id="linked" hidden></div>
           <form id="pw" novalidate>
-            ${password("current", "Current password", "current-password")}
+            ${me.has_password === false ? "" : password("current", "Current password", "current-password")}
             <div class="two">
               ${password("password", "New password", "new-password", "at least 8 characters")}
               ${password("password2", "Repeat new password", "new-password")}
@@ -603,6 +630,13 @@ async function load() {
     } catch (err) { $("details-err").textContent = err.message; refreshDetails(); }
   };
 
+  /* accounts linked with Google or GitHub (oauth.py) */
+  api("/api/auth/identities").then(list => {
+    if (!list.length || !$("linked")) return;
+    $("linked").innerHTML = list.map(i => `<span class="hchip ok">${icon("check", { size: 13 })}Linked with ${esc(i.name)}<span data-no-i18n>· ${esc(i.email)}</span></span>`).join(" ");
+    $("linked").hidden = false;
+  }).catch(() => {});
+
   /* password */
   const paintOthers = (n) => {
     $("others-text").textContent = n ? `You're also logged in on ${n} other device${n === 1 ? "" : "s"} or browser${n === 1 ? "" : "s"}.` : "You're not logged in anywhere else.";
@@ -615,27 +649,26 @@ async function load() {
     e.preventDefault();
     $("pw-err").textContent = "";
     const fail = (message, id) => { $("pw-err").textContent = message; $(id).focus(); };
-    if (!$("current").value) return fail("Enter your current password.", "current");
+    if ($("current") && !$("current").value) return fail("Enter your current password.", "current");
     if ($("password").value.length < MIN_PASSWORD) return fail("Use at least 8 characters for your new password.", "password");
     if ($("password").value !== $("password2").value) return fail("The two new passwords don't match.", "password2");
     $("pw-go").disabled = true;
     try {
-      await send("/api/auth/password", "POST", { current: $("current").value, password: $("password").value });
+      await send("/api/auth/password", "POST", { current: $("current")?.value || "", password: $("password").value });
+      if (me.has_password === false) { me.has_password = true; setTimeout(() => location.reload(), 900); }
       $("pw").reset();
       $("password-hint").classList.remove("met");
       paintOthers(0);
       $("pw-saved").textContent = "Password changed. Your other devices were logged out.";
-    } catch (err) { $("pw-err").textContent = err.message; }
+    } catch (err) { $("pw-err").textContent = err.message; if (err.status >= 400 && err.status < 500) ($("current") || $("password")).focus(); }
     $("pw-go").disabled = false;
   };
 
-  $("others-go").onclick = async () => {
-    try {
-      const { ended } = await send("/api/auth/sessions", "DELETE");
-      paintOthers(0);
-      toast(`Logged out ${ended} other device${ended === 1 ? "" : "s"}`);
-    } catch (err) { toast(err.message, "err"); }
-  };
+  $("others-go").onclick = () => withBusy($("others-go"), async () => {
+    const { ended } = await send("/api/auth/sessions", "DELETE");
+    paintOthers(0);
+    toast(`Logged out ${ended} other device${ended === 1 ? "" : "s"}`);
+  });
 
   /* delete */
   $("del-go").onclick = () => {
@@ -644,7 +677,7 @@ async function load() {
     d.innerHTML = `<h3>Delete your account?</h3>
       <p>It's deactivated now and deleted for good in ${DELETE_DAYS} days, with your agents, teams, projects and files. Log in before then to cancel.</p>
       <form id="del-form" novalidate>
-        ${password("del-password", "Enter your password to confirm", "current-password")}
+        ${me.has_password === false ? "" : password("del-password", "Enter your password to confirm", "current-password")}
         <p class="perr" id="del-err" role="alert"></p>
         <div class="row"><button class="btn btn-ghost" type="button" data-close>Keep my account</button>
           <button class="btn btn-danger" id="del-yes">Deactivate my account</button></div>
@@ -658,10 +691,10 @@ async function load() {
     d.querySelector("#del-form").onsubmit = async (e) => {
       e.preventDefault();
       $("del-err").textContent = "";
-      if (!$("del-password").value) { $("del-err").textContent = "Enter your password."; return $("del-password").focus(); }
+      if ($("del-password") && !$("del-password").value) { $("del-err").textContent = "Enter your password."; return $("del-password").focus(); }
       $("del-yes").disabled = true;
       try {
-        const r = await send("/api/auth/delete", "POST", { password: $("del-password").value });
+        const r = await send("/api/auth/delete", "POST", { password: $("del-password")?.value || "" });
         const day = new Date(r.delete_after * 1000).toLocaleDateString(getLocale(), { day: "numeric", month: "long", year: "numeric" });
         try { sessionStorage.setItem("atelier-toast", `Your account is deactivated. It will be deleted on ${day} unless you log in before then.`); } catch {}
         location.href = "/";
@@ -670,7 +703,7 @@ async function load() {
   };
 
 }
-load();
+load().catch(err => showError(app, err, () => location.reload(), "Something went wrong on this page"));   // a bug must not leave "Loading…" forever
 </script>
 </body>
 </html>

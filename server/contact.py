@@ -46,16 +46,16 @@ def clean(key: str, value: str) -> str:
         digits = re.sub(r"[\s().-]", "", value)
         digits = "+" + digits[2:] if digits.startswith("00") else digits
         if not re.fullmatch(r"\+?\d{8,15}", digits):
-            raise ValueError(f"“{value}” doesn't look like a phone number. Write it with digits, e.g. {FIELDS[key][1]}.")
+            raise ValueError(f"“{value[:60]}” doesn't look like a phone number. Write it with digits, e.g. {FIELDS[key][1]}.")
         return digits
     if key == "email":
         if not EMAIL_RE.match(value) or len(value) > 120:
-            raise ValueError(f"“{value}” doesn't look like an email address, e.g. {FIELDS[key][1]}.")
+            raise ValueError(f"“{value[:60]}” doesn't look like an email address, e.g. {FIELDS[key][1]}.")
         return value
     if key == "telegram":
         name = re.sub(r"^(https?://)?(t\.me/|telegram\.me/)|^@", "", value).strip("/")
         if not TELEGRAM_RE.match(name):
-            raise ValueError(f"“{value}” isn't a Telegram username: 5–32 letters, digits or _, starting with a letter.")
+            raise ValueError(f"“{value[:60]}” isn't a Telegram username: 5–32 letters, digits or _, starting with a letter.")
         return name
     raise ValueError("Unknown contact detail.")
 

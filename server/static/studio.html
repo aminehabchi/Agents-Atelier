@@ -208,6 +208,9 @@
   .attachments[hidden] { display: none; }
   .att { position: relative; width: 64px; height: 64px; border-radius: var(--r); overflow: hidden; background: var(--linen); box-shadow: var(--ring); }
   .att img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .att.failed { box-shadow: inset 0 0 0 2px var(--danger); }
+  .att.failed img { opacity: .45; }
+  .att .reup { top: auto; right: auto; bottom: 4px; left: 4px; background: var(--danger); }
   .att.loading::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--paper) 60%, transparent); animation: blink 1s infinite; }
   .att button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: var(--r); border: 0; background: rgba(22,15,12,.75); color: #fff;
     display: grid; place-items: center; padding: 0; }
@@ -490,6 +493,9 @@
 
   /* project */
   .pj { container-type: inline-size; }
+  .pj-details .pf-main, .pj-details .pf-more { display: grid; gap: 12px; }
+  .pj-details form { display: grid; gap: 14px; }
+  .pj-details .row { display: flex; justify-content: flex-end; gap: 8px; }
   .pj-stats { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .pj-stat { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; gap: 0 12px; align-items: center; text-align: start;
     padding: 14px 16px; border: 0; border-radius: var(--r-card); background: var(--paper); box-shadow: var(--ring); color: var(--ink); cursor: pointer; font: inherit; min-width: 0; }
@@ -823,6 +829,7 @@ function renderHeader() {
 let wsFails = 0, wasConnected = false, reconnectTimer, bannerTimer;
 function connect() {
   clearTimeout(reconnectTimer);
+  if (ws && ws.readyState <= 1) { ws.onclose = null; try { ws.close(); } catch {} }   // "Retry now" while a try is pending
   try { ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/${PID}`); }
   catch { reconnectTimer = setTimeout(connect, 3000); return; }
   ws.onopen = () => {
@@ -847,12 +854,19 @@ function connect() {
   };
 }
 function showConnBanner() {
-  if ($("connBanner") || ws?.readyState === 1) return;
+  if (ws?.readyState === 1) return;
+  const text = navigator.onLine === false
+    ? "You're offline. The studio reconnects when you're back online. Agents keep working on the server."
+    : "Lost the connection to the server. Reconnecting… Agents keep working on the server.";
+  if ($("connBanner")) { $("connBanner").querySelector("span:not(.spacer)").textContent = text; return; }
   $("messages").insertAdjacentHTML("beforebegin", `<div class="conn-banner" id="connBanner" role="status">${icon("alert", { size: 16 })}
-    <span>Lost the connection to the server. Reconnecting… Agents keep working on the server.</span><span class="spacer"></span>
+    <span>${esc(text)}</span><span class="spacer"></span>
     <button class="btn btn-ghost btn-sm" type="button" id="reconnectNow">Retry now</button></div>`);
   $("reconnectNow").onclick = () => { wsFails = 0; connect(); };
 }
+/* Back online: reconnect now instead of waiting for the next try. Offline: say so in the banner. */
+addEventListener("online", () => { if (PID && ws?.readyState !== 1 && ws?.readyState !== 0) { wsFails = 0; connect(); } });
+addEventListener("offline", () => { if ($("connBanner")) showConnBanner(); });
 /* After a reconnect: show what happened while we were away (events are numbered, duplicates are skipped). */
 async function resync() {
   try {
@@ -922,6 +936,7 @@ function handle(ev) {
       editDetails({ required: true, note: ev.text });
       break;
     case "user":
+      if (!replaying) pendingPrompt = null;   // the server took it
       closeAsks(ev.answers ? "Answered" : "You sent a new message instead");
       addMsg(`<div class="msg user">${(ev.images || []).length ? `<div class="imgs">${ev.images.map(i =>
         `<a href="${esc(mediaUrl(i))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(i))}" loading="lazy" decoding="async" alt="Reference image"></a>`).join("")}</div>` : ""}${
@@ -1019,17 +1034,28 @@ function handle(ev) {
       if (paused) addResumeCard(paused); else addSystem("Stopped");
       renderTeam();
       break;
-    case "error":
-      setBusy(false); run = null; markStopped();
+    case "error": {
+      // A numbered error is part of the run's story (it failed). One without a number answers only this tab
+      // (too many runs, a viewer can't run agents, agents already working…): whatever is running carries on.
+      const direct = ev.seq === undefined;
+      if (!direct) { setBusy(false); run = null; markStopped(); }
       document.querySelectorAll(".msg.orch.asking [aria-busy]").forEach(b => {   // the answer didn't go through: let them try again
         b.removeAttribute("aria-busy");
         b.closest(".ask").querySelectorAll("button").forEach(x => x.disabled = false);
       });
-      addMsg(`<div class="msg error">${icon("alert", { size: 16 })}<span>${esc(ev.text)}</span></div>`);
-      paused = ev.run?.resumable ? ev.run : paused;
-      if (ev.run?.resumable) addResumeCard(ev.run);
+      if (!replaying) restorePrompt();          // a refused prompt goes back in the box, with its images
+      if (ev.viewer && !replaying) {           // the owner made this person a viewer while the studio was open
+        canEdit = false; myRole = "viewer"; document.body.classList.add("viewer"); updateSend();
+      }
+      const ic = ev.rate_limited ? "clock" : ev.viewer ? "eye" : "alert";
+      addMsg(`<div class="msg error" ${replaying ? "" : 'role="alert"'}>${icon(ic, { size: 16 })}<span>${esc(ev.text)}</span></div>`);
+      if (!direct) {
+        paused = ev.run?.resumable ? ev.run : paused;
+        if (ev.run?.resumable) addResumeCard(ev.run);
+      }
       renderTeam();
       break;
+    }
     case "browser_check_start": break;
     case "browser_check": {
       const shots = (ev.screenshots || []).map(f => `<a href="${mediaUrl(f)}" target="_blank" rel="noopener"><img loading="lazy" src="${mediaUrl(f)}?v=${Date.now()}" alt="${esc(f.includes("phone") ? "Phone screenshot" : "Desktop screenshot")}"></a>`).join("");
@@ -1399,11 +1425,21 @@ $("composer").onsubmit = async (e) => {
   if (ws?.readyState !== 1) return toast("Not connected to the server. Reconnecting…", "err");
   if (!selected.size) return toast("Switch on at least one agent first", "err");
   if (attachments.some(x => x.loading)) return toast("Images are still uploading…");
+  if (attachments.some(x => x.failed)) return toast("An image didn't upload. Try it again or remove it", "err");
   lastPrompt = text;
   if (!wsSend({ type: "prompt", text, agents: [...selected], images: attachments.map(x => x.path) })) return;
+  pendingPrompt = { text, attachments };
   $("input").value = ""; autosize();
   attachments = []; renderAttachments();
 };
+/* A prompt the server refused (or that never reached it) comes back, so nothing typed is lost. */
+let pendingPrompt = null;
+function restorePrompt() {
+  if (!pendingPrompt) return;
+  if (!$("input").value.trim()) { $("input").value = pendingPrompt.text; autosize(); }
+  if (!attachments.length) { attachments = pendingPrompt.attachments; renderAttachments(); }
+  pendingPrompt = null;
+}
 $("input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); }
 });
@@ -1412,19 +1448,52 @@ $("input").addEventListener("input", autosize);
 
 // name + description (both required) & copy id
 const needsDetails = () => !project.description || project.name === "Untitled project";
-async function editDetails({ required = false, note = "" } = {}) {
-  const details = await projectDialog({
-    title: required ? "Name this project" : "Project details", ok: required ? "Save and continue" : "Save",
+/* ---------- project details (name, description, pages, brief): a form in the Project tab ----------
+   Opening them (the title, the description, the command palette, or a run that needs them) shows that tab and focuses
+   the form. The form is kept while someone types in it, even when the tab re-renders after an agent. */
+let detailsHost = null, detailsDirty = false, detailsNote = "";
+function detailsForm() {
+  if (detailsHost && detailsDirty) return detailsHost;
+  const host = document.createElement("div");
+  host.className = "pj-details";
+  const form = fillProjectForm(host, {
+    heading: false, ok: "Save details", cancellable: false,
     name: project.name === "Untitled project" ? "" : project.name, description: project.description || "",
     pages: (project.pages || [{ title: "Home" }]).map(p => p.title), brief: project.brief || {},
-    note: note || (required ? "This project is missing its name or description. The agents read both, so be specific." : ""),
-    cancellable: !required,
+  }, async (details, e) => {
+    e.preventDefault();
+    const go = host.querySelector('button[value="ok"]');
+    if (!canEdit || go?.disabled) return;
+    go.disabled = true; go.setAttribute("aria-busy", "true");
+    host.querySelector(".form-err")?.remove();
+    try {
+      project = { ...project, ...(await api(`/api/projects/${PID}`, { method: "PATCH", body: JSON.stringify(details) })) };
+      detailsDirty = false; detailsNote = "";
+      renderHeader(); renderPages(); toast("Project details saved");
+      if (tabOn("project")) renderProject();
+    } catch (err) {
+      go.disabled = false; go.removeAttribute("aria-busy");
+      const box = document.createElement("p");
+      box.className = "form-err"; box.setAttribute("role", "alert");
+      box.textContent = `Not saved: ${err.message}`;
+      go.closest(".row")?.before(box);
+      go.focus();
+    }
   });
-  if (!details) return;
-  try {
-    project = { ...project, ...(await api(`/api/projects/${PID}`, { method: "PATCH", body: JSON.stringify(details) })) };
-    renderHeader(); renderPages(); toast("Project details saved");
-  } catch (err) { toast(err.message, "err"); }
+  host.addEventListener("input", () => { detailsDirty = true; });
+  if (!canEdit) host.querySelectorAll("input, textarea, select, button").forEach(x => { x.disabled = true; });
+  detailsHost = host; host._form = form;
+  return host;
+}
+async function editDetails({ required = false, note = "" } = {}) {
+  if (required) detailsNote = note || "This project is missing its name or description. The agents read both, so be specific.";
+  if (onPhone()) showM("site");
+  if (!tabOn("project")) showTab("project");
+  await renderProject();
+  const card = $("briefCard");
+  card?.scrollIntoView({ behavior: "smooth", block: "start" });
+  card?.classList.add("flash-card"); setTimeout(() => card?.classList.remove("flash-card"), 1200);
+  detailsHost?._form?.focus();
 }
 $("pname").addEventListener("click", () => editDetails());
 $("pname").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); editDetails(); } });
@@ -1820,12 +1889,11 @@ async function renderProject() {
       <dt>Fonts</dt><dd>${fonts.length ? fonts.map((f, i) => `<span class="pj-font" style="font-family:${esc(JSON.stringify(f))}, sans-serif" data-no-i18n><b>Aa</b>${esc(f)}</span>`).join("") : `<span class="muted">Chosen by the team</span>`}</dd>
       <dt>Logo</dt><dd>${logo ? `<img class="pj-logo" src="/work/${PID}/${logo.path.split("/").map(encodeURIComponent).join("/")}" alt="Logo">` : `<span class="muted">No logo</span>`}</dd>
     </dl></section>`;
-  const brief = Object.entries(project.brief || {}).filter(([, v]) => v);
-  const briefCard = `<section class="pcard2" id="briefCard"><header><span class="tile">${icon("clipboard", { size: 18 })}</span><h3>Brief</h3>
-      <span class="acts"><button class="btn btn-ghost btn-sm" type="button" data-edit-details>${icon("pencil", { size: 14 })}Edit</button></span></header>
+  const briefCard = `<section class="pcard2" id="briefCard"><header><span class="tile">${icon("clipboard", { size: 18 })}</span><h3>Project details</h3></header>
+    <p class="lead">The name, description, pages and brief every agent reads with each request.${canEdit ? " Changes apply from the next request." : ""}</p>
+    ${detailsNote ? `<p class="form-err start" role="alert">${esc(detailsNote)}</p>` : ""}
     <div class="pj-pages">${(project.pages || []).map(p => `<button type="button" class="pj-page" data-show-page="${esc(p.file)}" title="Preview this page">${icon("file", { size: 14 })}<span data-no-i18n>${esc(p.title)}</span><code data-no-i18n>${esc(p.file)}</code></button>`).join("")}</div>
-    ${brief.length ? `<dl class="pj-brief">${brief.map(([k, v]) => `<dt>${esc(BRIEF_LABELS[k] || k)}</dt><dd data-no-i18n>${esc(v)}</dd>`).join("")}</dl>`
-      : `<div class="pj-empty">${icon("clipboard", { size: 18 })}<p>No brief yet. Answer a few questions so every agent knows the audience, the goal and the tone.</p></div>`}</section>`;
+    <div id="detailsSlot"></div></section>`;
   const stat = (target, ic, value, label, ok) => `<button type="button" class="pj-stat ${ok ? "ok" : ""}" data-jump="${target}">
       <span class="pi">${icon(ic, { size: 16 })}</span><b>${value}</b><span>${label}</span></button>`;
   const pages = (project.pages || []).length || 1;
@@ -1838,9 +1906,10 @@ async function renderProject() {
       ${stat("qrCard", "grid", qrFiles.length, qrFiles.length === 1 ? "QR code" : "QR codes", qrFiles.length)}
     </div>
     <div class="pj-cols">
-      <div class="pj-col">${contactCard}${briefCard}</div>
+      <div class="pj-col">${briefCard}${contactCard}</div>
       <div class="pj-col">${brandCard}${imagesCard}${qrCard}</div>
     </div></div>`;
+  $("detailsSlot")?.replaceWith(detailsForm());
 }
 $("proj").addEventListener("click", async (e) => {
   if (e.target.closest("[data-save-contact]")) {
@@ -1871,7 +1940,7 @@ $("proj").addEventListener("click", async (e) => {
   if (jump) { const c = $(jump.dataset.jump); c?.scrollIntoView({ behavior: "smooth", block: "start" }); c?.classList.add("flash-card"); setTimeout(() => c?.classList.remove("flash-card"), 1200); return; }
   const pg = e.target.closest("[data-show-page]");
   if (pg) { const sel = $("pageSel"); if ([...sel.options].some(o => o.value === pg.dataset.showPage)) { sel.value = pg.dataset.showPage; sel.dispatchEvent(new Event("change")); } return showTab("preview"); }
-  if (e.target.closest("[data-edit-details]")) { await editDetails(); if (tabOn("project")) renderProject(); }
+  if (e.target.closest("[data-edit-details]")) await editDetails();
 });
 
 // ================================================================ research report
@@ -1929,7 +1998,7 @@ async function refreshResearch() {
   if (replaying || !box.classList.contains("on")) return;
   let res;
   try { res = await fetch(`/work/${PID}/research.md?t=${Date.now()}`, { cache: "no-store" }); }
-  catch { return showError(box, new Error("Can't reach the server. Check that it's running, then try again."), refreshResearch, "Couldn't load the report"); }
+  catch { return showError(box, new Error(navigator.onLine === false ? "You're offline. Check your connection, then try again." : "Can't reach the server. Check your connection, then try again in a moment."), refreshResearch, "Couldn't load the report"); }
   if (res.status === 404) {
     const on = selected.has("research");
     box.innerHTML = `<div class="placeholder"><div class="box"><div class="tile">${icon("search", { size: 24 })}</div>
@@ -1939,8 +2008,9 @@ async function refreshResearch() {
         : "Add an agent with web research to get a report here."}</div></div>`;
     return;
   }
-  if (!res.ok) return showError(box, new Error(`The server answered ${res.status}.`), refreshResearch, "Couldn't load the report");
-  const md = await res.text();
+  if (!res.ok) return showError(box, new Error(res.status >= 500 ? "The server had a problem. Try again in a moment." : `Request failed (${res.status}).`), refreshResearch, "Couldn't load the report");
+  let md;
+  try { md = await res.text(); } catch { return showError(box, new Error("The connection dropped while loading. Try again."), refreshResearch, "Couldn't load the report"); }
   const sources = (md.match(/^\s*(?:\d+[.)]\s+)?\[\d{1,3}\]/gm) || []).length;
   box.innerHTML = `<div class="bar">${icon("search", { size: 14 })}<span>research.md${sources ? ` · ${sources} source${sources === 1 ? "" : "s"}` : ""} · links open in a new tab</span></div>
     <article class="doc">${renderMarkdown(md)}</article>`;
@@ -1956,7 +2026,12 @@ let fileCache = [];
 async function refreshCode(force = false) {
   if (replaying || !$("code").classList.contains("on")) return;
   try { fileCache = await api(`/api/projects/${PID}/files`); }
-  catch (err) { $("files").innerHTML = `<div class="msg error" style="margin:4px">${esc(err.message)}</div>`; return; }
+  catch (err) {
+    $("files").innerHTML = `<div class="msg error" role="alert" style="margin:4px;flex-wrap:wrap">${icon("alert", { size: 16 })}<span>${esc(err.message)}</span>
+      <button class="btn btn-ghost btn-sm" type="button" data-files-retry>${icon("refresh", { size: 13 })}Try again</button></div>`;
+    $("files").querySelector("[data-files-retry]").onclick = (e) => { e.stopPropagation(); withBusy(e.currentTarget, () => refreshCode(force)); };
+    return;
+  }
   if (fileCache.length && !fileCache.some(f => f.path === currentFile)) { currentFile = fileCache[0].path; saveState(); }
   const total = fileCache.reduce((n, f) => n + f.size, 0);
   $("files").innerHTML = fileCache.map(f =>
@@ -2014,19 +2089,24 @@ async function saveFile() {
   const bytes = new Blob([content]).size;
   if (bytes > 500 * 1024) { editor.saving = false; return updateEditorState(`Too large to save here (${fmtSize(bytes)}, limit 500 KB)`, true); }
   updateEditorState("Saving…");
+  let failed = false;
   try {
     await api(`/api/projects/${PID}/files`, { method: "PUT", body: JSON.stringify({ path, content }) });
     if (editor.path === path) { editor.saved = content; editor.dirty = $("source").value !== content; }
     const cached = fileCache.find(f => f.path === path); if (cached) cached.content = content;
+    editor.fails = 0;
     updateEditorState(editor.dirty ? undefined : "Saved");
     reloadPreview();
   } catch (err) {
-    updateEditorState(err.message, true);
+    failed = true; editor.fails = (editor.fails || 0) + 1;
+    updateEditorState(`Not saved: ${err.message}`, true);     // the edits stay in the editor
   } finally {
     editor.saving = false;
-    if (editor.dirty && autosaveOn) scheduleSave();
+    // autosave tries again, more slowly after each failure (offline, server down…), never in a tight loop
+    if (editor.dirty && autosaveOn) { clearTimeout(editor.timer); editor.timer = setTimeout(saveFile, failed ? Math.min(30000, 2500 * 2 ** editor.fails) : 800); }
   }
 }
+addEventListener("online", () => { if (editor.dirty && editor.fails) { editor.fails = 0; saveFile(); } });
 function scheduleSave() { clearTimeout(editor.timer); editor.timer = setTimeout(saveFile, 800); }
 async function flushEdits() {
   if (!editor.dirty) return true;
@@ -2074,25 +2154,41 @@ window.addEventListener("beforeunload", (e) => { if (editor.dirty) { e.preventDe
 let attachments = [];   // { preview, path, url, loading }
 function renderAttachments() {
   $("attachments").hidden = !attachments.length;
-  $("attachments").innerHTML = attachments.map((a, i) => `<div class="att ${a.loading ? "loading" : ""}" title="${a.loading ? "Uploading…" : esc(a.path)}">
-    <img src="${a.preview}" alt="Attached image"><button type="button" data-rm="${i}" aria-label="Remove image">${icon("x", { size: 12, stroke: 2 })}</button></div>`).join("");
+  $("attachments").innerHTML = attachments.map((a, i) => `<div class="att ${a.loading ? "loading" : ""} ${a.failed ? "failed" : ""}"
+    title="${a.loading ? "Uploading…" : a.failed ? esc(`${a.name}: ${a.error}`) : esc(a.path)}">
+    <img src="${a.preview}" alt="${a.failed ? "Image not uploaded" : "Attached image"}"><button type="button" data-rm="${i}" aria-label="Remove image">${icon("x", { size: 12, stroke: 2 })}</button>
+    ${a.failed ? `<button type="button" class="reup" data-reup="${i}" aria-label="Upload this image again" title="Upload again">${icon("refresh", { size: 12, stroke: 2 })}</button>` : ""}</div>`).join("");
+}
+/* Upload one attached image. A failed one stays in the tray, marked, with a button to try again. */
+async function uploadAttachment(item) {
+  Object.assign(item, { loading: true, failed: false, error: "" });
+  renderAttachments();
+  try { Object.assign(item, await api(`/api/projects/${PID}/uploads`, { method: "POST", timeout: 90000, body: JSON.stringify({ name: item.name, data: item.preview }) }), { loading: false }); }
+  catch (err) {
+    Object.assign(item, { loading: false, failed: true, error: err.message });
+    if (attachments.includes(item)) toast(`${item.name} wasn't uploaded: ${err.message}`, "err");
+  }
+  renderAttachments();
 }
 async function addImages(files) {
   for (const file of [...files]) {
     if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) { toast(`${file.name}: use PNG, JPG, WebP or GIF`, "err"); continue; }
     if (file.size > 5e6) { toast(`${file.name} is over 5 MB`, "err"); continue; }
     if (attachments.length >= 6) { toast("Up to 6 images per prompt", "err"); break; }
-    const data = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(file); });
-    const item = { preview: data, loading: true };
-    attachments.push(item); renderAttachments();
-    try { Object.assign(item, await api(`/api/projects/${PID}/uploads`, { method: "POST", body: JSON.stringify({ name: file.name, data }) }), { loading: false }); }
-    catch (err) { attachments = attachments.filter(x => x !== item); toast(err.message, "err"); }
-    renderAttachments();
+    let data;
+    try { data = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = () => no(new Error(`Couldn't read ${file.name}.`)); fr.readAsDataURL(file); }); }
+    catch (err) { toast(err.message, "err"); continue; }
+    const item = { preview: data, name: file.name, loading: true };
+    attachments.push(item);
+    await uploadAttachment(item);
   }
 }
 $("attach").onclick = () => $("fileInput").click();
 $("fileInput").onchange = () => { addImages($("fileInput").files); $("fileInput").value = ""; };
-$("attachments").onclick = (e) => { const b = e.target.closest("[data-rm]"); if (b) { attachments.splice(+b.dataset.rm, 1); renderAttachments(); } };
+$("attachments").onclick = (e) => {
+  const b = e.target.closest("[data-rm]"); if (b) { attachments.splice(+b.dataset.rm, 1); renderAttachments(); return; }
+  const r = e.target.closest("[data-reup]"); if (r && attachments[+r.dataset.reup]) uploadAttachment(attachments[+r.dataset.reup]);
+};
 $("input").addEventListener("paste", (e) => {
   const imgs = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith("image/"));
   if (imgs.length) { e.preventDefault(); addImages(imgs); }
@@ -2172,8 +2268,8 @@ document.addEventListener("click", async (e) => {
     if (!await flushEdits()) return;
     const label = await promptDialog({ title: "Save a version", label: "Label", placeholder: "e.g. Before trying a dark theme", ok: "Save version", optional: true, max: 80 });
     if (label === null) return;
-    try { const v = await api(`/api/projects/${PID}/versions`, { method: "POST", body: JSON.stringify({ label }) }); toast(`Saved as v${v.n}`); loadVersions(); }
-    catch (err) { toast(err.message, "err"); }
+    await withBusy($("saveVersion"), async () => { const v = await api(`/api/projects/${PID}/versions`, { method: "POST", body: JSON.stringify({ label }) }); toast(`Saved as v${v.n}`); loadVersions(); },
+      { onError: (err) => toast(`The version wasn't saved: ${err.message}`, "err") });
   }
   if (restore) {
     const n = +restore.dataset.vrestore;
@@ -2181,16 +2277,16 @@ document.addEventListener("click", async (e) => {
     if (!await confirmDialog({ title: `Restore version ${n}?`, ok: "Restore",
       text: "The project's code goes back to this version. The current code is saved as a new version first, so nothing is lost." })) return;
     if (!await flushEdits()) return;
-    try { await api(`/api/projects/${PID}/versions/${n}/restore`, { method: "POST" }); }
-    catch (err) { toast(err.message, "err"); }
+    await withBusy(restore, () => api(`/api/projects/${PID}/versions/${n}/restore`, { method: "POST" }),
+      { onError: (err) => toast(`v${n} wasn't restored: ${err.message}`, "err") });
   }
 });
 
 /* ---------- this project's brand kit: saved as you change it; agents follow it from the next request ---------- */
 async function openBrand() {
   let kit, sources;
-  try { [kit, sources] = await Promise.all([api(`/api/projects/${PID}/brand`), api("/api/brand/sources")]); }
-  catch (err) { return toast(err.message, "err"); }
+  try { [kit, sources] = await Promise.all([api(`/api/projects/${PID}/brand`), api("/api/brand/sources").catch(() => [])]); }
+  catch (err) { return toast(`Couldn't open the brand kit: ${err.message}`, "err"); }
   const d = document.createElement("dialog");
   d.className = "modal project-modal brand-modal";
   d.innerHTML = `<form method="dialog"><h3>Brand kit</h3>
@@ -2249,7 +2345,11 @@ async function loadShare() {
       api(`/api/projects/${PID}/comments`), api(`/api/projects/${PID}/people`),
       canEdit ? api(`/api/projects/${PID}/share`) : Promise.resolve(null)]);
     shareData = { comments, people, links };
-  } catch (err) { return showError(box, err, loadShare, "Couldn't load the sharing settings"); }
+  } catch (err) {
+    // a refresh (a new comment arrived, an action finished) that fails keeps what's on screen
+    if (shareData && box.querySelector(".pj")) return toast(`Couldn't refresh the Share tab: ${err.message}`, "err");
+    return showError(box, err, loadShare, "Couldn't load the sharing settings");
+  }
   setShareBadge(shareData.comments);
   renderShare();
 }
@@ -2319,9 +2419,17 @@ function renderShare() {
       : `<div class="pj-empty">${icon("chat", { size: 18 })}<p>${shareFilter === "open" ? "No open comments. People you share a link with can click any spot of the page to leave one." : "No resolved comments yet."}</p></div>`}
   </section>`;
 
+  // a live refresh must not wipe what's being typed in the link or invitation form
+  const kept = [...$("sharePane").querySelectorAll("#shNew [name], #shInvite [name]")].map(el => ({ form: el.form.id, name: el.name,
+    value: el.type === "checkbox" ? el.checked : el.value, focused: el === document.activeElement }));
   $("sharePane").innerHTML = `<div class="pane-in pj">
     <div class="pane-head"><h2>Share</h2><span class="meta">Show the site to people without an account, collect their comments, and choose who works on it</span></div>
     <div class="pj-cols"><div class="pj-col">${commentsCard}</div><div class="pj-col">${linksCard}${peopleCard}</div></div></div>`;
+  for (const k of kept) {
+    const el = $(k.form)?.elements[k.name]; if (!el) continue;
+    if (el.type === "checkbox") el.checked = k.value; else el.value = k.value;
+    if (k.focused) el.focus();
+  }
 }
 $("sharePane").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -2336,17 +2444,23 @@ $("sharePane").addEventListener("submit", async (e) => {
       const r = await api(`/api/projects/${PID}/people`, { method: "POST", body: JSON.stringify({ email: f.email.value.trim(), role: f.role.value }) });
       toast(r.joined ? `${r.email} can open this project now` : `Invitation sent to ${r.email}: they join when they create their account`);
     }
+    f.reset();
     await loadShare();
-  } catch (err) { btn.disabled = false; toast(err.message, "err"); }
+  } catch (err) {
+    btn.disabled = false; toast(err.message, "err");
+    if (f.id === "shInvite" && err.status >= 400 && err.status < 500 && err.status !== 429) { f.email.setAttribute("aria-invalid", "true"); f.email.focus(); }
+  }
 });
+$("sharePane").addEventListener("input", (e) => e.target.removeAttribute?.("aria-invalid"));
 $("sharePane").addEventListener("change", async (e) => {
   const sel = e.target.closest("[data-role]"); if (!sel) return;
-  try { await api(`/api/projects/${PID}/people/${sel.dataset.role}`, { method: "PATCH", body: JSON.stringify({ role: sel.value }) }); toast("Role changed"); }
-  catch (err) { toast(err.message, "err"); loadShare(); }
+  await withBusy(sel, async () => { await api(`/api/projects/${PID}/people/${sel.dataset.role}`, { method: "PATCH", body: JSON.stringify({ role: sel.value }) }); toast("Role changed"); },
+    { onError: (err) => { toast(err.message, "err"); loadShare(); } });
 });
 $("sharePane").addEventListener("click", async (e) => {
   const t = (sel) => e.target.closest(sel);
-  const call = async (path, opts, done) => { try { await api(path, opts); if (done) toast(done); await loadShare(); } catch (err) { toast(err.message, "err"); } };
+  const btn = e.target.closest("button");
+  const call = (path, opts, done) => withBusy(btn, async () => { await api(path, opts); if (done) toast(done); await loadShare(); });
   if (t("[data-cfilter]")) { shareFilter = t("[data-cfilter]").dataset.cfilter; return renderShare(); }
   if (t("[data-copy-link]")) {
     const url = `${location.origin}/s/${t("[data-copy-link]").dataset.copyLink}`;
@@ -2381,8 +2495,7 @@ $("sharePane").addEventListener("click", async (e) => {
   if (t("[data-cancel-invite]")) return call(`/api/projects/${PID}/invites?email=${encodeURIComponent(t("[data-cancel-invite]").dataset.cancelInvite)}`, { method: "DELETE" }, "Invitation cancelled");
   if (t("[data-leave]")) {
     if (!await confirmDialog({ title: "Leave this project?", text: "You won't see it any more unless its owner invites you again.", ok: "Leave", danger: true })) return;
-    try { await api(`/api/projects/${PID}/membership`, { method: "DELETE" }); location.replace("/projects"); }
-    catch (err) { toast(err.message, "err"); }
+    await withBusy(btn, async () => { await api(`/api/projects/${PID}/membership`, { method: "DELETE" }); location.replace("/projects"); });
   }
 });
 
@@ -2444,7 +2557,7 @@ async function saveAsTeam() {
     text: `${selected.size} agents: ${AGENTS.filter(a => selected.has(a.id)).map(a => a.name).join(", ")}. It appears in My teams, ready for your other projects.` });
   if (!name) return;
   try { await api("/api/presets", { method: "POST", body: JSON.stringify({ name, agents: [...selected], scope: "mine" }) }); await loadPresets(); renderTeamHead(); toast(`Team “${name}” saved`); }
-  catch (err) { toast(err.message, "err"); }
+  catch (err) { toast(`Team “${name}” wasn't saved: ${err.message}`, "err"); }
 }
 
 // ================================================================ command palette: studio actions
@@ -2475,7 +2588,7 @@ registerCommands([
 registerCommands(() => [...new Set([...(project?.pages || []).map(p => p.file), ...builtPages])].map(f => ({
   group: "Pages", icon: "file", title: `Preview ${f}`, run: () => { currentPage = f; renderPages(); reloadPreview(); } })));
 
-boot();
+boot().catch(err => fatal(err));   // a bug must not leave a half-open studio
 </script>
 </body>
 </html>

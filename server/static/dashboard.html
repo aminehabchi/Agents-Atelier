@@ -293,15 +293,27 @@ function newsCard(me, builtProject) {
   </section>`;
 }
 
+/* One panel that couldn't load: its own message and Try again, the rest of the dashboard stays. */
+const panelError = (err, what) => `<div class="panel-err" role="alert">${icon("alert", { size: 15 })}
+  <span><b>${esc(what)}</b> ${esc(err.message)}</span>
+  <button type="button" class="btn btn-ghost btn-sm" data-reload>${icon("refresh", { size: 13 })}Try again</button></div>`;
+const soft = (p) => Promise.resolve(p).then(v => v, err => ({ failed: err }));
+const failed = (x) => x?.failed || null;
+
 async function load() {
   let me, projects, shared = null, stats, agents, teams, users = null, planInfo;
   try {
-    me = (await api("/api/auth/me")).user;
-    [projects, shared, stats, agents, teams, users, planInfo] = await Promise.all([
-      api("/api/projects?page=1&per_page=5&mine=true"), api("/api/projects?page=1&per_page=3&status=shared").catch(() => null),
-      api("/api/stats?mine=true"), api("/api/agents"), api("/api/presets"),
-      me?.role === "admin" ? api("/api/users") : null, api("/api/plans")]);
+    // the projects are the heart of this page; the other panels can fail on their own
+    [me, projects, shared, stats, agents, teams, users, planInfo] = await Promise.all([
+      api("/api/auth/me").then(d => d.user), api("/api/projects?page=1&per_page=5&mine=true"),
+      api("/api/projects?page=1&per_page=3&status=shared").catch(() => null),
+      soft(api("/api/stats?mine=true")), soft(api("/api/agents")), soft(api("/api/presets")),
+      getMe().then(u => u?.role === "admin" ? soft(api("/api/users")) : null), soft(api("/api/plans"))]);
+    if (!me) { location.href = `/login?next=${encodeURIComponent(location.pathname)}`; return; }
   } catch (err) { return showError(app, err, load, "Couldn't load your dashboard"); }
+  const statsErr = failed(stats), agentsErr = failed(agents) || failed(teams), usersErr = failed(users), planErr = failed(planInfo);
+  if (statsErr) stats = { totals: { runs: 0, failed: 0, cost: 0, seconds: 0 }, agents: [], run_times: [] };
+  if (planErr) planInfo = null;
   const { totals } = stats, counts = projects.counts;
   const sharedItems = shared?.items || [], sharedCount = shared?.counts?.shared || 0;
   document.getElementById("topNew").hidden = !counts.all;           // one "new project" button per screen: the empty state has its own
@@ -309,7 +321,8 @@ async function load() {
   const first = (me.name || "").split(" ")[0];
   const waiting = users ? users.filter(u => u.role === "unconfirmed").length : 0;
   const asks = users ? users.filter(u => u.plan_request).length : 0;
-  const byKey = planInfo.keys === "user", plan = planInfo.plans.find(p => p.id === me.plan);
+  const byKey = planInfo?.keys === "user", plan = planInfo?.plans.find(p => p.id === me.plan);
+  const dash = `<span aria-label="Not available">–</span>`;
   const builtProject = projects.items.find(p => p.has_preview) || sharedItems.find(p => p.has_preview && p.role === "editor");
   // the first steps, until they're all done
   const steps = [
@@ -323,7 +336,7 @@ async function load() {
   document.title = "Dashboard · Agents Atelier";
   app.innerHTML = `
     <div class="head"><div class="head-main"><h1 class="page-title">${first ? `Welcome back, ${esc(first)}` : "Welcome back"}</h1><p class="head-lead">${lead}</p></div>
-      <div class="head-acts">${me.role === "admin" ? "" : `<a class="plan-chip" href="/profile#plan">${icon("sparkles", { size: 14 })}<span>${esc(plan?.name || "Starter")} plan</span>${me.plan !== "agency" ? `<b>Upgrade</b>` : ""}</a>`}
+      <div class="head-acts">${me.role === "admin" ? "" : `<a class="plan-chip" href="/profile#plan">${icon("sparkles", { size: 14 })}<span>${esc(plan?.name || ({ pro: "Pro", agency: "Agency" })[me.plan] || "Starter")} plan</span>${me.plan !== "agency" ? `<b>Upgrade</b>` : ""}</a>`}
         <a class="btn btn-ghost" href="/hire">${icon("users", { size: 16 })}Browse agents</a></div></div>
 
     ${next ? `<section class="start" aria-label="Get started">
@@ -334,11 +347,12 @@ async function load() {
         ${s === next ? `<a class="btn btn-dark btn-sm" href="${s.href}">${esc(s.cta)}${icon("arrow-right", { size: 14 })}</a>` : ""}</li>`).join("")}</ol>
     </section>` : ""}
 
+    ${statsErr ? panelError(statsErr, "Your numbers couldn't load.") : ""}
     <section class="tiles" aria-label="Your numbers">
       <a class="tile tile-link" href="/projects"><h2>Projects</h2><b>${counts.all}</b><small><span>${counts.working ? `${counts.working} building now` : `${counts.built} built`}</span>${sharedCount ? `<span aria-hidden="true"> · </span><span>${sharedCount} shared with you</span>` : ""}</small></a>
-      <div class="tile"><h2>Agent runs</h2><b>${totals.runs}</b><small>${totals.failed ? `${totals.failed} stopped or failed` : `${projects.prompts} ${projects.prompts === 1 ? "prompt" : "prompts"} sent`}</small></div>
-      <div class="tile"><h2>AI cost</h2><b>${money(totals.cost)}</b><small>${byKey ? "on your Claude account" : "API equivalent, not a bill"}</small></div>
-      <div class="tile"><h2>Agent time</h2><b data-no-i18n>${duration(totals.seconds)}</b><small>Total across all your runs</small></div>
+      <div class="tile"><h2>Agent runs</h2><b>${statsErr ? dash : totals.runs}</b><small>${totals.failed ? `${totals.failed} stopped or failed` : `${projects.prompts} ${projects.prompts === 1 ? "prompt" : "prompts"} sent`}</small></div>
+      <div class="tile"><h2>AI cost</h2><b>${statsErr ? dash : money(totals.cost)}</b><small>${byKey ? "on your Claude account" : "API equivalent, not a bill"}</small></div>
+      <div class="tile"><h2>Agent time</h2><b data-no-i18n>${statsErr ? dash : duration(totals.seconds)}</b><small>Total across all your runs</small></div>
     </section>
 
     <div class="main-grid">
@@ -352,34 +366,36 @@ async function load() {
             <div class="acts"><button class="btn btn-dark" data-new>${icon("plus", { size: 16 })}Create your first project</button>
               <a class="btn btn-ghost" href="/hire">${icon("layers", { size: 16 })}See ready teams</a></div></div>`}
       </section>
-      <section class="panel o-5"><div class="panel-head"><h2>Agent runs, last 14 days</h2></div>${runsChart(stats.run_times || [])}</section>
+      <section class="panel o-5"><div class="panel-head"><h2>Agent runs, last 14 days</h2></div>${statsErr ? panelError(statsErr, "The chart couldn't load.") : runsChart(stats.run_times || [])}</section>
       </div>
       <div class="col side">
         <div id="commentsSlot" class="o-2"></div>
         ${sharedItems.length ? `<section class="panel o-3">
           <div class="panel-head"><h2>Shared with me</h2>${sharedCount > sharedItems.length ? `<a href="/projects?status=shared">See all <span data-no-i18n>${sharedCount}</span></a>` : ""}</div>
           <div class="rows">${sharedItems.map(projectRow).join("")}</div></section>` : ""}
-        <section class="panel o-4">
+        ${document.documentElement.dataset.ownAgents === "no" ? "" : `<section class="panel o-4">
           <div class="panel-head"><h2>Your agents and teams</h2></div>
+          ${agentsErr ? panelError(agentsErr, "Your agents couldn't load.") : `
           <a class="count-row" href="/agents?show=mine"><span>Your agents</span><b>${own(agents)}</b></a>
           <a class="count-row" href="/teams?show=mine"><span>Your teams</span><b>${own(teams)}</b></a>
-          <a class="count-row" href="/agents?show=shared"><span>Shared agents</span><b>${agents.length - own(agents)}</b></a>
-        </section>
-        ${users ? `<section class="panel o-4"><div class="panel-head"><h2>Accounts</h2></div>
+          <a class="count-row" href="/agents?show=shared"><span>Shared agents</span><b>${agents.length - own(agents)}</b></a>`}
+        </section>`}
+        ${usersErr ? `<section class="panel o-4"><div class="panel-head"><h2>Accounts</h2></div>${panelError(usersErr, "The accounts couldn't load.")}</section>` : users ? `<section class="panel o-4"><div class="panel-head"><h2>Accounts</h2></div>
           <a class="count-row" href="/users"><span>Users</span><b>${users.length}</b></a>
           <a class="count-row" href="/users"><span>Not confirmed</span><b>${waiting}</b></a>
           <a class="count-row ${asks ? "hot" : ""}" href="/users"><span>Plan requests waiting</span><b>${asks}</b></a></section>` : ""}
-        <section class="panel o-6"><div class="panel-head"><h2>Time per agent</h2></div>${timeChart(stats.agents)}</section>
+        <section class="panel o-6"><div class="panel-head"><h2>Time per agent</h2></div>${statsErr ? panelError(statsErr, "The chart couldn't load.") : timeChart(stats.agents)}</section>
       </div>
     </div>
 `;
+  app.querySelectorAll("[data-reload]").forEach(b => b.addEventListener("click", () => withBusy(b, load)));
   document.getElementById("newsClose")?.addEventListener("click", () => {
     try { localStorage.setItem(NEWS_KEY, "1"); } catch {}
     document.getElementById("news")?.remove();
   });
   loadComments([...projects.items, ...sharedItems]).catch(() => {});
 }
-load();
+load().catch(err => showError(app, err, () => location.reload(), "Something went wrong on this page"));   // a bug must not leave "Loading…" forever
 </script>
 </body>
 </html>

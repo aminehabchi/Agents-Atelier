@@ -139,13 +139,28 @@ class Store:
         self.queue.put_nowait(job)
 
     async def _writer(self):
+        """Run the queued jobs in order, for ever. A job that fails because Postgres is down or restarting is tried again
+        (for about a minute, keeping the order); any other failure is logged and the next job runs."""
+        import db
         while True:
             job = await self.queue.get()
             try:
-                async with self.pool.acquire() as con:
-                    await job(con)
+                for wait in (1, 2, 4, 8, 15, 30, None):
+                    try:
+                        async with self.pool.acquire() as con:
+                            await job(con)
+                        break
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as e:
+                        if wait is None or not db.unavailable(e):
+                            raise
+                        log.warning("The database isn't reachable (%s); saving again in %d s", e.__class__.__name__, wait)
+                        await asyncio.sleep(wait)
+            except asyncio.CancelledError:
+                raise
             except Exception:
-                log.exception("Couldn't save to the database")
+                log.exception("Couldn't save to the database (%s)", getattr(job, "__qualname__", "a change"))
             finally:
                 self.queue.task_done()
 

@@ -145,6 +145,13 @@ TRUST_PROXY = _yes("TRUST_PROXY", False)          # behind a reverse proxy: read
 SIGNUPS_PER_HOUR = _int("SIGNUPS_PER_HOUR", 5, low=0)          # new accounts per IP per hour (0 = no limit)
 LOGINS_PER_15_MIN = _int("LOGINS_PER_15_MIN", 30, low=0)       # login attempts per IP per 15 minutes
 RESETS_PER_HOUR = _int("RESETS_PER_HOUR", 10, low=0)           # password reset requests per IP per hour
+# ---- Rate limits on the rest of the app (0 = no limit). Counted per member, or per address when logged out.
+API_REQUESTS_PER_MINUTE = _int("API_REQUESTS_PER_MINUTE", 300, low=0)   # any /api/ call
+RUNS_PER_HOUR = _int("RUNS_PER_HOUR", 60, low=0)                 # prompts, Continue, Start again and retries that start agents
+INVITES_PER_HOUR = _int("INVITES_PER_HOUR", 30, low=0)           # people invited to projects
+SHARE_LINKS_PER_HOUR = _int("SHARE_LINKS_PER_HOUR", 30, low=0)   # share links created
+COMMENTS_PER_HOUR = _int("COMMENTS_PER_HOUR", 30, low=0)         # comments left through share links, per visitor address
+CHECKOUTS_PER_HOUR = _int("CHECKOUTS_PER_HOUR", 10, low=0)       # PayPal checkouts started
 BLOCK_DISPOSABLE_EMAILS = _yes("BLOCK_DISPOSABLE_EMAILS", True)
 DISPOSABLE_DOMAINS_FILE = _path("DISPOSABLE_DOMAINS_FILE", Path()) if os.environ.get("DISPOSABLE_DOMAINS_FILE", "").strip() else None   # extra domains, one per line
 
@@ -169,5 +176,21 @@ PAYPAL_API = (os.environ.get("PAYPAL_API", "").strip()
               or ("https://api-m.paypal.com" if PAYPAL_MODE == "live" else "https://api-m.sandbox.paypal.com")).rstrip("/")
 PAYPAL_PLAN_PRO = os.environ.get("PAYPAL_PLAN_PRO", "").strip()          # PayPal billing plan ids (P-…), see manage.py paypal-setup
 PAYPAL_PLAN_AGENCY = os.environ.get("PAYPAL_PLAN_AGENCY", "").strip()
+PAYPAL_PLAN_PRO_YEARLY = os.environ.get("PAYPAL_PLAN_PRO_YEARLY", "").strip()       # yearly plans: optional; without them only monthly
+PAYPAL_PLAN_AGENCY_YEARLY = os.environ.get("PAYPAL_PLAN_AGENCY_YEARLY", "").strip()
 PAYPAL_WEBHOOK_ID = os.environ.get("PAYPAL_WEBHOOK_ID", "").strip()      # checks that webhooks really come from PayPal
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "").strip().rstrip("/")         # e.g. https://atelier.example.com (PayPal sends members back here)
+
+# ---- Log in with Google or GitHub (see oauth.py). A provider shows up on the login page once its id and secret are set.
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "").strip()
+GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "").strip()
+# the providers' addresses (only changed by the tests, which use a fake provider)
+GOOGLE_AUTH_URL = os.environ.get("GOOGLE_AUTH_URL", "").strip() or "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = os.environ.get("GOOGLE_TOKEN_URL", "").strip() or "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_URL = os.environ.get("GOOGLE_USERINFO_URL", "").strip() or "https://openidconnect.googleapis.com/v1/userinfo"
+GITHUB_AUTH_URL = os.environ.get("GITHUB_AUTH_URL", "").strip() or "https://github.com/login/oauth/authorize"
+GITHUB_TOKEN_URL = os.environ.get("GITHUB_TOKEN_URL", "").strip() or "https://github.com/login/oauth/access_token"
+GITHUB_API_URL = (os.environ.get("GITHUB_API_URL", "").strip() or "https://api.github.com").rstrip("/")
+

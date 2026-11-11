@@ -21,18 +21,29 @@ PLANS = {
     },
     "pro": {
         "name": "Pro", "price": 9,
+        "price_yearly": 90,         # paid once a year: two months free ($7.50 a month)
         "projects": None, "custom_agents": True, "instructions": True, "publish": False, "research": True, "browser_checks": "all",
         "versions": 100, "credit": False, "run_limit": 5.0, "run_limit_max": 50.0,
         "members": False,
     },
     "agency": {
         "name": "Agency", "price": 29,
+        "price_yearly": 290,        # $24.17 a month
         "projects": None, "custom_agents": True, "instructions": True, "publish": True, "research": True, "browser_checks": "all",
         "versions": None, "credit": False, "run_limit": 10.0, "run_limit_max": 200.0,
         "members": True,
     },
 }
 DEFAULT = "starter"
+PERIODS = ("monthly", "yearly")
+
+
+def monthly_value(plan: str, period: str = "monthly") -> float:
+    """What a plan brings in per month: a yearly plan counts as a twelfth of its price (revenue analytics)."""
+    p = PLANS.get(plan) or {}
+    if period == "yearly" and p.get("price_yearly"):
+        return p["price_yearly"] / 12
+    return p.get("price", 0)
 ADMIN = {**PLANS["agency"], "name": "Admin", "run_limit_max": 1000.0}
 
 

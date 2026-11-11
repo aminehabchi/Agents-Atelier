@@ -315,7 +315,13 @@ command line wins over the file: `AGENT_MODEL=sonnet PORT=9000 ./run.sh`. Restar
 | `PAYPAL_MODE` | `sandbox` | `sandbox` (test money) or `live` |
 | `PAYPAL_PLAN_PRO` / `PAYPAL_PLAN_AGENCY` | *(empty)* | PayPal plan ids, printed by `manage.py paypal-setup` |
 | `PAYPAL_WEBHOOK_ID` | *(empty)* | The id of your PayPal webhook, used to check that webhooks really come from PayPal |
-| `PUBLIC_URL` | *(empty)* | The app's public address (e.g. `https://atelier.example.com`), where PayPal sends members back |
+| `PUBLIC_URL` | *(empty)* | The app's public address (e.g. `https://atelier.example.com`), where PayPal and Google/GitHub send people back |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | *(empty)* | Show **Continue with Google** on the login and sign-up pages. Callback: `<PUBLIC_URL>/api/auth/oauth/google/callback` |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | *(empty)* | Show **Continue with GitHub**. Callback: `<PUBLIC_URL>/api/auth/oauth/github/callback` |
+| `API_REQUESTS_PER_MINUTE` | `300` | API calls per member (or per address when logged out) per minute; `0` = no limit |
+| `RUNS_PER_HOUR` | `60` | Runs that start agents (prompt, Continue, Start again, retry) per member per hour |
+| `INVITES_PER_HOUR` / `SHARE_LINKS_PER_HOUR` / `CHECKOUTS_PER_HOUR` | `30` / `30` / `10` | Per member per hour |
+| `COMMENTS_PER_HOUR` | `30` | Comments through share links, per visitor address per hour |
 | `CLAUDE_KEYS` | `user` | `user`: each member runs on their own Claude API key · `server`: everyone uses the server's Claude Code login |
 | `KEY_SECRET` | *(generated)* | Fernet key that encrypts members' API keys; empty = one is made and kept in `storage/.secrets/` |
 | `REVIEW_ROUNDS` | `2` | Times the Critic may send work back in one run |
@@ -537,7 +543,7 @@ and only ever shows its last four characters. Every run, the Orchestrator and mo
 key; the agents get a clean environment holding only that key and their own Claude folder, never the server's secrets
 or login. A full site costs about $1.50–2 on the member's account, a small change $0.20–0.50.
 
-| | **Starter** (free) | **Pro** ($9/month) | **Agency** ($29/month) |
+| | **Starter** (free) | **Pro** ($9/month, or $90/year) | **Agency** ($29/month, or $290/year) |
 |---|---|---|---|
 | Projects | 1 | Unlimited | Unlimited |
 | Official agents and ready teams | ✅ | ✅ | ✅ |
@@ -557,7 +563,8 @@ or login. A full site costs about $1.50–2 on the member's account, a small cha
 - **Spending limit:** after each agent, the run's cost is added up; when it reaches the member's limit, the agents stop
   and a card explains it. **Continue** goes on. Set it on **/profile → Claude and spending**.
 - **Changing plan:** on **/profile → Plan**, a member sees their plan, their usage (projects used, key, limit) and the
-  three plans. With PayPal set up, a paid plan is a **monthly PayPal subscription**: the member pays on PayPal's page and
+  three plans. With PayPal set up, a paid plan is a **PayPal subscription, paid monthly or yearly** (yearly = two
+  months free; it needs `PAYPAL_PLAN_PRO_YEARLY` and `PAYPAL_PLAN_AGENCY_YEARLY`, which `paypal-setup` prints too): the member pays on PayPal's page and
   the plan turns on when they come back (PayPal's webhooks then keep it in step: renewals are recorded, a cancelled or
   suspended subscription moves them back to Starter). Without PayPal, **Upgrade** sends a request: the admins get an
   email and approve or decline it on **/users**. **Moving down** applies at once, after a warning listing what's lost;
@@ -592,6 +599,7 @@ migrations** in `server/migrations/`, which the server applies on startup, once 
 | `0014_plan_events.sql` | every plan change, for the revenue analytics |
 | `0015_members_and_share_links.sql` | editors and viewers on projects, waiting invitations, share links and pinned comments |
 | `0016_paypal_billing.sql` | PayPal subscriptions, payments received and the webhook events already handled |
+| `0017_oauth_identities.sql` | which Google or GitHub account belongs to which member |
 
 To change the shared agents or teams, edit `agents/*.md` or `agents/_presets.json`, then run
 `.venv/bin/python server/manage.py make-agents-migration`. It writes the next migration with what changed, applied on
@@ -692,6 +700,12 @@ Everything is in the studio's **Share** tab.
 - **GDPR basics:** **/terms** and **/privacy** pages (fill in `LEGAL_NAME`, `LEGAL_EMAIL` and `LEGAL_ADDRESS`), terms
   accepted at sign-up with the date stored, a one-cookie notice (no tracking or advertising cookies), data export and
   account deletion (after 30 days).
+- **Log in with Google or GitHub:** set a provider's client id and secret and its button appears on the login and
+  sign-up pages. Only a **verified** email is accepted: it logs into the account with that email (linking it), or creates
+  a confirmed account with no password (the member can set one later on /profile or with "Forgot your password?").
+- **Rate limits:** besides the sign-up protection below, every API call is limited per member (per address when logged
+  out), and so are runs, invitations, share links, comments and PayPal checkouts (see Settings). Past a limit the answer
+  is `429` with `Retry-After`.
 - **Sign-up protection:** per-IP limits on sign-ups, logins and reset requests, a hidden honeypot field, and throwaway
   email domains refused (`server/disposable_domains.txt`). Behind a reverse proxy, set `TRUST_PROXY=true`.
 - When you serve it publicly, use HTTPS and set `COOKIE_SECURE=true`.

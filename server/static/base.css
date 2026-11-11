@@ -356,3 +356,32 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
 .instr-locked .tile { width: 40px; height: 40px; border-radius: var(--r); display: grid; place-items: center; background: var(--ice); color: var(--sky); }
 .instr-locked b { display: block; font-weight: 500; font-size: 15px; color: var(--ink); }
 .instr-locked p { margin: 6px 0 12px; font-size: 13.5px; line-height: 1.55; color: var(--graphite); max-width: 60ch; }
+
+/* ---------- offline / back online banner (ui.js) ---------- */
+.net-banner { position: fixed; inset-block-start: 12px; inset-inline: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 32px); z-index: 120;
+  display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: var(--r); font-size: 13px; line-height: 1.4;
+  background: var(--del-bg); color: var(--del-fg); border: 1px solid var(--line-strong); box-shadow: var(--hard-sm); animation: toast-in .25s ease; }
+.net-banner.ok { background: var(--paper); color: var(--ink); }
+.net-banner .ic { flex: none; }
+.toast { max-width: min(520px, calc(100vw - 32px)); line-height: 1.45; }
+.toast .ic { flex: none; }
+[aria-busy="true"] { cursor: progress; }
+/* a form's own error, next to its submit button */
+.form-err { color: var(--danger); font-size: 13px; line-height: 1.45; margin: 0 0 10px; text-align: end; }
+.form-err:empty { display: none; }
+/* one panel that couldn't load, inside a page that did */
+.panel-err { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; padding: 10px 12px; margin: 0 0 12px; border-radius: var(--r);
+  background: color-mix(in srgb, var(--danger) 8%, var(--paper)); color: var(--danger); font-size: 13px; line-height: 1.45;
+  border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent); }
+.panel-err > span { flex: 1 1 200px; min-width: 0; color: var(--ink); }
+.panel-err b { font-weight: 500; }
+.panel-err .ic { flex: none; }
+.panel-err .btn { margin-inline-start: auto; }
+.form-err.start { text-align: start; }
+.status-err { display: inline-flex; align-items: center; gap: 6px; color: var(--danger); }
+.status-err .ic { flex: none; }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+
+/* Starter members have no My agents / My teams pages (ui.js data-own-agents) */
+html[data-own-agents="no"] a[href="/agents"], html[data-own-agents="no"] a[href^="/agents/"], html[data-own-agents="no"] a[href^="/agents?"],
+html[data-own-agents="no"] a[href="/teams"], html[data-own-agents="no"] a[href^="/teams/"], html[data-own-agents="no"] a[href^="/teams?"] { display: none !important; }

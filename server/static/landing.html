@@ -91,6 +91,13 @@
   .price-card .amount span { color: var(--stone); font-size: 14px; margin-inline-start: 6px; }
   .price-card ul.plain { flex: 1; }
   .price-card .btn { align-self: flex-start; }
+  .price-card .billed { margin: -8px 0 0; font-size: 13px; color: var(--stone); }
+  .price-card .billed.y { color: var(--ok); }
+  .pricing[data-period="yearly"] .m, .pricing[data-period="monthly"] .y { display: none; }
+  #pricing .period { display: inline-flex; gap: 2px; padding: 3px; margin: 0 auto 20px; border-radius: var(--r); background: var(--paper); box-shadow: var(--ring); }
+  #pricing .period button { border: 0; background: none; font: inherit; font-size: 14px; padding: 8px 16px; border-radius: var(--r); color: var(--graphite); cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
+  #pricing .period button[aria-checked="true"] { background: var(--sky); color: var(--on-sky); }
+  #pricing .period .save { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: var(--r-pill); background: var(--add-bg); color: var(--add-fg); }
   .price-note { margin: 20px auto 0; max-width: 720px; font-size: 14px; color: var(--stone); text-align: center; }
   @media (max-width: 900px) { .pricing { grid-template-columns: minmax(0, 1fr); } }
   ul.plain { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
@@ -802,18 +809,24 @@
       <p class="eyebrow reveal">Pricing</p>
       <h2 class="reveal">You pay for the studio. The AI runs on your own Claude account.</h2>
       <p class="sub reveal">Add your Claude API key once. Anthropic bills you directly for what your agents use, at their prices: about $1.50–2 for a full site and $0.20–0.50 for a small change. Set a spending limit per run, and every run shows what it cost.</p>
-      <div class="pricing">
+      <div class="period reveal" role="radiogroup" aria-label="Billing period">
+        <button type="button" role="radio" data-period="monthly" aria-checked="false">Monthly</button>
+        <button type="button" role="radio" data-period="yearly" aria-checked="true">Yearly <span class="save">2 months free</span></button>
+      </div>
+      <div class="pricing" data-period="yearly">
         <article class="price-card reveal"><h3>Starter</h3><div class="amount"><b>Free</b></div>
           <ul class="plain"><li>One project</li><li>Every official agent and ready team</li><li>Browser check before the Critic</li><li>Last 10 versions of each project</li><li>Downloads carry a small “Made with Agents Atelier” line</li><li>Spending limit of $3 per run</li></ul>
           <a class="btn btn-ghost" href="/register">Start free</a></article>
-        <article class="price-card featured reveal"><h3>Pro</h3><div class="amount"><b>$9</b><span>/ month</span></div>
+        <article class="price-card featured reveal"><h3>Pro</h3><div class="amount m"><b>$9</b><span>/ month</span></div><div class="amount y"><b>$7.50</b><span>/ month</span></div>
+          <p class="billed m">Billed monthly. Or $90 a year: two months free</p><p class="billed y">Billed $90 a year · you save $18</p>
           <ul class="plain"><li>Unlimited projects</li><li>Read every agent's instructions</li><li>Your own agents and teams</li><li>Web research agent</li><li>Browser checks before Responsive, Accessibility, QA and the Critic</li><li>Last 100 versions, downloads without the credit line</li><li>Your own spending limit, up to $50 per run</li></ul>
           <a class="btn btn-dark" href="/register">Choose Pro</a></article>
-        <article class="price-card reveal"><h3>Agency</h3><div class="amount"><b>$29</b><span>/ month</span></div>
+        <article class="price-card reveal"><h3>Agency</h3><div class="amount m"><b>$29</b><span>/ month</span></div><div class="amount y"><b>$24.17</b><span>/ month</span></div>
+          <p class="billed m">Billed monthly. Or $290 a year: two months free</p><p class="billed y">Billed $290 a year · you save $58</p>
           <ul class="plain"><li>Everything in Pro</li><li>Work with editors and viewers</li><li>Publish your agents and teams to the marketplace</li><li>Every version kept</li><li>Spending limit up to $200 per run</li></ul>
           <a class="btn btn-ghost" href="/register">Choose Agency</a></article>
       </div>
-      <p class="price-note reveal"><span>Every plan includes share links with client comments.</span> <span class="pay-note" hidden>Pro and Agency are monthly subscriptions, paid with PayPal.</span></p>
+      <p class="price-note reveal"><span>Every plan includes share links with client comments.</span> <span class="pay-note" hidden>Pro and Agency are subscriptions paid with PayPal, monthly or yearly.</span></p>
     </div>
   </section>
 
@@ -1033,6 +1046,13 @@ const io = new IntersectionObserver((entries) => entries.forEach(e => {
 /* siblings in a grid reveal one after another */
 document.querySelectorAll(".stats, .cards, .features, .compare").forEach(g => [...g.children].forEach((c, i) => c.style.transitionDelay = `${i * 70}ms`));
 document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+
+/* pricing: monthly or yearly (two months free) */
+document.querySelector("#pricing .period")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-period]"); if (!b) return;
+  document.querySelector("#pricing .pricing").dataset.period = b.dataset.period;
+  document.querySelectorAll("#pricing .period [data-period]").forEach(x => x.setAttribute("aria-checked", x === b ? "true" : "false"));
+});
 </script>
 </body>
 </html>

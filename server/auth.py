@@ -141,7 +141,10 @@ def public(row) -> dict:
                            "checked": row.get("claude_key_at")},
             "run_limit": plans.run_limit(dict(row)),
             "plan_request": row.get("plan_request") or "", "plan_request_at": row.get("plan_request_at"),
+            "plan_request_period": row.get("plan_request_period") or "monthly",
             "paid_online": bool(row.get("billing_subscription")),   # the plan is a PayPal subscription (see billing.py)
+            "billing_period": row.get("billing_period") or "monthly",  # monthly · yearly
+            "has_password": bool(row.get("password_hash")),         # accounts made with Google or GitHub start without one
             "deactivated_at": row.get("deactivated_at"), "delete_after": row.get("delete_after"),
             **({"reactivated": True} if row.get("reactivated") else {})}   # just logged in during the 30 days
 
@@ -359,7 +362,7 @@ async def send_email(to: str, subject: str, text: str, code: str | None = None):
     msg.set_content(text)
     try:
         await asyncio.to_thread(_smtp_send, msg)
-    except (OSError, smtplib.SMTPException) as e:
+    except (OSError, smtplib.SMTPException, ValueError) as e:     # ValueError: an address SMTP can't encode
         log.error("Couldn't send email to %s: %s", to, e)
         raise AuthError("We couldn't send the email. Try again in a moment, or contact the administrator.", 502)
 
@@ -390,6 +393,8 @@ def _send_later(to: str, subject: str, text: str, code: str | None = None):
             await send_email(to, subject, text, code=code)
         except AuthError:
             pass        # send_email has logged it
+        except Exception:
+            log.exception("Couldn't send the email “%s” to %s", subject, to)
     task = asyncio.create_task(send())
     _background.add(task)
     task.add_done_callback(_background.discard)
@@ -475,6 +480,8 @@ async def set_preferences(user: dict, body: dict) -> dict:
 async def _check_current_password(user: dict, password):
     """Someone may have found an unlocked screen, so these guesses count towards the same lock as logins."""
     _check_lock(user)
+    if not user["password_hash"]:                 # an account made with Google or GitHub: the session is the proof
+        return
     if not verify_password(str(password or ""), user["password_hash"]):
         await _note_failed_password(user)
         raise AuthError("Your current password isn't right.")
@@ -483,7 +490,7 @@ async def _check_current_password(user: dict, password):
 async def change_password(user: dict, current, new, keep_token: str | None):
     await _check_current_password(user, current)
     new = check_password(new)
-    if new == current:
+    if new == current and user["password_hash"]:
         raise AuthError("Choose a password different from your current one.")
     await db.pool.execute("UPDATE users SET password_hash = $2, failed_logins = 0 WHERE id = $1", user["id"], hash_password(new))
     await end_other_sessions(user, keep_token)
@@ -566,8 +573,10 @@ async def set_plan(actor: dict, user_id: str, plan: str) -> dict:
     except ValueError:
         raise AuthError("Unknown user.", 404)
     before = await db.pool.fetchval("SELECT plan FROM users WHERE id = $1", uid)
-    row = await db.pool.fetchrow("UPDATE users SET plan = $2, plan_request = '', plan_request_at = NULL WHERE id = $1 RETURNING *",
-                                 uid, plan)
+    # approving a request: the member pays the way they asked (monthly or yearly); any other change is monthly
+    row = await db.pool.fetchrow("""UPDATE users SET plan = $2,
+                                      billing_period = CASE WHEN plan_request = $2 THEN plan_request_period ELSE 'monthly' END,
+                                      plan_request = '', plan_request_at = NULL WHERE id = $1 RETURNING *""", uid, plan)
     if not row:
         raise AuthError("Unknown user.", 404)
     await _plan_event(uid, before, plan, by_admin=True)
@@ -593,13 +602,15 @@ async def decline_plan_request(actor: dict, user_id: str) -> dict:
     return public(row)
 
 
-async def change_my_plan(user: dict, plan: str) -> dict:
+async def change_my_plan(user: dict, plan: str, period: str = "monthly") -> dict:
     """A member's own choice: a lower plan applies at once; a higher one is a request an admin approves
     (no online payment yet). The admins get an email about it."""
     if plan not in plans.PLANS:
         raise AuthError("Pick Starter, Pro or Agency.")
     if user["role"] == "admin":
         raise AuthError("Admins already have every feature.")
+    if period not in plans.PERIODS:
+        raise AuthError("Pick monthly or yearly.")
     current = user.get("plan") or plans.DEFAULT
     if plan == current:
         raise AuthError(f"You're already on {plans.PLANS[plan]['name']}.")
@@ -609,15 +620,18 @@ async def change_my_plan(user: dict, plan: str) -> dict:
         await _plan_event(user["id"], current, plan, by_admin=False)
         log.info("%s moved down to %s", user["email"], plan)
         return public(row)
-    row = await db.pool.fetchrow("UPDATE users SET plan_request = $2, plan_request_at = $3 WHERE id = $1 RETURNING *",
-                                 user["id"], plan, time.time())
-    log.info("%s asked for the %s plan", user["email"], plan)
+    row = await db.pool.fetchrow("UPDATE users SET plan_request = $2, plan_request_at = $3, plan_request_period = $4 WHERE id = $1 RETURNING *",
+                                 user["id"], plan, time.time(), period)
+    log.info("%s asked for the %s plan (%s)", user["email"], plan, period)
     admins = await db.pool.fetch("SELECT email FROM users WHERE role = 'admin'")
-    name = plans.PLANS[plan]["name"]
+    p = plans.PLANS[plan]
+    name = p["name"]
+    how = (f"paid yearly: ${p['price_yearly']} a year, two months free" if period == "yearly" and p.get("price_yearly")
+           else f"paid monthly: ${p['price']} a month")
     for a in admins:
         _send_later(a["email"], f"{user['email']} asked for the {name} plan",
                     f"Hello,\n\n{user.get('name') or user['email']} ({user['email']}) asked to move from "
-                    f"{plans.PLANS[current]['name']} to {name}.\n\nOpen the Users page in Agents Atelier to approve or decline it.\n")
+                    f"{plans.PLANS[current]['name']} to {name}, {how}.\n\nOpen the Users page in Agents Atelier to approve or decline it.\n")
     return public(row)
 
 

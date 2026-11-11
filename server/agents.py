@@ -233,6 +233,11 @@ async def create_agent(user: dict, data: dict, position: int | None = None) -> d
     """Admins create shared agents unless they ask for scope "mine"; everyone else creates their own.
     `position` (0-based) places it in the run order."""
     agent = validate(data, new=True)
+    if position is not None:
+        try:
+            position = int(position)
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError("The position must be a whole number (0 puts the agent first).")
     shared = is_admin(user) and data.get("scope") != "mine"
     if await _id_taken(user, agent["id"], shared):
         raise ValueError(f"An agent with id “{agent['id']}” already exists. Choose another id.")
@@ -249,7 +254,7 @@ async def create_agent(user: dict, data: dict, position: int | None = None) -> d
         await storage.export_instructions(con)
     if position is not None:
         ids = [a["id"] for a in await load_agents(user) if a["id"] != agent["id"]]
-        ids.insert(max(0, min(int(position), len(ids))), agent["id"])
+        ids.insert(max(0, min(position, len(ids))), agent["id"])
         await reorder_agents(user, ids)
     return await _find(user, agent["id"])
 
@@ -287,7 +292,7 @@ async def delete_agent(user: dict, agent_id: str):
 async def reorder_agents(user: dict, ids: list[str]):
     """Save the user's run order. An admin's order also becomes the shared agents' order for everyone else."""
     agents = await load_agents(user)
-    if sorted(ids) != sorted(a["id"] for a in agents):
+    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids) or sorted(ids) != sorted(a["id"] for a in agents):
         raise ValueError("The new order must list every agent exactly once.")
     await db.pool.execute("UPDATE users SET agent_order = $2 WHERE id = $1", user["id"], ids)
     if is_admin(user):
@@ -354,7 +359,9 @@ async def _clean_team(user: dict, data: dict) -> dict:
     prompt = "\n".join(line.rstrip() for line in str(data.get("prompt") or "").strip().splitlines())
     if len(prompt) > db.MAX_TEAM_PROMPT:
         raise ValueError(f"Keep the starting prompt under {db.MAX_TEAM_PROMPT} characters.")
-    wanted = list(data.get("agents") or [])
+    wanted = data.get("agents") or []
+    if not isinstance(wanted, list):
+        raise ValueError("List the team's agents by their ids, like [\"brief\", \"html\"].")
     ids = [a["id"] for a in await load_agents(user) if a["id"] in wanted]
     if not ids:
         raise ValueError("A team needs at least one agent.")
@@ -492,8 +499,10 @@ async def plan_import(user: dict, items: list[dict], on_conflict: str = "rename"
 
     for it in items:
         if it["kind"] == "team":
-            t = it["team"]
-            ids = [id_map.get(i, i) for i in t.get("agents", [])]
+            t = it["team"] if isinstance(it["team"], dict) else {}
+            t = {**t, "name": " ".join(str(t.get("name") or "").split())[:40]}
+            raw_ids = t.get("agents") if isinstance(t.get("agents"), list) else []
+            ids = [id_map.get(i, i) for i in raw_ids if isinstance(i, str)]
             known = [i for i in ids if i in existing or i in taken]
             missing = [i for i in ids if i not in known]
             same = next((p for p in teams if p["name"] == t.get("name") and sorted(p["agents"]) == sorted(known)), None)

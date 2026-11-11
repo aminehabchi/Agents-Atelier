@@ -1791,3 +1791,67 @@ Object.assign(window.I18N.fr, {
   "<b>Starter</b> (free): one project, the official agents and ready teams. You see what each agent does, its stats, projects and ratings; its instructions are shown from Pro.": "<b>Starter</b> (gratuit) : un projet, les agents officiels et les équipes prêtes. Vous voyez ce que fait chaque agent, ses statistiques, ses projets et ses notes ; ses instructions sont visibles à partir de Pro.",
   "<b>Pro</b>: unlimited projects, every agent's instructions, your own agents and teams, exports, web research, more checks and versions.": "<b>Pro</b> : projets illimités, les instructions de chaque agent, vos propres agents et équipes, les exports, la recherche web, plus de vérifications et de versions.",
 });
+/* log in with Google or GitHub, rate limits */
+Object.assign(window.I18N.fr, {
+ "or with your email": "ou avec votre e-mail",
+ "You log in with Google or GitHub, so your account has no password yet. Set one to also log in with your email.": "Vous vous connectez avec Google ou GitHub : votre compte n'a donc pas encore de mot de passe. Définissez-en un pour pouvoir aussi vous connecter avec votre e-mail.",
+ "This way of logging in isn't available.": "Ce mode de connexion n'est pas disponible.",
+ "We couldn't reach the provider. Try again in a moment.": "Impossible de joindre le fournisseur. Réessayez dans un instant.",
+ "The provider didn't confirm the login. Try again.": "Le fournisseur n'a pas confirmé la connexion. Réessayez.",
+ "The provider didn't say who you are. Try again.": "Le fournisseur n'a pas indiqué qui vous êtes. Réessayez.",
+ "You cancelled the login, or the provider refused it.": "Vous avez annulé la connexion, ou le fournisseur l'a refusée.",
+ "This login link expired or didn't start here. Try again.": "Ce lien de connexion a expiré ou n'a pas été ouvert ici. Réessayez.",
+ "You've started a lot of runs this hour. Try again in": "Vous avez lancé beaucoup d'exécutions cette heure-ci. Réessayez dans"
+});
+window.I18N_PATTERNS.fr.push(
+  [/^Continue with (.+)$/, "Continuer avec $1"],
+  [/^By continuing with (.+), you accept the <a href="\/terms" target="_blank" rel="noopener">Terms of use<\/a> and the <a href="\/privacy" target="_blank" rel="noopener">Privacy policy<\/a>\.$/,
+   (m, p) => `En continuant avec ${p.replace(" or ", " ou ")}, vous acceptez les <a href="/terms" target="_blank" rel="noopener">Conditions d'utilisation</a> et la <a href="/privacy" target="_blank" rel="noopener">Politique de confidentialité</a>.`],
+  [/^Linked with (.+)$/, "Associé à $1"],
+  [/^Your (.+) account has no verified email address\. Verify one there, or sign up with your email and a password\.$/,
+   "Votre compte $1 n'a pas d'adresse e-mail vérifiée. Vérifiez-en une chez lui, ou inscrivez-vous avec votre e-mail et un mot de passe."],
+  [/^Too many requests\. Slow down and try again in (\d+) seconds\.$/, "Trop de requêtes. Ralentissez et réessayez dans $1 secondes."],
+  [/^Too many (invitations|share links|payment attempts|comments) from your network\. Try again in (.+)\.$/,
+   (m, w, t) => `Trop de ${({ "invitations": "invitations", "share links": "liens de partage", "payment attempts": "tentatives de paiement", "comments": "commentaires" })[w]} depuis votre réseau. Réessayez dans ${t.replace("minutes", "minutes").replace("minute", "minute")}.`],
+  [/^You've started a lot of runs this hour\. Try again in (.+)\.$/, "Vous avez lancé beaucoup d'exécutions cette heure-ci. Réessayez dans $1."],
+);
+window.I18N_PATTERNS.fr.push([/^You've made a lot of (invitations|share links|payment attempts) recently\. Try again in (.+)\.$/,
+  (m, w, t) => `Vous avez fait beaucoup ${({ "invitations": "d'invitations", "share links": "de liens de partage", "payment attempts": "de tentatives de paiement" })[w]} récemment. Réessayez dans ${t}.`]);
+/* yearly billing, project details in the Project tab */
+Object.assign(window.I18N.fr, {
+ "Monthly": "Mensuel",
+ "Yearly": "Annuel",
+ "2 months free": "2 mois offerts",
+ "Billing period": "Période de facturation",
+ "Pay yearly instead": "Payer à l'année",
+ "Pay monthly instead": "Payer au mois",
+ "Paid with PayPal · yearly": "Payé avec PayPal · annuel",
+ "Project details": "Détails du projet",
+ "Save details": "Enregistrer les détails",
+ "The name, description, pages and brief every agent reads with each request.": "Le nom, la description, les pages et le brief que chaque agent lit à chaque demande.",
+ "The name, description, pages and brief every agent reads with each request. Changes apply from the next request.": "Le nom, la description, les pages et le brief que chaque agent lit à chaque demande. Les changements s'appliquent dès la prochaine demande.",
+ "Paying by the year isn't available on this server yet. Pick monthly.": "Le paiement à l'année n'est pas encore disponible sur ce serveur. Choisissez le mois.",
+ "Pick monthly or yearly.": "Choisissez mensuel ou annuel."
+});
+window.I18N_PATTERNS.fr.push(
+  [/^Pay with PayPal · yearly · save (\d+)%$/, "Payer avec PayPal · annuel · économisez $1 %"],
+  [/^Billed \$(\d+) a year · you save \$(\d+)$/, "Facturé $1 $ par an · vous économisez $2 $"],
+  [/^\$(\d+) \/ year$/, "$1 $ / an"],
+  [/^or \$(\d+) a year: two months free$/, "ou $1 $ par an : deux mois offerts"],
+  [/^(Starter|Pro|Agency) is \$(\d+) a year \(\$([\d.]+) a month\), paid with PayPal\. (.+)$/,
+    (_, p, y, mo, rest) => window.t(`${p} is $0 a month, paid with PayPal. ${rest}`).replace(/0 \$ par mois/, `${y} $ par an (${mo} $ par mois)`)],
+  [/^Pro and Agency are PayPal subscriptions(, paid monthly or yearly \(two months free\)|, paid monthly): pay with a card or your PayPal balance\. The features change as soon as PayPal confirms\. (Moving to Starter applies at once and cancels your subscription\.|Moving to Starter applies at once\.)$/,
+    (_, per, end) => `Pro et Agence sont des abonnements PayPal${per.includes("yearly") ? ", payés au mois ou à l'année (deux mois offerts)" : ", payés au mois"} : payez par carte ou avec votre solde PayPal. Les fonctionnalités changent dès que PayPal confirme. ${end.includes("cancels") ? "Passer à Starter s'applique tout de suite et annule votre abonnement." : "Passer à Starter s'applique tout de suite."}`],
+);
+/* yearly prices on the landing page and in upgrade requests */
+Object.assign(window.I18N.fr, {
+ "Pro and Agency are subscriptions paid with PayPal, monthly or yearly.": "Pro et Agence sont des abonnements payés avec PayPal, au mois ou à l'année.",
+ "Sent as a request, yearly: an admin confirms it": "Envoyé comme demande, à l'année : un admin la confirme"
+});
+window.I18N_PATTERNS.fr.push(
+  [/^Billed monthly\. Or \$(\d+) a year: two months free$/, "Facturé au mois. Ou $1 $ par an : deux mois offerts"],
+  [/^You asked for (Starter|Pro|Agency), paid (yearly|monthly)$/, (_, p, per) => `Vous avez demandé ${p === "Agency" ? "Agence" : p}, payé ${per === "yearly" ? "à l'année" : "au mois"}`],
+  [/^You asked for (Starter|Pro|Agency), paid (yearly|monthly) · (.+)$/, (_, p, per, when) => `Vous avez demandé ${p === "Agency" ? "Agence" : p}, payé ${per === "yearly" ? "à l'année" : "au mois"} · ${window.t(when)}`],
+  [/^(Starter|Pro|Agency) is \$(\d+) a year \(\$([\d.]+) a month\)\. (.+)$/,
+    (_, p, y, mo, rest) => window.t(`${p} is $0 a month. ${rest}`).replace(/0 \$ par mois/, `${y} $ par an (${mo} $ par mois)`)],
+);

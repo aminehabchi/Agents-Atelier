@@ -331,8 +331,7 @@ async function detailView(id) {
   if ($("del")) $("del").onclick = async () => {
     if (!await confirmDialog({ title: `Delete “${a.name}”?`, ok: "Delete", danger: true,
       text: `This deletes the agent${a.scope === "shared" ? " for everyone" : ""}. Projects and teams that use it will simply skip it.` })) return;
-    try { await api(`/api/agents/${encodeURIComponent(a.id)}`, { method: "DELETE" }); toast("Agent deleted"); go("/agents"); }
-    catch (err) { toast(err.message, "err"); }
+    await withBusy($("del"), async () => { await api(`/api/agents/${encodeURIComponent(a.id)}`, { method: "DELETE" }); toast("Agent deleted"); go("/agents"); });
   };
 }
 
@@ -461,17 +460,20 @@ async function formView(id) {
   $("f-colors").onclick = (e) => { const b = e.target.closest("[data-color]"); if (b) { setColor(b.dataset.color); $("f-color").value = b.dataset.color; } };
   $("f-color").oninput = (e) => setColor(e.target.value);
   $("save").onclick = async () => {
-    if ($("f-model").value === "__other") return toast("Check the model with the Claude CLI first, or pick one from the list", "err");
+    const invalid = (fieldId, text) => { statusError($("status"), text); const f = $(fieldId); if (f) { f.setAttribute("aria-invalid", "true"); f.focus(); } };
+    app.querySelectorAll("[aria-invalid=true]").forEach(f => f.removeAttribute("aria-invalid"));
+    if ($("f-model").value === "__other") return invalid("f-model-other", "Check the model with the Claude CLI first, or pick one from the list");
+    if (!draft.name.trim()) return invalid("f-name", "Give the agent a name.");
+    if (isNew && !draft.id) return invalid("f-id", "Give the agent an id.");
     const body = { ...draft }; delete body._idTouched;
     if (askScope && !$("f-shared").checked) body.scope = "mine";
-    $("save").disabled = true;
-    try {
+    await withBusy($("save"), async () => {
       const saved = isNew
         ? await api("/api/agents", { method: "POST", body: JSON.stringify(body) })
         : await api(`/api/agents/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) });
       toast(isNew ? `${saved.name} joined the agents` : "Agent saved");
       go(`/agents/${encodeURIComponent(saved.id)}`);
-    } catch (err) { toast(err.message, "err"); $("save").disabled = false; }
+    }, { onError: (err) => { statusError($("status"), `Not saved: ${err.message}`); toast(err.message, "err"); } });
   };
 }
 
@@ -502,13 +504,12 @@ async function rulesView() {
     </section>`;
   if (me?.role !== "admin") return;
   $("rules").oninput = () => { dirty = $("rules").value !== rules; $("status").innerHTML = dirty ? `${icon("pencil", { size: 14 })}Unsaved changes` : ""; };
-  $("save").onclick = async () => {
-    try { rules = (await api("/api/agents/common", { method: "PUT", body: JSON.stringify({ text: $("rules").value }) })).text; dirty = false; $("status").innerHTML = `${icon("check", { size: 14 })}Saved`; toast("Shared rules saved"); }
-    catch (err) { toast(err.message, "err"); }
-  };
+  $("save").onclick = () => withBusy($("save"), async () => {
+    rules = (await api("/api/agents/common", { method: "PUT", body: JSON.stringify({ text: $("rules").value }) })).text; dirty = false; $("status").innerHTML = `${icon("check", { size: 14 })}Saved`; toast("Shared rules saved");
+  }, { onError: (err) => { statusError($("status"), `Not saved: ${err.message}`); toast(err.message, "err"); } });
 }
 
-route();
+Promise.resolve().then(route).catch(err => showError(app, err, () => location.reload(), "Something went wrong on this page"));   // a bug must not leave "Loading…" forever
 </script>
 </body>
 </html>

@@ -157,13 +157,21 @@ async function load() {
   document.querySelectorAll("#views button").forEach(b => { const on = b.dataset.view === view; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
   history.replaceState(null, "", view === "monitoring" ? "?view=monitoring" : location.pathname);
   app.setAttribute("aria-busy", "true");
-  try { view === "revenue" ? await loadRevenue() : await loadMonitoring(); }
-  catch (err) { showError(app, err, load, "Couldn't load the analytics"); }
-  app.removeAttribute("aria-busy");
+  const ticket = ++loads;               // a quick switch of view or range: only the last answer is shown
+  try { view === "revenue" ? await loadRevenue(ticket) : await loadMonitoring(ticket); }
+  catch (err) { if (ticket === loads) showError(app, err, load, "Couldn't load the analytics"); }
+  if (ticket === loads) app.removeAttribute("aria-busy");
 }
+let loads = 0;
+/* One half of the Monitoring view that couldn't load: the other half still shows. */
+const partError = (err, what) => `<div class="panel-err" role="alert">${icon("alert", { size: 15 })}
+  <span><b>${esc(what)}</b> ${esc(err.message)}</span>
+  <button type="button" class="btn btn-ghost btn-sm" data-reload>${icon("refresh", { size: 13 })}Try again</button></div>`;
+app.addEventListener("click", (e) => { const b = e.target.closest("[data-reload]"); if (b) withBusy(b, load); });
 
-async function loadRevenue() {
+async function loadRevenue(ticket) {
   const r = await api(`/api/admin/revenue?days=${days}`);
+  if (ticket !== loads) return;
   const first = r.series[0]?.value || 0, change = r.mrr - first;
   const total = r.by_plan.reduce((n, p) => n + p.members, 0) || 1;
   app.innerHTML = `
@@ -206,13 +214,20 @@ async function loadRevenue() {
 }
 const plansRank = (p) => ({ starter: 0, pro: 1, agency: 2 })[p] ?? 0;
 
-async function loadMonitoring() {
-  const [m, d] = await Promise.all([api(`/api/admin/monitoring?days=${days}`), api(`/api/admin/analytics?days=${days}`)]);
-  const h = m.health, u = d.users, b = d.builds;
+async function loadMonitoring(ticket) {
+  const soft = (p) => p.then(v => ({ v }), err => ({ err }));
+  const [mr, dr] = await Promise.all([soft(api(`/api/admin/monitoring?days=${days}`)), soft(api(`/api/admin/analytics?days=${days}`))]);
+  if (ticket !== loads) return;
+  if (mr.err && dr.err) throw mr.err;
+  app.innerHTML = (mr.err ? `<h2 class="sec">Is everything working?</h2>${partError(mr.err, "Health and runs couldn't load.")}` : monitoringHTML(mr.v))
+    + (dr.err ? `<h2 class="sec">Usage</h2>${partError(dr.err, "Usage couldn't load.")}` : usageHTML(dr.v, mr.v?.health?.keys));
+}
+function monitoringHTML(m) {
+  const h = m.health;
   const okc = (ok, text, warn = false) => `<span class="st ${ok ? "ok" : warn ? "warn" : "bad"}">${icon(ok ? "check" : "alert", { size: 13 })}${text}</span>`;
   const diskPct = h.disk.total ? (1 - h.disk.free / h.disk.total) : 0;
   const failRate = m.runs.total ? m.runs.failed / m.runs.total : 0;
-  app.innerHTML = `
+  return `
     <h2 class="sec">Is everything working?</h2>
     <section class="health" aria-label="Server health">
       <div class="hcard">${okc(h.database.ok, h.database.ok ? "Database" : "Database down")}<small>${h.database.ok ? `answers in ${h.database.ms} ms` : "the server can't reach Postgres"}</small></div>
@@ -242,8 +257,11 @@ async function loadMonitoring() {
         <code data-no-i18n>${esc(e.error || "No details")}</code></li>`).join("")}</ul>` : `<p class="empty-note">No errors in this period.</p>`}
     </section>
     ${m.accounts.leaving.length ? `<section class="panel"><h2>Accounts being deleted</h2><p class="total">Deactivated by their owners. They're deleted on this date unless they log in again.</p>
-      <div class="table-wrap"><table><tbody>${m.accounts.leaving.map(a => `<tr><td data-no-i18n>${esc(a.email)}</td><td class="num">${esc(new Date(a.delete_after * 1000).toLocaleDateString(getLocale(), { day: "numeric", month: "short", year: "numeric" }))}</td></tr>`).join("")}</tbody></table></div></section>` : ""}
-
+      <div class="table-wrap"><table><tbody>${m.accounts.leaving.map(a => `<tr><td data-no-i18n>${esc(a.email)}</td><td class="num">${esc(new Date(a.delete_after * 1000).toLocaleDateString(getLocale(), { day: "numeric", month: "short", year: "numeric" }))}</td></tr>`).join("")}</tbody></table></div></section>` : ""}`;
+}
+function usageHTML(d, keys) {
+  const u = d.users, b = d.builds;
+  return `
     <h2 class="sec">Usage</h2>
     <section class="tiles" aria-label="Accounts">
       ${tile("Accounts", `${u.total}`, `${u.confirmed} confirmed (${pct(u.confirmed, u.total)}) · ${u.admins} admin${u.admins === 1 ? "" : "s"}`)}
@@ -255,7 +273,7 @@ async function loadMonitoring() {
       <section class="panel"><h2>New accounts per day</h2><p class="total">${sum(d.series.signups)} in ${d.days} days</p>${barChart(d.series.signups)}</section>
       <section class="panel"><h2>Agent runs per day</h2><p class="total">${sum(d.series.runs)} in ${d.days} days</p>${barChart(d.series.runs)}</section>
       <section class="panel"><h2>AI cost per day</h2><p class="total" data-no-i18n>${money(sum(d.series.cost))}</p>${barChart(d.series.cost, money)}
-        <p class="foot">${h.keys === "user" ? "Paid by members on their own Claude accounts." : "API-equivalent estimate."}</p></section>
+        <p class="foot">${keys === "user" ? "Paid by members on their own Claude accounts." : "API-equivalent estimate."}</p></section>
     </div>
     <div class="grid two">
       <section class="panel"><h2>What best describes them</h2><p class="total">Confirmed accounts</p>${hbars(d.breakdown.job_role)}</section>
@@ -282,7 +300,7 @@ document.getElementById("range").addEventListener("click", (e) => {
   try { localStorage.setItem("analytics-days", days); } catch {}
   load();
 });
-load();
+load().catch(err => showError(app, err, () => location.reload(), "Something went wrong on this page"));   // a bug must not leave "Loading…" forever
 </script>
 </body>
 </html>

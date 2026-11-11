@@ -104,8 +104,8 @@ async def check(name: str, timeout: int = 90, env: dict | None = None) -> dict:
                 CLAUDE, "-p", "Reply with the single word OK.", "--model", name, "--output-format", "json",
                 "--restricted", "--strict-mcp-config", "--disable-slash-commands", "--tools", "",
                 cwd=tmp, env=env, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        except FileNotFoundError:
-            raise ValueError(f"Claude Code wasn't found (tried “{CLAUDE}”), so the model can't be checked.")
+        except (FileNotFoundError, PermissionError):
+            raise ValueError("The server can't start Claude Code, so the model can't be checked. Tell the site's admin.")
         try:
             out, err = await asyncio.wait_for(proc.communicate(), timeout)
         except asyncio.TimeoutError:
@@ -119,6 +119,8 @@ async def check(name: str, timeout: int = 90, env: dict | None = None) -> dict:
         data = json.loads(text.strip().splitlines()[-1])
     except (ValueError, IndexError):
         raise ValueError(f"The Claude CLI couldn't use “{name}”: {errors.strip()[-200:] or 'no answer'}")
+    if not isinstance(data, dict):
+        raise ValueError(f"The Claude CLI gave an answer the server can't read while checking “{name}”. Try again.")
     resolved = list((data.get("modelUsage") or {}).keys())
     if data.get("is_error") or not resolved:
         raise ValueError(f"The Claude CLI couldn't use “{name}”: {str(data.get('result') or errors).strip()[-200:]}")

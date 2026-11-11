@@ -43,6 +43,11 @@
   .hint button { border: 0; background: rgb(255 255 255 / .2); color: inherit; border-radius: var(--r); padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
   .empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--stone); }
   .empty b { display: block; color: var(--ink); font-weight: 500; font-size: 18px; margin-bottom: 6px; }
+  .empty[hidden] { display: none; }
+  .empty > div { max-width: 440px; line-height: 1.55; }
+  .empty .btn { margin-top: 16px; }
+  .stage > .empty { background: var(--linen); z-index: 4; }
+  .cnote { font-size: 12px; color: var(--danger); margin: 4px; line-height: 1.45; }
 
   aside { width: 340px; border-inline-start: 1px solid var(--line); background: var(--paper); display: flex; flex-direction: column; min-height: 0; }
   aside[hidden] { display: none; }
@@ -127,7 +132,12 @@ async function start() {
   document.querySelector("[data-theme-btn]").innerHTML = icon(themeIcon(), { size: 17 });
   document.querySelector("[data-theme-btn]").onclick = () => { cycleTheme(); document.querySelector("[data-theme-btn]").innerHTML = icon(themeIcon(), { size: 17 }); };
   try { info = await api(`${BASE}/info`); }
-  catch (err) { document.body.innerHTML = `<div class="empty"><div><b>Link not available</b>${esc(err.message)}</div></div>`; return; }
+  catch (err) {
+    // a link that expired or was turned off can't come back; anything else (network, server) is worth another try
+    if (err.status === 404 || err.status === 410 || err.status === 403) return linkGone(err.message);
+    return showState("Couldn't open this preview", err.message, start);
+  }
+  $("empty").hidden = true; $("frame").hidden = false;
   $("name").textContent = info.name;
   document.title = `${info.name} · Shared preview`;
   const pages = info.pages.length ? info.pages : [{ file: "index.html", title: "Home" }];
@@ -142,13 +152,66 @@ async function start() {
   $("foot").textContent = info.expires
     ? `This link works until ${new Date(info.expires * 1000).toLocaleDateString(getLocale(), { day: "numeric", month: "long", year: "numeric" })}.`
     : "This link has no end date.";
-  if (!info.built) { $("empty").hidden = false; $("frame").hidden = true; return; }
+  if (!info.built) return showState("Nothing to see yet", "The team hasn't built this site yet. Come back a little later.", start);
   load();
   if (info.comments) await loadComments();
 }
-function load() { $("site").src = `${BASE}/site/${page.split("/").map(encodeURIComponent).join("/")}`; }
+/* The whole stage says what's wrong: the link is gone, the site isn't built, or something failed (with Try again). */
+function showState(title, text, retry) {
+  $("frame").hidden = true;
+  $("empty").hidden = false;
+  $("empty").setAttribute("role", retry ? "alert" : "status");
+  $("empty").innerHTML = `<div><b>${esc(title)}</b><span>${esc(text)}</span>
+    ${retry ? `<br><button class="btn btn-ghost btn-sm" type="button" data-retry>${icon("refresh", { size: 14 })}Try again</button>` : ""}</div>`;
+  $("empty").querySelector("[data-retry]")?.addEventListener("click", (e) => withBusy(e.currentTarget, retry));
+}
+function linkGone(text) {
+  clearTimeout(frameWatch);
+  ["pageSel", "devices", "commentBtn", "listBtn"].forEach(id => { $(id).hidden = true; });
+  openPanel(false); setCommenting(false);
+  if (info) info.comments = false;
+  showState("Link not available", text || "This link has expired or was turned off. Ask the person who sent it for a new one.");
+}
+
+/* Load a page into the frame. The page is checked first, so a missing page or a server problem shows a message
+   instead of an error page inside the frame; then a watchdog notices a frame that never finishes. */
+let frameWatch = 0, loadTicket = 0;
+async function load() {
+  const ticket = ++loadTicket;
+  const url = `${BASE}/site/${page.split("/").map(encodeURIComponent).join("/")}`;
+  clearTimeout(frameWatch);
+  let res;
+  try { res = await fetch(url, { method: "HEAD", cache: "no-store" }); }
+  catch {
+    if (ticket !== loadTicket) return;
+    return showState("Couldn't load this page", navigator.onLine === false ? "You're offline. Check your connection, then try again."
+      : "Can't reach the server. Check your connection, then try again in a moment.", load);
+  }
+  if (ticket !== loadTicket) return;
+  if (res.status === 404) {
+    // the page may be gone, or the whole link: ask which
+    try { await api(`${BASE}/info`); } catch (err) { if (err.status === 404) return linkGone(err.message); }
+    return showState("This page doesn't exist any more", "The team may have renamed or removed it. Pick another page above.", null);
+  }
+  if (!res.ok) return showState("Couldn't load this page", res.status >= 500 ? "The server had a problem. Try again in a moment." : `Request failed (${res.status}).`, load);
+  $("empty").hidden = true; $("frame").hidden = false;
+  $("site").src = url;
+  frameWatch = setTimeout(() => {
+    if (ticket === loadTicket) toast("This page is slow to load. If it stays blank, reload it.", "err");
+  }, 20000);
+}
 async function loadComments() {
-  try { comments = await api(`${BASE}/comments`); } catch { comments = []; }
+  try {
+    comments = await api(`${BASE}/comments`);
+    $("clist").querySelector(".cnote")?.remove();
+  } catch (err) {
+    if (err.status === 404) return linkGone(err.message);
+    if (err.status === 403) { info.comments = false; $("commentBtn").hidden = $("listBtn").hidden = true; setCommenting(false); return; }
+    // keep the comments already shown; just say the list may be out of date
+    renderComments();
+    $("clist").insertAdjacentHTML("afterbegin", `<p class="cnote" role="status">Couldn't refresh the comments: ${esc(err.message)}</p>`);
+    return;
+  }
   renderComments();
 }
 function renderComments() {
@@ -186,22 +249,50 @@ function commentForm(spot) {
   d.querySelector("[name=author]").value = savedName();
   d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
   d.addEventListener("close", () => d.remove());
+  const errBox = d.querySelector(".err");
+  d.querySelector("form").addEventListener("input", (e) => { e.target.removeAttribute("aria-invalid"); });
   d.querySelector("form").addEventListener("submit", async (e) => {
     if (e.submitter?.value !== "send") return;
     e.preventDefault();
     const f = e.target, btn = e.submitter;
-    btn.disabled = true;
+    errBox.textContent = "";
+    const author = f.author.value.trim(), text = f.text.value.trim();
+    const invalid = (field, msg) => { errBox.textContent = msg; field.setAttribute("aria-invalid", "true"); field.focus(); };
+    if (!author) return invalid(f.author, "Add your name, so the team knows who wrote it.");
+    if (!text) return invalid(f.text, "Write a comment first.");
+    btn.disabled = true; btn.setAttribute("aria-busy", "true");
     try {
-      const author = f.author.value.trim();
       try { localStorage.setItem(NAME_KEY, author); } catch {}
-      const c = await api(`${BASE}/comments`, { method: "POST", body: JSON.stringify({ ...spot, page, author, text: f.text.value.trim() }) });
+      const c = await api(`${BASE}/comments`, { method: "POST", body: JSON.stringify({ ...spot, page, author, text }) });
       comments.push(c);
       renderComments();
       d.close();
       setCommenting(false);
       openPanel(true);
       toast("Comment sent to the team");
-    } catch (err) { btn.disabled = false; d.querySelector(".err").textContent = err.message; }
+    } catch (err) {
+      btn.removeAttribute("aria-busy");
+      errBox.textContent = err.message;          // what they wrote stays in the form
+      if (err.status === 404) { d.close(); return linkGone(err.message); }
+      if (err.status === 403) {                  // comments were turned off meanwhile
+        btn.hidden = true;
+        info.comments = false; $("commentBtn").hidden = $("listBtn").hidden = true; setCommenting(false);
+        return;
+      }
+      if (err.status === 429 && err.retryAfter) {   // too many comments: Send comes back after the wait
+        let left = Math.min(err.retryAfter, 3600);
+        const label = btn.textContent;
+        const tick = () => {
+          if (!btn.isConnected) return clearInterval(timer);
+          if (--left <= 0) { clearInterval(timer); btn.textContent = label; btn.disabled = false; return; }
+          btn.textContent = `Send (${left}s)`;
+        };
+        const timer = setInterval(tick, 1000); tick();
+        return;
+      }
+      if (err.status === 422 || err.status === 400) f.text.focus();
+      btn.disabled = false;
+    }
   });
   d.showModal();
   d.querySelector(savedName() ? "[name=text]" : "[name=author]").focus();
@@ -230,6 +321,7 @@ addEventListener("message", (e) => {
   } else if (d.type === "escape") setCommenting(false);
 });
 $("pageSel").onchange = () => { page = $("pageSel").value; load(); };
+$("site").addEventListener("load", () => clearTimeout(frameWatch));
 $("devices").onclick = (e) => {
   const b = e.target.closest("button"); if (!b) return;
   [...$("devices").children].forEach(x => x.classList.toggle("on", x === b));
@@ -246,7 +338,7 @@ $("clist").onclick = (e) => {
 };
 addEventListener("keydown", (e) => { if (e.key === "Escape" && commenting && !document.querySelector("dialog[open]")) setCommenting(false); });
 setInterval(() => { if (info?.comments && !document.hidden) loadComments(); }, 30000);   // the team may resolve some
-start();
+start().catch(err => showState("Couldn't open this preview", err.message, start));
 </script>
 </body>
 </html>

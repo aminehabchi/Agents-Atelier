@@ -52,7 +52,7 @@
       const r = el.getBoundingClientRect();
       if (r.width || r.height) return { left: r.left + scrollX + p.x * r.width, top: r.top + scrollY + p.y * r.height };
     }
-    return { left: p.doc_x * docWidth(), top: p.doc_y };
+    return { left: (+p.doc_x || 0) * docWidth(), top: +p.doc_y || 0 };   // an old pin without a spot: top left, not NaN
   }
   function place() {
     if (!layer) return;
@@ -100,6 +100,7 @@
     e.preventDefault();
     e.stopPropagation();
     const el = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+    if (!el || !el.getBoundingClientRect) return;          // the document itself: nothing to pin
     const r = el.getBoundingClientRect();
     post({
       type: "spot", selector: selectorOf(el),

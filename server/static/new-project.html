@@ -109,11 +109,17 @@ const form = fillProjectForm(host, { allowImport: true, askAssets: true, heading
   go.textContent = "Creating…";
   host.setAttribute("aria-busy", "true");
   saving = true;                        // createProject opens the studio when it works
-  await createProject(details);
+  const err = await createProject(details);
   saving = false;                       // still here: it failed and has said why, so the answers stay for another try
   go.disabled = false;
   go.textContent = "Create project";
   host.removeAttribute("aria-busy");
+  if (err) {
+    let box = host.querySelector(".form-err");
+    if (!box) { box = document.createElement("p"); box.className = "form-err"; box.setAttribute("role", "alert"); go.closest(".row").before(box); }
+    box.textContent = `The project wasn't created: ${err.message}`;
+    go.focus();
+  }
 });
 form.focus();
 })();

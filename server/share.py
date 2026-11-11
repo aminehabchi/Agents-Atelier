@@ -86,7 +86,7 @@ async def create(pid: str, actor: dict, body: dict) -> dict:
     else:
         try:
             days = int(days)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             raise ShareError("Pick when the link expires.")
         if days not in EXPIRY_DAYS:
             raise ShareError(f"A link lasts {', '.join(map(str, EXPIRY_DAYS))} days, or never expires.")

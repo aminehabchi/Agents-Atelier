@@ -97,6 +97,11 @@ def db_exec(sql, *args):
     return asyncio.run(go())
 
 
+# the suite sends far more than a person would; T45 tests the limits on a server of its own
+NO_RATE_LIMITS = {"API_REQUESTS_PER_MINUTE": "0", "RUNS_PER_HOUR": "0", "INVITES_PER_HOUR": "0", "SHARE_LINKS_PER_HOUR": "0",
+                  "COMMENTS_PER_HOUR": "0", "CHECKOUTS_PER_HOUR": "0"}
+
+
 def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -125,7 +130,8 @@ def setUpModule():
            # every test comes from 127.0.0.1: limits high enough for the suite, except resets, tested per fake address
            "TRUST_PROXY": "1", "SIGNUPS_PER_HOUR": "100000", "LOGINS_PER_15_MIN": "100000", "RESETS_PER_HOUR": "5",
            "LEGAL_NAME": "Test Operator SARL", "LEGAL_EMAIL": "legal@example.com",
-           "CLAUDE_KEYS": "user", "KEY_SECRET": "", "ACCOUNT_PURGE_SECONDS": "1"}     # every member runs on their own key (see register())
+           "CLAUDE_KEYS": "user", "KEY_SECRET": "", "ACCOUNT_PURGE_SECONDS": "1",     # every member runs on their own key (see register())
+           **NO_RATE_LIMITS}
     env.pop("AGENT_MODEL", None)
     global SERVER_LOG
     SERVER_LOG = open(TMP / "server.log", "w")
@@ -2098,7 +2104,7 @@ class T16BrandKit(unittest.TestCase):
         self.assertTrue((SITE(b) / "assets" / "logo.png").is_file(), "the logo is copied too")
         stranger = register(f"brand-{time.time_ns()}@example.com")
         c = self.project(stranger)
-        self.assertEqual(call("POST", f"/api/projects/{c}/brand/copy", {"from": a}, cookie=stranger)[0], 403)
+        self.assertEqual(call("POST", f"/api/projects/{c}/brand/copy", {"from": a}, cookie=stranger)[0], 404, "someone else's project: as if it didn't exist")
         # a kit saved on the account by an earlier version is offered once, as a copy source
         uid = call("GET", "/api/auth/me", cookie=stranger)[1]["user"]["id"]
         asyncio.run(_db(f"INSERT INTO brand_kits (user_id, colors, heading_font) VALUES ('{uid}', ARRAY['#abcdef'], 'Lora')"))
@@ -3052,7 +3058,8 @@ class T43PayPal(unittest.TestCase):
                "ADMIN_EMAIL": ADMIN_EMAIL, "EMAIL_OUTBOX": str(OUTBOX), "SMTP_HOST": "", "TRUST_PROXY": "1", "SIGNUPS_PER_HOUR": "100000",
                "LOGINS_PER_15_MIN": "100000", "CLAUDE_KEYS": "user", "KEY_SECRET": "",
                "PAYPAL_CLIENT_ID": "id", "PAYPAL_CLIENT_SECRET": "secret", "PAYPAL_API": f"http://127.0.0.1:{cls.paypal.port}",
-               "PAYPAL_PLAN_PRO": "P-PRO", "PAYPAL_PLAN_AGENCY": "P-AGENCY", "PAYPAL_WEBHOOK_ID": "WH-1"}
+               "PAYPAL_PLAN_PRO": "P-PRO", "PAYPAL_PLAN_AGENCY": "P-AGENCY", "PAYPAL_WEBHOOK_ID": "WH-1",
+               "PAYPAL_PLAN_PRO_YEARLY": "P-PRO-Y", "PAYPAL_PLAN_AGENCY_YEARLY": "P-AGENCY-Y", **NO_RATE_LIMITS}
         cls.log = open(TMP / "server-paypal.log", "w")
         cls.proc = subprocess.Popen([str(PYTHON), "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(cls.port)],
                                     cwd=ROOT / "server", env=env, stdout=cls.log, stderr=subprocess.STDOUT)
@@ -3150,6 +3157,27 @@ class T43PayPal(unittest.TestCase):
         self.hook("BILLING.SUBSCRIPTION.SUSPENDED", {**self.paypal.subs[sid], "status": "SUSPENDED"})
         self.assertEqual(self.plan_of(cookie)["plan"], "starter")
 
+    def test_paying_by_the_year(self):
+        cookie, uid = self.member()
+        self.assertTrue(self.call("GET", "/api/plans", cookie=cookie)[1]["yearly"])
+        self.assertEqual(self.call("POST", "/api/billing/paypal/subscribe", {"plan": "pro", "period": "weekly"}, cookie=cookie)[0], 400)
+        s, r, _ = self.call("POST", "/api/billing/paypal/subscribe", {"plan": "pro", "period": "yearly"}, cookie=cookie)
+        self.assertEqual(s, 200, r)
+        self.assertEqual(self.paypal.subs[r["id"]]["plan_id"], "P-PRO-Y")
+        self.paypal.subs[r["id"]]["status"] = "ACTIVE"
+        self.hook("BILLING.SUBSCRIPTION.ACTIVATED", self.paypal.subs[r["id"]])
+        me = self.plan_of(cookie)
+        self.assertEqual((me["plan"], me["billing_period"], me["paid_online"]), ("pro", "yearly", True))
+        by_plan = {p["id"]: p for p in self.call("GET", "/api/admin/revenue?days=30", cookie=ADMIN)[1]["by_plan"]}
+        self.assertGreaterEqual(by_plan["pro"]["yearly"], 1)
+        # the same plan, monthly instead: a new subscription, and the yearly one is cancelled once it's active
+        s, r2, _ = self.call("POST", "/api/billing/paypal/subscribe", {"plan": "pro", "period": "monthly"}, cookie=cookie)
+        self.assertEqual(s, 200, r2)
+        self.paypal.subs[r2["id"]]["status"] = "ACTIVE"
+        self.hook("BILLING.SUBSCRIPTION.ACTIVATED", self.paypal.subs[r2["id"]])
+        self.assertEqual(self.plan_of(cookie)["billing_period"], "monthly")
+        self.assertEqual(self.paypal.subs[r["id"]]["status"], "CANCELLED")
+
     def test_unsigned_webhooks_are_refused(self):
         cookie, uid = self.member()
         sid = self.call("POST", "/api/billing/paypal/subscribe", {"plan": "pro"}, cookie=cookie)[1]["id"]
@@ -3185,3 +3213,494 @@ class T44StarterInstructions(unittest.TestCase):
         self.assertTrue(call("GET", "/api/agents/css", cookie=pro)[1]["role"])
         self.assertEqual(call("GET", "/api/agents/common", cookie=pro)[0], 200)
         self.assertEqual(call("GET", "/api/agents/css/export", cookie=pro)[0], 200)
+        # no My agents / My teams pages on Starter: the marketplace instead
+        for path in ("/agents", "/agents/css", "/teams", "/teams/new"):
+            self.assertEqual(page_redirect(path, cookie=starter), (303, "/hire"), path)
+            self.assertEqual(page_redirect(path, cookie=pro)[0], 200, path)
+
+
+class FakeOAuth:
+    """A stand-in for Google and GitHub's OAuth endpoints. The code chooses who logs in: PROFILES[code]."""
+    PROFILES = {}
+
+    def __init__(self):
+        import http.server
+        import threading
+        fake = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def reply(self, status, data):
+                body = json.dumps(data).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def who(self):
+                return fake.PROFILES.get((self.headers.get("Authorization") or "").removeprefix("Bearer tok-"))
+
+            def do_POST(self):
+                form = urllib.parse.parse_qs(self.rfile.read(int(self.headers.get("Content-Length") or 0)).decode())
+                code = (form.get("code") or [""])[0]
+                if self.path == "/token" and code in fake.PROFILES and form.get("client_secret") == ["s3cret"]:
+                    return self.reply(200, {"access_token": f"tok-{code}", "token_type": "bearer"})
+                self.reply(400, {"error": "bad_verification_code"})
+
+            def do_GET(self):
+                p = self.who()
+                if not p:
+                    return self.reply(401, {"message": "Bad credentials"})
+                if self.path == "/userinfo":
+                    return self.reply(200, {"sub": p["sub"], "email": p["email"], "email_verified": p["verified"], "name": p["name"]})
+                if self.path == "/api/user":
+                    return self.reply(200, {"id": int(p["sub"]), "login": p["name"].lower(), "name": p["name"]})
+                if self.path == "/api/user/emails":
+                    return self.reply(200, [{"email": p["email"], "primary": True, "verified": p["verified"]}])
+                self.reply(404, {})
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+
+class T45OAuthAndLimits(unittest.TestCase):
+    """Log in with Google or GitHub (oauth.py), and the rate limits, on a server of their own."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.fake = FakeOAuth()
+        cls.port = free_port()
+        cls.base = f"http://127.0.0.1:{cls.port}"
+        f = cls.fake.base
+        env = {**os.environ, "STORAGE_DIR": str(TMP / "storage-oauth"), "ATELIER_WORK": str(TMP / "none"), "ATELIER_AGENTS": str(TMP / "agents"),
+               "CLAUDE_BIN": str(ROOT / "tests" / "fake-claude"), "ATELIER_ENV_FILE": str(TMP / "no.env"), "DATABASE_URL": TEST_DB_URL,
+               "ADMIN_EMAIL": ADMIN_EMAIL, "EMAIL_OUTBOX": str(OUTBOX), "SMTP_HOST": "", "TRUST_PROXY": "1", "SIGNUPS_PER_HOUR": "100000",
+               "LOGINS_PER_15_MIN": "100000", "CLAUDE_KEYS": "user", "KEY_SECRET": "",
+               "GOOGLE_CLIENT_ID": "gid", "GOOGLE_CLIENT_SECRET": "s3cret", "GITHUB_CLIENT_ID": "hid", "GITHUB_CLIENT_SECRET": "s3cret",
+               "GOOGLE_AUTH_URL": f"{f}/authorize", "GOOGLE_TOKEN_URL": f"{f}/token", "GOOGLE_USERINFO_URL": f"{f}/userinfo",
+               "GITHUB_AUTH_URL": f"{f}/authorize", "GITHUB_TOKEN_URL": f"{f}/token", "GITHUB_API_URL": f"{f}/api",
+               **NO_RATE_LIMITS, "API_REQUESTS_PER_MINUTE": "40", "SHARE_LINKS_PER_HOUR": "2"}
+        cls.log = open(TMP / "server-oauth.log", "w")
+        cls.proc = subprocess.Popen([str(PYTHON), "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(cls.port)],
+                                    cwd=ROOT / "server", env=env, stdout=cls.log, stderr=subprocess.STDOUT)
+        for _ in range(100):
+            try:
+                urllib.request.urlopen(cls.base + "/api/agents", timeout=1)
+                return
+            except urllib.error.URLError:
+                time.sleep(0.1)
+        raise RuntimeError("The OAuth test server didn't start:\n" + (TMP / "server-oauth.log").read_text())
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.proc.terminate()
+        cls.proc.wait(5)
+        cls.log.close()
+        cls.fake.server.shutdown()
+
+    def get(self, path, cookie=None):
+        """(status, Location, set-cookies) without following redirects."""
+        req = urllib.request.Request(self.base + path, headers={"Cookie": cookie} if cookie else {})
+        try:
+            with urllib.request.build_opener(NoRedirect).open(req, timeout=10) as r:
+                return r.status, r.headers.get("location"), r.headers.get_all("set-cookie") or []
+        except urllib.error.HTTPError as e:
+            with e:
+                return e.code, e.headers.get("location"), e.headers.get_all("set-cookie") or []
+
+    def login(self, provider, code, next_path="/projects"):
+        s, loc, cookies = self.get(f"/api/auth/oauth/{provider}/start?next={urllib.parse.quote(next_path)}")
+        self.assertEqual(s, 303)
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(loc).query)
+        self.assertEqual(q["redirect_uri"], [f"{self.base}/api/auth/oauth/{provider}/callback"])
+        state_cookie = next(c.split(";", 1)[0] for c in cookies if c.startswith("atelier_oauth="))
+        return self.get(f"/api/auth/oauth/{provider}/callback?code={code}&state={q['state'][0]}", cookie=state_cookie)
+
+    def me(self, set_cookies):
+        session = next(c.split(";", 1)[0] for c in set_cookies if c.startswith("atelier_session="))
+        global BASE
+        saved, BASE = BASE, self.base
+        try:
+            return call("GET", "/api/auth/me", cookie=session)[1]["user"], session
+        finally:
+            BASE = saved
+
+    def test_google_and_github_create_link_and_refuse(self):
+        n = time.time_ns()
+        self.fake.PROFILES.update({
+            f"g{n}": {"sub": f"1{n}", "email": f"ana-{n}@example.com", "verified": True, "name": "Ana Google"},
+            f"h{n}": {"sub": f"2{n}", "email": f"ana-{n}@example.com", "verified": True, "name": "Ana Hub"},
+            f"u{n}": {"sub": f"3{n}", "email": f"nope-{n}@example.com", "verified": False, "name": "Not Verified"},
+        })
+        global BASE
+        saved, BASE = BASE, self.base
+        try:
+            opts = call("GET", "/api/auth/options", cookie=None)[1]
+        finally:
+            BASE = saved
+        self.assertEqual([p["id"] for p in opts["oauth"]], ["google", "github"])
+        s, loc, cookies = self.login("google", f"g{n}")
+        self.assertEqual((s, loc), (303, "/projects"))
+        user, _ = self.me(cookies)
+        self.assertEqual((user["email"], user["confirmed"], user["has_password"], user["name"]), (f"ana-{n}@example.com", True, False, "Ana Google"))
+        # GitHub with the same verified email: the same account, now linked twice
+        s, loc, cookies = self.login("github", f"h{n}")
+        self.assertEqual(self.me(cookies)[0]["id"], user["id"])
+        # an unverified email is refused; a forged or missing state too
+        s, loc, _ = self.login("google", f"u{n}")
+        self.assertTrue(loc.startswith("/login?oauth_error="), loc)
+        self.assertEqual(self.get(f"/api/auth/oauth/google/callback?code=g{n}&state=forged")[1].split("?")[0], "/login")
+        self.assertTrue(self.get("/api/auth/oauth/twitter/start")[1].startswith("/login?oauth_error="))
+        self.assertEqual(self.get("/api/auth/oauth/google/start?next=//evil.example")[0], 303)
+        s, loc, cookies = self.login("google", f"g{n}", next_path="//evil.example")
+        self.assertEqual(loc, "/", "only paths on this site")
+
+    def test_an_existing_password_account_is_linked_by_its_verified_email(self):
+        email = f"pw-{time.time_ns()}@example.com"
+        cookie = register(email)                          # main server, same database
+        uid = call("GET", "/api/auth/me", cookie=cookie)[1]["user"]["id"]
+        self.fake.PROFILES[f"x{uid}"] = {"sub": f"9{time.time_ns()}", "email": email, "verified": True, "name": "Same Person"}
+        s, loc, cookies = self.login("google", f"x{uid}")
+        user, _ = self.me(cookies)
+        self.assertEqual((user["id"], user["has_password"]), (uid, True))
+
+    def test_rate_limits(self):
+        cookie = register(f"busy-{time.time_ns()}@example.com")
+        global BASE
+        saved, BASE = BASE, self.base
+        try:
+            pid = new_project(cookie=cookie)
+            self.assertEqual(call("POST", f"/api/projects/{pid}/share", {"days": 7}, cookie=cookie)[0], 200)
+            self.assertEqual(call("POST", f"/api/projects/{pid}/share", {"days": 7}, cookie=cookie)[0], 200)
+            s, r, h = call("POST", f"/api/projects/{pid}/share", {"days": 7}, cookie=cookie)
+            self.assertEqual(s, 429, "SHARE_LINKS_PER_HOUR=2")
+            statuses = [call("GET", "/api/auth/me", cookie=cookie)[0] for _ in range(45)]
+            self.assertIn(429, statuses, "API_REQUESTS_PER_MINUTE=40")
+            s, r, h = call("GET", "/api/auth/me", cookie=cookie)
+            self.assertEqual(s, 429)
+            self.assertTrue(int(h["Retry-After"]) > 0)
+            other = register(f"calm-{time.time_ns()}@example.com")
+            self.assertEqual(call("GET", "/api/auth/me", cookie=other)[0], 200, "counted per member")
+        finally:
+            BASE = saved
+
+
+# ---------------------------------------------------------------- error handling: no 500s, readable messages, outages
+
+class FlakyProxy:
+    """A TCP proxy in front of Postgres that can be cut and restored, to see the server while its database is unreachable."""
+
+    def __init__(self, host, port):
+        self.target, self.port, self.conns, self.listener = (host, port), free_port(), [], None
+        self.restore()
+
+    def restore(self):
+        import threading
+        self.listener = socket.socket()
+        self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.listener.bind(("127.0.0.1", self.port))
+        self.listener.listen(32)
+        threading.Thread(target=self._accept, args=(self.listener,), daemon=True).start()
+
+    def _accept(self, listener):
+        import threading
+        while True:
+            try:
+                client, _ = listener.accept()
+                upstream = socket.create_connection(self.target, timeout=5)
+                upstream.settimeout(None)
+            except OSError:
+                return
+            self.conns += [client, upstream]
+            for a, b in ((client, upstream), (upstream, client)):
+                threading.Thread(target=self._pipe, args=(a, b), daemon=True).start()
+
+    @staticmethod
+    def _pipe(a, b):
+        try:
+            while data := a.recv(65536):
+                b.sendall(data)
+        except OSError:
+            pass
+        finally:
+            for s in (a, b):
+                try:
+                    s.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+
+    def cut(self):
+        self.listener.close()
+        for s in self.conns:
+            try:
+                s.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            s.close()
+        self.conns = []
+
+
+def zip_bytes(files: dict) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in files.items():
+            z.writestr(name, data)
+    return buf.getvalue()
+
+
+class T46ErrorHandling(unittest.TestCase):
+    """Whatever a person sends, the answer is JSON with a readable `detail` and the right status, never a 500 or a hang."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.member = register(f"errors-{time.time_ns()}@example.com")
+        cls.pid = new_project(cookie=cls.member)
+        s, link, _ = call("POST", f"/api/projects/{cls.pid}/share", {"days": 7}, cookie=cls.member)
+        cls.token = link["token"]
+
+    def assertReadable(self, s, r, where, statuses=None):
+        self.assertLess(s, 500, (where, s, r))
+        if statuses:
+            self.assertIn(s, statuses, (where, s, r))
+        self.assertIsInstance(r, dict, where)
+        self.assertIsInstance(r.get("detail"), str, where)
+        self.assertTrue(r["detail"].strip() and "Traceback" not in r["detail"] and "asyncpg" not in r["detail"], (where, r))
+
+    def test_bodies_that_arent_objects_get_a_readable_422(self):
+        routes = [("POST", "/api/projects"), ("PATCH", f"/api/projects/{self.pid}"), ("PUT", f"/api/projects/{self.pid}/files"),
+                  ("PUT", f"/api/projects/{self.pid}/contact"), ("POST", f"/api/projects/{self.pid}/share"),
+                  ("POST", "/api/auth/login"), ("PATCH", "/api/auth/me"), ("POST", "/api/agents/order"), ("POST", "/api/presets"),
+                  ("PUT", f"/api/projects/{self.pid}/brand"), ("POST", "/api/import"), ("PUT", "/api/auth/run-limit"),
+                  ("POST", f"/s/{self.token}/comments")]
+        for method, path in routes:
+            for raw, words in ((b"[]", "JSON object"), (b'"text"', "JSON object"), (b"null", "JSON object"), (b"42", "JSON object"),
+                               (b"", "needs a JSON body"), (b"{oops", "isn't valid JSON")):
+                s, r, _ = call(method, path, raw=raw, cookie=self.member)
+                self.assertReadable(s, r, (method, path, raw), (422,))
+                self.assertIn(words, r["detail"], (method, path, raw))
+
+    def test_wrong_types_in_fields_never_give_a_500(self):
+        pid = self.pid
+        cases = [  # the bugs found by sending wrong types: each one answered 500 before
+            ("POST", "/api/agents/order", {"ids": 5}), ("POST", "/api/agents/order", {"ids": [1, {}]}),
+            ("PUT", f"/api/projects/{pid}/brand", {"colors": 5}), ("PUT", f"/api/projects/{pid}/brand", {"colors": True}),
+            ("POST", "/api/presets", {"name": "T", "agents": 5}), ("POST", "/api/presets", {"name": "T", "agents": True}),
+            ("PUT", f"/api/projects/{pid}/ratings", {"agent": "html", "value": float("inf")}),
+            ("POST", f"/api/projects/{pid}/share", {"days": float("inf")}),
+            ("PUT", f"/api/projects/{pid}/files", {"path": "a\x00.html", "content": "x"}),
+            ("POST", "/api/auth/login", {"email": "a\x00@example.com", "password": "x"}),
+            ("POST", "/api/auth/reset", {"email": "a\x00@example.com", "code": "123456", "password": "long enough pw"}),
+            ("POST", "/api/presets", {"name": "Nul\x00team", "agents": ["html"]}),
+            ("POST", "/api/projects", {"name": "P", "description": "D", "pages": [None, "About"]}),
+            ("POST", "/api/agents", {"id": "pos-test", "name": "Pos", "role": "You are a position test agent.", "position": "first"}),
+            ("POST", "/api/projects/import", {"name": "P", "description": "D", "files": 5}),
+            ("POST", "/api/import", {"name": "team.json", "data": b64(json.dumps({"format": "agents-atelier-team", "team": "x",
+                                                                                   "agents": 5}).encode())}),
+        ]
+        for method, path, body in cases:
+            s, r, _ = call(method, path, raw=json.dumps(body).encode(), cookie=self.member)
+            self.assertLess(s, 500, (method, path, body, r))
+            if s >= 400:
+                self.assertReadable(s, r, (method, path, body))
+        # an agent with a bad position isn't half-created
+        self.assertNotIn("pos-test", [a["id"] for a in call("GET", "/api/agents", cookie=self.member)[1]])
+        # the admin-only market review with an id no database can hold
+        for pk in (1e308, float("inf"), 10 ** 30):
+            s, r, _ = call("POST", "/api/market/review", raw=json.dumps({"kind": "agent", "pk": pk, "decision": "approve"}).encode())
+            self.assertReadable(s, r, ("review", pk), (400, 404))
+
+    def test_a_sweep_of_bad_values_on_every_form(self):
+        pid = self.pid
+        forms = [("POST", "/api/projects", {"name": "P", "description": "D", "pages": ["Home"], "brief": {}, "brand": {"colors": []}}),
+                 ("PATCH", f"/api/projects/{pid}", {"name": "P", "description": "D", "agents": ["html"], "pages": ["Home"], "brief": {}}),
+                 ("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": "<h1>x</h1>"}),
+                 ("PUT", f"/api/projects/{pid}/contact", {"whatsapp": "+212600000000", "email": "a@example.com"}),
+                 ("POST", f"/api/projects/{pid}/uploads", {"name": "a.png", "data": "data:image/png;base64,iVBORw0KGgo="}),
+                 ("POST", f"/api/projects/{pid}/assets", {"name": "a.png", "data": "data:image/png;base64,iVBORw0KGgo=", "kind": "photo"}),
+                 ("POST", f"/api/projects/{pid}/versions", {"label": "x"}),
+                 ("POST", f"/api/projects/{pid}/share", {"label": "x", "days": 7, "comments": True}),
+                 ("POST", f"/api/projects/{pid}/people", {"email": "someone@example.com", "role": "viewer"}),
+                 ("POST", f"/api/projects/{pid}/brand/copy", {"from": pid, "logo_only": False}),
+                 ("PUT", f"/api/projects/{pid}/ratings", {"agent": "html", "value": 1, "comment": "x"}),
+                 ("POST", "/api/presets", {"name": "Sweep", "description": "d", "agents": ["html"], "prompt": "p"}),
+                 ("POST", "/api/agents/order", {"ids": []}),
+                 ("PATCH", "/api/auth/preferences", {"language": "en", "theme": "dark"}),
+                 ("PUT", "/api/auth/run-limit", {"limit": 5}),
+                 ("POST", "/api/auth/plan", {"plan": "agency"}),
+                 ("POST", "/api/market/publish", {"kind": "agent", "id": "html", "category": "build"}),
+                 ("POST", f"/s/{self.token}/comments", {"text": "t", "page": "index.html", "x": 0.5, "y": 0.5, "viewport": 1000})]
+        values = [None, 5, -1, 1e308, float("inf"), float("nan"), True, [], [1, {}], {}, {"a": [1]}, "x" * 20000, "\x00", "../../x", 10 ** 30]
+        for method, path, form in forms:
+            for field in form:
+                for v in values:
+                    s, r, _ = call(method, path, raw=json.dumps({**form, field: v}).encode(), cookie=self.member)
+                    self.assertLess(s, 500, (method, path, field, repr(v)[:20], r))
+                    if s >= 400:
+                        self.assertReadable(s, r, (method, path, field, repr(v)[:20]))
+
+    def test_ids_in_urls_that_cant_exist(self):
+        for path in ("/api/projects/not-a-uuid", f"/api/projects/{uuid.uuid4()}/files", "/api/agents?project=nope",
+                     "/api/stats?project=nope"):
+            s, r, _ = call("GET", path, cookie=self.member)
+            self.assertReadable(s, r, path, (404,))
+            self.assertIn("doesn't exist", r["detail"])
+        for path in ("/api/market/agents/99999999999999999999/hire", "/api/market/teams/99999999999999999999/hire",
+                     "/api/market/agents/-1/hire"):
+            s, r, _ = call("POST", path, cookie=self.member)
+            self.assertReadable(s, r, path, (404,))
+        s, r, _ = call("GET", "/api/market/agents/99999999999999999999", cookie=self.member)
+        self.assertReadable(s, r, "market profile", (404,))
+        for path in (f"/work/{self.pid}/%00", f"/media/{self.pid}/uploads/a%00b", f"/s/{self.token}/site/%00"):
+            self.assertEqual(call("GET", path, cookie=self.member)[0], 404, path)
+
+    def test_unknown_api_addresses_and_methods(self):
+        s, r, h = call("GET", "/api/no-such-thing", cookie=self.member)
+        self.assertReadable(s, r, "unknown", (404,))
+        self.assertIn("nothing at this address", r["detail"])
+        s, r, h = call("DELETE", "/api/auth/me", cookie=self.member)
+        self.assertReadable(s, r, "method", (405,))
+        self.assertEqual(r["detail"], "This address doesn't accept DELETE requests (it accepts GET, PATCH).")
+        self.assertEqual(h["Allow"], "GET, PATCH")
+        s, r, _ = call("GET", "/api/projects?page=abc", cookie=self.member)
+        self.assertEqual((s, r["detail"]), (422, "“page” must be a whole number."))
+        s, r, _ = call("GET", "/api/agents?full=maybe", cookie=self.member)
+        self.assertEqual((s, r["detail"]), (422, "“full” must be true or false."))
+
+    def test_damaged_zips_are_explained(self):
+        good = zip_bytes({"index.html": "<h1>" + base64.b64encode(os.urandom(900)).decode() + "</h1>"})
+        start = good.index(b"index.html") + len("index.html")
+        broken = good[:start + 20] + bytes(b ^ 0xFF for b in good[start + 20:start + 40]) + good[start + 40:]
+        s, r, _ = call("POST", "/api/projects/import", {"name": "Broken", "description": "A damaged zip.",
+                                                        "zip": base64.b64encode(broken).decode()}, cookie=self.member)
+        self.assertReadable(s, r, "import", (400,))
+        s, r, _ = call("POST", "/api/import", {"name": "agents.zip", "data": base64.b64encode(
+            zip_bytes({"agents/01-x.md": "---\nname: X\n---\nYou are X." * 50})[:-30] + b"\x00" * 30).decode()}, cookie=self.member)
+        self.assertReadable(s, r, "agents import", (400,))
+
+    def test_another_members_project_is_not_found_when_copying_its_brand(self):
+        other = register(f"other-brand-{time.time_ns()}@example.com")
+        theirs = new_project(cookie=other)
+        s, r, _ = call("POST", f"/api/projects/{self.pid}/brand/copy", {"from": theirs}, cookie=self.member)
+        self.assertEqual((s, r["detail"]), (404, "That project doesn't exist any more."))
+
+    def test_paypal_webhook_with_a_body_that_isnt_an_event(self):
+        for raw in (b"[]", b"5", b"not json"):
+            s, r, _ = call("POST", "/api/billing/paypal/webhook", raw=raw, cookie=None)
+            self.assertReadable(s, r, raw, (400,))
+
+    def test_websocket_errors_are_answered_and_the_socket_stays_open(self):
+        pid = new_project(cookie=self.member)
+
+        async def script(sock, recv):
+            answers = []
+            for raw in [b"\x00\x01binary", send({"text": "no type"}), send({"type": None}), send({"type": 5}),
+                        send({"type": "prompt", "text": "hi", "agents": 5}), send({"type": "prompt", "text": "hi", "images": "x"}),
+                        send({"type": "retry", "agent": "nobody"}), send({"type": "x" * 1000}), "x" * (300 * 1024)]:
+                await sock.send(raw)
+                answers.append((await recv())[-1])
+            await sock.send(send({"type": "dance"}))          # still open after all that
+            answers.append((await recv())[-1])
+            return answers
+        answers = ws(pid, script, cookie=self.member)
+        self.assertTrue(all(a["type"] == "error" and a["text"] for a in answers), answers)
+        self.assertIn("JSON text", answers[0]["text"])
+        self.assertIn("needs a type", answers[1]["text"])
+        self.assertIn("must be a list", answers[4]["text"])
+        self.assertIn("must be a list", answers[5]["text"])
+        self.assertIn("no agent called", answers[6]["text"])
+        self.assertLess(len(answers[7]["text"]), 120)
+        self.assertIn("the limit is", answers[8]["text"])
+        self.assertIn("Unknown message type", answers[9]["text"])
+        self.assertFalse(any("Traceback" in a["text"] or "ref " in a["text"] for a in answers), answers)
+
+    def test_a_message_after_the_project_was_deleted(self):
+        pid = new_project(cookie=self.member)
+
+        async def script(sock, recv):
+            self.assertEqual(call("DELETE", f"/api/projects/{pid}", cookie=self.member)[0], 200)
+            await sock.send(send({"type": "prompt", "text": "still there?"}))
+            got = (await recv())[-1]
+            try:
+                await asyncio.wait_for(sock.recv(), 5)
+            except websockets.ConnectionClosed as e:
+                return got, e.code
+            return got, None
+        got, code = ws(pid, script, cookie=self.member)
+        self.assertEqual((got["type"], got.get("gone"), code), ("error", True, 4404))
+        self.assertIn("doesn't exist", got["text"])
+
+    def test_the_database_going_away_gives_503_then_recovers(self):
+        url = urllib.parse.urlsplit(TEST_DB_URL)
+        proxy = FlakyProxy(url.hostname, url.port or 5432)
+        port = free_port()
+        base = f"http://127.0.0.1:{port}"
+        env = {**os.environ, "STORAGE_DIR": str(TMP / "storage-outage"), "ATELIER_WORK": str(TMP / "none"),
+               "ATELIER_AGENTS": str(TMP / "agents"), "CLAUDE_BIN": str(ROOT / "tests" / "fake-claude"),
+               "ATELIER_ENV_FILE": str(TMP / "no.env"), "ADMIN_EMAIL": ADMIN_EMAIL, "EMAIL_OUTBOX": str(OUTBOX), "SMTP_HOST": "",
+               "TRUST_PROXY": "1", "SIGNUPS_PER_HOUR": "100000", "LOGINS_PER_15_MIN": "100000", "CLAUDE_KEYS": "user", "KEY_SECRET": "",
+               "DATABASE_URL": url._replace(netloc=f"{url.username}:{url.password}@127.0.0.1:{proxy.port}").geturl(), **NO_RATE_LIMITS}
+        log = open(TMP / "server-outage.log", "w")
+        proc = subprocess.Popen([str(PYTHON), "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(port)],
+                                cwd=ROOT / "server", env=env, stdout=log, stderr=subprocess.STDOUT)
+        global BASE
+        saved = BASE
+        try:
+            for _ in range(100):
+                try:
+                    urllib.request.urlopen(base + "/api/agents", timeout=1)
+                    break
+                except urllib.error.URLError:
+                    time.sleep(0.1)
+            BASE = base
+            cookie = register(f"outage-{time.time_ns()}@example.com", key=False, plan=None)
+            self.assertEqual(call("GET", "/api/auth/me", cookie=cookie)[0], 200)
+            proxy.cut()
+            started = time.time()
+            s, r, h = call("GET", "/api/auth/me", cookie=cookie)
+            self.assertEqual((s, r["detail"]), (503, "The database isn't reachable right now. Try again in a minute."))
+            self.assertEqual(h["Retry-After"], "30")
+            s, r, _ = call("GET", "/api/projects", cookie=cookie)
+            self.assertEqual(s, 503)
+            s, page, _ = call("GET", "/projects", cookie=cookie, headers={"Accept": "text/html"})
+            self.assertEqual(s, 503)
+            self.assertIn("database isn't reachable", page)
+            self.assertLess(time.time() - started, 25, "no hang while the database is away")
+            proxy.restore()
+            for _ in range(50):
+                if call("GET", "/api/auth/me", cookie=cookie)[0] == 200:
+                    break
+                time.sleep(0.2)
+            self.assertEqual(call("GET", "/api/auth/me", cookie=cookie)[0], 200, "back once the database is")
+        finally:
+            BASE = saved
+            proc.terminate()
+            proc.wait(10)
+            log.close()
+            proxy.cut()
+        server_log = (TMP / "server-outage.log").read_text()
+        self.assertNotIn("Unhandled error", server_log)
+
+
+class T46YearlyRequests(unittest.TestCase):
+    """Without PayPal, an upgrade request says monthly or yearly, and approving it keeps that period."""
+
+    def test_a_yearly_request_is_approved_as_yearly(self):
+        email = f"yearly-{time.time_ns()}@example.com"
+        cookie = register(email, plan="starter")
+        uid = call("GET", "/api/auth/me", cookie=cookie)[1]["user"]["id"]
+        plans_now = call("GET", "/api/plans", cookie=cookie)[1]["plans"]
+        self.assertEqual({p["id"]: p.get("price_yearly") for p in plans_now}, {"starter": None, "pro": 90, "agency": 290})
+        self.assertEqual(call("POST", "/api/auth/plan", {"plan": "pro", "period": "weekly"}, cookie=cookie)[0], 400)
+        s, r, _ = call("POST", "/api/auth/plan", {"plan": "pro", "period": "yearly"}, cookie=cookie)
+        self.assertEqual((s, r["user"]["plan_request"], r["user"]["plan_request_period"]), (200, "pro", "yearly"))
+        mail = [json.loads(l) for l in OUTBOX.read_text().splitlines() if email in json.loads(l)["subject"]][-1]
+        self.assertIn("paid yearly: $90 a year", mail["text"])
+        s, r, _ = call("PATCH", f"/api/users/{uid}", {"plan": "pro"})
+        self.assertEqual((r["plan"], r["billing_period"]), ("pro", "yearly"))
+        by_plan = {p["id"]: p for p in call("GET", "/api/admin/revenue?days=30")[1]["by_plan"]}
+        self.assertGreaterEqual(by_plan["pro"]["yearly"], 1)
+
