@@ -18,6 +18,7 @@ Markers inside the prompt choose what happens during an agent run:
   [[research-escape]]  the Research agent also edits index.html and creates evil.html (the server must undo both)
   (the Critic always ends with "Score: 8.5/10.")
   [[qr]]            the QR codes agent writes qr.json (one good code, one with a bad file name)
+  [[pricey]]        each agent run costs $0.60 (to test the spending limit per run)
   [[new-page]]      the HTML agent also creates about.html (titled "About us") and a page with a bad name, Bad Name.html
 
 The Research agent writes research.md (with a WebSearch step) instead of touching index.html.
@@ -30,7 +31,11 @@ markers inside <user_request>:
   [[orch-confirm]]  picks design + css, but waits for the user's yes
   [[orch-garbage]]  replies with text that isn't JSON (the server falls back to the whole team)
 
-Every call is appended to $FAKE_CLAUDE_LOG as one JSON line: {"argv": [...], "cwd": "..."}.
+Every call is appended to $FAKE_CLAUDE_LOG as one JSON line: {"argv": [...], "cwd": "...", "key": "<last 4 of
+ANTHROPIC_API_KEY or ''>", "home": "<CLAUDE_CONFIG_DIR>", "env": [names of the variables it got]}.
+
+An ANTHROPIC_API_KEY containing "bad" is refused like Claude does (invalid x-api-key); one containing "broke" has
+no credit left.
 """
 
 import json
@@ -50,7 +55,8 @@ def arg(name):
 
 if os.environ.get("FAKE_CLAUDE_LOG"):
     with open(os.environ["FAKE_CLAUDE_LOG"], "a") as f:
-        f.write(json.dumps({"argv": args, "cwd": os.getcwd()}) + "\n")
+        f.write(json.dumps({"argv": args, "cwd": os.getcwd(), "key": os.environ.get("ANTHROPIC_API_KEY", "")[-4:],
+                            "home": os.environ.get("CLAUDE_CONFIG_DIR", ""), "env": sorted(os.environ)}) + "\n")
 
 if "--help" in args:
     print("Usage: claude [options] [command] [prompt]\n\n"
@@ -59,6 +65,13 @@ if "--help" in args:
           "                    'fable', 'opus', or 'sonnet') or a\n"
           "                    model's full name.\n")
     sys.exit(0)
+
+KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+if "bad" in KEY or "broke" in KEY:
+    reason = ("Invalid API key · Fix external API key: authentication_error invalid x-api-key" if "bad" in KEY
+              else "Your credit balance is too low to access the Anthropic API.")
+    print(json.dumps({"type": "result", "subtype": "success", "is_error": True, "result": reason, "total_cost_usd": 0}))
+    sys.exit(1)
 
 prompt = arg("-p") or ""
 model = arg("--model") or "default"
@@ -117,7 +130,7 @@ if "[[slow]]" in prompt:
 
 def result(text, is_error=False, denials=()):
     out({"type": "result", "subtype": "error" if is_error else "success", "is_error": is_error, "result": text,
-         "total_cost_usd": 0.0123, "num_turns": 3, "duration_api_ms": 1500,
+         "total_cost_usd": 0.6 if "[[pricey]]" in prompt else 0.0123, "num_turns": 3, "duration_api_ms": 1500,
          "usage": {"input_tokens": 100, "cache_read_input_tokens": 50, "output_tokens": 20},
          "permission_denials": list(denials)})
 

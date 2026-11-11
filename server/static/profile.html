@@ -52,6 +52,29 @@
   .form-end { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
   .perr { color: var(--danger); font-size: 13px; line-height: 1.5; margin: 0 0 12px; }
   .perr:empty { display: none; }
+  .key-steps { margin: 0 0 16px; padding-inline-start: 20px; display: grid; gap: 6px; font-size: 14px; line-height: 1.55; color: var(--graphite); }
+  .key-on { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; border-radius: var(--r); background: var(--mist); }
+  .key-ic { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--add-bg, var(--ice)); color: var(--ok); flex: none; }
+  .key-txt { flex: 1 1 200px; min-width: 0; display: grid; gap: 2px; }
+  .key-txt b { font: 500 14px var(--mono, monospace); }
+  .key-txt small { font-size: 12px; color: var(--stone); }
+  .plans { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); margin-bottom: 12px; }
+  .plan { border: 1px solid var(--line-strong); border-radius: var(--r); padding: 16px; display: grid; gap: 10px; align-content: start; }
+  .plan.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .plan header { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+  .plan header b { font-size: 15px; font-weight: 500; }
+  .plan .price b { font-size: 24px; font-weight: 500; }
+  .plan .price span { font-size: 13px; color: var(--stone); margin-inline-start: 4px; }
+  .plan ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; line-height: 1.45; }
+  .plan li { display: grid; grid-template-columns: 14px 1fr; gap: 8px; align-items: start; color: var(--graphite); }
+  .plan li svg { margin-top: 3px; color: var(--ok); }
+  .plan li.no { color: var(--stone); }
+  .plan li.no svg { color: var(--stone); }
+  .plan-note { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--stone); margin: 0 0 16px; }
+  .limit { border-top: 1px solid var(--line); padding-top: 16px; }
+  .limit-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .limit-row .input { width: 120px; }
+  .limit-row .cur { color: var(--stone); }
   .saved { font-size: 13px; color: var(--ok); display: inline-flex; align-items: center; gap: 6px; }
   .saved:empty { display: none; }
 
@@ -125,10 +148,99 @@ function wirePeek(root) {
   }; });
 }
 
+/* ---------- the member's own Claude API key: checked with one tiny call, kept encrypted, never shown again ---------- */
+let me, planInfo;
+function paintKey() {
+  const box = $("key-box"); if (!box) return;
+  const k = me.claude_key || {};
+  box.innerHTML = k.set ? `
+    <div class="key-on">
+      <span class="key-ic">${icon("check", { size: 16 })}</span>
+      <div class="key-txt"><b data-no-i18n>${esc(k.hint)}</b><small>Working${k.checked ? ` · checked ${esc(ago(k.checked))}` : ""}. Your projects run on this key.</small></div>
+      <button class="btn btn-ghost btn-sm" type="button" id="key-replace">${icon("refresh", { size: 14 })}Replace</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="key-remove">${icon("trash", { size: 14 })}Remove</button>
+    </div>` : keyForm();
+  wireKey();
+}
+const keyForm = (replacing = false) => `
+  <ol class="key-steps">
+    <li>Open <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>, add a little credit, and create an API key.</li>
+    <li>Paste it here. The server checks it with one tiny call (well under a cent) and keeps it encrypted. Only its last four characters are ever shown.</li>
+  </ol>
+  <form id="key-form" novalidate>
+    <div class="pf"><label for="key-input"><span>API key</span><em>starts with sk-ant-</em></label>
+      <input class="input mono" id="key-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" data-no-i18n></div>
+    <p class="perr" id="key-err" role="alert"></p>
+    <div class="form-end"><button class="btn btn-dark" id="key-go">${icon("check", { size: 15 })}Check and save</button>
+      ${replacing ? `<button class="btn btn-ghost" type="button" id="key-cancel">Cancel</button>` : ""}
+      <span class="saved" id="key-saved" role="status"></span></div>
+  </form>`;
+function wireKey() {
+  $("key-replace")?.addEventListener("click", () => { $("key-box").innerHTML = keyForm(true); wireKey(); $("key-input").focus(); });
+  $("key-cancel")?.addEventListener("click", paintKey);
+  $("key-remove")?.addEventListener("click", async () => {
+    if (!await confirmDialog({ title: "Remove your API key?", ok: "Remove", danger: true,
+      text: "The agents can't work until you add a key again. Your projects stay as they are." })) return;
+    try { me = (await api("/api/auth/claude-key", { method: "DELETE" })).user; paintKey(); toast("API key removed"); }
+    catch (err) { toast(err.message, "err"); }
+  });
+  const form = $("key-form"); if (!form) return;
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const key = $("key-input").value.trim();
+    $("key-err").textContent = "";
+    if (!key.startsWith("sk-ant-")) { $("key-err").textContent = "A Claude API key starts with sk-ant-."; return $("key-input").focus(); }
+    $("key-go").disabled = true; $("key-saved").textContent = "Checking with Claude…";
+    try {
+      me = (await send("/api/auth/claude-key", "PUT", { key })).user;
+      paintKey(); paintPlan(); toast("API key saved: your agents are ready");
+    } catch (err) { $("key-err").textContent = err.message; $("key-saved").textContent = ""; $("key-go").disabled = false; }
+  };
+}
+
+/* ---------- plan: what it includes, and the spending limit per run ---------- */
+const PLAN_FEATURES = (p) => [
+  [p.projects == null ? "Unlimited projects" : `Up to ${p.projects} projects`, true],
+  ["Official agents and ready teams", true],
+  ["Your own agents and teams", p.custom_agents],
+  ["Web research agent", p.research],
+  [p.browser_checks === "all" ? "Browser checks before Responsive, Accessibility, QA and the Critic" : "Browser check before the Critic", true],
+  [p.versions == null ? "Every version kept" : `Last ${p.versions} versions kept`, true],
+  ["Publish to the marketplace", p.publish],
+  [p.credit ? "Downloads carry a small “Made with Agents Atelier” line" : "Downloads without the credit line", !p.credit],
+];
+function paintPlan() {
+  const box = $("plan-box"); if (!box) return;
+  const isAdmin = me.role === "admin";
+  const cur = planInfo.plans.find(p => p.id === me.plan) || planInfo.plans[0];
+  const max = isAdmin ? 1000 : cur.run_limit_max, fixed = !isAdmin && cur.run_limit === cur.run_limit_max;
+  box.innerHTML = `
+    <div class="plans">${planInfo.plans.map(p => `<article class="plan ${p.id === me.plan ? "on" : ""}">
+      <header><b>${esc(p.name)}</b>${p.id === me.plan ? `<span class="badge">${isAdmin ? "Admin: every feature" : "Your plan"}</span>` : ""}</header>
+      <div class="price"><b>${p.price ? `$${p.price}` : "Free"}</b>${p.price ? "<span>/ month</span>" : ""}</div>
+      <ul>${PLAN_FEATURES(p).map(([text, ok]) => `<li class="${ok ? "" : "no"}">${icon(ok ? "check" : "x", { size: 14 })}<span>${esc(text)}</span></li>`).join("")}</ul>
+    </article>`).join("")}</div>
+    <p class="plan-note">${icon("alert", { size: 14 })}<span>To change your plan, contact the site's admin.</span></p>
+    ${planInfo.keys === "user" ? `<form id="limit-form" class="limit" novalidate>
+      <div class="pf"><label for="limit-input"><span>Spending limit per run</span><em>${fixed ? `fixed at $${cur.run_limit} on ${esc(cur.name)}` : `$0.50 to $${max}`}</em></label>
+        <div class="limit-row"><span class="cur">$</span><input class="input" id="limit-input" type="number" min="0.5" max="${max}" step="0.5" value="${me.run_limit}" ${fixed ? "disabled" : ""}>
+          ${fixed ? "" : `<button class="btn btn-ghost" id="limit-go">Save limit</button>`}<span class="saved" id="limit-saved" role="status"></span></div>
+        <small class="help">When a run reaches it, the agents stop after the current step. Press Continue to keep going.</small></div>
+      <p class="perr" id="limit-err" role="alert"></p></form>` : ""}`;
+  const form = $("limit-form");
+  if (form) form.onsubmit = async (e) => {
+    e.preventDefault();
+    $("limit-err").textContent = "";
+    try { me = (await send("/api/auth/run-limit", "PUT", { limit: $("limit-input").value })).user; $("limit-saved").textContent = "Saved"; }
+    catch (err) { $("limit-err").textContent = err.message; }
+  };
+}
+
 async function load() {
-  let me, opts, sessions;
+  let opts, sessions;
   try {
-    [me, opts, sessions] = await Promise.all([api("/api/auth/me").then(r => r.user), api("/api/auth/options"), api("/api/auth/sessions")]);
+    [me, opts, sessions, planInfo] = await Promise.all([api("/api/auth/me").then(r => r.user), api("/api/auth/options"), api("/api/auth/sessions"),
+                                                       api("/api/plans")]);
   } catch (err) { return showError(app, err, load, "Couldn't load your profile"); }
   app.innerHTML = `
     <section class="hero">
@@ -142,6 +254,8 @@ async function load() {
 
     <div class="layout">
       <nav class="toc" id="toc" aria-label="Sections of your profile">
+        ${planInfo.keys === "user" ? `<a href="#claude-key">${icon("lock", { size: 15 })}<span>Claude API key</span></a>` : ""}
+        <a href="#plan">${icon("briefcase", { size: 15 })}<span>Plan</span></a>
         <a href="#preferences">${icon("sliders", { size: 15 })}<span>Preferences</span></a>
         <a href="#details">${icon("user", { size: 15 })}<span>Your details</span></a>
         <a href="#password-section">${icon("lock", { size: 15 })}<span>Password</span></a>
@@ -150,6 +264,18 @@ async function load() {
         <a href="#delete" class="danger">${icon("trash", { size: 15 })}<span>Delete account</span></a>
       </nav>
       <div>
+        ${planInfo.keys === "user" ? `<section class="sect" id="claude-key">
+          <h2>Claude API key</h2>
+          <p>The agents run on your own Claude account, so you pay Anthropic directly for what they use, at their prices. A full site costs about $1.50–2, a small change about $0.20–0.50.</p>
+          <div id="key-box"></div>
+        </section>` : ""}
+
+        <section class="sect" id="plan">
+          <h2>Plan</h2>
+          <p>Your plan unlocks features.${planInfo.keys === "user" ? " The AI itself is always paid on your own Claude account." : ""}</p>
+          <div id="plan-box"></div>
+        </section>
+
         <section class="sect" id="preferences">
           <h2>Preferences</h2>
           <p>Saved on your account, so they follow you to your other devices.</p>
@@ -211,6 +337,7 @@ async function load() {
       </div>
     </div>`;
   wirePeek(app);
+  paintKey(); paintPlan();
 
   /* the contents list follows the section you're reading */
   const links = [...$("toc").querySelectorAll("a")];

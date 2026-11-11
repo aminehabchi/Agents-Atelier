@@ -49,19 +49,24 @@
 document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
 const list = document.getElementById("list");
 const LABEL = { admin: "Admin", user: "User", unconfirmed: "Not confirmed" };
+const PLAN = { starter: "Starter", pro: "Pro", agency: "Agency" };
 let users = [], me = null, page = 1, perPage = perPagePref("users", 10);
 const cell = (v) => (v ? esc(v) : `<span class="muted">-</span>`);
 function draw() {
   const pg = paginate(users, page, perPage);
   page = pg.page;
   list.innerHTML = `<div class="table-wrap"><table class="utable">
-    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Company</th><th scope="col">Occupation</th><th scope="col">Builds for</th><th scope="col">Heard from</th><th scope="col">Joined</th><th scope="col">Role</th></tr></thead>
+    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Company</th><th scope="col">Occupation</th><th scope="col">Builds for</th><th scope="col">Heard from</th><th scope="col">Joined</th><th scope="col">Claude key</th><th scope="col">Plan</th><th scope="col">Role</th></tr></thead>
     <tbody>${pg.items.map(u => `<tr>
       <td class="who"><b data-no-i18n>${esc(u.name || "-")}</b>${u.id === me.id ? ` <span class="badge">you</span>` : ""}</td>
       <td data-no-i18n>${esc(u.email)}</td>
       <td data-no-i18n>${cell(u.company)}</td>
       <td>${cell(u.job_role)}</td><td>${cell(u.use_case)}</td><td>${cell(u.referral)}</td>
       <td class="muted">${ago(u.created)}</td>
+      <td>${u.claude_key?.set ? `<span class="badge listed" title="Runs on their own Claude account">${icon("check", { size: 12 })}Added</span>` : `<span class="muted">None</span>`}</td>
+      <td>${u.role === "admin" ? `<span class="muted">Every feature</span>` : `<select class="input" data-plan="${esc(u.id)}" aria-label="Plan of ${esc(u.email)}">
+        ${Object.keys(PLAN).map(r => `<option value="${r}" ${r === u.plan ? "selected" : ""}>${PLAN[r]}</option>`).join("")}
+      </select>`}</td>
       <td><select class="input" data-id="${esc(u.id)}" aria-label="Role of ${esc(u.email)}" ${u.id === me.id ? 'disabled title="You can\'t change your own role"' : ""}>
         ${Object.keys(LABEL).map(r => `<option value="${r}" ${r === u.role ? "selected" : ""}>${LABEL[r]}</option>`).join("")}
       </select></td></tr>`).join("")}</tbody></table></div>`;
@@ -78,6 +83,12 @@ async function load() {
 bindPager($pager, (p) => { page = p; draw(); list.scrollIntoView({ block: "nearest", behavior: "smooth" }); },
   (n) => { perPage = n; savePerPage("users", n); page = 1; draw(); });
 list.addEventListener("change", async (e) => {
+  const plan = e.target.closest("select[data-plan]");
+  if (plan) {
+    try { const u = await api(`/api/users/${plan.dataset.plan}`, { method: "PATCH", body: JSON.stringify({ plan: plan.value }) }); Object.assign(users.find(x => x.id === u.id), u); toast(`${u.email} is now on ${PLAN[u.plan]}`); }
+    catch (err) { toast(err.message, "err"); load(); }
+    return;
+  }
   const sel = e.target.closest("select[data-id]");
   if (!sel) return;
   try { const u = await api(`/api/users/${sel.dataset.id}`, { method: "PATCH", body: JSON.stringify({ role: sel.value }) }); Object.assign(users.find(x => x.id === u.id), u); toast(`${u.email} is now: ${LABEL[u.role]}`); }

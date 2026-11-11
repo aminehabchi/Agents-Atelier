@@ -82,6 +82,16 @@
   .points li + li { border-top: 1px solid var(--line); }
   .points b { display: block; font-weight: 500; margin-bottom: 2px; }
   .points span { font-size: 15px; color: var(--graphite); }
+  #pricing .sub { max-width: 720px; color: var(--graphite); font-size: 16px; line-height: 1.6; margin: 16px auto 0; text-align: center; }
+  .pricing { display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 48px; align-items: stretch; }
+  .price-card { text-align: start; background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 28px; display: flex; flex-direction: column; gap: 16px; }
+  .price-card.featured { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .price-card h3 { margin: 0; font-size: 18px; font-weight: 500; }
+  .price-card .amount b { font-size: 36px; font-weight: 500; letter-spacing: -.01em; }
+  .price-card .amount span { color: var(--stone); font-size: 14px; margin-inline-start: 6px; }
+  .price-card ul.plain { flex: 1; }
+  .price-card .btn { align-self: flex-start; }
+  @media (max-width: 900px) { .pricing { grid-template-columns: minmax(0, 1fr); } }
   ul.plain { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
   ul.plain li { position: relative; padding-left: 16px; font-size: 15px; line-height: 1.5; color: var(--graphite); }
   ul.plain li::before { content: ""; position: absolute; left: 0; top: .6em; width: 4px; height: 4px; border-radius: 50%; background: var(--stone); }
@@ -372,6 +382,7 @@
       <a href="#how" data-show="guest unconfirmed"><i data-icon="play" data-size="16"></i>How it works</a>
       <a href="#usecases" data-show="guest unconfirmed"><i data-icon="layers" data-size="16"></i>Use cases</a>
       <a href="#marketplace" data-show="guest unconfirmed"><i data-icon="briefcase" data-size="16"></i>Marketplace</a>
+      <a href="#pricing" data-show="guest unconfirmed"><i data-icon="chart" data-size="16"></i>Pricing</a>
       <a href="#faq" data-show="guest unconfirmed"><i data-icon="message" data-size="16"></i>FAQ</a>
     </nav>
     <div class="hdr-actions">
@@ -759,6 +770,25 @@
     </div>
   </section>
 
+  <section class="block" id="pricing">
+    <div class="wrap">
+      <p class="eyebrow reveal">Pricing</p>
+      <h2 class="reveal">You pay for the studio. The AI runs on your own Claude account.</h2>
+      <p class="sub reveal">Add your Claude API key once. Anthropic bills you directly for what your agents use, at their prices: about $1.50–2 for a full site and $0.20–0.50 for a small change. Set a spending limit per run, and every run shows what it cost.</p>
+      <div class="pricing">
+        <article class="price-card reveal"><h3>Starter</h3><div class="amount"><b>Free</b></div>
+          <ul class="plain"><li>Up to 3 projects</li><li>Every official agent and ready team</li><li>Browser check before the Critic</li><li>Last 10 versions of each project</li><li>Downloads carry a small “Made with Agents Atelier” line</li><li>Spending limit of $3 per run</li></ul>
+          <a class="btn btn-ghost" href="/register">Start free</a></article>
+        <article class="price-card featured reveal"><h3>Pro</h3><div class="amount"><b>$9</b><span>/ month</span></div>
+          <ul class="plain"><li>Unlimited projects</li><li>Your own agents and teams</li><li>Web research agent</li><li>Browser checks before Responsive, Accessibility, QA and the Critic</li><li>Last 100 versions, downloads without the credit line</li><li>Your own spending limit, up to $50 per run</li></ul>
+          <a class="btn btn-dark" href="/register">Choose Pro</a></article>
+        <article class="price-card reveal"><h3>Agency</h3><div class="amount"><b>$29</b><span>/ month</span></div>
+          <ul class="plain"><li>Everything in Pro</li><li>Publish your agents and teams to the marketplace</li><li>Every version kept</li><li>Spending limit up to $200 per run</li></ul>
+          <a class="btn btn-ghost" href="/register">Choose Agency</a></article>
+      </div>
+    </div>
+  </section>
+
   <section class="block" id="faq">
     <div class="wrap">
       <p class="eyebrow reveal">Questions</p>
@@ -770,7 +800,8 @@
         <details class="reveal"><summary>What happens if I stop a build?<i data-icon="chevron-down" data-size="18"></i></summary><p>Nothing is lost. Finished work is kept, and you can continue from the agent that stopped or start again. The same choice appears after an error or a server restart.</p></details>
         <details class="reveal"><summary>Can I undo a change?<i data-icon="chevron-down" data-size="18"></i></summary><p>Yes. A version is saved before each run and after each agent. You can compare any version with the current code and restore it in one click.</p></details>
         <details class="reveal"><summary>Can I change how the agents work?<i data-icon="chevron-down" data-size="18"></i></summary><p>Yes. Duplicate a shared agent and edit its instructions, or write a new one in plain Markdown. Your agents and teams are private to you.</p></details>
-        <details class="reveal"><summary>What does hiring an agent cost?<i data-icon="chevron-down" data-size="18"></i></summary><p>Agents run on your Claude Code plan, so there's no fee per hire. Each agent's profile shows its average time and its API-equivalent cost per job, and a team's page estimates the whole team before you start.</p></details>
+        <details class="reveal"><summary>Why do I need my own Claude API key?<i data-icon="chevron-down" data-size="18"></i></summary><p>Your agents run on your own Claude account, so you pay Anthropic directly, at their prices, with no markup. Create a key at console.anthropic.com and paste it in your profile. It's checked once, kept encrypted, and only its last four characters are ever shown.</p></details>
+        <details class="reveal"><summary>What does hiring an agent cost?<i data-icon="chevron-down" data-size="18"></i></summary><p>There's no fee per hire. Agents run on your own Claude API key, so a job costs what Claude charges for it. Each agent's profile shows its average time and cost per job, and a team's page estimates the whole team before you start.</p></details>
         <details class="reveal"><summary>Which languages can I use?<i data-icon="chevron-down" data-size="18"></i></summary><p>The app speaks English, French and Moroccan Darija. Your site can be in any language, or in several: the Translator agent adds a language switcher and right-to-left layouts.</p></details>
         <details class="reveal"><summary>Can my site receive messages from visitors?<i data-icon="chevron-down" data-size="18"></i></summary><p>The sites are front end only, so they don't store messages. Contact forms send them where you already read them: WhatsApp, Telegram or the visitor's email app opens with the message written, and they press send.</p></details>
         <details class="reveal"><summary>Who can see my projects?<i data-icon="chevron-down" data-size="18"></i></summary><p>Your projects are private to your account, though admins can open every project. A site's preview link works for anyone you send it to.</p></details>

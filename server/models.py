@@ -93,7 +93,7 @@ def allowed(name: str) -> bool:
     return not name or name in {o["id"] for o in catalog()["options"]}
 
 
-async def check(name: str, timeout: int = 90) -> dict:
+async def check(name: str, timeout: int = 90, env: dict | None = None) -> dict:
     """Ask the Claude CLI to run a one-word reply with this model. Costs a tiny call when the model is valid."""
     name = name.strip()
     if not NAME_RE.match(name):
@@ -103,7 +103,7 @@ async def check(name: str, timeout: int = 90) -> dict:
             proc = await asyncio.create_subprocess_exec(
                 CLAUDE, "-p", "Reply with the single word OK.", "--model", name, "--output-format", "json",
                 "--restricted", "--strict-mcp-config", "--disable-slash-commands", "--tools", "",
-                cwd=tmp, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                cwd=tmp, env=env, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         except FileNotFoundError:
             raise ValueError(f"Claude Code wasn't found (tried “{CLAUDE}”), so the model can't be checked.")
         try:

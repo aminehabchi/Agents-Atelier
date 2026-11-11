@@ -27,6 +27,7 @@ from email.message import EmailMessage
 import config
 import db
 import limits
+import plans
 
 log = logging.getLogger("agents-atelier.auth")
 
@@ -133,7 +134,12 @@ def public(row) -> dict:
             "confirmed": row["role"] != "unconfirmed",
             "name": row["name"], "company": row["company"], "job_role": row["job_role"],
             "use_case": row["use_case"], "referral": row["referral"], "language": row["language"], "theme": row["theme"],
-            "created": row["created_at"].timestamp() if row.get("created_at") else None}
+            "created": row["created_at"].timestamp() if row.get("created_at") else None,
+            # the plan and the Claude key's state; the key itself (even encrypted) never leaves the server
+            "plan": row.get("plan") or plans.DEFAULT,
+            "claude_key": {"set": bool(row.get("claude_key")), "hint": row.get("claude_key_hint") or "",
+                           "checked": row.get("claude_key_at")},
+            "run_limit": plans.run_limit(dict(row))}
 
 
 def _hash(text: str) -> str:
@@ -487,3 +493,52 @@ async def set_role(actor: dict, user_id: str, role: str) -> dict:
     if not row:
         raise AuthError("Unknown user.", 404)
     return public(row)
+
+
+async def set_plan(actor: dict, user_id: str, plan: str) -> dict:
+    if plan not in plans.PLANS:
+        raise AuthError("A plan is starter, pro or agency.")
+    try:
+        uid = uuid.UUID(str(user_id))
+    except ValueError:
+        raise AuthError("Unknown user.", 404)
+    row = await db.pool.fetchrow("UPDATE users SET plan = $2 WHERE id = $1 RETURNING *", uid, plan)
+    if not row:
+        raise AuthError("Unknown user.", 404)
+    log.info("%s set the plan of %s to %s", actor["email"], row["email"], plan)
+    return public(row)
+
+
+# ---------------------------------------------------------------- the member's own Claude API key
+
+async def save_claude_key(user: dict, encrypted: str, hint: str) -> dict:
+    row = await db.pool.fetchrow("UPDATE users SET claude_key = $2, claude_key_hint = $3, claude_key_at = $4 WHERE id = $1 RETURNING *",
+                                 user["id"], encrypted, hint, time.time())
+    log.info("%s saved a Claude API key", user["email"])
+    return public(row)
+
+
+async def delete_claude_key(user: dict) -> dict:
+    row = await db.pool.fetchrow("UPDATE users SET claude_key = '', claude_key_hint = '', claude_key_at = NULL WHERE id = $1 RETURNING *",
+                                 user["id"])
+    return public(row)
+
+
+async def set_run_limit(user: dict, value) -> dict:
+    p = plans.of(user)
+    if value in (None, ""):
+        amount = None
+    else:
+        try:
+            amount = round(float(value), 2)
+        except (TypeError, ValueError):
+            raise AuthError("The limit is an amount in US dollars, like 5.")
+        if not 0.5 <= amount <= p["run_limit_max"]:
+            raise AuthError(f"Pick a limit between $0.50 and ${p['run_limit_max']:g} on the {p['name']} plan.")
+    row = await db.pool.fetchrow("UPDATE users SET run_limit = $2 WHERE id = $1 RETURNING *", user["id"], amount)
+    return public(row)
+
+
+async def stored_claude_key(user_id) -> str:
+    """The encrypted key of this member ('' if none)."""
+    return await db.pool.fetchval("SELECT claude_key FROM users WHERE id = $1", user_id) or ""

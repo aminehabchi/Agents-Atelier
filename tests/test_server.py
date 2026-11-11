@@ -124,7 +124,8 @@ def setUpModule():
            "DATABASE_URL": TEST_DB_URL, "ADMIN_EMAIL": ADMIN_EMAIL, "EMAIL_OUTBOX": str(OUTBOX), "SMTP_HOST": "",
            # every test comes from 127.0.0.1: limits high enough for the suite, except resets, tested per fake address
            "TRUST_PROXY": "1", "SIGNUPS_PER_HOUR": "100000", "LOGINS_PER_15_MIN": "100000", "RESETS_PER_HOUR": "5",
-           "LEGAL_NAME": "Test Operator SARL", "LEGAL_EMAIL": "legal@example.com"}
+           "LEGAL_NAME": "Test Operator SARL", "LEGAL_EMAIL": "legal@example.com",
+           "CLAUDE_KEYS": "user", "KEY_SECRET": ""}     # every member runs on their own key (see register())
     env.pop("AGENT_MODEL", None)
     global SERVER_LOG
     SERVER_LOG = open(TMP / "server.log", "w")
@@ -189,14 +190,25 @@ def last_code(email) -> str:
     return [json.loads(l) for l in OUTBOX.read_text().splitlines() if json.loads(l)["to"] == email][-1]["code"]
 
 
-def register(email, password="correct horse", confirm=True) -> str:
-    """Create an account and return its session cookie, confirmed unless told otherwise."""
+TEST_KEY = "sk-ant-api03-test-key-0000000000000000000000-okay"
+
+
+def register(email, password="correct horse", confirm=True, key=True, plan="agency") -> str:
+    """Create an account and return its session cookie, confirmed unless told otherwise, with a Claude API key saved
+    (the fake CLI accepts it) unless key=False, on the Agency plan (every feature) unless told otherwise."""
     status, r, h = call("POST", "/api/auth/register", {"name": "Test Person", "email": email, "password": password}, cookie=None)
     assert status == 200, r
     cookie = session_cookie(h)
     if confirm:
         status, r, _ = call("POST", "/api/auth/confirm", {"code": last_code(email)}, cookie=cookie)
         assert status == 200, r
+        if key:
+            status, r, _ = call("PUT", "/api/auth/claude-key", {"key": TEST_KEY}, cookie=cookie)
+            assert status == 200, r
+        if plan and email != ADMIN_EMAIL:
+            uid = call("GET", "/api/auth/me", cookie=cookie)[1]["user"]["id"]
+            status, r, _ = call("PATCH", f"/api/users/{uid}", {"plan": plan})
+            assert status == 200, r
     return cookie
 
 
@@ -2553,7 +2565,8 @@ class T24Storage(unittest.TestCase):
         pid = new_project(name="Stored")
         call("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": "<h1>stored</h1>"})
         call("POST", f"/api/projects/{pid}/versions", {"label": "Saved"})
-        self.assertEqual(sorted(p.name for p in STORAGE.iterdir()), ["agents", "works"])
+        # + the key secret and each member's Claude folder (CLAUDE_KEYS=user)
+        self.assertEqual(sorted(p.name for p in STORAGE.iterdir()), [".secrets", "agents", "claude-home", "works"])
         self.assertTrue((SITE(pid) / "index.html").is_file())
         versions = list((STORAGE / "works" / pid / "versions").iterdir())
         self.assertEqual(len(versions), 1)
@@ -2590,3 +2603,126 @@ class T24Storage(unittest.TestCase):
         self.assertFalse((STORAGE / "works" / pid).exists())
         for table, col in (("projects", "id"), ("files", "project_id"), ("project_events", "project_id")):
             self.assertEqual(asyncio.run(_db(f"SELECT count(*) AS n FROM {table} WHERE {col} = '{pid}'"))[0]["n"], 0, table)
+
+
+class T30KeysAndPlans(unittest.TestCase):
+    """Members bring their own Claude API key (CLAUDE_KEYS=user); plans unlock features."""
+
+    def member(self, plan="starter", key=True):
+        email = f"member-{time.time_ns()}@example.com"
+        return register(email, key=key, plan=plan)
+
+    def prompt(self, pid, text, cookie, agents=("html",)):
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": text, "agents": list(agents)}))
+            return await recv(("run_done", "error", "run_stopped", "needs_key"))
+        return ws(pid, script, cookie=cookie)
+
+    def test_the_key_is_checked_kept_secret_and_removable(self):
+        me = self.member(key=False)
+        self.assertFalse(call("GET", "/api/auth/me", cookie=me)[1]["user"]["claude_key"]["set"])
+        s, r, _ = call("PUT", "/api/auth/claude-key", {"key": "hello"}, cookie=me)
+        self.assertEqual(s, 400)
+        self.assertIn("sk-ant-", r["detail"])
+        bad = "sk-ant-api03-this-one-is-bad-000000000000000000"
+        s, r, _ = call("PUT", "/api/auth/claude-key", {"key": bad}, cookie=me)
+        self.assertEqual(s, 400)
+        self.assertIn("refused", r["detail"])
+        self.assertNotIn(bad, r["detail"], "a key is never echoed back")
+        s, r, _ = call("PUT", "/api/auth/claude-key", {"key": " " + TEST_KEY + "\n"}, cookie=me)
+        self.assertEqual(s, 200, r)
+        self.assertEqual(r["user"]["claude_key"]["hint"], "sk-ant-…" + TEST_KEY[-4:])
+        whole = json.dumps(call("GET", "/api/auth/me", cookie=me)[1])
+        self.assertNotIn(TEST_KEY, whole)
+        uid = call("GET", "/api/auth/me", cookie=me)[1]["user"]["id"]
+        stored = asyncio.run(_db(f"SELECT claude_key FROM users WHERE id = '{uid}'"))[0]["claude_key"]
+        self.assertTrue(stored and TEST_KEY not in stored, "kept encrypted")
+        self.assertEqual(call("DELETE", "/api/auth/claude-key", cookie=me)[0], 200)
+        self.assertFalse(call("GET", "/api/auth/me", cookie=me)[1]["user"]["claude_key"]["set"])
+
+    def test_nothing_runs_without_a_key(self):
+        me = self.member(key=False)
+        pid = new_project(cookie=me)
+        LOG.write_text("")
+        events = self.prompt(pid, "Make a page", me)
+        self.assertEqual(events[-1]["type"], "needs_key")
+        self.assertTrue(events[-1]["mine"])
+        self.assertEqual(log_calls(), [], "no Claude call at all")
+
+    def test_runs_use_the_owners_key_in_a_clean_environment(self):
+        me = self.member(plan="pro")
+        uid = call("GET", "/api/auth/me", cookie=me)[1]["user"]["id"]
+        pid = new_project(cookie=me)
+        LOG.write_text("")
+        events = self.prompt(pid, "Make a page", me)
+        self.assertEqual(events[-1]["type"], "run_done", events[-1])
+        runs = [c for c in log_calls() if "-p" in c["argv"]]
+        self.assertTrue(runs)
+        for c in runs:
+            self.assertEqual(c["key"], TEST_KEY[-4:])
+            self.assertEqual(c["home"], str(STORAGE / "claude-home" / uid))
+            for secret in ("DATABASE_URL", "KEY_SECRET", "SMTP_PASSWORD", "ADMIN_EMAIL"):
+                self.assertNotIn(secret, c["env"])
+            self.assertIn("Read(//proc/**)", c["argv"], "an agent can't read its own environment")
+
+    def test_a_refused_key_explains_itself(self):
+        me = self.member(plan="pro")
+        uid = call("GET", "/api/auth/me", cookie=me)[1]["user"]["id"]
+        from cryptography.fernet import Fernet       # the server's own secret: store a key Claude will refuse
+        enc = Fernet((STORAGE / ".secrets" / "key_secret").read_bytes()).encrypt(b"sk-ant-api03-broke-account-0000000000000000").decode()
+        asyncio.run(_db(f"UPDATE users SET claude_key = '{enc}' WHERE id = '{uid}'"))
+        pid = new_project(cookie=me)
+        events = self.prompt(pid, "Make a page", me)
+        self.assertEqual(events[-1]["type"], "error")
+        self.assertIn("no credit left", events[-1]["text"])
+        self.assertNotIn("sk-ant-api03-broke", json.dumps(events))
+
+    def test_starter_limits(self):
+        me = self.member()
+        for i in range(3):
+            new_project(name=f"S{i}", cookie=me)
+        s, r, _ = call("POST", "/api/projects", {"name": "Fourth", "description": "x"}, cookie=me)
+        self.assertEqual((s, r["upgrade"]), (403, "pro"))
+        s, r, _ = call("POST", "/api/agents", {"id": f"st-{time.time_ns() % 10**8}", "name": "Mine", "role": "You do a thing well."}, cookie=me)
+        self.assertEqual((s, r["upgrade"]), (403, "pro"))
+        s, r, _ = call("POST", "/api/presets", {"name": "Mine", "agents": ["html"]}, cookie=me)
+        self.assertEqual(s, 403)
+        s, r, _ = call("POST", "/api/market/publish", {"kind": "agent", "id": "html", "category": "code"}, cookie=me)
+        self.assertEqual((s, r["upgrade"]), (403, "agency"))
+
+    def test_starter_skips_web_research_and_credits_the_download(self):
+        me = self.member()
+        pid = new_project(cookie=me)
+        events = self.prompt(pid, "Make a page", me, agents=("research", "html"))
+        self.assertEqual(events[-1]["type"], "run_done", events[-1])
+        self.assertTrue(any(e["type"] == "notice" and "Research" in e["text"] for e in events))
+        self.assertNotIn("research", [e["agent"] for e in events if e["type"] == "agent_done"])
+        req = urllib.request.Request(BASE + f"/api/projects/{pid}/download", headers={"Cookie": me})
+        with urllib.request.urlopen(req) as r:
+            z = zipfile.ZipFile(io.BytesIO(r.read()))
+            page = next(n for n in z.namelist() if n.endswith("index.html"))
+            self.assertIn("Made with Agents Atelier", z.read(page).decode())
+
+    def test_a_run_stops_at_the_spending_limit(self):
+        me = self.member(plan="pro")
+        self.assertEqual(call("PUT", "/api/auth/run-limit", {"limit": 0.1}, cookie=me)[0], 400)
+        self.assertEqual(call("PUT", "/api/auth/run-limit", {"limit": 500}, cookie=me)[0], 400)
+        s, r, _ = call("PUT", "/api/auth/run-limit", {"limit": 1}, cookie=me)
+        self.assertEqual((s, r["user"]["run_limit"]), (200, 1.0))
+        pid = new_project(cookie=me)
+        events = self.prompt(pid, "Make a page [[pricey]]", me, agents=("ux", "html", "css"))
+        self.assertEqual(events[-1]["type"], "run_stopped")
+        self.assertTrue(events[-1]["run"]["resumable"])
+        limit = next(e for e in events if e["type"] == "limit")
+        self.assertEqual(limit["limit"], 1.0)
+        self.assertEqual(len([e for e in events if e["type"] == "agent_done"]), 2, "Brief + UX: $1.20 reached the $1 limit")
+
+    def test_admin_sets_a_plan(self):
+        me = self.member()
+        uid = call("GET", "/api/auth/me", cookie=me)[1]["user"]["id"]
+        self.assertEqual(call("PATCH", f"/api/users/{uid}", {"plan": "gold"})[0], 400)
+        self.assertEqual(call("PATCH", f"/api/users/{uid}", {"plan": "pro"}, cookie=me)[0], 403)
+        s, r, _ = call("PATCH", f"/api/users/{uid}", {"plan": "pro"})
+        self.assertEqual((s, r["plan"]), (200, "pro"))
+        self.assertEqual([p["id"] for p in call("GET", "/api/plans")[1]["plans"]], ["starter", "pro", "agency"])
+

@@ -97,6 +97,16 @@ if PLAN not in ("free", "pro"):
 # times the Critic may send work back to earlier agents in one run (always 0 on the free plan)
 REVIEW_ROUNDS = 0 if PLAN == "free" else _int("REVIEW_ROUNDS", 2, low=0)
 
+# ---- whose Claude account pays for the agents
+# "user": every member adds their own Claude API key (profile page); runs use the project owner's key, and nothing
+#         runs without one. The server's own Claude login is never used for members' projects.
+# "server": the agents use the Claude Code login of the machine running the server (a private, self-hosted install).
+CLAUDE_KEYS = (os.environ.get("CLAUDE_KEYS", "").strip() or "user").lower()
+if CLAUDE_KEYS not in ("user", "server"):
+    raise SystemExit(f"Setting CLAUDE_KEYS must be user or server, got {CLAUDE_KEYS!r} (check your .env).")
+# encrypts the members' API keys in the database (a Fernet key). Empty: one is made and kept in STORAGE_DIR/.secrets/.
+KEY_SECRET = os.environ.get("KEY_SECRET", "").strip()
+
 # ---- database (Postgres: users, sessions, email codes, agents, teams) — see database/docker-compose.yaml
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip() or "postgresql://atelier:atelier@127.0.0.1:5432/atelier"
 

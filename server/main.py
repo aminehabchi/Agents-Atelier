@@ -77,6 +77,8 @@ import qr as qr_codes
 from versions import Versions
 import models as model_catalog
 import market
+import keys
+import plans
 import storage
 import legacy
 
@@ -86,6 +88,7 @@ store = storage.store          # every project's data, in Postgres (cached in me
 site_dir = storage.site_dir    # works/<project>/site: the website the agents edit
 work_dir = storage.work_dir    # works/<project>: site/, versions/, uploads/, checks/
 VERS = Versions(store)
+VERS.keep = lambda pid: runs.get(pid, {}).get("keep_versions")   # set from the owner's plan at each run
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL, logging.INFO), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("agents-atelier")
 
@@ -174,6 +177,12 @@ async def http_error(request: Request, exc: StarletteHTTPException):
 @app.exception_handler(auth.AuthError)
 async def auth_error(request: Request, exc: auth.AuthError):
     return JSONResponse({"detail": str(exc)}, status_code=exc.status)
+
+
+@app.exception_handler(plans.PlanError)
+async def plan_error(request: Request, exc: plans.PlanError):
+    """A feature the member's plan doesn't include: 403, with the plan that has it (the pages offer to upgrade)."""
+    return JSONResponse({"detail": str(exc), "upgrade": exc.needs}, status_code=403)
 
 
 @app.exception_handler(RequestValidationError)
@@ -506,8 +515,40 @@ async def owner_of(meta: dict) -> dict | None:
     """The account whose agents a project uses (None for old projects with no owner: the shared agents)."""
     if not meta.get("owner"):
         return None
-    row = await db.pool.fetchrow("SELECT id, role, email, language FROM users WHERE id = $1", uuid.UUID(meta["owner"]))
+    row = await db.pool.fetchrow("SELECT id, role, email, language, plan, run_limit FROM users WHERE id = $1", uuid.UUID(meta["owner"]))
     return dict(row) if row else None
+
+
+class NoClaudeKey(RuntimeError):
+    """CLAUDE_KEYS=user and the project's owner has no working key: nothing may run."""
+
+
+async def claude_env(meta: dict) -> dict | None:
+    """The environment of this project's `claude` processes: the owner's own API key and nothing else from the server
+    (CLAUDE_KEYS=user), or None to inherit the server's login (CLAUDE_KEYS=server)."""
+    if not keys.USER_MODE:
+        return None
+    owner = await owner_of(meta)
+    if not owner:
+        raise NoClaudeKey("This older project has no owner, so there's no Claude API key to run it with. "
+                          "Duplicate it into your own account to keep working on it.")
+    key = keys.decrypt(await auth.stored_claude_key(owner["id"]))
+    if not key:
+        raise NoClaudeKey("The agents run on the project owner's own Claude account, and no Claude API key is saved yet. "
+                          "Add one in the profile (Claude API key), then send the request again.")
+    return keys.env_for(str(owner["id"]), key)
+
+
+async def key_problem(meta: dict, user: dict) -> dict | None:
+    """What the studio shows instead of starting a run when there's no key to run with (None: all set)."""
+    try:
+        await claude_env(meta)
+        return None
+    except NoClaudeKey as e:
+        mine = meta.get("owner") == str(user["id"])
+        return {"text": str(e) if not mine or not meta.get("owner") else
+                "The agents run on your own Claude account. Add your Claude API key once, then send your request again.",
+                "mine": mine}
 
 
 async def project_agents(meta: dict) -> list[dict]:
@@ -907,7 +948,43 @@ async def users_list(request: Request):
 
 @app.patch("/api/users/{user_id}")
 async def users_set_role(request: Request, user_id: str, body: dict):
-    return await auth.set_role(require_admin(request), user_id, str(body.get("role") or ""))
+    """An admin changes a member's role and/or plan."""
+    actor = require_admin(request)
+    out = None
+    if "plan" in body:
+        out = await auth.set_plan(actor, user_id, str(body.get("plan") or ""))
+    if "role" in body or out is None:
+        out = await auth.set_role(actor, user_id, str(body.get("role") or ""))
+    return out
+
+
+# ---------------------------------------------------------------- plans and the member's own Claude key
+
+@app.get("/api/plans")
+async def list_plans():
+    return {"plans": plans.public(), "keys": config.CLAUDE_KEYS}
+
+
+@app.put("/api/auth/claude-key")
+async def put_claude_key(request: Request, body: dict):
+    """Check the key with one tiny call on the member's own account, then keep it encrypted."""
+    user = _confirmed_user(request)
+    try:
+        key = keys.clean(body.get("key"))
+        await keys.check(key, str(user["id"]))
+    except keys.KeyError_ as e:
+        raise HTTPException(400, str(e))
+    return {"user": await auth.save_claude_key(user, keys.encrypt(key), keys.hint(key))}
+
+
+@app.delete("/api/auth/claude-key")
+async def delete_claude_key(request: Request):
+    return {"user": await auth.delete_claude_key(_confirmed_user(request))}
+
+
+@app.put("/api/auth/run-limit")
+async def put_run_limit(request: Request, body: dict):
+    return {"user": await auth.set_run_limit(_confirmed_user(request), body.get("limit"))}
 
 
 @app.get("/p/{pid}")
@@ -950,11 +1027,19 @@ async def list_models():
 
 
 @app.post("/api/models/check")
-async def check_model(body: dict):
+async def check_model(request: Request, body: dict):
+    """One tiny call with this model, on the member's own Claude account (CLAUDE_KEYS=user)."""
+    env = None
+    if keys.USER_MODE:
+        user = current_user(request)
+        key = keys.decrypt(await auth.stored_claude_key(user["id"]))
+        if not key:
+            raise HTTPException(400, "Add your Claude API key in your profile first: checking a model makes a tiny call on your account.")
+        env = keys.env_for(str(user["id"]), key)
     try:
-        return await model_catalog.check(str(body.get("model") or ""))
+        return await model_catalog.check(str(body.get("model") or ""), env=env)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, keys.scrub(str(e), ""))
 
 
 @app.get("/api/agents/common")
@@ -980,6 +1065,8 @@ async def order_agents(request: Request, body: dict):
 
 @app.post("/api/agents")
 async def add_agent(request: Request, body: dict):
+    plans.need(current_user(request), "custom_agents", "Making and editing your own agents and teams comes with the Pro plan. "
+                                                     "The official agents and ready teams are yours to use.")
     return await _agent_call(team_files.create_agent(current_user(request), body, body.get("position")))
 
 
@@ -999,6 +1086,8 @@ async def get_agent(request: Request, agent_id: str):
 
 @app.put("/api/agents/{agent_id}")
 async def edit_agent(request: Request, agent_id: str, body: dict):
+    plans.need(current_user(request), "custom_agents", "Making and editing your own agents and teams comes with the Pro plan. "
+                                                     "The official agents and ready teams are yours to use.")
     agent = await _agent_call(team_files.update_agent(current_user(request), agent_id, body))
     await market.after_edit(current_user(request), "agent", agent_id)
     return agent
@@ -1072,9 +1161,17 @@ def all_projects(user: dict, default_count: int) -> list[dict]:
     return sorted(projects, key=lambda m: m["updated"], reverse=True)
 
 
+def check_project_limit(user: dict):
+    """Starter accounts keep a few projects; deleting one frees a place."""
+    most = plans.of(user)["projects"]
+    if most is not None and sum(m.get("owner") == str(user["id"]) for m in store.all()) >= most:
+        raise plans.PlanError(f"The Starter plan holds {most} projects. Delete one, or move to Pro for unlimited projects.")
+
+
 @app.post("/api/projects")
 async def new_project(request: Request, body: dict):
     user = current_user(request)
+    check_project_limit(user)
     return create_project(**clean_details(body), pages=body.get("pages"), brief=body.get("brief"),
                           owner=str(user["id"]), agents=await default_ids(user), brand=clean_brand(body.get("brand")))
 
@@ -1156,6 +1253,7 @@ def _page_title(html: bytes, path: str) -> str:
 @app.post("/api/projects/import")
 async def import_project(request: Request, body: dict):
     """Create a project that starts from an existing site (HTML, CSS, JS, Markdown and assets only)."""
+    check_project_limit(current_user(request))
     details = clean_details(body)
     brief = clean_brief(body.get("brief"))
     files, skipped = _site_files(body)
@@ -1455,9 +1553,21 @@ async def list_files(pid: str):
     return files
 
 
+CREDIT = ('<p style="margin:24px 0;text-align:center;font:13px/1.4 system-ui,sans-serif;opacity:.7">'
+          'Made with Agents Atelier</p>')
+
+
+def with_credit(html: bytes) -> bytes:
+    """A small line before </body>, for sites downloaded on the Starter plan."""
+    text = html.decode(errors="replace")
+    i = text.lower().rfind("</body>")
+    return (text[:i] + CREDIT + "\n" + text[i:] if i >= 0 else text + CREDIT).encode()
+
+
 @app.get("/api/projects/{pid}/download")
 async def download(pid: str):
     meta = load_meta(pid)
+    credit = plans.of(await owner_of(meta))["credit"]
     if is_busy(meta["id"]):
         raise HTTPException(409, "Agents are still working on this project. Download it when they finish.")
     folder = site_dir(meta["id"])
@@ -1467,7 +1577,10 @@ async def download(pid: str):
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for p in sorted(folder.rglob("*")):
             if p.is_file() and p.relative_to(folder).parts[0] != browser_check.CHECK_DIR:   # the server's own screenshots
-                z.write(p, f"{root}/{p.relative_to(folder)}")
+                if credit and p.suffix.lower() in (".html", ".htm"):
+                    z.writestr(f"{root}/{p.relative_to(folder)}", with_credit(p.read_bytes()))
+                else:
+                    z.write(p, f"{root}/{p.relative_to(folder)}")
     buf.seek(0)
     return StreamingResponse(buf, media_type="application/zip",
                              headers={"Content-Disposition": f'attachment; filename="{root}.zip"'})
@@ -1585,6 +1698,7 @@ def _import_items(name: str, raw: bytes) -> list[dict]:
 async def import_bundle(request: Request, body: dict):
     """Body: {name, data (base64), on_conflict: rename|replace|skip, apply: bool}.
     Without apply (or apply=false) it only returns the plan."""
+    plans.need(current_user(request), "custom_agents", "Importing agents and teams comes with the Pro plan.")
     name = str(body.get("name") or "")
     try:
         raw = base64.b64decode(str(body.get("data") or ""), validate=True)
@@ -1615,6 +1729,8 @@ async def get_preset(request: Request, preset_id: str):
 
 @app.post("/api/presets")
 async def add_preset(request: Request, body: dict):
+    plans.need(current_user(request), "custom_agents", "Making and editing your own agents and teams comes with the Pro plan. "
+                                                     "The official agents and ready teams are yours to use.")
     return await _agent_call(team_files.save_preset(current_user(request), body.get("name", ""), list(body.get("agents") or []),
                                                     str(body.get("description") or ""), body.get("scope"),
                                                     str(body.get("prompt") or "")))
@@ -1622,6 +1738,8 @@ async def add_preset(request: Request, body: dict):
 
 @app.put("/api/presets/{preset_id}")
 async def edit_preset(request: Request, preset_id: str, body: dict):
+    plans.need(current_user(request), "custom_agents", "Making and editing your own agents and teams comes with the Pro plan. "
+                                                     "The official agents and ready teams are yours to use.")
     team = await _agent_call(team_files.update_preset(current_user(request), preset_id, body))
     await market.after_edit(current_user(request), "team", preset_id)
     return team
@@ -1692,6 +1810,7 @@ async def market_hire_team(request: Request, pk: int):
 
 @app.post("/api/market/publish")
 async def market_publish(request: Request, body: dict):
+    plans.need(current_user(request), "publish", "Publishing agents and teams to the marketplace comes with the Agency plan.")
     kind = "team" if body.get("kind") == "team" else "agent"
     return await _market_call(market.publish(current_user(request), kind, str(body.get("id") or ""), str(body.get("category") or "")))
 
@@ -2232,6 +2351,19 @@ def _undo_site_changes(folder: Path, before: dict[str, bytes]) -> list[str]:
     return undone
 
 
+def _no_read(path) -> str:
+    return "Read(/" + str(Path(path).resolve()) + "/**)"
+
+
+# Paths no agent may read, on top of the confinement to the project folder: the process's own environment (it holds
+# the member's API key), the server's code and settings, the key secret, the members' Claude folders and the server
+# account's own Claude login. Read rules also cover Glob and Grep.
+DENY_READS = [_no_read("/proc"), _no_read("/sys"), _no_read("/etc"), _no_read(config.ROOT / "server"),
+              "Read(/" + str((config.ROOT / ".env").resolve()) + ")",
+              _no_read(Path(config.STORAGE_DIR) / ".secrets"), _no_read(Path(config.STORAGE_DIR) / "claude-home"),
+              *[_no_read(Path.home() / d) for d in (".claude", ".config", ".ssh", ".aws", ".docker")]]
+
+
 async def run_agent(pid: str, agent: dict, common: str, request: str, notes: list[str], meta: dict,
                     images: list[str] = (), extra: str = "") -> str:
     """Run one agent as a `claude -p` process inside the project folder and stream what it does."""
@@ -2252,7 +2384,7 @@ async def run_agent(pid: str, agent: dict, common: str, request: str, notes: lis
         "--restricted", "--strict-mcp-config", "--disable-slash-commands",
         "--tools", ",".join(tools),
         "--allowedTools", *tools,
-        "--disallowedTools", "Bash", "Task", *([] if web else ["WebFetch", "WebSearch"]),
+        "--disallowedTools", "Bash", "Task", *([] if web else ["WebFetch", "WebSearch"]), *DENY_READS,
         "--permission-mode", "acceptEdits",
         *[arg for d in extra_dirs for arg in ("--add-dir", str(d.resolve()))],
         # Prompt caching: each agent's system prompt is byte-identical for every project and run (no project data
@@ -2270,10 +2402,14 @@ async def run_agent(pid: str, agent: dict, common: str, request: str, notes: lis
 
     st = live(pid)
     folder.mkdir(parents=True, exist_ok=True)
+    try:
+        env = await claude_env(meta)
+    except NoClaudeKey as e:
+        raise RuntimeError(str(e))
     guard = _guarded_files(folder) if web else None
     try:
         proc = await asyncio.create_subprocess_exec(
-            *cmd, cwd=folder,
+            *cmd, cwd=folder, env=env,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             limit=16 * 1024 * 1024,
         )
@@ -2328,7 +2464,10 @@ async def run_agent(pid: str, agent: dict, common: str, request: str, notes: lis
 
 def explain_failure(text: str) -> str:
     """Turn Claude Code's raw error output into something actionable."""
+    text = keys.scrub(text, "")                      # never show an API key, even one echoed in an error
     low = text.lower()
+    if keys.USER_MODE and keys.explain(text):
+        return keys.explain(text)
     if "not logged in" in low or "/login" in low or "invalid api key" in low or "authentication" in low:
         return "Claude Code isn't logged in. Run `claude` in a terminal, log in, then try again."
     if "usage limit" in low or "rate limit" in low or "429" in low or "overloaded" in low:
@@ -2473,6 +2612,13 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
         save_meta(meta, touch=False)
         store.index_site(pid)
     team = [a for a in await project_agents(meta) if a["id"] in agent_ids]  # snapshot of the owner's agents at run start
+    owner = await owner_of(meta)
+    tier = plans.of(owner)                                  # the owner's plan (`plan` is the Orchestrator's)
+    no_web = [a for a in team if a.get("tools") == "web" and not tier["research"]]
+    team = [a for a in team if a not in no_web]           # web research is a Pro feature
+    checked = BROWSER_CHECK_AGENTS if tier["browser_checks"] == "all" else {REVIEWER}
+    limit, spent = (plans.run_limit(owner) if keys.USER_MODE else 0), 0.0
+    st["keep_versions"] = tier["versions"]
     common = load_common()
     prev = meta.get("run") or {}
     done = [i for i in prev.get("done", []) if i in agent_ids] if resume else []
@@ -2489,6 +2635,9 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
 
     await broadcast(pid, {"type": "run_start", "request": request, "name": meta["name"],
                           "agents": meta["run"]["agents"], "pool": meta.get("agents") or [], "done": done, "resumed": resume})
+    if no_web:
+        await broadcast(pid, {"type": "notice", "text": f"{', '.join(a['name'] for a in no_web)} skipped: agents that search "
+                                                        "the web come with the Pro plan."})
     seen_findings = set(safely("Scan", scan_site, site_dir(pid)) or [])
     if safely("Snapshot", VERS.snapshot, pid, f"Before: {request[:60]}", kind="before", request=request):
         await broadcast(pid, {"type": "versions"})
@@ -2504,7 +2653,7 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
                 extra = review_feedback(fix, review_round) if fix else run_plan_brief(plan, agent["id"])
             update_run(pid, current=agent["id"])
             agent_images = images
-            if agent["id"] in BROWSER_CHECK_AGENTS and browser_check.available():
+            if agent["id"] in checked and browser_check.available():
                 await broadcast(pid, {"type": "browser_check_start", "agent": agent["id"]})
                 report = await safe_browser_check(pid)
                 if report is not None:
@@ -2539,6 +2688,15 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
                 await broadcast(pid, {"type": "send_back", "agent": agent["id"], "round": review_round,
                                       "rounds": REVIEW_ROUNDS, "items": items})
             update_run(pid, done=done, notes=notes, current=None, review_round=review_round, send_back=send_back)
+            spent += float(last_stat(pid).get("cost") or 0)
+            if limit and spent >= limit and any(a["id"] not in done for a in team):
+                # the member's own money: stop at their limit, keep what's done, and let them Continue on purpose
+                run = update_run(pid, status="stopped", error="")
+                await broadcast(pid, {"type": "limit", "spent": round(spent, 2), "limit": limit,
+                                      "text": f"This run reached your ${limit:g} spending limit (about ${spent:.2f} on your Claude account). "
+                                              "Press Continue to keep going, or change the limit in your profile."})
+                await broadcast(pid, {"type": "run_stopped", "run": run_summary(run)})
+                return
         meta = load_meta(pid)
         meta["history"].append(request)
         meta["run"].update(status="done", current=None, updated=time.time())
@@ -2569,14 +2727,18 @@ async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict)
     cmd = [CLAUDE, "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--restricted", "--strict-mcp-config", "--disable-slash-commands",
            "--tools", "Read,Glob,Grep", "--allowedTools", "Read", "Glob", "Grep",
-           "--disallowedTools", "Write", "Edit", "Bash", "WebFetch", "WebSearch", "Task",
+           "--disallowedTools", "Write", "Edit", "Bash", "WebFetch", "WebSearch", "Task", *DENY_READS,
            "--max-turns", "8", "--exclude-dynamic-system-prompt-sections",
            "--append-system-prompt", await language_rule(meta) + role + "\n\n" + SECURITY_RULES]
     if model:
         cmd += ["--model", model]
     folder.mkdir(parents=True, exist_ok=True)
     try:
-        proc = await asyncio.create_subprocess_exec(*cmd, cwd=folder, stdout=asyncio.subprocess.PIPE,
+        env = await claude_env(meta)
+    except NoClaudeKey as e:
+        raise OrchestratorUnavailable(str(e))
+    try:
+        proc = await asyncio.create_subprocess_exec(*cmd, cwd=folder, env=env, stdout=asyncio.subprocess.PIPE,
                                                     stderr=asyncio.subprocess.PIPE, limit=16 * 1024 * 1024)
     except (FileNotFoundError, PermissionError):
         raise OrchestratorUnavailable(f"Claude Code wasn't found or isn't executable (tried “{CLAUDE}”). "
@@ -2611,7 +2773,7 @@ async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict)
         return None
     except RuntimeError as e:
         msg = str(e)
-        if any(k in msg for k in ("isn't logged in", "rate-limited")):
+        if any(k in msg for k in ("isn't logged in", "rate-limited", "API key", "no credit left")):
             raise OrchestratorUnavailable(msg)
         log.warning("Orchestrator failed on project %s: %s", pid, msg)
         return None
@@ -2796,6 +2958,15 @@ async def ws_endpoint(ws: WebSocket, pid: str):
                 st["clients"].discard(ws)
                 await ws.close(code=4401)
                 return
+            if msg.get("type") in ("prompt", "continue", "restart", "retry", "answer") and not is_busy(pid):
+                me_now, meta_now = await auth.user_for_token(token), load_meta(pid)
+                if keys.USER_MODE and not meta_now.get("owner") and me_now["role"] == "admin":
+                    meta_now["owner"] = str(me_now["id"])     # an older project (admins only) becomes the admin's own:
+                    save_meta(meta_now)                      # it then runs on their key, like any project
+                problem = await key_problem(meta_now, me_now)
+                if problem:                         # nothing runs without a Claude API key: the studio shows how to add one
+                    await ws.send_json({"type": "needs_key", **problem})
+                    continue
             try:
                 await handle_ws_message(ws, pid, st, msg)
             except HTTPException as e:

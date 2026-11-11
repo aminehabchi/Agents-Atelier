@@ -41,6 +41,7 @@ def _hash(folder: Path) -> str:
 class Versions:
     def __init__(self, store: "storage.Store"):
         self.store = store
+        self.keep = lambda pid: None      # versions kept for this project (None: MAX_VERSIONS); main.py sets it
 
     def _index(self, pid: str) -> list[dict]:
         return self.store.version_list(pid)
@@ -79,7 +80,8 @@ class Versions:
         self.store.add_version(pid, v)
         self.store.index_files(pid, "version", dest, version_id=vid)
         items.append(v)
-        while len(items) > MAX_VERSIONS:                      # prune the oldest
+        keep = min(self.keep(pid) or MAX_VERSIONS, MAX_VERSIONS)   # the owner's plan may keep fewer
+        while len(items) > keep:                              # prune the oldest
             old = items.pop(0)
             shutil.rmtree(storage.versions_dir(pid) / old["id"], ignore_errors=True)
             self.store.drop_version(pid, old["id"])

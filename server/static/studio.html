@@ -56,6 +56,13 @@
   .chip:hover { border-color: var(--graphite); color: var(--ink); }
   .chip .ic { color: var(--stone); }
 
+  .msg.keycard, .msg.limitcard { align-self: stretch; display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start;
+    padding: 14px 16px; border-radius: var(--r); background: var(--paper); box-shadow: var(--ring); font-size: 14px; line-height: 1.5; }
+  .msg.keycard .tile, .msg.limitcard .tile { width: 36px; height: 36px; border-radius: var(--r); display: grid; place-items: center; background: var(--ice); color: var(--sky); }
+  .msg.limitcard .tile { background: var(--linen); color: var(--saffron, var(--ink)); }
+  .msg.keycard b, .msg.limitcard b { font-weight: 500; color: var(--ink); }
+  .msg.keycard p, .msg.limitcard p { margin: 4px 0 10px; color: var(--graphite); font-size: 13px; }
+  .msg.limitcard .lnk { font-size: 13px; }
   .msg.bcheck { padding: 12px 14px; border-radius: 8px; box-shadow: var(--ring); background: var(--paper); font-size: 13px; color: var(--graphite); }
   .msg.bcheck .head { display: flex; gap: 8px; align-items: center; }
   .msg.bcheck .shots { display: flex; gap: 8px; margin-top: 10px; }
@@ -829,6 +836,22 @@ function handle(ev) {
       renderTeamHead();
       break;
     case "plan": showPlan(ev); break;
+    case "needs_key":                     // the agents run on the owner's own Claude account, and there's no key yet
+      setBusy(false);
+      if (lastPrompt && !$("input").value) { $("input").value = lastPrompt; autosize(); }
+      document.querySelectorAll(".msg.keycard").forEach(x => x.remove());
+      addMsg(`<div class="msg keycard" role="alert"><span class="tile">${icon("lock", { size: 18 })}</span>
+        <div><b>${ev.mine ? "Add your Claude API key" : "This project's owner needs a Claude API key"}</b><p>${esc(ev.text)}</p>
+        ${ev.mine ? `<a class="btn btn-dark btn-sm" href="/profile#claude-key">${icon("arrow-right", { size: 14 })}Add my API key</a>` : ""}</div></div>`);
+      break;
+    case "notice":
+      addSystem(ev.text);
+      break;
+    case "limit":                         // the run reached the member's spending limit: run_stopped follows
+      addMsg(`<div class="msg limitcard"><span class="tile">${icon("pause", { size: 18 })}</span>
+        <div><b>Spending limit reached</b><p>${esc(ev.text)}</p>
+        <a class="lnk" href="/profile#plan">Change the limit</a></div></div>`);
+      break;
     case "needs_details":
       if (lastPrompt && !$("input").value) { $("input").value = lastPrompt; autosize(); }
       editDetails({ required: true, note: ev.text });
