@@ -96,7 +96,7 @@
       <a href="/agents"><i data-icon="users" data-size="16"></i>My agents</a>
       <a href="/teams"><i data-icon="layers" data-size="16"></i>My teams</a>
     </nav>
-    <a class="btn btn-dark" href="/projects/new"><i data-icon="plus" data-size="16"></i>New project</a>
+    <a class="btn btn-dark" id="topNew" href="/projects/new"><i data-icon="plus" data-size="16"></i>New project</a>
   </div>
 </header>
 <main class="wrap page">
@@ -160,14 +160,14 @@ async function load() {
       me?.role === "admin" ? api("/api/users") : null]);
   } catch (err) { return showError(app, err, load, "Couldn't load your dashboard"); }
   const { totals } = stats, counts = projects.counts;
+  document.getElementById("topNew").hidden = !counts.all;           // one "new project" button per screen: the empty state has its own
   const own = (list) => list.filter(x => x.scope === "mine").length;
   const first = (me.name || "").split(" ")[0];
   const waiting = users ? users.filter(u => u.role === "unconfirmed").length : 0;
   document.title = "Dashboard · Agents Atelier";
   app.innerHTML = `
     <div class="head"><h1 class="page-title">${first ? `Welcome back, ${esc(first)}` : "Welcome back"}</h1>
-      <div class="head-acts"><a class="btn btn-ghost" href="/hire">${icon("users", { size: 16 })}Browse agents</a>
-        <a class="btn btn-dark" href="/projects/new">${icon("plus", { size: 16 })}New project</a></div></div>
+      <div class="head-acts"><a class="btn btn-ghost" href="/hire">${icon("users", { size: 16 })}Browse agents</a></div></div>
 
     <section class="tiles" aria-label="Your numbers">
       <div class="tile"><h2>Projects</h2><b>${counts.all}</b><small>${counts.working ? `${counts.working} building now` : `${counts.built} built`}</small></div>

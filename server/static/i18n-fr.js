@@ -1119,3 +1119,45 @@ Object.assign(window.I18N.fr, {
   "The sites are front end only, so they don't store messages. Contact forms send them where you already read them: WhatsApp, Telegram or the visitor's email app opens with the message written, and they press send.": "Les sites sont uniquement front-end, ils ne stockent donc pas de messages. Les formulaires de contact les envoient là où vous les lisez déjà : WhatsApp, Telegram ou l'application e-mail du visiteur s'ouvre avec le message écrit, et il appuie sur envoyer.",
 });
 Object.assign(window.I18N.fr, { "Nothing changed.": "Rien n'a changé." });
+Object.assign(window.I18N.fr, {
+  "Saved before every run and after each agent": "Enregistrées avant chaque exécution et après chaque agent",
+  "Every agent run in this project": "Chaque exécution d'agent dans ce projet",
+  "Every saved version of the code: open, compare, restore": "Chaque version enregistrée du code : ouvrir, comparer, restaurer",
+  "Cost and time per agent in this project": "Coût et durée par agent dans ce projet",
+});
+Object.assign(window.I18N.fr, {
+  "Every page opens in a real browser at desktop and phone width. Overlapping elements, blank gaps, a header on two rows, accessibility problems, errors and broken links are measured, and the agents fix them: the Critic doesn't let one through.": "Chaque page s'ouvre dans un vrai navigateur, en largeur ordinateur et téléphone. Éléments superposés, espaces vides, en-tête sur deux lignes, problèmes d'accessibilité, erreurs et liens cassés sont mesurés, et les agents les corrigent : le Critique n'en laisse passer aucun.",
+  "The Stats tab shows the estimated cost, time and tokens per agent in this project.": "L'onglet Statistiques montre le coût estimé, la durée et les tokens par agent dans ce projet.",
+});
+Object.assign(window.I18N.fr, {
+  "Not in the team": "Pas dans l'équipe",
+  "Add an agent": "Ajouter un agent",
+  "Pick a specialist in the marketplace": "Choisissez un spécialiste sur la place de marché",
+  "Add agents": "Ajouter des agents",
+  "Choose a team": "Choisir une équipe",
+  "Save this team to use it in other projects": "Enregistrer cette équipe pour d'autres projets",
+  "Attach a logo or photos in the chat. They appear here, with the smaller WebP copies the server makes for phones.": "Joignez un logo ou des photos dans la discussion. Ils apparaissent ici, avec les copies WebP plus légères que le serveur prépare pour les téléphones.",
+  "Fonts": "Polices",
+  "Chosen by the Design System agent": "Choisies par l'agent Design System",
+  "Chosen by the team": "Choisies par l'équipe",
+  "No logo": "Pas de logo",
+  "Preview this page": "Prévisualiser cette page",
+  "contact details": "coordonnées",
+  "page": "page",
+  "pages": "pages",
+  "image": "image",
+  "images": "images",
+  "QR code": "code QR",
+  "Choosing for": "Choix pour",
+  "Add an agent to its team, or use a whole team. It's ready in the studio for your next prompt.": "Ajoutez un agent à son équipe ou utilisez une équipe entière. Tout est prêt dans le studio pour votre prochaine demande.",
+  "Back to the studio": "Retour au studio",
+  "Stop choosing for this project": "Ne plus choisir pour ce projet",
+  "In the team": "Dans l'équipe",
+  "Add to the team": "Ajouter à l'équipe",
+  "Use this team": "Utiliser cette équipe",
+  "Required: always runs": "Obligatoire : s'exécute toujours",
+});
+Object.assign(window.I18N.fr, {
+  "In the studio, <b>Add agents</b> and <b>Choose a team</b> open the marketplace for this project: pick a specialist or a ready team and it joins the project. Duplicate any agent on the <a href=\"/agents\">Agents page</a> to make your own version, or save a team for a kind of job.": "Dans le studio, <b>Ajouter des agents</b> et <b>Choisir une équipe</b> ouvrent la place de marché pour ce projet : choisissez un spécialiste ou une équipe prête et il rejoint le projet. Dupliquez n'importe quel agent sur la <a href=\"/agents\">page Agents</a> pour créer votre version, ou enregistrez une équipe pour un type de travail.",
+  "The team strip shows this project's agents only. Use × on a tile to remove an agent; add more from the marketplace.": "La bande de l'équipe ne montre que les agents de ce projet. Utilisez × sur une tuile pour retirer un agent ; ajoutez-en depuis la place de marché.",
+});

@@ -29,11 +29,52 @@ window.hire = async (kind, pk, name) => {
   return r;
 };
 
+/* Choosing for a project: the studio's "Add agents" and "Choose a team" open the marketplace with the project noted in
+   sessionStorage. Then "Start a job" sends the agent or team straight back to that project, with no project picker. */
+window.JOB_FOR = (() => { try { const j = JSON.parse(sessionStorage.getItem("atelier-job-for") || "null"); return j && j.id ? j : null; } catch { return null; } })();
+const onTeam = (kind, id) => kind !== "team" && !!JOB_FOR?.agents?.includes(id);
+function sendToProject(kind, id) {
+  try {
+    sessionStorage.setItem("atelier-start-for", JOB_FOR.id);
+    if (kind === "team") sessionStorage.setItem("atelier-start-team", id);
+    else sessionStorage.setItem("atelier-start-add", JSON.stringify([id]));
+  } catch {}
+  location.href = `/p/${JOB_FOR.id}`;
+}
+function jobBanner() {
+  if (!JOB_FOR || document.querySelector(".job-for")) return;
+  const main = document.querySelector("main"); if (!main) return;
+  main.insertAdjacentHTML("beforebegin", `<div class="wrap job-wrap"><div class="job-for" role="status">
+    <span class="ico">${icon("briefcase", { size: 18 })}</span>
+    <span class="txt"><span>Choosing for</span> <b data-no-i18n>${esc(JOB_FOR.name || "your project")}</b><small>Add an agent to its team, or use a whole team. It's ready in the studio for your next prompt.</small></span>
+    <a class="btn btn-ghost btn-sm" href="/p/${esc(JOB_FOR.id)}">${icon("arrow-right", { size: 14, cls: "flip" })}Back to the studio</a>
+    <button class="icon-btn plain" type="button" data-job-for-off title="Stop choosing for this project" aria-label="Stop choosing for this project">${icon("x", { size: 16 })}</button></div></div>`);
+}
+if (JOB_FOR) {
+  const css = document.createElement("style");
+  css.textContent = `.job-wrap { padding-top: 20px; }
+    .job-for { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; margin: 0; border-radius: var(--r);
+      background: var(--paper); box-shadow: var(--ring); }
+    .job-for .ico { width: 36px; height: 36px; border-radius: var(--r); display: grid; place-items: center; background: var(--ice, var(--linen)); color: var(--sky, var(--ink)); flex: none; }
+    .job-for .txt { flex: 1 1 260px; min-width: 0; font-size: 14px; color: var(--ink); }
+    .job-for .txt small { display: block; font-size: 13px; color: var(--stone); margin-top: 2px; }`;
+  document.head.append(css);
+  document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", jobBanner) : jobBanner();
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-job-for-off]")) return;
+    try { sessionStorage.removeItem("atelier-job-for"); } catch {}
+    location.reload();
+  });
+}
+
 /* The action buttons of a catalogue card or a profile.
    Start a job: pick one of your projects and the agent (or team) joins it. Hire: copy a community one, then the same. */
 window.hireButtons = (kind, item, { big = false } = {}) => {
   const size = big ? "" : " btn-sm";
-  const start = (id) => `<button class="btn btn-dark${size}" type="button" data-start-job="${kind}" data-id="${esc(id)}" data-name="${esc(item.name)}">${icon("briefcase", { size: 15 })}Start a job</button>`;
+  const start = (id) => onTeam(kind, id)
+    ? `<span class="badge listed">${icon("check", { size: 12 })}In the team</span>`
+    : `<button class="btn btn-dark${size}" type="button" data-start-job="${kind}" data-id="${esc(id)}" data-name="${esc(item.name)}">${JOB_FOR
+        ? `${icon("plus", { size: 15 })}${kind === "team" ? "Use this team" : "Add to the team"}` : `${icon("briefcase", { size: 15 })}Start a job`}</button>`;
   if (item.mine) return start(item.id);
   if (item.official) return start(item.id);
   if (item.hired_as) return `<span class="badge listed">${icon("check", { size: 12 })}Hired</span>${start(item.hired_as)}`;
@@ -41,7 +82,7 @@ window.hireButtons = (kind, item, { big = false } = {}) => {
 };
 
 /* "Start a job with X": choose one of your projects. X joins its team (a team replaces the selection) in the studio. */
-window.startJobDialog = (kind, id, name) => new Promise((resolve) => {
+window.startJobDialog = (kind, id, name) => JOB_FOR ? sendToProject(kind, id) : new Promise((resolve) => {
   const d = document.createElement("dialog");
   d.className = "modal project-modal job-pick";
   d.innerHTML = `<form method="dialog" novalidate>

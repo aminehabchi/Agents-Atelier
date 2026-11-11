@@ -1770,30 +1770,6 @@ async def save_file(pid: str, body: dict):
     return {"ok": True, "path": str(target.relative_to(site_dir(pid).resolve())), "saved": time.time()}
 
 
-@app.post("/api/projects/{pid}/check")
-async def run_check_now(pid: str):
-    """Open the site in the server's browser now (layout, accessibility, errors, links) and keep the result."""
-    pid = load_meta(pid)["id"]
-    if is_busy(pid):
-        raise HTTPException(409, "Agents are working on this project. The check runs on its own after QA and the Critic.")
-    if not browser_check.available():
-        raise HTTPException(503, "The server has no Chrome or Chromium, so it can't open the site. Install one to use checks.")
-    if not (site_dir(pid) / "index.html").is_file():
-        raise HTTPException(400, "There is no page to check yet. Build the site first.")
-    st = live(pid)
-    if st.get("checking"):                      # one check at a time: each one replaces the screenshots of the last
-        raise HTTPException(409, "A check is already running on this project. Wait a moment.")
-    st["checking"] = True
-    try:
-        report = await safe_browser_check(pid)
-    finally:
-        st["checking"] = False
-    if report is None:
-        raise HTTPException(500, "The check couldn't open the site. Try again in a moment.")
-    save_check(pid, report, "you")
-    return load_meta(pid)["check"]
-
-
 @app.put("/api/projects/{pid}/contact")
 async def put_contact(pid: str, body: dict):
     """The contact details the contact agents use: {whatsapp, phone, email, telegram}. An empty one is "not given":
@@ -2487,14 +2463,6 @@ async def safe_browser_check(pid: str) -> dict | None:
         return None
 
 
-def save_check(pid: str, report: dict, by: str):
-    """Keep the latest browser check with the project, for the studio's Checks tab."""
-    meta = load_meta(pid)
-    meta["check"] = {"ts": time.time(), "by": by, "problems": browser_check.problems(report),
-                     "summary": browser_check.summary(report), **report}
-    save_meta(meta, touch=False)
-
-
 async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool = False, images: list[str] = (),
                     plan: dict | None = None):
     """Run the team in order. With resume=True, skip the agents that already finished in the saved run
@@ -2540,7 +2508,6 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
                 await broadcast(pid, {"type": "browser_check_start", "agent": agent["id"]})
                 report = await safe_browser_check(pid)
                 if report is not None:
-                    save_check(pid, report, agent["id"])
                     extra += browser_check.prompt_block(report)
                     agent_images = [*images, *report["screenshots"]]
                     await broadcast(pid, {"type": "browser_check", "agent": agent["id"], "text": browser_check.summary(report),

@@ -84,12 +84,7 @@
   .row .tools { display: flex; gap: 2px; position: relative; z-index: 2; }
   .row .tools .icon-btn { width: 32px; height: 32px; }
 
-  .newcard { border: 1px dashed var(--line-strong); border-radius: var(--r); display: grid; place-items: center; min-height: 300px;
     color: var(--graphite); background: transparent; transition: border-color .2s, background .2s; text-align: center; }
-  .newcard:hover { border-color: var(--graphite); background: var(--paper); color: var(--ink); }
-  .newcard .tile { width: 52px; height: 52px; border-radius: var(--r); background: var(--espresso); color: var(--on-espresso); display: grid; place-items: center; margin: 0 auto 14px; }
-  .newcard b { font-weight: 500; font-size: 16px; display: block; }
-  .newcard small { display: block; font-size: 13px; color: var(--stone); margin-top: 4px; }
 
   .empty { background: var(--paper); border-radius: var(--r); padding: 64px 24px; text-align: center; color: var(--graphite); }
   .empty .tile { width: 56px; height: 56px; border-radius: var(--r); background: var(--linen); display: grid; place-items: center; margin: 0 auto 16px; color: var(--charcoal); }
@@ -133,7 +128,7 @@
       <a href="/agents"><i data-icon="users" data-size="16"></i>My agents</a>
       <a href="/teams"><i data-icon="layers" data-size="16"></i>My teams</a>
     </nav>
-    <a class="btn btn-dark" href="/projects/new"><i data-icon="plus" data-size="16"></i>New project</a>
+    <a class="btn btn-dark" id="topNew" href="/projects/new"><i data-icon="plus" data-size="16"></i>New project</a>
   </div>
 </header>
 
@@ -242,6 +237,7 @@ function render() {
   const filtered = state.q || state.status !== "all";
   $("resultLine").textContent = filtered ? `${total} result${total === 1 ? "" : "s"}${state.q ? ` for “${state.q}”` : ""}` : "";
 
+  $("topNew").hidden = !counts.all;           // one "new project" button per screen: the empty state has its own
   if (!counts.all) {
     $("results").innerHTML = `<div class="empty"><div class="tile">${icon("folder", { size: 24 })}</div>
       <h3>No projects yet</h3><p>Give your first project a name and a description, then describe the page you want.</p>
@@ -255,16 +251,13 @@ function render() {
     $("pager").innerHTML = ""; return;
   }
 
-  const showNew = !filtered && state.page === 1 && state.view === "grid";
   $("results").innerHTML = state.view === "grid"
-    ? `<div class="grid">${showNew ? newCard() : ""}${items.map(cardHTML).join("")}</div>`
+    ? `<div class="grid">${items.map(cardHTML).join("")}</div>`
     : `<div class="list">${items.map(rowHTML).join("")}</div>`;
   document.querySelectorAll("iframe[data-src]").forEach(f => thumbs.observe(f));
   renderPager();
 }
 
-const newCard = () => `<button class="newcard" data-new><div><div class="tile">${icon("plus", { size: 22 })}</div>
-  <b>New project</b><small>Name it, describe it, then prompt the team</small></div></button>`;
 
 const desc = (p) => p.description
   ? `<div class="pdesc" title="${esc(p.description)}">${esc(p.description)}</div>`

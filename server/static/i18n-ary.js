@@ -1842,3 +1842,45 @@ Object.assign(window.I18N.ary, {
   "The sites are front end only, so they don't store messages. Contact forms send them where you already read them: WhatsApp, Telegram or the visitor's email app opens with the message written, and they press send.": "السيتات فرونت إند غير، داكشي علاش ما كيحتافظوش بالرسائل. الفورمات ديال الاتصال كيصيفطوهم فين ديجا كتقراهم: واتساب، تيليغرام ولا تطبيق الإيميل ديال الزائر كيتحل والرسالة مكتوبة، وهو كيضغط صيفط.",
 });
 Object.assign(window.I18N.ary, { "Nothing changed.": "حتى حاجة ما تبدلات." });
+Object.assign(window.I18N.ary, {
+  "Saved before every run and after each agent": "كيتسجلو قبل كل خدمة ومن بعد كل وكيل",
+  "Every agent run in this project": "كل خدمة ديال وكيل فهاد المشروع",
+  "Every saved version of the code: open, compare, restore": "كل نسخة مسجلة من الكود: حل، قارن، رجّع",
+  "Cost and time per agent in this project": "الثمن والوقت ديال كل وكيل فهاد المشروع",
+});
+Object.assign(window.I18N.ary, {
+  "Every page opens in a real browser at desktop and phone width. Overlapping elements, blank gaps, a header on two rows, accessibility problems, errors and broken links are measured, and the agents fix them: the Critic doesn't let one through.": "كل صفحة كتحل فمتصفح حقيقي بعرض الكمبيوتر والتيليفون. العناصر اللي طالعة على بعضها، الفراغات، الهيدر على جوج سطور، مشاكل سهولة الاستعمال، الأخطاء والروابط المقطوعة كيتقاسو، والوكلاء كيصلحوهم: الناقد ما كيخلي حتى وحدة تدوز.",
+  "The Stats tab shows the estimated cost, time and tokens per agent in this project.": "الخانة ديال الإحصائيات كتبين الثمن التقريبي والوقت والتوكنز ديال كل وكيل فهاد المشروع.",
+});
+Object.assign(window.I18N.ary, {
+  "Not in the team": "ماشي فالفريق",
+  "Add an agent": "زيد وكيل",
+  "Pick a specialist in the marketplace": "ختار متخصص فالسوق",
+  "Add agents": "زيد وكلاء",
+  "Choose a team": "ختار فريق",
+  "Save this team to use it in other projects": "سجل هاد الفريق باش تخدم بيه فمشاريع أخرى",
+  "Attach a logo or photos in the chat. They appear here, with the smaller WebP copies the server makes for phones.": "زيد لوغو ولا تصاور فالدردشة. غادي يبانو هنا، مع نسخ WebP الخفاف اللي كيوجد السيرفر للتيليفونات.",
+  "Fonts": "الخطوط",
+  "Chosen by the Design System agent": "كيختارهم وكيل نظام التصميم",
+  "Chosen by the team": "كيختارهم الفريق",
+  "No logo": "ما كاينش لوغو",
+  "Preview this page": "شوف هاد الصفحة",
+  "contact details": "معلومات التواصل",
+  "page": "صفحة",
+  "pages": "صفحات",
+  "image": "صورة",
+  "images": "صور",
+  "QR code": "كود QR",
+  "Choosing for": "كتختار لـ",
+  "Add an agent to its team, or use a whole team. It's ready in the studio for your next prompt.": "زيد وكيل للفريق ديالو ولا خدم بفريق كامل. غادي يكون واجد فالستوديو للطلب الجاي.",
+  "Back to the studio": "رجع للستوديو",
+  "Stop choosing for this project": "حبس الاختيار لهاد المشروع",
+  "In the team": "فالفريق",
+  "Add to the team": "زيد للفريق",
+  "Use this team": "خدم بهاد الفريق",
+  "Required: always runs": "ضروري: ديما كيخدم",
+});
+Object.assign(window.I18N.ary, {
+  "In the studio, <b>Add agents</b> and <b>Choose a team</b> open the marketplace for this project: pick a specialist or a ready team and it joins the project. Duplicate any agent on the <a href=\"/agents\">Agents page</a> to make your own version, or save a team for a kind of job.": "فالستوديو، <b>زيد وكلاء</b> و<b>ختار فريق</b> كيحلو السوق لهاد المشروع: ختار متخصص ولا فريق واجد وغادي يدخل للمشروع. نسخ أي وكيل فـ<a href=\"/agents\">صفحة الوكلاء</a> باش تصاوب النسخة ديالك، ولا سجل فريق لنوع ديال الخدمة.",
+  "The team strip shows this project's agents only. Use × on a tile to remove an agent; add more from the marketplace.": "شريط الفريق كيبين غير الوكلاء ديال هاد المشروع. كليكي على × فشي بطاقة باش تحيد وكيل، وزيد آخرين من السوق.",
+});

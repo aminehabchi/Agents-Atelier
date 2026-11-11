@@ -30,33 +30,10 @@
   .title .desc.missing { color: var(--danger); }
   .title .pid { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--stone); background: none; border: 0; padding: 0; flex: none; }
   .title .pid:hover { color: var(--ink); }
-  .pitem .pdesc { font-size: 12px; color: var(--graphite); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
   .conn { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); flex: none; }
   .conn.on { background: var(--ink); }
 
-  /* projects drawer */
-  .drawer { position: absolute; inset: 64px 0 0 0; background: var(--paper); z-index: 5; display: flex; flex-direction: column;
-    transform: translateX(-100%); transition: transform .25s ease, visibility .25s; visibility: hidden; }
-  .drawer.open { transform: none; visibility: visible; }
-  [dir="rtl"] .drawer:not(.open) { transform: translateX(100%); }
-  .chat { overflow: hidden; }            /* the closed drawer waits beside the column, not beside the page */
-  .drawer .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 16px 12px; }
-  .drawer h2 { margin: 0; font-size: 24px; font-weight: 400; letter-spacing: 0; }
-  .drawer .search { margin: 0 16px 8px; }
-  .plist { flex: 1; overflow-y: auto; padding: 4px 10px 12px; }
-  .pitem { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--r); text-decoration: none; }
-  .pitem:hover { background: var(--linen); }
-  .pitem.current { background: var(--bone); }
-  .pitem .thumb { width: 36px; height: 36px; border-radius: var(--r); background: var(--linen); box-shadow: var(--ring); display: grid; place-items: center; color: var(--stone); flex: none; }
-  .pitem.current .thumb { background: var(--paper); }
-  .pitem .info { flex: 1; min-width: 0; }
-  .pitem .pname { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pitem .meta { font-size: 12px; color: var(--stone); margin-top: 2px; display: flex; gap: 6px; align-items: center; }
-  .pitem .tools { display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
-  .pitem:hover .tools, .pitem:focus-within .tools { opacity: 1; }
-  .drawer .foot { border-top: 1px solid var(--line); padding: 12px 16px; }
-  .drawer .foot a { display: flex; align-items: center; justify-content: space-between; text-decoration: none; font-size: 14px; color: var(--graphite); padding: 6px 4px; }
-  .drawer .foot a:hover { color: var(--ink); }
+  .chat { overflow: hidden; }
 
   /* messages */
   .messages { flex: 1; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 12px; background: var(--linen); }
@@ -263,14 +240,6 @@
   .menu .mi .del:hover { color: var(--danger); }
   .menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 4px; }
 
-  /* ---------- big panels (versions, stats) ---------- */
-  dialog.panel { border: 0; border-radius: var(--r); padding: 0; width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); background: var(--linen); color: var(--ink);
-    box-shadow: var(--ring); display: none; flex-direction: column; overflow: hidden; }
-  dialog.panel[open] { display: flex; }
-  dialog.panel::backdrop { background: var(--scrim); backdrop-filter: blur(2px); }
-  .panel-head { display: flex; align-items: center; gap: 12px; padding: 20px 24px; background: var(--paper); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  .panel-head h2 { margin: 0; font-weight: 400; font-size: 26px; letter-spacing: 0; display: flex; align-items: center; gap: 10px; }
-  .panel-body { overflow: auto; padding: 20px 24px 24px; }
   .note { font-size: 13px; color: var(--stone); margin: 0 0 16px; display: flex; gap: 8px; align-items: flex-start; line-height: 1.5; }
   .note > .ic { margin-top: calc((1lh - 14px) / 2); }
 
@@ -412,7 +381,15 @@
   .sw:disabled { opacity: .5; cursor: default; }
 
   .agent-tile.s-skipped { opacity: .6; }
-  .agent-tile .sw.locked { cursor: not-allowed; }
+  .agent-tile .t-remove { width: 26px; height: 26px; margin: -4px -4px -4px 0; color: var(--stone); }
+  .agent-tile .t-remove:hover { color: var(--danger); }
+  .agent-tile .t-lock { color: var(--stone); display: inline-flex; }
+  .agent-tile.s-working .t-remove, .agent-tile.s-working .t-lock { color: inherit; }
+  .add-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; text-decoration: none;
+    background: transparent; box-shadow: none; border: 1px dashed var(--line-strong); color: var(--graphite); }
+  .add-tile:hover { box-shadow: none; border-color: var(--graphite); background: var(--paper); color: var(--ink); }
+  .add-tile b { font-size: 14px; font-weight: 500; }
+  .add-tile small { font-size: 12px; color: var(--stone); }
   .agent-tile.off { opacity: .5; background: transparent; box-shadow: inset 0 0 0 1px var(--line); border: 1px dashed transparent; }
   .agent-tile.off .tile { background: var(--linen); color: var(--stone); }
   .agent-tile.s-waiting { background: var(--paper); }
@@ -446,7 +423,7 @@
   .seg .badge.ok { background: var(--ok); }
   .seg .badge[hidden] { display: none; }
 
-  /* ---------- Checks and Project tabs ---------- */
+  /* ---------- Project tab ---------- */
   .pane { position: absolute; inset: 0; display: none; overflow: auto; background: var(--linen); }
   .pane.on { display: block; }
   .pane-in { max-width: 1040px; margin: 0 auto; padding: 24px; display: grid; gap: 16px; }
@@ -466,33 +443,44 @@
   .pempty .tile { width: 48px; height: 48px; border-radius: var(--r); display: grid; place-items: center; background: var(--paper); box-shadow: var(--ring); color: var(--ink); }
   .pempty b { color: var(--ink); font-weight: 500; font-size: 16px; }
 
-  /* checks */
-  .ck-sum { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-  .ck-kpi { background: var(--paper); box-shadow: var(--ring); border-radius: var(--r-card); padding: 14px 16px; display: grid; gap: 4px; }
-  .ck-kpi b { font-size: 22px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
-  .ck-kpi span { font-size: 12px; color: var(--stone); display: inline-flex; align-items: center; gap: 6px; }
-  .ck-kpi span svg { flex-shrink: 0; display: block; }
-  .ck-kpi.bad b { color: var(--danger); }
-  .ck-shots { display: grid; grid-template-columns: 3fr 1fr; gap: 12px; align-items: start; }
-  .ck-shots a { display: block; border-radius: var(--r); overflow: hidden; box-shadow: var(--ring); background: var(--paper); max-height: 320px; }
-  .ck-shots img { display: block; width: 100%; height: auto; }
-  .ck-page { display: grid; gap: 12px; }
-  .ck-page > header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-  .ck-page > header .mono { font-size: 13px; color: var(--stone); }
-  .ck-page > header .acts { margin-inline-start: auto; }
-  .ck-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
-  .ck-col { display: grid; gap: 8px; align-content: start; min-width: 0; }
-  .ck-col h4 { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--stone); text-transform: uppercase; letter-spacing: .04em; }
-  .ck-col h4 svg { flex-shrink: 0; display: block; }
-  .ck-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-  .ck-list li { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: start; padding: 10px 12px; border-radius: var(--r); background: var(--linen); font-size: 13px; line-height: 1.45; color: var(--graphite); min-width: 0; }
-  .ck-list li .tag { grid-row: span 2; align-self: start; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: var(--r-pill); background: var(--paper); box-shadow: var(--ring); color: var(--ink); white-space: nowrap; }
-  .ck-list li .tag.a11y { color: var(--sky); } .ck-list li .tag.err { color: var(--danger); } .ck-list li .tag.layout { color: var(--saffron); }
-  .ck-list li span:last-child { overflow-wrap: anywhere; }
-  .ck-ok { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ok); padding: 10px 12px; border-radius: var(--r); background: var(--linen); }
-  .ck-ok svg { flex-shrink: 0; display: block; }
-
   /* project */
+  .pj { container-type: inline-size; }
+  .pj-stats { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .pj-stat { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; gap: 0 12px; align-items: center; text-align: start;
+    padding: 14px 16px; border: 0; border-radius: var(--r-card); background: var(--paper); box-shadow: var(--ring); color: var(--ink); cursor: pointer; font: inherit; min-width: 0; }
+  .pj-stat:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .pj-stat .pi { grid-row: span 2; width: 36px; height: 36px; border-radius: var(--r); display: grid; place-items: center; background: var(--linen); color: var(--stone); }
+  .pj-stat.ok .pi { background: var(--ice); color: var(--sky); }
+  .pj-stat b { font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .pj-stat > span:last-child { font-size: 12px; color: var(--stone); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pj-cols { display: grid; gap: 16px; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+  .pj-col { display: grid; gap: 16px; min-width: 0; }
+  @container (max-width: 760px) {
+    .pj-cols { grid-template-columns: 1fr; }
+    .pj-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  .pj-count { margin-inline-start: auto; font-size: 12px; font-variant-numeric: tabular-nums; padding: 2px 10px; border-radius: var(--r-pill); background: var(--linen); color: var(--graphite); }
+  .pcard2 > header .pj-count + .acts { margin-inline-start: 8px; }
+  .pcard2 { transition: box-shadow .3s; }
+  .pcard2.flash-card { box-shadow: inset 0 0 0 2px var(--sky); }
+  .pj-empty { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: start; padding: 14px; border-radius: var(--r); border: 1px dashed var(--line-strong); color: var(--stone); }
+  .pj-empty > svg { margin-top: 2px; }
+  .pj-empty p { margin: 0; font-size: 13px; line-height: 1.5; }
+  .pj-empty .btn { grid-column: 2; justify-self: start; }
+  .pj-kit { margin: 0; display: grid; grid-template-columns: 72px 1fr; gap: 12px 16px; align-items: center; font-size: 13px; }
+  .pj-kit dt { color: var(--stone); }
+  .pj-kit dd { margin: 0; min-width: 0; display: flex; flex-wrap: wrap; gap: 8px; color: var(--ink); }
+  .pj-kit .muted { color: var(--stone); }
+  .pj-kit .sw-c { display: inline-flex; align-items: center; gap: 6px; }
+  .pj-kit .sw-c i { width: 22px; height: 22px; border-radius: 6px; box-shadow: var(--ring); display: block; }
+  .pj-kit .sw-c code { font-size: 11px; color: var(--graphite); }
+  .pj-font { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 10px; border-radius: var(--r); background: var(--linen); }
+  .pj-font b { font-size: 16px; font-weight: 600; }
+  .pj-logo { max-height: 40px; max-width: 160px; object-fit: contain; display: block; border-radius: 6px; background: var(--linen); padding: 4px; }
+  .pj-pages { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pj-page { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 0; border-radius: var(--r); background: var(--linen); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
+  .pj-page:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .pj-page code { font-size: 11px; color: var(--stone); }
   .pj-form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
   .pj-form label { display: grid; gap: 6px; font-size: 13px; color: var(--ink); min-width: 0; }
   .pj-form label > span { display: flex; align-items: center; gap: 8px; }
@@ -517,13 +505,11 @@
   .pj-qrs img { width: 112px; height: 112px; background: #fff; padding: 6px; border-radius: var(--r); display: block; }
   .pj-qrs figcaption { font: 12px var(--mono); color: var(--graphite); overflow-wrap: anywhere; }
   .pj-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
-  .pj-swatches span { width: 32px; height: 32px; border-radius: var(--r); box-shadow: var(--ring); display: block; }
   .pj-brief { margin: 0; display: grid; grid-template-columns: minmax(110px, 30%) 1fr; gap: 8px 16px; font-size: 13px; line-height: 1.45; }
   .pj-brief dt { color: var(--stone); }
   .pj-brief dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
   @media (max-width: 640px) {
     .pane-in { padding: 16px; }
-    .ck-shots { grid-template-columns: 1fr 1fr; }
     .pj-brief { grid-template-columns: 1fr; gap: 2px; }
     .pj-brief dd { margin-bottom: 8px; }
   }
@@ -537,7 +523,6 @@
   body > * { min-width: 0; }               /* a column never grows past the screen because of its content */
   @media (max-width: 520px) {
     .bar { gap: 6px; padding: 0 10px; }
-    .bar [data-new] { padding-inline: 10px; }
     .title .pid, .title .sub > span[aria-hidden] { display: none; }
     .toolbar { overflow-x: auto; scrollbar-width: none; }
     .toolbar > * { flex: none; }
@@ -559,20 +544,8 @@
         <span aria-hidden="true">·</span><button class="pid mono" id="pid" title="Copy project id"></button></div>
     </div>
     <span class="conn" id="conn" title="Connecting…"></span>
-    <button class="icon-btn" id="menu" title="Projects" aria-label="Projects"><i data-icon="folder" data-size="17"></i></button>
-    <button class="btn btn-dark btn-sm" data-new title="New project"><i data-icon="plus" data-size="16"></i>New</button>
+    <a class="icon-btn" href="/projects" title="All projects" aria-label="All projects"><i data-icon="grid" data-size="17"></i></a>
   </div>
-
-  <aside class="drawer" id="drawer" aria-label="Projects">
-    <div class="head"><h2>Projects</h2><button class="btn btn-dark btn-sm" data-new><i data-icon="plus" data-size="16"></i>New project</button></div>
-    <label class="search"><i data-icon="search" data-size="16"></i><input class="input" id="psearch" placeholder="Search projects" autocomplete="off"></label>
-    <div class="plist" id="plist"></div>
-    <div class="foot">
-      <a href="/projects"><span>All projects</span><i data-icon="arrow-right" data-size="16"></i></a>
-      <a href="/agents"><span>Agents</span><i data-icon="arrow-right" data-size="16"></i></a>
-      <a href="/guide"><span>Guide</span><i data-icon="arrow-right" data-size="16"></i></a>
-    </div>
-  </aside>
 
   <div class="messages" id="messages"></div>
 
@@ -593,13 +566,12 @@
     <div class="seg" id="tabs" role="tablist">
       <button data-tab="preview" class="on"><i data-icon="eye" data-size="16"></i><span class="lbl">Preview</span></button>
       <button data-tab="code"><i data-icon="code" data-size="16"></i><span class="lbl">Code</span></button>
-      <button data-tab="checks" title="What the server's browser found: layout, accessibility, errors and links"><i data-icon="gauge" data-size="16"></i><span class="lbl">Checks</span><span class="badge" id="checksBadge" hidden></span></button>
       <button data-tab="project" title="Contact details, images, QR codes, brand kit and brief"><i data-icon="briefcase" data-size="16"></i><span class="lbl">Project</span></button>
       <button data-tab="research" title="The Research agent's report"><i data-icon="search" data-size="16"></i><span class="lbl">Research</span></button>
+      <button data-tab="versions" title="Every saved version of the code: open, compare, restore"><i data-icon="history" data-size="16"></i><span class="lbl">Versions</span></button>
+      <button data-tab="stats" title="Cost and time per agent in this project"><i data-icon="chart" data-size="16"></i><span class="lbl">Stats</span></button>
     </div>
     <span class="spacer"></span>
-    <button class="icon-btn" id="historyBtn" title="Versions: history of the code" aria-label="Versions"><i data-icon="history" data-size="17"></i></button>
-    <button class="icon-btn" id="statsBtn" title="Cost &amp; time per agent" aria-label="Stats"><i data-icon="chart" data-size="17"></i></button>
     <a class="btn btn-ghost btn-sm" id="download" title="Download the code as .zip"><i data-icon="download" data-size="16"></i>.zip</a>
   </div>
 
@@ -638,7 +610,13 @@
       </div>
     </div>
     <div class="research" id="research" role="region" aria-label="Research report" aria-live="polite"></div>
-    <div class="pane" id="checks" role="region" aria-label="Checks"></div>
+    <div class="pane" id="versions" role="region" aria-label="Versions"><div class="pane-in">
+      <div class="pane-head"><h2>Versions</h2><span class="meta">Saved before every run and after each agent</span>
+        <div class="acts"><button class="btn btn-dark btn-sm" id="saveVersion"><i data-icon="save" data-size="14"></i>Save version now</button></div></div>
+      <div id="versionsBody"></div></div></div>
+    <div class="pane" id="stats" role="region" aria-label="Stats"><div class="pane-in">
+      <div class="pane-head"><h2>Cost &amp; time</h2><span class="meta">Every agent run in this project</span></div>
+      <div id="statsBody"></div></div></div>
     <div class="pane" id="proj" role="region" aria-label="Project"></div>
   </div>
 
@@ -713,6 +691,7 @@ async function boot() {
     // Handed over by another page: "New project with this team", the project form, or "Start a job" in the
     // marketplace (atelier-start-for names the project it's meant for; it may already have a history).
     const take = (k) => { try { const v = sessionStorage.getItem(k); sessionStorage.removeItem(k); return v; } catch { return null; } };
+    take("atelier-job-for");
     const start = take("atelier-start-team"), startFor = take("atelier-start-for"), startPrompt = take("atelier-start-prompt");
     let startAgents = null, addAgents = null;
     try { startAgents = JSON.parse(take("atelier-start-agents") || "null"); addAgents = JSON.parse(take("atelier-start-add") || "null"); } catch {}
@@ -749,12 +728,10 @@ async function boot() {
   foldHistory();
   scrollDown();
 
+  const tab = restoreState();
   reloadPreview();
   refreshPages();
-  setChecksBadge();
-  // deep link to a tab: /p/<id>#code or /p/<id>#research
-  const tab = document.querySelector(`#tabs [data-tab="${CSS.escape(location.hash.slice(1))}"]`);
-  if (tab) tab.click();
+  if (tab) showTab(tab);
   addEventListener("hashchange", () => { if (PANES[location.hash.slice(1)] || location.hash === "#preview") showTab(location.hash.slice(1)); });
   connect();
   setInterval(tick, 1000);
@@ -911,12 +888,12 @@ function handle(ev) {
       if (!a) break;
       status[a.id] = { ...(status[a.id] || {}), state: "done", ended: now };
       finishCard(a.id, ev.text, now, ev.stat);
-      if (!replaying && $("statsPanel")?.open) loadStats();
-      if (!replaying && ev.version && $("historyPanel")?.open) loadVersions();
+      if (!replaying && tabOn("stats")) loadStats();
+      if (!replaying && ev.version && tabOn("versions")) loadVersions();
       renderTeam();
       break;
     case "run_done": {
-      if (!replaying && (tabOn("project") || tabOn("checks"))) syncProject().then(() => tabOn("project") ? renderProject() : renderChecks());
+      if (!replaying && tabOn("project")) syncProject().then(renderProject);
       if (ev.retry) {
         setBusy(false); const r = run?.retry; run = null; renderTeam();
         addSystem(`${BY_ID[r]?.name || "Agent"} finished its retry`);
@@ -927,8 +904,6 @@ function handle(ev) {
       setBusy(false); run = null; renderTeam();
       addMsg(`<div class="msg done-card">
         <span class="lbl"><span class="tile">${icon("check", { size: 16 })}</span>Team finished${took}</span>
-        <a class="btn btn-ghost btn-sm" href="/api/projects/${PID}/download">${icon("download", { size: 16 })}.zip</a>
-        <button class="btn btn-dark btn-sm" data-new>${icon("plus", { size: 16 })}New project</button>
         ${canRate ? `<label class="showcase"><input type="checkbox" data-showcase ${project.showcase ? "checked" : ""}>
           <span>Show this site in the portfolios of the agents that built it</span></label>` : ""}</div>`);
       if (!replaying) toast("The team finished the page");
@@ -956,9 +931,7 @@ function handle(ev) {
     case "browser_check_start": break;
     case "browser_check": {
       const shots = (ev.screenshots || []).map(f => `<a href="${mediaUrl(f)}" target="_blank" rel="noopener"><img loading="lazy" src="${mediaUrl(f)}?v=${Date.now()}" alt="${esc(f.includes("phone") ? "Phone screenshot" : "Desktop screenshot")}"></a>`).join("");
-      addMsg(`<div class="msg bcheck ${ev.problems ? "warn" : ""}"><div class="head">${icon(ev.problems ? "alert" : "check", { size: 16 })}<span>${esc(ev.text)}</span>
-        ${ev.problems ? `<button class="btn btn-ghost btn-sm" type="button" data-goto="checks">See the list</button>` : ""}</div>${shots ? `<div class="shots">${shots}</div>` : ""}</div>`);
-      if (!replaying) syncProject().then(() => { if (tabOn("checks")) renderChecks(); });
+      addMsg(`<div class="msg bcheck ${ev.problems ? "warn" : ""}"><div class="head">${icon(ev.problems ? "alert" : "check", { size: 16 })}<span>${esc(ev.text)}</span></div>${shots ? `<div class="shots">${shots}</div>` : ""}</div>`);
       break;
     }
     case "security":
@@ -979,14 +952,14 @@ function handle(ev) {
       renderTeam();
       break;
     }
-    case "versions": if ($("historyPanel")?.open) loadVersions(); break;
+    case "versions": if (tabOn("versions")) loadVersions(); break;
     case "pages":
       project.pages = ev.pages;
       refreshPagesSoon();
       if (!replaying) toast("A new page was added to the site");
       break;
     case "restored":
-      if (!replaying) { reloadPreview(); refreshCode(true); if ($("historyPanel")?.open) loadVersions(); toast(`Restored version ${ev.version}`); }
+      if (!replaying) { reloadPreview(); refreshCode(true); if (tabOn("versions")) loadVersions(); toast(`Restored version ${ev.version}`); }
       addSystem(`Restored version ${ev.version}${ev.backup ? ` (the code before was saved as v${ev.backup})` : ""}`);
       break;
     case "resume": {
@@ -1043,8 +1016,6 @@ $("messages").addEventListener("click", (e) => {
   if (e.target.closest("[data-usecases-more]")) { showAllUseCases = !showAllUseCases; showEmpty(); }
   const more = e.target.closest(".more");
   if (more) { const box = more.parentElement; box.classList.toggle("open"); updateMore(box); }
-  const go = e.target.closest("[data-goto]");
-  if (go) showTab(go.dataset.goto);
 });
 
 function addMsg(html) {
@@ -1302,8 +1273,7 @@ function setBusy(b) {
   dl.setAttribute("aria-disabled", b ? "true" : "false");
   dl.title = b ? "Available when the agents finish" : "Download the code as .zip";
   dl.innerHTML = icon(b ? "lock" : "download", { size: 16 }) + ".zip";
-  document.querySelectorAll(".sw").forEach(x => x.disabled = b);
-  $("historyBtn").title = "Versions: history of the code";
+  document.querySelectorAll(".t-remove").forEach(x => x.disabled = b);
   updateEditorLock();
   updateSend();
 }
@@ -1425,56 +1395,6 @@ document.addEventListener("click", (e) => {
   if (b) resumeRun(b.dataset.resume);
 });
 
-// ================================================================ projects drawer
-document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
-
-let projectList = [], drawerTimer;
-async function loadProjects() {
-  try { projectList = await api("/api/projects"); renderProjects(); }
-  catch (err) { showError($("plist"), err, loadProjects, "Couldn't load your projects"); }
-}
-function renderProjects() {
-  const q = $("psearch").value.trim().toLowerCase();
-  const list = projectList.filter(p => !q || p.name.toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q) || p.id.startsWith(q));
-  $("plist").innerHTML = list.map(p => `
-    <a class="pitem ${p.id === PID ? "current" : ""}" href="/p/${p.id}">
-      <span class="thumb">${icon(p.has_preview ? "monitor" : "file", { size: 16 })}</span>
-      <div class="info">
-        <div class="pname">${esc(p.name)}</div>
-        <div class="pdesc">${esc(p.description || "No description yet")}</div>
-        <div class="meta">${p.busy ? `<span class="badge live">Working</span>` : p.paused ? `<span class="badge">Paused</span>` : ""}<span class="mono">#${p.id.slice(0, 8)}</span>· ${ago(p.updated)}</div>
-      </div>
-      <span class="tools">
-        ${p.busy ? "" : `<span class="icon-btn plain" role="button" tabindex="0" data-dl="${p.id}" title="Download .zip">${icon("download", { size: 16 })}</span>`}
-        <span class="icon-btn plain danger" role="button" tabindex="0" data-del="${p.id}" title="Delete">${icon("trash", { size: 16 })}</span>
-      </span>
-    </a>`).join("") || `<div class="msg system" style="padding:24px">${q ? "No project matches." : "No projects yet."}</div>`;
-}
-function toggleDrawer(open = !$("drawer").classList.contains("open")) {
-  $("drawer").classList.toggle("open", open);
-  $("menu").classList.toggle("on", open);
-  clearInterval(drawerTimer);
-  if (open) { loadProjects(); drawerTimer = setInterval(loadProjects, 4000); setTimeout(() => $("psearch").focus(), 200); }
-}
-$("menu").onclick = (e) => { e.stopPropagation(); toggleDrawer(); };
-$("psearch").addEventListener("input", renderProjects);
-document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("drawer").classList.contains("open")) toggleDrawer(false); });
-document.addEventListener("click", (e) => {
-  if ($("drawer").classList.contains("open") && !e.target.closest("#drawer, #menu, dialog")) toggleDrawer(false);
-});
-$("plist").addEventListener("click", async (e) => {
-  const dl = e.target.closest("[data-dl]"), del = e.target.closest("[data-del]");
-  if (!dl && !del) return;
-  e.preventDefault(); e.stopPropagation();
-  if (dl) { location.href = `/api/projects/${dl.dataset.dl}/download`; return; }
-  const p = projectList.find(x => x.id === del.dataset.del);
-  const ok = await confirmDialog({ title: "Delete project?", text: `“${p?.name}” and all its files will be removed. This cannot be undone.`, ok: "Delete", danger: true });
-  if (!ok) return;
-  try { await api(`/api/projects/${p.id}`, { method: "DELETE" }); }
-  catch (err) { return toast(err.message, "err"); }
-  if (p.id === PID) location.replace("/projects"); else { toast("Project deleted"); loadProjects(); }
-});
-
 // ================================================================ team panel
 const tileEl = (id) => document.querySelector(`.agent-tile[data-id="${CSS.escape(id)}"]`);
 
@@ -1482,7 +1402,7 @@ function tileHTML(a, i) {
   const on = selected.has(a.id), st = status[a.id];
   const state = st?.state || (on ? "ready" : "off");
   let line = "", last = "";
-  if (!on && !st) line = "Off · skipped";
+  if (state === "off") line = "Not in the team";
   else if (state === "ready") line = "Ready";
   else if (state === "waiting") line = `${icon("clock", { size: 12 })}Waiting`;
   else if (state === "working") {
@@ -1496,21 +1416,25 @@ function tileHTML(a, i) {
   const locked = REQUIRED.includes(a.id);
   return `<div class="agent-tile s-${state} ${on || st ? "" : "off"}" data-id="${esc(a.id)}" style="--c:${a.color}" tabindex="0"
       role="button" aria-label="${esc(a.name)} agent, ${state}${a.description ? ": " + esc(a.description) : ""}"
-      title="${esc(a.description ? a.description + "\n\n" : "")}${locked ? "Required: always runs when the team works" : cards[a.id] ? "Click to show in chat" : on ? "Click to switch off" : "Click to switch on"}">
+      title="${esc(a.description ? a.description + "\n\n" : "")}${locked ? "Required: always runs when the team works" : cards[a.id] ? "Click to show in chat" : ""}">
     <div class="t-top"><span class="tile">${icon(a.icon, { size: 17 })}</span><span class="t-num">${String(i + 1).padStart(2, "0")}</span>
       ${a.model_ok === false ? `<a class="model-badge" style="color:var(--danger)" href="/agents/${encodeURIComponent(a.id)}/edit" title="Not a known model. Click to fix">${icon("alert", { size: 10 })}${esc(a.model)}</a>`
         : a.model ? `<span class="model-badge" title="Runs on ${esc(a.model)}" data-no-i18n>${esc(a.model.replace(/^claude-/, ""))}</span>` : ""}
-      <button class="sw ${on ? "on" : ""} ${locked ? "locked" : ""}" data-toggle role="switch" aria-checked="${on}" aria-label="Use ${esc(a.name)}${locked ? " (required)" : ""}" ${busy || locked ? "disabled" : ""}></button></div>
+      ${locked ? `<span class="t-lock" title="Required: always runs">${icon("lock", { size: 13 })}</span>`
+        : on ? `<button class="icon-btn plain t-remove" data-remove title="Remove ${esc(a.name)} from this project's team" aria-label="Remove ${esc(a.name)} from the team" ${busy ? "disabled" : ""}>${icon("x", { size: 14 })}</button>` : ""}</div>
     <div class="t-name">${esc(a.name)}</div>
     <div class="t-status">${line}</div>
     ${state === "working" ? `<div class="t-last">${esc(last)}</div>` : `<div class="t-desc">${esc(a.description || "")}</div>`}
   </div>`;
 }
+/* The strip shows this project's team only (plus any agent of the current run's history): agents and teams are
+   chosen in the marketplace, which sends them back here. */
+const teamList = () => AGENTS.filter(a => selected.has(a.id) || status[a.id]);
 function renderTile(id) {
-  const el = tileEl(id), i = AGENTS.findIndex(a => a.id === id);
+  const list = teamList(), el = tileEl(id), i = list.findIndex(a => a.id === id);
   if (!el || i < 0) return;
   const was = [...el.classList].find(c => c.startsWith("s-"));
-  el.outerHTML = tileHTML(AGENTS[i], i);
+  el.outerHTML = tileHTML(list[i], i);
   // a short "stamp" when an agent starts or finishes, so the change is easy to catch
   const now = tileEl(id), is = now && [...now.classList].find(c => c.startsWith("s-"));
   if (now && was !== is && (is === "s-working" || is === "s-done") && !replaying) {
@@ -1519,7 +1443,8 @@ function renderTile(id) {
 }
 function renderTeam() {
   $("team").classList.toggle("collapsed", collapsed);
-  $("teamRow").innerHTML = AGENTS.map(tileHTML).join("");
+  $("teamRow").innerHTML = teamList().map(tileHTML).join("") + (busy ? "" : `
+    <a class="agent-tile add-tile" href="/hire" data-hire-link="agents">${icon("plus", { size: 20 })}<b>Add an agent</b><small>Pick a specialist in the marketplace</small></a>`);
   renderTeamHead();
   // keep the working agent in view
   const working = Object.keys(status).find(id => status[id].state === "working");
@@ -1556,13 +1481,11 @@ function renderTeamHead() {
   } else {
     $("progress").style.width = "0";
     $("teamHead").innerHTML = `<h3>${icon("users", { size: 16 })}Team</h3>
-      <span class="count">${team.length} of ${AGENTS.length} on</span>
+      <span class="count">${team.length} agent${team.length === 1 ? "" : "s"}${matchingPreset() ? ` · <span data-no-i18n>${esc(matchingPreset().name)}</span>` : ""}</span>
       <span class="spacer"></span>
-      <span class="menu-wrap">
-        <button class="btn btn-ghost btn-sm" id="presetsBtn" aria-haspopup="true">${icon("sliders", { size: 14 })}${esc(matchingPreset()?.name || "Teams")}${icon("chevron-up", { size: 13 })}</button>
-        <div class="menu" id="presetsMenu" role="menu"></div>
-      </span>
-      <a class="lnk" href="/agents">${icon("users", { size: 13 })}Agents</a>${chevron}`;
+      <a class="btn btn-ghost btn-sm" href="/hire" data-hire-link="agents">${icon("plus", { size: 14 })}Add agents</a>
+      <a class="btn btn-ghost btn-sm" href="/hire?tab=teams" data-hire-link="teams">${icon("layers", { size: 14 })}Choose a team</a>
+      <button class="icon-btn plain" id="saveTeam" title="Save this team to use it in other projects" aria-label="Save as a team">${icon("save", { size: 15 })}</button>${chevron}`;
   }
 }
 async function saveSelection() {
@@ -1571,13 +1494,19 @@ async function saveSelection() {
   try { await api(`/api/projects/${PID}`, { method: "PATCH", body: JSON.stringify({ agents: [...selected] }) }); }
   catch (err) { toast(`Couldn't save the team: ${err.message}`, "err"); }
 }
-function toggleAgent(id) {
+function removeAgent(id) {
   if (busy) return toast("Agents are working. Stop them to change the team");
   if (REQUIRED.includes(id)) return toast(`${BY_ID[id]?.name || id} is required: it always runs`);
-  selected.has(id) ? selected.delete(id) : selected.add(id);
-  if (status[id] && !selected.has(id)) delete status[id];
+  selected.delete(id); delete status[id];
   saveSelection();
+  toast(`${BY_ID[id]?.name || "The agent"} left this project's team`);
 }
+/* To the marketplace, which knows it's choosing for this project: "Start a job" there brings the agent or team back here. */
+document.addEventListener("click", (e) => {
+  const l = e.target.closest("[data-hire-link]"); if (!l) return;
+  if (busy) { e.preventDefault(); return toast("Agents are working. Change the team when they finish"); }
+  try { sessionStorage.setItem("atelier-job-for", JSON.stringify({ id: PID, name: project.name, agents: [...selected] })); } catch {}
+});
 function showCard(id) {
   const card = cards[id]; if (!card) return false;
   card.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1586,8 +1515,8 @@ function showCard(id) {
 }
 $("teamRow").addEventListener("click", (e) => {
   const t = e.target.closest(".agent-tile"); if (!t) return;
-  if (e.target.closest("[data-toggle]")) return toggleAgent(t.dataset.id);
-  if (!showCard(t.dataset.id) && !busy) toggleAgent(t.dataset.id);
+  if (e.target.closest("[data-remove]")) return removeAgent(t.dataset.id);
+  showCard(t.dataset.id);
 });
 $("teamRow").addEventListener("keydown", (e) => {
   const t = e.target.closest(".agent-tile");
@@ -1600,7 +1529,7 @@ $("teamHead").addEventListener("click", (e) => {
     return renderTeam();
   }
   if (busy) return;
-  if (e.target.closest("#presetsBtn")) { e.stopPropagation(); togglePresets(); }
+  if (e.target.closest("#saveTeam")) saveAsTeam();
 });
 
 // ================================================================ preview
@@ -1617,10 +1546,11 @@ function renderPages() {
   const planned = (project.pages || [{ title: "Home", file: "index.html" }]);
   const extra = [...builtPages].filter(f => !planned.some(p => p.file === f)).sort();
   const opts = [...planned.map(p => ({ file: p.file, label: `${p.title} · ${p.file}` })), ...extra.map(f => ({ file: f, label: f }))];
-  if (!opts.some(o => o.file === currentPage)) currentPage = "index.html";
+  if (builtPages.size && !opts.some(o => o.file === currentPage)) currentPage = "index.html";   // wait for the file list before dropping a page from the address
   $("pageSel").innerHTML = opts.map(o => `<option value="${esc(o.file)}" ${o.file === currentPage ? "selected" : ""}>${esc(o.label)}${builtPages.size && !builtPages.has(o.file) ? " (not built yet)" : ""}</option>`).join("");
   $("pageSel").closest(".page-pick").hidden = opts.length < 2;
   $("url").textContent = `/work/${PID.slice(0, 8)}…/${currentPage}`;
+  saveState();
   $("url").title = workUrl();
 }
 let pagesTimer;
@@ -1660,8 +1590,35 @@ $("devices").onclick = (e) => {
   const b = e.target.closest("button"); if (!b) return;
   [...$("devices").children].forEach(x => x.classList.toggle("on", x === b));
   $("frameWrap").className = "frame-wrap " + b.dataset.device;
+  saveState();
 };
-const PANES = { code: "code", research: "research", checks: "checks", project: "proj" };
+/* The studio's state lives in the address, so a reload, a bookmark or a shared link opens the same view:
+   /p/<id>?tab=code&file=style.css&page=about.html&device=phone (defaults are left out). Old links like #code still work. */
+const SAFE_FILE = /^[\w.-]+(\/[\w.-]+)*$/;
+let stateRead = false;          // nothing is written to the address before it has been read
+function restoreState() {
+  stateRead = true;
+  const q = new URLSearchParams(location.search);
+  const page = q.get("page"), file = q.get("file"), device = q.get("device");
+  if (page && /^[\w.-]+\.html?$/i.test(page)) currentPage = page;
+  if (file && SAFE_FILE.test(file) && !file.split("/").includes("..")) currentFile = file;
+  if (device) document.querySelector(`#devices [data-device="${CSS.escape(device)}"]`)?.click();
+  const tab = q.get("tab") || location.hash.slice(1);
+  return PANES[tab] ? tab : null;
+}
+function saveState() {
+  if (!stateRead) return;
+  const q = new URLSearchParams();
+  const tab = document.querySelector("#tabs button.on")?.dataset.tab;
+  const device = document.querySelector("#devices button.on")?.dataset.device;
+  if (tab && tab !== "preview") q.set("tab", tab);
+  if (currentPage !== "index.html") q.set("page", currentPage);
+  if (device && device !== "desktop") q.set("device", device);
+  if (tab === "code" && currentFile !== "index.html") q.set("file", currentFile);
+  const url = location.pathname + (q.size ? `?${q}` : "");
+  if (url !== location.pathname + location.search + location.hash) history.replaceState(history.state, "", url);
+}
+const PANES = { code: "code", research: "research", versions: "versions", stats: "stats", project: "proj" };
 const tabOn = (tab) => !!$(PANES[tab])?.classList.contains("on");
 const showTab = (tab) => document.querySelector(`#tabs [data-tab="${tab}"]`)?.click();
 $("tabs").onclick = (e) => {
@@ -1671,104 +1628,23 @@ $("tabs").onclick = (e) => {
   $("pvTools").hidden = b.dataset.tab !== "preview";          // the device, page and reload controls only make sense on the preview
   if (b.dataset.tab === "code") refreshCode();
   if (b.dataset.tab === "research") refreshResearch();
-  if (b.dataset.tab === "checks") renderChecks();
+  if (b.dataset.tab === "versions") loadVersions();
+  if (b.dataset.tab === "stats") loadStats();
   if (b.dataset.tab === "project") renderProject();
+  saveState();
 };
 
-/* Fresh project data for the Checks and Project tabs (the chat events don't carry it). */
+/* Fresh project data for the Project tab (the chat events don't carry it). */
 async function syncProject() {
   try {
     const p = await api(`/api/projects/${PID}`);
-    for (const k of ["check", "contact", "contact_skipped", "assets", "brief", "brand", "pages"]) project[k] = p[k];
+    for (const k of ["contact", "contact_skipped", "assets", "brief", "brand", "pages"]) project[k] = p[k];
   } catch (err) { console.warn("Couldn't refresh the project", err); }
-  setChecksBadge();
 }
 function fillComposer(text) {
   $("input").value = text; autosize(); $("input").focus();
   toast("Your request is ready: check it, then press Enter");
 }
-
-// ================================================================ checks
-/* The latest browser check: the server opened every page at desktop and phone width, measured the layout, ran axe-core
-   and collected errors and broken links. QA and the Critic get the same list; here the owner sees it too. */
-function setChecksBadge() {
-  const n = project?.check?.problems || 0, b = $("checksBadge");
-  b.hidden = !n; b.textContent = n > 99 ? "99+" : String(n);
-  b.title = n ? `${n} problem${n === 1 ? "" : "s"} in the latest check` : "";
-}
-function checkItems(r) {
-  const out = [];
-  const add = (cls, tag, text) => out.push({ cls, tag, text });
-  (r.errors || []).forEach(t => add("err", "Script error", t));
-  (r.missing_files || []).forEach(t => add("err", "Missing file", t));
-  (r.broken_images || []).forEach(t => add("err", "Broken image", t));
-  (r.dead_links || []).forEach(t => add("err", "Dead link", t));
-  (r.missing_anchors || []).forEach(t => add("err", "Broken anchor", `Links to ${t}, which doesn't exist`));
-  if (r.viewport === "phone" && r.overflow > 1) add("layout", "Sideways scroll", `The page scrolls sideways by ${r.overflow}px` + ((r.too_wide || []).length ? `: ${r.too_wide.join("; ")}` : ""));
-  (r.layout || []).forEach(t => add("layout", "Layout", t));
-  (r.a11y || []).forEach(t => {
-    const m = t.match(/^\[(\w+)\]\s*(.*)$/s);
-    add("a11y", m ? m[1][0].toUpperCase() + m[1].slice(1) : "Accessibility", m ? m[2] : t);
-  });
-  if (r.images_without_alt) add("a11y", "Alt text", `${r.images_without_alt} image${r.images_without_alt === 1 ? "" : "s"} without an alt attribute`);
-  return out;
-}
-function renderChecks() {
-  const box = $("checks"), c = project.check;
-  const runBtn = `<button class="btn btn-ghost btn-sm" type="button" data-run-check>${icon("refresh", { size: 14 })}Run check now</button>`;
-  if (!c) {
-    box.innerHTML = `<div class="pane-in"><div class="pempty"><span class="tile">${icon("gauge", { size: 22 })}</span><b>No check yet</b>
-      <span>The server opens your site in a real browser, at desktop and phone width, before QA and the Critic work. You can also run a check yourself.</span>
-      ${runBtn}</div></div>`;
-    return;
-  }
-  const pages = c.pages || [];
-  const all = pages.flatMap(r => checkItems(r).map(i => ({ ...i, page: r.page, viewport: r.viewport })));
-  const count = (cls) => all.filter(i => i.cls === cls).length;
-  const by = c.by === "you" ? "you" : `the ${BY_ID[c.by]?.name || c.by} agent`;
-  const shots = (c.screenshots || []).map(f => `<a href="${esc(mediaUrl(f))}" target="_blank" rel="noopener" title="Open full size">
-      <img loading="lazy" src="${esc(mediaUrl(f))}" alt="${f.includes("phone") ? "Phone screenshot" : "Desktop screenshot"}"></a>`).join("");
-  const kpi = (n, label, ic, bad) => `<div class="ck-kpi ${bad && n ? "bad" : ""}"><b>${n}</b><span>${icon(ic, { size: 14 })}${label}</span></div>`;
-  const files = [...new Set(pages.map(r => r.page))];
-  box.innerHTML = `<div class="pane-in">
-    <div class="pane-head"><h2>Checks</h2><span class="meta">${esc(ago(c.ts))} · run by ${esc(by)} · ${files.length} page${files.length === 1 ? "" : "s"} at desktop and phone width</span>
-      <div class="acts">${runBtn}${all.length ? `<button class="btn btn-dark btn-sm" type="button" data-fix-checks>${icon("sparkles", { size: 14 })}Ask the team to fix these</button>` : ""}</div></div>
-    <div class="ck-sum">${kpi(all.length, "problems in total", "alert", true)}${kpi(count("layout"), "layout", "grid", true)}${kpi(count("a11y"), "accessibility", "accessibility", true)}${kpi(count("err"), "errors and broken links", "bug", true)}</div>
-    ${shots ? `<div class="ck-shots">${shots}</div>` : ""}
-    ${files.map(file => {
-      const title = (project.pages || []).find(p => p.file === file)?.title || file;
-      const col = (vp, label, ic) => {
-        const r = pages.find(x => x.page === file && x.viewport === vp);
-        const items = r ? checkItems(r) : [];
-        return `<div class="ck-col"><h4>${icon(ic, { size: 14 })}${label}</h4>${items.length
-          ? `<ul class="ck-list">${items.map(i => `<li><span class="tag ${i.cls}">${esc(i.tag)}</span><span data-no-i18n>${esc(i.text)}</span></li>`).join("")}</ul>`
-          : `<span class="ck-ok">${icon("check", { size: 14 })}No problems</span>`}</div>`;
-      };
-      return `<section class="pcard2 ck-page"><header><h3>${esc(title)}</h3><span class="mono">${esc(file)}</span>
-        <span class="acts"><button class="btn btn-ghost btn-sm" type="button" data-show-page="${esc(file)}">${icon("eye", { size: 14 })}Preview</button></span></header>
-        <div class="ck-cols">${col("desktop", "Desktop · 1280px", "monitor")}${col("phone", "Phone · 390px", "phone")}</div></section>`;
-    }).join("")}
-  </div>`;
-}
-$("checks").addEventListener("click", async (e) => {
-  const run = e.target.closest("[data-run-check]");
-  if (run) {
-    if (busy) return toast("Agents are working. The check runs on its own after QA and the Critic.", "err");
-    run.disabled = true; run.setAttribute("aria-busy", "true"); run.lastChild.textContent = "Checking…";
-    try { project.check = await api(`/api/projects/${PID}/check`, { method: "POST", timeout: 120000 }); setChecksBadge(); renderChecks();
-          toast(project.check.problems ? `Check done: ${project.check.problems} problem${project.check.problems === 1 ? "" : "s"} found` : "Check done: no problems found"); }
-    catch (err) { toast(err.message, "err"); run.disabled = false; run.removeAttribute("aria-busy"); run.lastChild.textContent = "Run check now"; }
-    return;
-  }
-  if (e.target.closest("[data-fix-checks]")) {
-    const lines = (project.check.pages || []).flatMap(r => checkItems(r).map(i => `- ${r.page} (${r.viewport}): ${i.tag}: ${i.text}`));
-    fillComposer("Fix the problems the browser check found. Keep the content and the design as they are.\n" + lines.slice(0, 15).join("\n")
-      + (lines.length > 15 ? `\n…and ${lines.length - 15} more in the same kinds.` : ""));
-    return;
-  }
-  const page = e.target.closest("[data-show-page]");
-  if (page) { const sel = $("pageSel"); if ([...sel.options].some(o => o.value === page.dataset.showPage)) { sel.value = page.dataset.showPage; sel.dispatchEvent(new Event("change")); } showTab("preview"); }
-});
 
 // ================================================================ project
 /* What the agents work from besides the chat: contact details, the user's images (and their WebP copies),
@@ -1787,7 +1663,9 @@ async function renderProject() {
   const size = Object.fromEntries(projFiles.map(f => [f.path, f.size]));
   const contact = project.contact || {}, skipped = new Set(project.contact_skipped || []);
   const status = (k) => contact[k] ? `<span class="st ok">Saved</span>` : skipped.has(k) ? `<span class="st">Not given: button hidden</span>` : `<span class="st">Asked when needed</span>`;
-  const contactCard = `<section class="pcard2" id="contactCard"><header><span class="tile">${icon("chat", { size: 18 })}</span><h3>Contact details</h3></header>
+  const savedN = CONTACT_FIELDS.filter(f => contact[f.key]).length;
+  const contactCard = `<section class="pcard2" id="contactCard"><header><span class="tile">${icon("chat", { size: 18 })}</span><h3>Contact details</h3>
+      <span class="pj-count">${savedN} of ${CONTACT_FIELDS.length}</span></header>
     <p class="lead">The WhatsApp, Email contact, Click-to-call, Telegram and QR codes agents use these. Changes apply from your next request.</p>
     <form class="pj-form" novalidate>${CONTACT_FIELDS.map(f => `<label><span>${icon(f.ic, { size: 14 })}${f.label}${status(f.key)}</span>
       <input class="input" name="${f.key}" type="${f.type}" value="${esc(contact[f.key] || "")}" placeholder="${esc(f.placeholder)}" autocomplete="off" data-no-i18n></label>`).join("")}</form>
@@ -1795,34 +1673,51 @@ async function renderProject() {
       <button class="btn btn-ghost btn-sm" type="button" data-apply-contact>Update the site with these</button>
       <span class="msg-line" role="status" aria-live="polite"></span></div></section>`;
   const assets = (project.assets || []).filter(a => size[a.path] !== undefined);
-  const imagesCard = `<section class="pcard2"><header><span class="tile">${icon("image", { size: 18 })}</span><h3>Your images</h3></header>
+  const imagesCard = `<section class="pcard2" id="imagesCard"><header><span class="tile">${icon("image", { size: 18 })}</span><h3>Your images</h3>${assets.length ? `<span class="pj-count">${assets.length}</span>` : ""}</header>
     ${assets.length ? `<ul class="pj-imgs">${assets.map(a => {
       const v = a.variants || [], small = v[0], orig = size[a.path] || 0, smallSize = small ? size[small.path] : 0;
       const saving = small && orig && smallSize ? `<span class="save">Phones load ${fmtSize(smallSize)} instead of ${fmtSize(orig)}</span>` : "";
       return `<li><img loading="lazy" src="/work/${PID}/${a.path.split("/").map(encodeURIComponent).join("/")}" alt="">
         <div class="an"><b data-no-i18n>${esc(a.path.replace(/^assets\//, ""))}</b><small>${a.kind === "logo" ? "Logo" : "Photo"} · ${fmtSize(orig)}${a.note ? ` · <span data-no-i18n>${esc(a.note)}</span>` : ""}</small>
         ${v.length ? `<div class="pj-chips">${v.map(x => `<span>${x.width}w WebP${size[x.path] ? ` · ${fmtSize(size[x.path])}` : ""}</span>`).join("")}${saving}</div>` : ""}</div></li>`;
-    }).join("")}</ul>` : `<p class="lead">Images you add to the project (a logo, photos) appear here, with the smaller WebP copies the server makes for phones.</p>`}</section>`;
+    }).join("")}</ul>` : `<div class="pj-empty">${icon("paperclip", { size: 18 })}<p>Attach a logo or photos in the chat. They appear here, with the smaller WebP copies the server makes for phones.</p></div>`}</section>`;
   const qrFiles = projFiles.filter(f => /^assets\/qr-[^/]+\.svg$/.test(f.path));
-  const qrCard = `<section class="pcard2"><header><span class="tile">${icon("grid", { size: 18 })}</span><h3>QR codes</h3></header>
+  const qrCard = `<section class="pcard2" id="qrCard"><header><span class="tile">${icon("grid", { size: 18 })}</span><h3>QR codes</h3>${qrFiles.length ? `<span class="pj-count">${qrFiles.length}</span>` : ""}</header>
     ${qrFiles.length ? `<div class="pj-qrs">${qrFiles.map(f => { const url = `/work/${PID}/${f.path.split("/").map(encodeURIComponent).join("/")}`;
       return `<figure><img src="${esc(url)}" alt="QR code ${esc(f.path)}"><figcaption>${esc(f.path.replace(/^assets\//, ""))}</figcaption>
         <a class="btn btn-ghost btn-sm" href="${esc(url)}" download>${icon("download", { size: 14 })}SVG</a></figure>`; }).join("")}</div>`
-      : `<p class="lead">No QR codes yet. The QR codes agent chooses them and the server draws them, so they always scan.</p>
-         <div class="pj-bar"><button class="btn btn-ghost btn-sm" type="button" data-ask-qr>${icon("plus", { size: 14 })}Ask for a QR code</button></div>`}</section>`;
+      : `<div class="pj-empty">${icon("grid", { size: 18 })}<p>No QR codes yet. The QR codes agent chooses them and the server draws them, so they always scan.</p>
+         <button class="btn btn-ghost btn-sm" type="button" data-ask-qr>${icon("plus", { size: 14 })}Ask for a QR code</button></div>`}</section>`;
   const brand = project.brand || {}, logo = (project.assets || []).find(a => a.kind === "logo");
-  const brandCard = `<section class="pcard2"><header><span class="tile">${icon("palette", { size: 18 })}</span><h3>Brand kit</h3>
+  const fonts = [brand.heading_font, brand.body_font].filter(Boolean);
+  const brandCard = `<section class="pcard2" id="brandCard"><header><span class="tile">${icon("palette", { size: 18 })}</span><h3>Brand kit</h3>
       <span class="acts"><button class="btn btn-ghost btn-sm" type="button" data-brand>${icon("pencil", { size: 14 })}Edit</button></span></header>
-    ${(brand.colors || []).length ? `<div class="pj-swatches">${brand.colors.map(c => `<span style="background:${esc(c)}" title="${esc(c)}"></span>`).join("")}</div>` : `<p class="lead">No colours set: the Design System agent chooses them.</p>`}
-    <p class="lead">${brand.heading_font || brand.body_font ? `Fonts: <span data-no-i18n>${esc([brand.heading_font, brand.body_font].filter(Boolean).join(" · "))}</span>` : "Fonts: chosen by the team"}${logo ? " · Logo added" : " · No logo"}</p></section>`;
+    <dl class="pj-kit">
+      <dt>Colours</dt><dd>${(brand.colors || []).length ? `<span class="pj-swatches">${brand.colors.map(c => `<span class="sw-c"><i style="background:${esc(c)}"></i><code data-no-i18n>${esc(c)}</code></span>`).join("")}</span>` : `<span class="muted">Chosen by the Design System agent</span>`}</dd>
+      <dt>Fonts</dt><dd>${fonts.length ? fonts.map((f, i) => `<span class="pj-font" style="font-family:${esc(JSON.stringify(f))}, sans-serif" data-no-i18n><b>Aa</b>${esc(f)}</span>`).join("") : `<span class="muted">Chosen by the team</span>`}</dd>
+      <dt>Logo</dt><dd>${logo ? `<img class="pj-logo" src="/work/${PID}/${logo.path.split("/").map(encodeURIComponent).join("/")}" alt="Logo">` : `<span class="muted">No logo</span>`}</dd>
+    </dl></section>`;
   const brief = Object.entries(project.brief || {}).filter(([, v]) => v);
-  const briefCard = `<section class="pcard2" style="grid-column: 1 / -1"><header><span class="tile">${icon("clipboard", { size: 18 })}</span><h3>Brief</h3>
+  const briefCard = `<section class="pcard2" id="briefCard"><header><span class="tile">${icon("clipboard", { size: 18 })}</span><h3>Brief</h3>
       <span class="acts"><button class="btn btn-ghost btn-sm" type="button" data-edit-details>${icon("pencil", { size: 14 })}Edit</button></span></header>
-    <div class="pj-chips">${(project.pages || []).map(p => `<span data-no-i18n>${esc(p.title)} · ${esc(p.file)}</span>`).join("")}</div>
+    <div class="pj-pages">${(project.pages || []).map(p => `<button type="button" class="pj-page" data-show-page="${esc(p.file)}" title="Preview this page">${icon("file", { size: 14 })}<span data-no-i18n>${esc(p.title)}</span><code data-no-i18n>${esc(p.file)}</code></button>`).join("")}</div>
     ${brief.length ? `<dl class="pj-brief">${brief.map(([k, v]) => `<dt>${esc(BRIEF_LABELS[k] || k)}</dt><dd data-no-i18n>${esc(v)}</dd>`).join("")}</dl>`
-      : `<p class="lead">No brief yet. Answer a few questions so every agent knows the audience, the goal and the tone.</p>`}</section>`;
-  box.innerHTML = `<div class="pane-in"><div class="pane-head"><h2>Project</h2><span class="meta">What the agents work from, besides the chat</span></div>
-    <div class="pgrid">${contactCard}${imagesCard}${qrCard}${brandCard}${briefCard}</div></div>`;
+      : `<div class="pj-empty">${icon("clipboard", { size: 18 })}<p>No brief yet. Answer a few questions so every agent knows the audience, the goal and the tone.</p></div>`}</section>`;
+  const stat = (target, ic, value, label, ok) => `<button type="button" class="pj-stat ${ok ? "ok" : ""}" data-jump="${target}">
+      <span class="pi">${icon(ic, { size: 16 })}</span><b>${value}</b><span>${label}</span></button>`;
+  const pages = (project.pages || []).length || 1;
+  box.innerHTML = `<div class="pane-in pj">
+    <div class="pane-head"><h2>Project</h2><span class="meta">What the agents work from, besides the chat</span></div>
+    <div class="pj-stats">
+      ${stat("contactCard", "chat", `${savedN}/${CONTACT_FIELDS.length}`, "contact details", savedN)}
+      ${stat("briefCard", "file", pages, pages === 1 ? "page" : "pages", true)}
+      ${stat("imagesCard", "image", assets.length, assets.length === 1 ? "image" : "images", assets.length)}
+      ${stat("qrCard", "grid", qrFiles.length, qrFiles.length === 1 ? "QR code" : "QR codes", qrFiles.length)}
+    </div>
+    <div class="pj-cols">
+      <div class="pj-col">${contactCard}${briefCard}</div>
+      <div class="pj-col">${brandCard}${imagesCard}${qrCard}</div>
+    </div></div>`;
 }
 $("proj").addEventListener("click", async (e) => {
   if (e.target.closest("[data-save-contact]")) {
@@ -1849,6 +1744,10 @@ $("proj").addEventListener("click", async (e) => {
   if (e.target.closest("[data-apply-contact]")) return fillComposer("Update the contact buttons, links and forms on every page with the contact details saved in the project. Keep everything else as it is.");
   if (e.target.closest("[data-ask-qr]")) return fillComposer("Add a QR code for WhatsApp in the contact section, with a text link under it for people on a phone.");
   if (e.target.closest("[data-brand]")) return openBrand();
+  const jump = e.target.closest("[data-jump]");
+  if (jump) { const c = $(jump.dataset.jump); c?.scrollIntoView({ behavior: "smooth", block: "start" }); c?.classList.add("flash-card"); setTimeout(() => c?.classList.remove("flash-card"), 1200); return; }
+  const pg = e.target.closest("[data-show-page]");
+  if (pg) { const sel = $("pageSel"); if ([...sel.options].some(o => o.value === pg.dataset.showPage)) { sel.value = pg.dataset.showPage; sel.dispatchEvent(new Event("change")); } return showTab("preview"); }
   if (e.target.closest("[data-edit-details]")) { await editDetails(); if (tabOn("project")) renderProject(); }
 });
 
@@ -1935,7 +1834,7 @@ async function refreshCode(force = false) {
   if (replaying || !$("code").classList.contains("on")) return;
   try { fileCache = await api(`/api/projects/${PID}/files`); }
   catch (err) { $("files").innerHTML = `<div class="msg error" style="margin:4px">${esc(err.message)}</div>`; return; }
-  if (fileCache.length && !fileCache.some(f => f.path === currentFile)) currentFile = fileCache[0].path;
+  if (fileCache.length && !fileCache.some(f => f.path === currentFile)) { currentFile = fileCache[0].path; saveState(); }
   const total = fileCache.reduce((n, f) => n + f.size, 0);
   $("files").innerHTML = fileCache.map(f =>
     `<button data-path="${esc(f.path)}" class="${f.path === currentFile ? "on" : ""} ${changed.has(f.path) ? "changed" : ""}" title="${esc(f.path)} · ${fmtSize(f.size)}">
@@ -2040,6 +1939,7 @@ $("files").onclick = async (e) => {
     else if (!await confirmDialog({ title: "Discard changes?", text: `You have unsaved changes in ${editor.path}.`, ok: "Discard", danger: true })) return;
   }
   currentFile = b.dataset.path; changed.delete(currentFile); editor.dirty = false;
+  saveState();
   refreshCode(true);
 };
 $("copyCode").onclick = async () => {
@@ -2094,29 +1994,11 @@ document.addEventListener("click", async (e) => {
   wsSend({ type: "retry", agent: a.id, note });
 });
 
-// ---------- panels (versions, stats)
-function ensurePanel(id, title, iconName, actions = "") {
-  let d = $(id);
-  if (d) return d;
-  d = document.createElement("dialog");
-  d.className = "panel"; d.id = id;
-  d.innerHTML = `<div class="panel-head"><h2>${icon(iconName, { size: 22 })}${esc(title)}</h2><span class="spacer"></span>${actions}
-    <button class="icon-btn plain" data-close title="Close" aria-label="Close">${icon("x", { size: 18 })}</button></div><div class="panel-body"></div>`;
-  d.addEventListener("click", (e) => { if (e.target === d || e.target.closest("[data-close]")) d.close(); });
-  document.body.append(d);
-  return d;
-}
-
 // ---------- versions
 const vfolder = (n) => `/work/.versions/${PID}/${String(n).padStart(4, "0")}/index.html`;
-function openHistory() {
-  ensurePanel("historyPanel", "Versions", "history",
-    `<button class="btn btn-dark btn-sm" id="saveVersion">${icon("save", { size: 14 })}Save version now</button>`).showModal();
-  loadVersions();
-}
 let vPage = 1, vPer = perPagePref("versions", 10);
 async function loadVersions() {
-  const body = $("historyPanel").querySelector(".panel-body");
+  const body = $("versionsBody");
   let res;
   try { res = await api(`/api/projects/${PID}/versions?page=${vPage}&per_page=${vPer}`); }
   catch (err) { return showError(body, err, loadVersions, "Couldn't load the versions"); }
@@ -2143,7 +2025,7 @@ async function loadVersions() {
   if (pager) bindPager(pager, (p) => { vPage = p; loadVersions(); }, (n) => { vPer = n; savePerPage("versions", n); vPage = 1; loadVersions(); });
 }
 async function showDiff(n) {
-  const body = $("historyPanel").querySelector(".panel-body");
+  const body = $("versionsBody");
   body.innerHTML = `<p class="note">Comparing…</p>`;
   let files;
   try { files = await api(`/api/projects/${PID}/versions/${n}/diff`); }
@@ -2180,7 +2062,6 @@ document.addEventListener("click", async (e) => {
     catch (err) { toast(err.message, "err"); }
   }
 });
-$("historyBtn").onclick = openHistory;
 
 /* ---------- this project's brand kit: saved as you change it; agents follow it from the next request ---------- */
 async function openBrand() {
@@ -2215,23 +2096,15 @@ async function openBrand() {
 }
 
 // ---------- stats (cost & time)
-let statsScope = "project";
-function openStats() {
-  const d = ensurePanel("statsPanel", "Cost & time", "chart",
-    `<div class="seg" id="statsScope"><button data-scope="project" class="on">This project</button><button data-scope="all">All projects</button></div>`);
-  d.showModal();
-  loadStats();
-}
 let agentsPg, sPage = 1, sPer = perPagePref("statsAgents", 10), rPage = 1, rPer = perPagePref("statsRuns", 10);
 async function loadStats() {
-  const body = $("statsPanel").querySelector(".panel-body");
+  const body = $("statsBody");
   let data;
   const qs = new URLSearchParams({ page: rPage, per_page: rPer });
-  if (statsScope === "project") qs.set("project", PID);
+  qs.set("project", PID);
   try { data = await api(`/api/stats?${qs}`); }
   catch (err) { return showError(body, err, loadStats, "Couldn't load the stats"); }
   const t = data.totals, maxCost = Math.max(...data.agents.map(a => a.cost), 1e-9), maxSec = Math.max(...data.agents.map(a => a.seconds), 1e-9);
-  const where = statsScope === "project" ? "in this project " : "";
   body.innerHTML = `
     <div class="kpis">
       <div class="kpi"><b>${money(t.cost)}</b><span>estimated cost</span></div>
@@ -2255,28 +2128,19 @@ async function loadStats() {
     </tbody></table>
     <nav class="pager compact" id="sPager" aria-label="Pages of agents">${pagerHTML(agentsPg, { noun: "agents" })}</nav>
     <h4 class="sec">Recent agent runs</h4>
-    <table class="stable"><thead><tr><th>Agent</th>${statsScope === "all" ? "<th>Project</th>" : ""}<th>Request</th><th class="num">Time</th><th class="num">Tokens</th><th class="num">Cost</th><th class="num">When</th></tr></thead><tbody>
+    <table class="stable"><thead><tr><th>Agent</th><th>Request</th><th class="num">Time</th><th class="num">Tokens</th><th class="num">Cost</th><th class="num">When</th></tr></thead><tbody>
     ${data.recent.map(e => `<tr>
       <td><span class="status-dot ${e.status}" title="${e.status}"></span>${esc(BY_ID[e.agent]?.name || e.agent)}</td>
-      ${statsScope === "all" ? `<td>${esc(e.project_name)}</td>` : ""}
       <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${esc(e.request || "")}">${esc(e.request || "")}</td>
       <td class="num">${duration(e.seconds || 0)}</td><td class="num">${compact((e.tokens_in || 0) + (e.tokens_out || 0))}</td>
       <td class="num">${e.cost ? money(e.cost) : "-"}</td><td class="num">${ago(e.ts)}</td></tr>`).join("")}
     </tbody></table>
     <nav class="pager compact" id="rPager" aria-label="Pages of agent runs">${data.recent_pager ? pagerHTML({ ...data.recent_pager, perPage: data.recent_pager.per_page }, { noun: "runs" }) : ""}</nav>`
-    : `<p class="note">No agent has run ${where}yet. Stats appear after the first run.</p>`}`;
+    : `<p class="note">No agent has run in this project yet. Stats appear after the first run.</p>`}`;
   rPage = data.recent_pager?.page || 1;
   if ($("sPager")) bindPager($("sPager"), (p) => { sPage = p; loadStats(); }, (n) => { sPer = n; savePerPage("statsAgents", n); sPage = 1; loadStats(); });
   if ($("rPager")) bindPager($("rPager"), (p) => { rPage = p; loadStats(); }, (n) => { rPer = n; savePerPage("statsRuns", n); rPage = 1; loadStats(); });
 }
-document.addEventListener("click", (e) => {
-  const b = e.target.closest("#statsScope [data-scope]"); if (!b) return;
-  statsScope = b.dataset.scope; sPage = rPage = 1;
-  document.querySelectorAll("#statsScope button").forEach(x => x.classList.toggle("on", x === b));
-  loadStats();
-});
-$("statsBtn").onclick = openStats;
-
 // ---------- team presets
 let presets = [];
 async function loadPresets() { try { presets = await api("/api/presets"); } catch { presets = []; } }
@@ -2284,65 +2148,28 @@ function matchingPreset() {
   const cur = [...selected].sort().join(",");
   return presets.find(p => p.agents.length && [...p.agents].sort().join(",") === cur);
 }
-function togglePresets(open) {
-  const m = $("presetsMenu"); if (!m) return;
-  const show = open ?? !m.classList.contains("open");
-  if (show) renderPresetsMenu();
-  m.classList.toggle("open", show);
+async function saveAsTeam() {
+  const name = await promptDialog({ title: "Save as a team", label: "Team name", placeholder: "e.g. Landing page sprint", ok: "Save team", max: 40,
+    text: `${selected.size} agents: ${AGENTS.filter(a => selected.has(a.id)).map(a => a.name).join(", ")}. It appears in My teams, ready for your other projects.` });
+  if (!name) return;
+  try { await api("/api/presets", { method: "POST", body: JSON.stringify({ name, agents: [...selected], scope: "mine" }) }); await loadPresets(); renderTeamHead(); toast(`Team “${name}” saved`); }
+  catch (err) { toast(err.message, "err"); }
 }
-function renderPresetsMenu() {
-  const cur = matchingPreset();
-  $("presetsMenu").innerHTML = presets.map(p => `
-    <button class="mi ${cur?.id === p.id ? "on" : ""}" data-preset="${esc(p.id)}" role="menuitem">
-      ${icon(cur?.id === p.id ? "check" : p.builtin ? "users" : "sliders", { size: 15 })}
-      <span><b>${esc(p.name)} <span class="badge">${p.agents.length}</span></b>
-      <small>${esc(p.description || p.agents.map(id => BY_ID[id]?.name || id).join(", "))}</small></span>
-      ${!p.editable ? "" : `<span class="del" data-preset-del="${esc(p.id)}" title="Delete team">${icon("trash", { size: 14 })}</span>`}
-    </button>`).join("") +
-    `<hr><button class="mi" data-preset-save role="menuitem">${icon("plus", { size: 15 })}<span><b>Save current agents as a team…</b><small>${selected.size} agent${selected.size === 1 ? "" : "s"} on</small></span></button>
-     <a class="mi" href="/teams" role="menuitem">${icon("layers", { size: 15 })}<span><b>Manage teams</b><small>Create, view and edit teams</small></span></a>`;
-}
-document.addEventListener("click", async (e) => {
-  const menu = $("presetsMenu");
-  if (!menu?.classList.contains("open")) return;
-  const del = e.target.closest("[data-preset-del]"), pick = e.target.closest("[data-preset]"), save = e.target.closest("[data-preset-save]");
-  if (del) {
-    e.stopPropagation();
-    const p = presets.find(x => x.id === del.dataset.presetDel);
-    togglePresets(false);
-    if (!await confirmDialog({ title: `Delete “${p.name}”?`, text: "The team is removed. Your agents are not changed.", ok: "Delete", danger: true })) return;
-    try { await api(`/api/presets/${encodeURIComponent(p.id)}`, { method: "DELETE" }); await loadPresets(); renderTeamHead(); toast("Team deleted"); }
-    catch (err) { toast(err.message, "err"); }
-  } else if (pick) {
-    const p = presets.find(x => x.id === pick.dataset.preset);
-    togglePresets(false);
-    useTeam(p);
-  } else if (save) {
-    togglePresets(false);
-    const name = await promptDialog({ title: "Save as a team", label: "Team name", placeholder: "e.g. Landing page sprint", ok: "Save team", max: 40,
-      text: `${selected.size} agents: ${AGENTS.filter(a => selected.has(a.id)).map(a => a.name).join(", ")}.` });
-    if (!name) return;
-    try { await api("/api/presets", { method: "POST", body: JSON.stringify({ name, agents: [...selected], scope: "mine" }) }); await loadPresets(); renderTeamHead(); toast(`Team “${name}” saved`); }
-    catch (err) { toast(err.message, "err"); }
-  } else if (!e.target.closest("#presetsMenu, #presetsBtn")) togglePresets(false);
-});
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") togglePresets(false); });
 
 // ================================================================ command palette: studio actions
 registerCommands([
   { group: "This project", icon: "eye", title: "Show the preview", run: () => document.querySelector('[data-tab="preview"]').click() },
   { group: "This project", icon: "code", title: "Show the code", run: () => document.querySelector('[data-tab="code"]').click() },
   { group: "This project", icon: "search", title: "Show the research report", run: () => document.querySelector('[data-tab="research"]').click() },
-  { group: "This project", icon: "gauge", title: "Show the checks", run: () => showTab("checks") },
   { group: "This project", icon: "briefcase", title: "Show contact details, images and QR codes", run: () => showTab("project") },
   { group: "This project", icon: "palette", title: "Edit the brand kit", run: () => openBrand() },
   { group: "This project", icon: "monitor", title: "Preview: desktop width", run: () => document.querySelector('[data-device="desktop"]').click() },
   { group: "This project", icon: "tablet", title: "Preview: tablet width (768px)", run: () => document.querySelector('[data-device="tablet"]').click() },
   { group: "This project", icon: "phone", title: "Preview: phone width (375px)", run: () => document.querySelector('[data-device="phone"]').click() },
   { group: "This project", icon: "external", title: "Open the page in a new tab", run: () => $("open").click() },
-  { group: "This project", icon: "history", title: "Versions", hint: "open, compare, restore", run: () => openHistory() },
-  { group: "This project", icon: "save", title: "Save a version now", when: () => !busy, run: () => { openHistory(); setTimeout(() => $("saveVersion")?.click(), 50); } },
-  { group: "This project", icon: "chart", title: "Cost & time", run: () => openStats() },
+  { group: "This project", icon: "history", title: "Versions", hint: "open, compare, restore", run: () => showTab("versions") },
+  { group: "This project", icon: "save", title: "Save a version now", when: () => !busy, run: () => { showTab("versions"); $("saveVersion").click(); } },
+  { group: "This project", icon: "chart", title: "Cost & time", run: () => showTab("stats") },
   { group: "This project", icon: "download", title: "Download the code (.zip)", when: () => !busy, run: () => location.href = `/api/projects/${PID}/download` },
   { group: "This project", icon: "pencil", title: "Edit name, description and pages", run: () => editDetails() },
   { group: "This project", icon: "paperclip", title: "Attach reference images", run: () => $("attach").click() },

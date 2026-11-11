@@ -2140,15 +2140,11 @@ class T18BrowserCheck(unittest.TestCase):
             self.assertFalse(any(".checks" in n for n in zipfile.ZipFile(io.BytesIO(r.read())).namelist()))
 
 
-    def test_check_now_is_saved_with_the_project(self):
-        pid = call("POST", "/api/projects", {"name": "Check me", "description": "x"})[1]["id"]
-        self.assertEqual(call("POST", f"/api/projects/{pid}/check")[0], 400)           # nothing built yet
-        call("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": '<!doctype html><html lang="en"><title>x</title><img src="a.png">'})
-        s, c, _ = call("POST", f"/api/projects/{pid}/check")
-        self.assertEqual(s, 200, c)
-        self.assertEqual(c["by"], "you")
-        self.assertGreaterEqual(c["problems"], 1)
-        self.assertEqual(call("GET", f"/api/projects/{pid}")[1]["check"]["problems"], c["problems"])
+    def test_the_check_is_only_for_the_agents(self):
+        pid = call("POST", "/api/projects", {"name": "No checks tab", "description": "x"})[1]["id"]
+        self.assertIn(call("POST", f"/api/projects/{pid}/check")[0], (404, 405))
+        for agent in ("responsive", "a11y", "qa", "critic"):
+            self.assertIn("<browser_check>", call("GET", f"/api/agents/{agent}")[1]["role"], agent)
 
     def test_layout_and_accessibility_problems_are_measured(self):
         sys.path.insert(0, str(ROOT / "server"))
