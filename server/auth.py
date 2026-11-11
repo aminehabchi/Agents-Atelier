@@ -144,7 +144,8 @@ def public(row) -> dict:
             "plan_request_period": row.get("plan_request_period") or "monthly",
             "paid_online": bool(row.get("billing_subscription")),   # the plan is a PayPal subscription (see billing.py)
             "billing_period": row.get("billing_period") or "monthly",  # monthly · yearly
-            "has_password": bool(row.get("password_hash")),         # accounts made with Google or GitHub start without one
+            "has_password": bool(row.get("password_hash")),
+            "notify_runs": row.get("notify_runs", True) is not False,   # email when a long run finishes (notify.py)         # accounts made with Google or GitHub start without one
             "deactivated_at": row.get("deactivated_at"), "delete_after": row.get("delete_after"),
             **({"reactivated": True} if row.get("reactivated") else {})}   # just logged in during the 30 days
 
@@ -473,7 +474,11 @@ async def set_preferences(user: dict, body: dict) -> dict:
     language, theme = body.get("language", user["language"]), body.get("theme", user["theme"])
     if language not in LANGUAGES + ("",) or theme not in THEMES + ("",):
         raise AuthError("That language or theme isn't available.")
-    row = await db.pool.fetchrow("UPDATE users SET language = $2, theme = $3 WHERE id = $1 RETURNING *", user["id"], language, theme)
+    notify_runs = body.get("notify_runs", user.get("notify_runs", True))
+    if not isinstance(notify_runs, bool):
+        raise AuthError("“notify_runs” must be true or false.")
+    row = await db.pool.fetchrow("UPDATE users SET language = $2, theme = $3, notify_runs = $4 WHERE id = $1 RETURNING *",
+                                 user["id"], language, theme, notify_runs)
     return dict(row)
 
 

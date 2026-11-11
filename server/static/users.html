@@ -14,16 +14,67 @@
 <script src="/static/icons.js"></script>
 <script src="/static/ui.js"></script>
 <style>
-  .table-wrap { margin-top: 20px; overflow-x: auto; background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); }
-  .utable { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 14px; }
+  .ucontrols { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 24px; }
+  .ucontrols .search { flex: 1 1 260px; max-width: 360px; }
+  .ucontrols select.input { height: 36px; width: auto; min-width: 0; padding-block: 0; padding-inline: 12px 30px; font-size: 13px; }
+  .ucontrols .right { margin-inline-start: auto; display: flex; gap: 8px; align-items: center; }
+  .fchip .n { font-size: 11px; font-feature-settings: "tnum"; opacity: .8; }
+  .fchip .n:empty { display: none; }
+  #count { margin: 12px 0 0; font-size: 13px; color: var(--stone); min-height: 1.4em; }
+  .table-wrap { margin-top: 12px; overflow-x: auto; background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); }
+  .utable { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 14px; }
   .utable th { padding: 12px 14px; text-align: start; font-size: 12px; font-weight: 500; letter-spacing: .04em; color: var(--graphite); background: var(--mist); border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
-  .utable td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; overflow-wrap: anywhere; }
+  .utable td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
   .utable tbody tr:last-child td { border-bottom: 0; }
   .utable tbody tr:hover td { background: var(--ice); }
-  .utable .who b { font-weight: 500; }
-  .utable .muted { color: var(--stone); white-space: nowrap; }
-  .utable select { height: 36px; min-width: 150px; padding: 0 10px; font-size: 13px; }
+  .utable tr.asks td { background: color-mix(in srgb, var(--saffron, var(--sky)) 6%, transparent); }
+  .utable td.who { min-width: 220px; }
+  .utable .nm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .utable .nm b { font-weight: 500; overflow-wrap: anywhere; }
+  .utable .em { margin-top: 2px; color: var(--graphite); font-size: 13px; overflow-wrap: anywhere; }
+  .utable .co { margin-top: 2px; color: var(--stone); font-size: 12px; overflow-wrap: anywhere; }
+  .utable td.about { max-width: 220px; font-size: 13px; color: var(--graphite); }
+  .utable td.about div + div { margin-top: 2px; }
+  .utable td.about span.k { color: var(--stone); }
+  .utable .muted { color: var(--stone); }
+  .utable td.joined, .utable td.key { white-space: nowrap; }
+  .utable td.pl { min-width: 230px; }
+  .utable td.rl { min-width: 150px; }
+  .utable select { height: 34px; width: 100%; max-width: 200px; padding-block: 0; padding-inline: 10px 28px; font-size: 13px; }
+  .utable .pbadges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .badge.p-pro { background: rgb(var(--sky-rgb) / .16); color: #3a43b5; }
+  [data-theme="dark"] .badge.p-pro { color: #a9b0ff; }
+  .badge.p-agency { background: rgb(var(--zellige-rgb) / .16); color: var(--zellige); }
+  .badge.warn { background: rgb(var(--saffron-rgb) / .18); color: var(--saffron); }
+  .badge.bad { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+  .utable .ask { display: grid; gap: 6px; margin-top: 10px; padding: 10px; border-radius: var(--r); background: rgb(var(--saffron-rgb) / .1); }
+  .utable .ask .req { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; }
+  .utable .ask .req b { font-weight: 500; }
+  .utable .ask .req .muted { font-size: 12px; }
+  .utable .ask-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .utable tr[aria-busy="true"] { opacity: .6; }
+  .utable .cl { display: none; }
+  .uempty { padding: 40px 20px; text-align: center; color: var(--graphite); }
+  .uempty b { display: block; color: var(--ink); font-weight: 500; margin-bottom: 6px; }
+  .uempty p { margin: 0 0 14px; font-size: 14px; }
   #pager { margin-top: 12px; }
+  @media (max-width: 760px) {
+    .ucontrols .search { flex-basis: 100%; max-width: none; }
+    .ucontrols .right { margin-inline-start: 0; flex: 1 1 100%; }
+    .ucontrols .right select { flex: 1; }
+    .utable thead { display: none; }
+    .utable, .utable tbody { display: block; min-width: 0; }
+    .utable tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; padding: 16px 14px; border-bottom: 1px solid var(--line); }
+    .utable tbody tr:last-child { border-bottom: 0; }
+    .utable td { display: block; padding: 0; border: 0; min-width: 0 !important; max-width: none; }
+    .utable tbody tr:hover td, .utable tr.asks td { background: none; }
+    .utable tr.asks { background: color-mix(in srgb, var(--saffron, var(--sky)) 6%, transparent); }
+    .utable td.who, .utable td.pl, .utable td.rl { grid-column: 1 / -1; }
+    .utable td.about { display: none; }
+    .utable .cl { display: block; font-size: 12px; color: var(--stone); margin-bottom: 4px; }
+    .utable select { max-width: none; height: 40px; }
+    .utable .ask-acts .btn { flex: 1; }
+  }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 </head>
@@ -42,98 +93,216 @@
 <main class="wrap page">
   <h1 class="page-title">Users</h1>
   <p class="lead" id="summary">Admins can change the shared agents, teams and rules, and open every project.</p>
+  <div class="ucontrols" role="search" aria-label="Find accounts">
+    <label class="search"><i data-icon="search" data-size="16"></i>
+      <input class="input" id="q" type="search" placeholder="Search by name, email or company" aria-label="Search by name, email or company" autocomplete="off"></label>
+    <select class="input" id="f-role" aria-label="Role">
+      <option value="">All roles</option><option value="admin">Admin</option><option value="user">User</option><option value="unconfirmed">Not confirmed</option>
+    </select>
+    <select class="input" id="f-plan" aria-label="Plan">
+      <option value="">All plans</option><option value="starter">Starter</option><option value="pro">Pro</option><option value="agency">Agency</option>
+      <option value="yearly">Paid yearly</option><option value="paypal">Paid with PayPal</option>
+    </select>
+    <button class="fchip" type="button" id="f-asks" aria-pressed="false"><i data-icon="clock" data-size="14"></i>Waiting requests <span class="n" id="asks-n"></span></button>
+    <div class="right">
+      <select class="input" id="sort" aria-label="Sort">
+        <option value="asks">Requests first</option>
+        <option value="new">Newest first</option>
+        <option value="old">Oldest first</option>
+        <option value="name">Name A–Z</option>
+        <option value="email">Email A–Z</option>
+      </select>
+    </div>
+  </div>
+  <p id="count" aria-live="polite"></p>
   <div id="list"><p>Loading…</p></div>
   <nav class="pager" id="pager" aria-label="Pages of users"></nav>
 </main>
 <script>
 document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
-const list = document.getElementById("list");
+const list = document.getElementById("list"), $pager = document.getElementById("pager"), $count = document.getElementById("count");
+const $q = document.getElementById("q"), $role = document.getElementById("f-role"), $plan = document.getElementById("f-plan"),
+  $asks = document.getElementById("f-asks"), $sort = document.getElementById("sort");
 const LABEL = { admin: "Admin", user: "User", unconfirmed: "Not confirmed" };
 const PLAN = { starter: "Starter", pro: "Pro", agency: "Agency" };
+const RANK = { starter: 0, pro: 1, agency: 2 };
 let users = [], me = null, page = 1, perPage = perPagePref("users", 10);
-const cell = (v) => (v ? esc(v) : `<span class="muted">-</span>`);
-function draw() {
-  const pg = paginate(users, page, perPage);
-  page = pg.page;
-  list.innerHTML = `<div class="table-wrap"><table class="utable">
-    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Company</th><th scope="col">Occupation</th><th scope="col">Builds for</th><th scope="col">Heard from</th><th scope="col">Joined</th><th scope="col">Claude key</th><th scope="col">Plan</th><th scope="col">Role</th></tr></thead>
-    <tbody>${pg.items.map(u => `<tr>
-      <td class="who"><b data-no-i18n>${esc(u.name || "-")}</b>${u.id === me.id ? ` <span class="badge">you</span>` : ""}</td>
-      <td class="em" data-no-i18n>${esc(u.email)}</td>
-      <td data-no-i18n>${cell(u.company)}</td>
-      <td class="opt">${cell(u.job_role)}</td><td class="opt">${cell(u.use_case)}</td><td class="opt">${cell(u.referral)}</td>
-      <td class="muted opt">${ago(u.created)}</td>
-      <td class="key"><span class="cl">Claude key</span>${u.claude_key?.set ? `<span class="badge listed" title="Runs on their own Claude account">${icon("check", { size: 12 })}Added</span>` : `<span class="muted">None</span>`}</td>
-      <td class="pl"><span class="cl">Plan</span>${u.role === "admin" ? `<span class="muted">Every feature</span>` : `<select class="input" data-plan="${esc(u.id)}" aria-label="Plan of ${esc(u.email)}">
+
+/* The filters live in the address, so a link like /users?asks=1 opens the waiting requests. */
+const params = new URLSearchParams(location.search);
+$q.value = params.get("q") || "";
+$role.value = LABEL[params.get("role")] ? params.get("role") : "";
+$plan.value = [...$plan.options].some(o => o.value === params.get("plan")) ? params.get("plan") : "";
+$sort.value = [...$sort.options].some(o => o.value === params.get("sort")) ? params.get("sort") : "asks";
+let asksOnly = params.get("asks") === "1";
+function saveFilters() {
+  const p = new URLSearchParams();
+  if ($q.value.trim()) p.set("q", $q.value.trim());
+  if ($role.value) p.set("role", $role.value);
+  if ($plan.value) p.set("plan", $plan.value);
+  if (asksOnly) p.set("asks", "1");
+  if ($sort.value !== "asks") p.set("sort", $sort.value);
+  history.replaceState(null, "", p.toString() ? `?${p}` : location.pathname);
+}
+
+/* "Pro · yearly · PayPal": the plan, how it's paid (paid plans only) and whether PayPal collects it. */
+function planBadges(u) {
+  if (u.plan === "starter") return "";
+  return `<span class="badge p-${esc(u.plan)}" title="${u.paid_online ? "Paid with PayPal" : "Set by an admin: no online payment"}">${esc(PLAN[u.plan] || u.plan)} · ${u.billing_period === "yearly" ? "yearly" : "monthly"}${u.paid_online ? " · PayPal" : ""}</span>`;
+}
+const fmtDate = (t) => new Date(t * 1000).toLocaleDateString(getLocale(), { day: "numeric", month: "short", year: "numeric" });
+function statusBadges(u) {
+  return (u.id === me.id ? ` <span class="badge">you</span>` : "")
+    + (u.role === "unconfirmed" ? ` <span class="badge warn">Not confirmed</span>` : "")
+    + (u.deactivated_at ? ` <span class="badge bad" title="${u.delete_after ? esc(`Deleted on ${fmtDate(u.delete_after)} unless they log in`) : ""}">Being deleted</span>` : "");
+}
+function row(u) {
+  const about = [["Occupation", u.job_role], ["Builds for", u.use_case], ["Heard from", u.referral]].filter(([, v]) => v);
+  return `<tr data-row="${esc(u.id)}" class="${u.plan_request ? "asks" : ""}">
+    <td class="who"><div class="nm"><b data-no-i18n>${esc(u.name || u.email)}</b>${statusBadges(u)}</div>
+      ${u.name ? `<div class="em" data-no-i18n>${esc(u.email)}</div>` : ""}${u.company ? `<div class="co" data-no-i18n>${esc(u.company)}</div>` : ""}</td>
+    <td class="about">${about.length ? about.map(([k, v]) => `<div><span class="k">${k}</span>: <span data-no-i18n>${esc(v)}</span></div>`).join("") : `<span class="muted">-</span>`}</td>
+    <td class="joined"><span class="cl">Joined</span>${u.created ? esc(ago(u.created)) : "-"}</td>
+    <td class="key"><span class="cl">Claude key</span>${u.claude_key?.set ? `<span class="badge tone-on" title="Runs on their own Claude account">${icon("check", { size: 12 })}Added</span>` : `<span class="muted">None</span>`}</td>
+    <td class="pl"><span class="cl">Plan</span>${u.role === "admin" ? `<span class="muted">Every feature</span>` : `${planBadges(u) ? `<div class="pbadges">${planBadges(u)}</div>` : ""}
+      <select class="input" data-plan="${esc(u.id)}" aria-label="Plan of ${esc(u.email)}">
         ${Object.keys(PLAN).map(r => `<option value="${r}" ${r === u.plan ? "selected" : ""}>${PLAN[r]}</option>`).join("")}
-      </select>${u.plan_request ? `<div class="ask"><span class="badge req">${icon("clock", { size: 12 })}Asks for ${esc(PLAN[u.plan_request] || u.plan_request)}${u.plan_request_period === "yearly" ? " · yearly" : " · monthly"}${u.plan_request_at ? ` · ${esc(ago(u.plan_request_at))}` : ""}</span>
-        <span class="ask-acts"><button class="btn btn-dark btn-sm" type="button" data-approve="${esc(u.id)}" data-to="${esc(u.plan_request)}">Approve</button>
-        <button class="btn btn-ghost btn-sm" type="button" data-decline="${esc(u.id)}">Decline</button></span></div>` : ""}`}</td>
-      <td class="rl"><span class="cl">Role</span><select class="input" data-id="${esc(u.id)}" aria-label="Role of ${esc(u.email)}" ${u.id === me.id ? 'disabled title="You can\'t change your own role"' : ""}>
-        ${Object.keys(LABEL).map(r => `<option value="${r}" ${r === u.role ? "selected" : ""}>${LABEL[r]}</option>`).join("")}
-      </select></td></tr>`).join("")}</tbody></table></div>`;
+      </select>${u.plan_request ? `<div class="ask"><div class="req">${icon("clock", { size: 13 })}<span>Asks for ${esc(PLAN[u.plan_request] || u.plan_request)} · ${u.plan_request_period === "yearly" ? "yearly" : "monthly"}</span>${u.plan_request_at ? `<span class="muted">${esc(ago(u.plan_request_at))}</span>` : ""}</div>
+        <div class="ask-acts"><button class="btn btn-dark btn-sm" type="button" data-approve="${esc(u.id)}" data-to="${esc(u.plan_request)}">${icon("check", { size: 13 })}Approve</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-decline="${esc(u.id)}">Decline</button></div></div>` : ""}`}</td>
+    <td class="rl"><span class="cl">Role</span><select class="input" data-id="${esc(u.id)}" aria-label="Role of ${esc(u.email)}" ${u.id === me.id ? 'disabled title="You can\'t change your own role"' : ""}>
+      ${Object.keys(LABEL).map(r => `<option value="${r}" ${r === u.role ? "selected" : ""}>${LABEL[r]}</option>`).join("")}
+    </select></td></tr>`;
+}
+function visible() {
+  const q = $q.value.trim().toLowerCase();
+  const out = users.filter(u => (!q || [u.name, u.email, u.company].some(v => (v || "").toLowerCase().includes(q)))
+    && (!$role.value || u.role === $role.value)
+    && (!$plan.value || ($plan.value === "yearly" ? u.role !== "admin" && u.plan !== "starter" && u.billing_period === "yearly"
+      : $plan.value === "paypal" ? u.paid_online : u.role !== "admin" && u.plan === $plan.value))
+    && (!asksOnly || u.plan_request));
+  const by = {
+    asks: (a, b) => (b.plan_request ? 1 : 0) - (a.plan_request ? 1 : 0) || (a.plan_request_at || 0) - (b.plan_request_at || 0) || (b.created || 0) - (a.created || 0),
+    new: (a, b) => (b.created || 0) - (a.created || 0),
+    old: (a, b) => (a.created || 0) - (b.created || 0),
+    name: (a, b) => (a.name || a.email).localeCompare(b.name || b.email, getLocale()),
+    email: (a, b) => a.email.localeCompare(b.email),
+  }[$sort.value] || (() => 0);
+  return out.sort(by);
+}
+const filtered = () => !!($q.value.trim() || $role.value || $plan.value || asksOnly);
+function draw() {
+  const asks = users.filter(u => u.plan_request).length;
+  document.getElementById("asks-n").textContent = asks || "";
+  $asks.classList.toggle("on", asksOnly); $asks.setAttribute("aria-pressed", asksOnly);
+  const rows = visible();
+  const pg = paginate(rows, page, perPage);
+  page = pg.page;
+  $count.innerHTML = filtered() ? `<span data-no-i18n>${rows.length}</span> <span>${rows.length === 1 ? "account matches" : "accounts match"}</span>` : "";
+  if (!rows.length) {
+    list.innerHTML = `<div class="table-wrap"><div class="uempty">${asksOnly && !$q.value.trim() && !$role.value && !$plan.value
+      ? `<b>No requests waiting</b><p>When a member asks for a higher plan, it shows here to approve or decline.</p>`
+      : `<b>No account matches</b><p>Try another name or email, or clear the filters.</p>`}
+      <button class="btn btn-ghost btn-sm" type="button" data-clear>Clear filters</button></div></div>`;
+    $pager.innerHTML = "";
+    return;
+  }
+  list.innerHTML = `<div class="table-wrap"><table class="utable">
+    <thead><tr><th scope="col">Account</th><th scope="col">About them</th><th scope="col">Joined</th><th scope="col">Claude key</th><th scope="col">Plan</th><th scope="col">Role</th></tr></thead>
+    <tbody>${pg.items.map(row).join("")}</tbody></table></div>`;
   $pager.innerHTML = pagerHTML(pg, { noun: "users" });
 }
-const $pager = document.getElementById("pager");
+/* Redraw, keeping the keyboard where it was (a select or button of the same account). */
+function redraw(focusSel) {
+  draw();
+  if (focusSel) list.querySelector(focusSel)?.focus();
+}
+function summary() {
+  const asks = users.filter(u => u.plan_request).length, waiting = users.filter(u => u.role === "unconfirmed").length;
+  const leaving = users.filter(u => u.deactivated_at).length;
+  const part = (n, one, many) => `<span><b data-no-i18n>${n}</b> <span>${n === 1 ? one : many}</span></span>`;
+  document.getElementById("summary").innerHTML = `<span class="sum">${[part(users.length, "account", "accounts"),
+    waiting ? part(waiting, "not confirmed yet", "not confirmed yet") : "",
+    asks ? part(asks, "plan request waiting", "plan requests waiting") : "",
+    leaving ? part(leaving, "being deleted", "being deleted") : ""].filter(Boolean).join(" · ")}</span><br>
+    <span>Admins can change the shared agents, teams and rules, and open every project.</span>`;
+}
 async function load() {
   try { [users, me] = await Promise.all([api("/api/users"), getMe()]); }
   catch (err) { return showError(list, err, load, "Couldn't load the users"); }
-  users.sort((a, b) => (b.plan_request ? 1 : 0) - (a.plan_request ? 1 : 0));   // plan requests first
-  const asks = users.filter(u => u.plan_request).length;
-  const waiting = users.filter(u => u.role === "unconfirmed").length;
-  document.getElementById("summary").textContent = `${users.length} account${users.length === 1 ? "" : "s"}${waiting ? `, ${waiting} not confirmed yet` : ""}${asks ? `, ${asks} plan request${asks === 1 ? "" : "s"} waiting` : ""}. Admins can change the shared agents, teams and rules, and open every project.`;
+  summary();
   draw();
 }
+const refilter = () => { page = 1; saveFilters(); draw(); };
+let typing = 0;
+$q.addEventListener("input", () => { clearTimeout(typing); typing = setTimeout(refilter, 150); });
+[$role, $plan, $sort].forEach(el => el.addEventListener("change", refilter));
+$asks.addEventListener("click", () => { asksOnly = !asksOnly; refilter(); });
 bindPager($pager, (p) => { page = p; draw(); list.scrollIntoView({ block: "nearest", behavior: "smooth" }); },
   (n) => { perPage = n; savePerPage("users", n); page = 1; draw(); });
-list.addEventListener("click", (e) => {
+
+const userOf = (id) => users.find(x => x.id === id);
+const busyRow = (id, on) => { const r = list.querySelector(`tr[data-row="${CSS.escape(id)}"]`); if (r) on ? r.setAttribute("aria-busy", "true") : r.removeAttribute("aria-busy"); };
+function saved(u) {
+  Object.assign(userOf(u.id), u);
+  summary();
+}
+list.addEventListener("click", async (e) => {
+  if (e.target.closest("[data-clear]")) {
+    $q.value = ""; $role.value = ""; $plan.value = ""; asksOnly = false; refilter(); $q.focus(); return;
+  }
   const ok = e.target.closest("[data-approve]"), no = e.target.closest("[data-decline]");
   if (!ok && !no) return;
+  const btn = ok || no, id = btn.dataset[ok ? "approve" : "decline"], u = userOf(id);
+  if (no && !(await confirmDialog({ title: t("Decline this request?"),
+    text: [t(`${u.email} stays on ${PLAN[u.plan]}.`), t("They can ask again from their profile.")].join(" "), ok: t("Decline"), danger: true }))) return;
   const body = ok ? { plan: ok.dataset.to } : { decline_request: true };
-  ok?.parentElement.querySelectorAll("button").forEach(x => { if (x !== ok) x.disabled = true; });
-  no?.parentElement.querySelectorAll("button").forEach(x => { if (x !== no) x.disabled = true; });
-  withBusy(ok || no, async () => {
-    const u = await api(`/api/users/${(ok || no).dataset[ok ? "approve" : "decline"]}`, { method: "PATCH", body: JSON.stringify(body) });
-    Object.assign(users.find(x => x.id === u.id), u); draw();
-    toast(ok ? `${u.email} is now on ${PLAN[u.plan]}` : "Request declined");
-  }, { onError: (err) => { toast(err.message, "err"); (ok || no).parentElement.querySelectorAll("button").forEach(x => { x.disabled = false; }); } });
+  const others = [...btn.parentElement.querySelectorAll("button")].filter(x => x !== btn);
+  others.forEach(x => { x.disabled = true; });
+  busyRow(id, true);
+  await withBusy(btn, async () => {
+    const r = await api(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+    saved(r); redraw(`select[data-plan="${CSS.escape(id)}"]`);
+    toast(ok ? `${r.email} is now on ${PLAN[r.plan]}` : "Request declined");
+  }, { onError: (err) => { toast(errorText(err), "err"); others.forEach(x => { x.disabled = false; }); } });
+  busyRow(id, false);
 });
-/* A plan or role change: the select is locked while it saves, and goes back to the saved value if it fails. */
-list.addEventListener("change", (e) => {
+/* A plan or role change asks first, then the select is locked while it saves, and goes back to the saved value if
+   it's cancelled or fails. */
+function planWarning(u, to) {
+  const lines = [t(`${u.email} moves from ${PLAN[u.plan]} to ${PLAN[to]}.`)];
+  if (u.plan_request === to) lines.push(t(u.plan_request_period === "yearly" ? "This approves their request, paid yearly." : "This approves their request, paid monthly."));
+  else if (to !== "starter") lines.push(t("A plan set here counts as monthly in the revenue."));
+  if (RANK[to] < RANK[u.plan]) lines.push(t("They lose the features of their current plan at once."));
+  if (u.paid_online) lines.push(t("They pay with PayPal: this doesn't change or cancel their PayPal subscription."));
+  return lines.join(" ");
+}
+function roleWarning(u, to) {
+  const lines = [t(`${u.email} becomes: ${LABEL[to]}.`)];
+  if (to === "admin") lines.push(t("Admins can change the shared agents, teams and rules, and open every project."));
+  else if (u.role === "admin") lines.push(t("They lose the admin pages and access to other people's projects."));
+  if (to === "unconfirmed") lines.push(t("They can't use the app until they confirm their email."));
+  return lines.join(" ");
+}
+list.addEventListener("change", async (e) => {
   const sel = e.target.closest("select[data-plan], select[data-id]");
   if (!sel) return;
-  const isPlan = sel.matches("[data-plan]"), id = isPlan ? sel.dataset.plan : sel.dataset.id;
-  const body = isPlan ? { plan: sel.value } : { role: sel.value };
-  withBusy(sel, async () => {
-    const u = await api(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) });
-    Object.assign(users.find(x => x.id === u.id), u);
-    toast(isPlan ? `${u.email} is now on ${PLAN[u.plan]}` : `${u.email} is now: ${LABEL[u.role]}`);
-  }, { onError: (err) => {
-    const u = users.find(x => x.id === id);
-    if (u) sel.value = isPlan ? u.plan : u.role;      // nothing changed on the server
-    toast(err.message, "err");
-  } });
+  const isPlan = sel.matches("[data-plan]"), id = isPlan ? sel.dataset.plan : sel.dataset.id, u = userOf(id), to = sel.value;
+  const back = () => { sel.value = isPlan ? u.plan : u.role; };
+  const risky = isPlan ? RANK[to] < RANK[u.plan] || u.paid_online : to === "admin" || u.role === "admin" || to === "unconfirmed";
+  const okd = await confirmDialog(isPlan
+    ? { title: t("Change the plan?"), text: planWarning(u, to), ok: t("Change plan"), danger: risky }
+    : { title: t("Change the role?"), text: roleWarning(u, to), ok: t("Change role"), danger: risky });
+  if (!okd) { back(); sel.focus(); return; }
+  busyRow(id, true);
+  await withBusy(sel, async () => {
+    const r = await api(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(isPlan ? { plan: to } : { role: to }) });
+    saved(r); redraw(`select[${isPlan ? "data-plan" : "data-id"}="${CSS.escape(id)}"]`);
+    toast(isPlan ? `${r.email} is now on ${PLAN[r.plan]}` : `${r.email} is now: ${LABEL[r.role]}`);
+  }, { onError: (err) => { back(); toast(errorText(err), "err"); } });     // nothing changed on the server
+  busyRow(id, false);
 });
 load().catch(err => showError(list, err, () => location.reload(), "Something went wrong on this page"));   // a bug must not leave "Loading…" forever
 </script>
-<style>
-  .utable .ask { display: grid; gap: 6px; margin-top: 8px; }
-  .utable .ask .badge.req { display: inline-flex; align-items: center; gap: 4px; background: var(--ice); color: var(--sky); justify-self: start; }
-  .utable .ask-acts { display: flex; gap: 6px; }
-  .utable .cl { display: none; }
-  @media (max-width: 760px) {
-    .utable thead { display: none; }
-    .utable, .utable tbody { display: block; min-width: 0; }
-    .utable tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 12px; padding: 14px; border-bottom: 1px solid var(--line); }
-    .utable td { display: block; padding: 0; border: 0; min-width: 0; }
-    .utable td.who, .utable td.em { grid-column: 1 / -1; }
-    .utable td.em { margin-top: -8px; color: var(--stone); overflow-wrap: anywhere; }
-    .utable td.opt { display: none; }
-    .utable td:nth-child(3) { display: none; }
-    .utable td.rl { grid-column: 1 / -1; }
-    .utable .cl { display: block; font-size: 12px; color: var(--stone); margin-bottom: 4px; }
-    .utable select.input { width: 100%; }
-  }
-</style>
 </body>
 </html>

@@ -131,6 +131,10 @@
 
   .hero-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
   .linked { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+  .notify-pref { display: flex; gap: 12px; align-items: flex-start; margin-top: 18px; padding: 14px 16px; border-radius: var(--r); background: var(--mist, var(--linen)); cursor: pointer; }
+  .notify-pref input { margin-top: 3px; }
+  .notify-pref b { display: block; font-weight: 500; font-size: 14px; }
+  .notify-pref small { display: block; font-size: 13px; color: var(--stone); line-height: 1.5; margin-top: 2px; }
   .hchip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-pill, 999px); font-size: 12px; text-decoration: none;
     background: var(--mist); color: var(--graphite); border: 1px solid var(--line); }
   a.hchip:hover { border-color: var(--line-strong); color: var(--ink); }
@@ -502,6 +506,9 @@ async function load() {
             ${seg("lang", "Language", "lang-label", getLang(), [["en", "English", "", true], ["fr", "Français", "", true], ["ary", "الدارجة", "", true]])}
             ${seg("pref-theme", "Appearance", "theme-label", getTheme(), [["system", "System", "monitor"], ["light", "Light", "sun"], ["dark", "Dark", "moon"]])}
           </div>
+          <label class="notify-pref"><input type="checkbox" id="notify-runs" ${me.notify_runs !== false ? "checked" : ""}>
+            <span><b>Email me when the agents finish</b><small>When a build takes more than a minute and you've left the studio. Emails about your plan and payments are always sent.</small></span></label>
+          <p class="saved" id="notify-saved" role="status"></p>
         </section>
         </div>
 
@@ -593,6 +600,15 @@ async function load() {
   show(location.hash, !!location.hash);
 
   /* preferences apply at once */
+  $("notify-runs")?.addEventListener("change", async (e) => {
+    const box = e.target;
+    box.disabled = true;
+    try {
+      me = (await api("/api/auth/preferences", { method: "PATCH", body: JSON.stringify({ notify_runs: box.checked }) })).user;
+      $("notify-saved").textContent = box.checked ? "You'll get an email when the agents finish." : "No more emails when the agents finish.";
+    } catch (err) { box.checked = !box.checked; toast(err.message, "err"); }
+    box.disabled = false;
+  });
   app.querySelectorAll("[data-lang]").forEach(b => { b.onclick = async () => {
     if (b.dataset.lang === getLang()) return;
     await savePreferences({ language: b.dataset.lang });

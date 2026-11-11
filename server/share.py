@@ -12,7 +12,9 @@ The token is the only secret: whoever has the link sees the site until it expire
 (owner and editors) creates and revokes links and reads, resolves or deletes every comment in the studio's Share tab;
 viewers read them.
 
-Nothing here touches the project's files: a link always shows the current site.
+A link shows either the live site, or one saved version ("frozen"): a version the team picks, or one saved when the
+link is made. A frozen link never shows work in progress, and its version is kept for as long as the link isn't revoked
+(versions.py asks `pinned`), even past the plan's number of versions.
 """
 
 import re
@@ -58,7 +60,8 @@ def _link(r, with_token: bool = True) -> dict:
     now = time.time()
     state = ("revoked" if r["revoked_at"] else "expired" if r["expires_at"] and r["expires_at"] <= now else "active")
     out = {"id": str(r["id"]), "label": r["label"], "comments": r["comments"], "created": r["created_at"],
-           "expires": r["expires_at"], "views": r["views"], "last_viewed": r["last_viewed"], "state": state}
+           "expires": r["expires_at"], "views": r["views"], "last_viewed": r["last_viewed"], "state": state,
+           "version": str(r["version_id"]) if r["version_id"] else None, "version_n": r["version_n"]}
     if with_token:
         out["token"] = r["token"]
     return out
@@ -67,7 +70,8 @@ def _link(r, with_token: bool = True) -> dict:
 def _comment(r) -> dict:
     return {"id": str(r["id"]), "link": str(r["link_id"]) if r["link_id"] else None, "page": r["page"], "selector": r["selector"],
             "x": r["x"], "y": r["y"], "doc_x": r["doc_x"], "doc_y": r["doc_y"], "viewport": r["viewport"], "snippet": r["snippet"],
-            "author": r["author"], "text": r["text"], "created": r["created_at"], "resolved": r["resolved_at"]}
+            "author": r["author"], "text": r["text"], "created": r["created_at"], "resolved": r["resolved_at"],
+            "reply": r["reply"] if "reply" in r.keys() else "", "reply_at": r["reply_at"] if "reply_at" in r.keys() else None}
 
 
 # ------------------------------------------------------------ the team's side
@@ -79,7 +83,18 @@ async def links(pid: str) -> list[dict]:
     return [{**_link(r), "comment_count": counts.get(str(r["id"]), 0)} for r in rows]
 
 
-async def create(pid: str, actor: dict, body: dict) -> dict:
+# versions a share link shows: never pruned while the link isn't revoked. {project id: {version id}}
+pinned: dict[str, set[str]] = {}
+
+
+async def load_pins():
+    pinned.clear()
+    for r in await db.pool.fetch("SELECT project_id, version_id FROM share_links WHERE version_id IS NOT NULL AND revoked_at IS NULL"):
+        pinned.setdefault(str(r["project_id"]), set()).add(str(r["version_id"]))
+
+
+async def create(pid: str, actor: dict, body: dict, version: dict | None = None) -> dict:
+    """A new link. `version` ({id, n}, chosen by main.py) freezes it on that saved version; None shows the live site."""
     days = body.get("days")
     if days in (None, 0, "0", "never"):
         expires = None
@@ -96,19 +111,24 @@ async def create(pid: str, actor: dict, body: dict) -> dict:
                                        AND (expires_at IS NULL OR expires_at > $2)""", key, time.time())
     if active >= MAX_LINKS:
         raise ShareError(f"A project can have up to {MAX_LINKS} active links. Revoke one first.")
-    row = await db.pool.fetchrow("""INSERT INTO share_links (id, project_id, token, label, comments, created_by, created_at, expires_at)
-                                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *""",
+    row = await db.pool.fetchrow("""INSERT INTO share_links (id, project_id, token, label, comments, created_by, created_at, expires_at,
+                                                             version_id, version_n)
+                                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *""",
                                  uuid.uuid4(), key, secrets.token_urlsafe(24), _text(body.get("label"), 80),
-                                 body.get("comments") is not False, actor["id"], time.time(), expires)
+                                 body.get("comments") is not False, actor["id"], time.time(), expires,
+                                 uuid.UUID(version["id"]) if version else None, version["n"] if version else None)
+    if version:
+        pinned.setdefault(pid, set()).add(version["id"])
     return {**_link(row), "comment_count": 0}
 
 
 async def revoke(pid: str, link_id: str):
-    row = await db.pool.fetchrow("UPDATE share_links SET revoked_at = coalesce(revoked_at, $3) WHERE project_id = $1 AND id = $2 RETURNING token",
-                                 uuid.UUID(pid), _id(link_id), time.time())
+    row = await db.pool.fetchrow("""UPDATE share_links SET revoked_at = coalesce(revoked_at, $3) WHERE project_id = $1 AND id = $2
+                                    RETURNING token, version_id""", uuid.UUID(pid), _id(link_id), time.time())
     if not row:
         raise ShareError("This link doesn't exist.", 404)
     _cache.pop(row["token"], None)
+    await load_pins()                           # its version may be pruned again (unless another link shows it)
 
 
 async def comments(pid: str) -> list[dict]:
@@ -123,6 +143,50 @@ async def resolve(pid: str, comment_id: str, actor: dict, done: bool = True) -> 
     if not row:
         raise ShareError("This comment doesn't exist.", 404)
     return _comment(row)
+
+
+async def reply(pid: str, comment_id: str, actor: dict, text) -> dict:
+    """The team's answer to a comment (one per comment; an empty text removes it). The visitor sees it on the shared page."""
+    text = _text(text, TEXT_LIMIT, multiline=True)
+    row = await db.pool.fetchrow("""UPDATE share_comments SET reply = $3, reply_at = $4, reply_by = $5
+                                    WHERE project_id = $1 AND id = $2 RETURNING *""",
+                                 uuid.UUID(pid), _id(comment_id), text, time.time() if text else None, actor["id"] if text else None)
+    if not row:
+        raise ShareError("This comment doesn't exist.", 404)
+    return _comment(row)
+
+
+async def update_link(pid: str, link_id: str, body: dict) -> dict:
+    """Change a link after it's made: its name, when it expires (days from now, or 0 for never), whether visitors comment."""
+    sets, args = [], [uuid.UUID(pid), _id(link_id)]
+    if "label" in body:
+        args.append(_text(body.get("label"), 80)); sets.append(f"label = ${len(args)}")
+    if "comments" in body:
+        if not isinstance(body["comments"], bool):
+            raise ShareError("“comments” must be true or false.")
+        args.append(body["comments"]); sets.append(f"comments = ${len(args)}")
+    if "days" in body:
+        days = body["days"]
+        if days in (0, "0", None, "never"):
+            expires = None
+        else:
+            try:
+                days = int(days)
+            except (TypeError, ValueError, OverflowError):
+                raise ShareError("Pick when the link expires.")
+            if days not in EXPIRY_DAYS:
+                raise ShareError(f"A link lasts {', '.join(map(str, EXPIRY_DAYS))} days, or never expires.")
+            expires = time.time() + days * 86400
+        args.append(expires); sets.append(f"expires_at = ${len(args)}")
+    if not sets:
+        raise ShareError("Nothing to change.")
+    row = await db.pool.fetchrow(f"""UPDATE share_links SET {", ".join(sets)} WHERE project_id = $1 AND id = $2 AND revoked_at IS NULL
+                                     RETURNING *""", *args)
+    if not row:
+        raise ShareError("This link doesn't exist or was turned off.", 404)
+    _cache.pop(row["token"], None)
+    count = await db.pool.fetchval("SELECT count(*) FROM share_comments WHERE link_id = $1", row["id"])
+    return {**_link(row), "comment_count": count}
 
 
 async def delete_comment(pid: str, comment_id: str):

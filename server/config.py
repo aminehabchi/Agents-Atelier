@@ -146,7 +146,7 @@ SIGNUPS_PER_HOUR = _int("SIGNUPS_PER_HOUR", 5, low=0)          # new accounts pe
 LOGINS_PER_15_MIN = _int("LOGINS_PER_15_MIN", 30, low=0)       # login attempts per IP per 15 minutes
 RESETS_PER_HOUR = _int("RESETS_PER_HOUR", 10, low=0)           # password reset requests per IP per hour
 # ---- Rate limits on the rest of the app (0 = no limit). Counted per member, or per address when logged out.
-API_REQUESTS_PER_MINUTE = _int("API_REQUESTS_PER_MINUTE", 300, low=0)   # any /api/ call
+API_REQUESTS_PER_MINUTE = _int("API_REQUESTS_PER_MINUTE", 600, low=0)   # any /api/ call
 RUNS_PER_HOUR = _int("RUNS_PER_HOUR", 60, low=0)                 # prompts, Continue, Start again and retries that start agents
 INVITES_PER_HOUR = _int("INVITES_PER_HOUR", 30, low=0)           # people invited to projects
 SHARE_LINKS_PER_HOUR = _int("SHARE_LINKS_PER_HOUR", 30, low=0)   # share links created
@@ -179,7 +179,9 @@ PAYPAL_PLAN_AGENCY = os.environ.get("PAYPAL_PLAN_AGENCY", "").strip()
 PAYPAL_PLAN_PRO_YEARLY = os.environ.get("PAYPAL_PLAN_PRO_YEARLY", "").strip()       # yearly plans: optional; without them only monthly
 PAYPAL_PLAN_AGENCY_YEARLY = os.environ.get("PAYPAL_PLAN_AGENCY_YEARLY", "").strip()
 PAYPAL_WEBHOOK_ID = os.environ.get("PAYPAL_WEBHOOK_ID", "").strip()      # checks that webhooks really come from PayPal
-PUBLIC_URL = os.environ.get("PUBLIC_URL", "").strip().rstrip("/")         # e.g. https://atelier.example.com (PayPal sends members back here)
+PUBLIC_URL = os.environ.get("PUBLIC_URL", "").strip().rstrip("/")
+# Email the person who started a run when it ends after this many seconds and nobody has the studio open (notify.py).
+RUN_EMAIL_AFTER = _int("RUN_EMAIL_AFTER", 90, low=0)         # e.g. https://atelier.example.com (PayPal sends members back here)
 
 # ---- Log in with Google or GitHub (see oauth.py). A provider shows up on the login page once its id and secret are set.
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()

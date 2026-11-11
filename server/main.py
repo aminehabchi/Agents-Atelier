@@ -89,6 +89,7 @@ import legacy
 import collab
 import share
 import billing
+import notify as notices      # the emails (notify.py); `notify` below tells open studios
 import oauth
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -98,6 +99,7 @@ site_dir = storage.site_dir    # works/<project>/site: the website the agents ed
 work_dir = storage.work_dir    # works/<project>: site/, versions/, uploads/, checks/
 VERS = Versions(store)
 VERS.keep = lambda pid: runs.get(pid, {}).get("keep_versions")   # set from the owner's plan at each run
+VERS.pinned = lambda pid: share.pinned.get(pid, set())             # versions frozen share links show: never pruned
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL, logging.INFO), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("agents-atelier")
 
@@ -123,13 +125,16 @@ async def lifespan(_app):
     await db.init()
     await store.start(db.pool)
     await collab.load()
+    await share.load_pins()
     imported = legacy.import_work_folder(config.LEGACY_WORK_DIR, store)     # once per project, from the old work/ folder
     if imported:
         log.info("Imported %d projects from %s into %s", imported, config.LEGACY_WORK_DIR, storage.ROOT)
     mark_interrupted_runs()
     purger = asyncio.create_task(purge_loop())
+    reminders = asyncio.create_task(notices.loop())          # yearly renewal reminders
     yield
     purger.cancel()
+    reminders.cancel()
     await store.stop()
     await db.close()
 
@@ -863,21 +868,23 @@ def _day_span(days: int):
 
 @app.get("/api/admin/revenue")
 async def revenue(request: Request, days: int = 30):
-    """What the members' plans are worth per month, and how it moved. Payments aren't collected online yet, so this is
-    the plans' value, not money received. Admins and deactivated accounts don't count."""
+    """What the members' plans are worth per month (a yearly plan counts a twelfth of its yearly price), how it moved, and
+    the money PayPal collected when it's set up. Admins and deactivated accounts don't count."""
     require_admin(request)
     import datetime as dt
     days = max(7, min(days, 365))
     span, since = _day_span(days)
     price = {k: v["price"] for k, v in plans.PLANS.items()}
-    users = await db.pool.fetch("SELECT id, email, name, role, plan, billing_period, plan_request, plan_request_at, deactivated_at, created_at FROM users")
+    users = await db.pool.fetch("""SELECT id, email, name, role, plan, billing_period, plan_request, plan_request_at, plan_request_period,
+                                          deactivated_at, created_at FROM users""")
     worth = lambda u: plans.monthly_value(u["plan"], u["billing_period"])      # a yearly plan counts a twelfth of its price
     members = [u for u in users if u["role"] == "user" and not u["deactivated_at"]]
     events = await db.pool.fetch("""SELECT e.user_id, e.from_plan, e.to_plan, e.by_admin, e.ts, u.email
                                     FROM plan_events e JOIN users u ON u.id = e.user_id ORDER BY e.ts""")
     counted = {u["id"] for u in members}
     mrr = round(sum(worth(u) for u in members), 2)
-    by_plan = [{"id": k, "name": v["name"], "price": v["price"], "members": sum(u["plan"] == k for u in members),
+    by_plan = [{"id": k, "name": v["name"], "price": v["price"], "price_yearly": v.get("price_yearly"),
+                "members": sum(u["plan"] == k for u in members),
                 "yearly": sum(u["plan"] == k and u["billing_period"] == "yearly" for u in members),
                 "mrr": round(sum(worth(u) for u in members if u["plan"] == k), 2)} for k, v in plans.PLANS.items()]
     paying = sum(u["plan"] != "starter" for u in members)
@@ -893,8 +900,10 @@ async def revenue(request: Request, days: int = 30):
     series = []
     for d in span:
         end = dt.datetime.combine(d, dt.time.max, dt.timezone.utc).timestamp()
-        series.append({"date": d.isoformat(), "value": sum(price.get(plan_on(u["id"], end, u["plan"]), 0)
-                                                            for u in members if u["created_at"].timestamp() <= end)})
+        # the current plan counts with the member's period (yearly: a twelfth); earlier plans at their monthly price
+        series.append({"date": d.isoformat(), "value": round(sum(
+            plans.monthly_value(p, u["billing_period"] if p == u["plan"] else "monthly")
+            for u in members if u["created_at"].timestamp() <= end for p in [plan_on(u["id"], end, u["plan"])]), 2)})
     moves = [e for e in events if e["ts"] >= since and e["user_id"] in counted]
     up = [e for e in moves if plans.rank(e["to_plan"]) > plans.rank(e["from_plan"])]
     down = [e for e in moves if plans.rank(e["to_plan"]) < plans.rank(e["from_plan"])]
@@ -906,8 +915,10 @@ async def revenue(request: Request, days: int = 30):
         "conversion": round(paying / len(members), 4) if members else 0,
         "arpu": round(mrr / len(members), 2) if members else 0,
         "by_plan": by_plan,
-        "pending": {"count": len(pending), "mrr": sum(price.get(u["plan_request"], 0) - price.get(u["plan"], 0) for u in pending),
-                    "items": [{"email": u["email"], "from": u["plan"], "to": u["plan_request"], "at": u["plan_request_at"]} for u in pending]},
+        "pending": {"count": len(pending),
+                    "mrr": round(sum(plans.monthly_value(u["plan_request"], u["plan_request_period"]) - worth(u) for u in pending), 2),
+                    "items": [{"email": u["email"], "from": u["plan"], "to": u["plan_request"], "period": u["plan_request_period"],
+                               "at": u["plan_request_at"]} for u in pending]},
         "moves": {"upgrades": len(up), "downgrades": len(down), "gained": gained, "lost": lost, "net": gained - lost},
         "series": series,
         "recent": [{"email": e["email"], "from": e["from_plan"], "to": e["to_plan"], "by_admin": e["by_admin"], "ts": e["ts"]}
@@ -1043,6 +1054,8 @@ async def oauth_callback(request: Request, provider: str, code: str = "", state:
         user = await oauth.account_for(provider, who, request.cookies.get("atelier_lang") or "")
         collab.note_user(user)
         await collab.claim_invites(user)           # projects someone invited this email to
+        if user.get("created"):
+            await notices.welcome(user)
         session = await auth.create_session(user["id"])
     except oauth.OAuthError as e:
         return _oauth_back(str(e), next_path)
@@ -1102,10 +1115,13 @@ async def login(request: Request, body: dict):
 async def confirm_email(request: Request, body: dict):
     if not request.state.user:
         raise HTTPException(401, "Log in first.")
+    was = request.state.user["role"]
     user = await auth.confirm(request.state.user, body.get("code"))
     if user["role"] != "unconfirmed":
         collab.note_user(user)
         await collab.claim_invites(user)           # projects someone invited this email to before it had an account
+        if was == "unconfirmed":
+            await notices.welcome(user)
     return _with_session(user)
 
 
@@ -1307,9 +1323,14 @@ async def users_set_role(request: Request, user_id: str, body: dict):
     actor = require_admin(request)
     out = None
     if body.get("decline_request"):
-        return await auth.decline_plan_request(actor, user_id)
+        out = await auth.decline_plan_request(actor, user_id)
+        await notices.plan_declined(out["id"])
+        return out
     if "plan" in body:
+        before = await db.pool.fetchval("SELECT plan FROM users WHERE id = $1", collab._uid(user_id)) if user_id else None
         out = await auth.set_plan(actor, user_id, str(body.get("plan") or ""))
+        if plans.rank(out["plan"]) > plans.rank(before or plans.DEFAULT):
+            await notices.plan_active(out["id"], out["plan"], out.get("billing_period") or "monthly")
     if "role" in body or out is None:
         out = await auth.set_role(actor, user_id, str(body.get("role") or ""))
     await collab.refresh_user(user_id)            # the people this member invited keep or lose access with the plan
@@ -2335,6 +2356,56 @@ def _managed(request: Request, pid: str) -> dict:
     return meta
 
 
+# ---------------------------------------------------------------- what a run will probably cost
+
+ESTIMATE_RECENT = 5          # this project's last runs of an agent weigh in first
+
+
+@app.get("/api/projects/{pid}/estimate")
+async def run_estimate(pid: str, agents: str = ""):
+    """About how much a run of these agents (default: the project's team) will cost on the owner's Claude account, and how
+    long it takes. Per agent: its recent runs on this project, else its runs everywhere (market.agent_estimate), else a
+    default for its model. A follow-up usually runs fewer agents (the Orchestrator picks), so it's an upper estimate."""
+    meta = load_meta(pid)
+    owner = await owner_of(meta)
+    visible = await project_agents(meta)
+    by_id = {a["id"]: a for a in visible}
+    wanted = [i for i in agents.split(",") if i in by_id] if agents else [i for i in (meta.get("agents") or []) if i in by_id]
+    wanted = wanted or await default_ids(owner)
+    ids = [a["id"] for a in visible if a["id"] in set(wanted) | {orch.BRIEF}]       # Brief always runs; team order
+    rows = await market._agent_rows()
+    stats = market.run_stats(_all_metas(), rows)
+    oid = owner["id"] if owner else None
+    here = [e for e in meta.get("stats") or [] if e.get("status") == "done"]
+    pages = max(1, len(meta.get("pages") or []))
+    first = orch.is_fresh(meta, site_dir(pid))
+    out = []
+    for i in ids:
+        mine = [e for e in here if e.get("agent") == i][-ESTIMATE_RECENT:]
+        if mine:
+            cost = sum(float(e.get("cost") or 0) for e in mine) / len(mine)
+            seconds = sum(float(e.get("seconds") or 0) for e in mine) / len(mine)
+            source = "project"
+        else:
+            row = next((r for r in rows if r["slug"] == i and r["owner_id"] == oid), None) or \
+                  next((r for r in rows if r["slug"] == i and r["owner_id"] is None), None)
+            if row is not None:
+                seconds, cost, measured = market.agent_estimate(row, stats, rows)
+                source = "measured" if measured else "default"
+            else:
+                seconds, cost, source = market.DEFAULT_SECONDS, market._default_cost(by_id[i].get("model") or ""), "default"
+            if first:                                # a first build writes every page from scratch
+                scale = 1 + 0.25 * (pages - 1)
+                seconds, cost = seconds * scale, cost * scale
+        out.append({"id": i, "name": by_id[i]["name"], "cost": round(cost, 4), "seconds": round(seconds, 1), "source": source})
+    total = sum(a["cost"] for a in out)
+    limit = plans.run_limit(owner) if keys.USER_MODE else 0
+    return {"agents": out, "cost": round(total, 2), "low": round(total * 0.7, 2), "high": round(total * 1.3, 2),
+            "seconds": round(sum(a["seconds"] for a in out)), "first_build": first, "limit": limit,
+            "over_limit": bool(limit) and total > limit,
+            "measured": sum(a["source"] != "default" for a in out), "count": len(out)}
+
+
 @app.get("/api/projects/{pid}/people")
 async def project_people(request: Request, pid: str):
     meta = load_meta(pid)
@@ -2403,7 +2474,54 @@ async def list_share_links(request: Request, pid: str):
 async def create_share_link(request: Request, pid: str, body: dict):
     meta = _editable(request, pid)
     _limited(limits.SHARE_LINKS, request, "share links", per_member=True)
-    return await share.create(meta["id"], current_user(request), body)
+    return await share.create(meta["id"], current_user(request), body, _share_version(meta, body.get("version")))
+
+
+def _share_version(meta: dict, choice) -> dict | None:
+    """What a new share link shows: None (the live site), "now" (the site as it is, saved as a version), or a version number."""
+    pid = meta["id"]
+    if choice in (None, "", "live"):
+        return None
+    if choice == "now":
+        if is_busy(pid):
+            raise HTTPException(409, "Agents are working, so the site may be half-finished. Pick a saved version, or wait until they finish.")
+        v = VERS.snapshot(pid, "Shared with a link", kind="share")
+        if v is None:                               # nothing changed since the last version: share that one
+            versions = VERS.list(pid)
+            if not versions:
+                raise HTTPException(400, "There's nothing to share yet: the site has no files.")
+            v = versions[0]
+        return {"id": v["id"], "n": v["n"]}
+    try:
+        v = VERS.get(pid, int(choice))
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(404, "That version doesn't exist any more. Pick another one.")
+    return {"id": v["id"], "n": v["n"]}
+
+
+def _share_root(link: dict, meta: dict) -> Path:
+    """The folder a share link shows: its frozen version, or the live site."""
+    if link.get("version"):
+        root = storage.versions_dir(meta["id"]) / link["version"]
+        if not root.is_dir():
+            raise HTTPException(404, "The version this link shows is no longer available. Ask the team for a new link.")
+        return root
+    return site_dir(meta["id"])
+
+
+@app.patch("/api/projects/{pid}/share/{link_id}")
+async def update_share_link(request: Request, pid: str, link_id: str, body: dict):
+    """{label?, days?, comments?}: rename a link, give it a new end date (days from now, 0 = never), turn comments on or off."""
+    return await share.update_link(_editable(request, pid)["id"], link_id, body)
+
+
+@app.post("/api/projects/{pid}/comments/{comment_id}/reply")
+async def reply_to_comment(request: Request, pid: str, comment_id: str, body: dict):
+    """{text}: the team's answer, shown to the visitor under their comment (empty text removes it)."""
+    meta = _editable(request, pid)
+    out = await share.reply(meta["id"], comment_id, current_user(request), body.get("text"))
+    await notify(meta["id"], {"type": "comment", "comment": out})
+    return out
 
 
 @app.delete("/api/projects/{pid}/share/{link_id}")
@@ -2458,9 +2576,14 @@ async def share_page(token: str):
 @app.get("/s/{token}/info")
 async def share_info(token: str):
     link, meta = await _share_link(token)
-    pages = [p for p in meta.get("pages") or DEFAULT_PAGES if (site_dir(meta["id"]) / p["file"]).is_file()]
+    root = _share_root(link, meta)
+    pages = [p for p in meta.get("pages") or DEFAULT_PAGES if (root / p["file"]).is_file()]
+    frozen = None
+    if link.get("version"):
+        v = next((v for v in VERS.list(meta["id"]) if v["id"] == link["version"]), None)
+        frozen = {"n": link.get("version_n"), "ts": v["ts"] if v else None}
     return {"name": meta["name"], "pages": pages, "comments": link["comments"], "expires": link["expires"],
-            "busy": is_busy(meta["id"]), "built": (site_dir(meta["id"]) / "index.html").is_file()}
+            "busy": is_busy(meta["id"]) and not frozen, "built": (root / "index.html").is_file(), "frozen": frozen}
 
 
 @app.get("/s/{token}/comments")
@@ -2489,7 +2612,7 @@ async def share_site(request: Request, token: str, path: str = ""):
     link, meta = await _share_link(token)
     if "\x00" in path:
         raise HTTPException(404, "This page or file doesn't exist.")
-    root = site_dir(meta["id"]).resolve()
+    root = _share_root(link, meta).resolve()
     target = (root / path).resolve()
     if (target != root and root not in target.parents) or (path.split("/")[0] == browser_check.CHECK_DIR):
         raise HTTPException(404, "This page or file doesn't exist.")
@@ -3452,12 +3575,14 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
                                       "text": f"This run reached your ${limit:g} spending limit (about ${spent:.2f} on your Claude account). "
                                               "Press Continue to keep going, or change the limit in your profile."})
                 await broadcast(pid, {"type": "run_stopped", "run": run_summary(run)})
+                await email_after_run(pid, False, f"it reached the ${limit:g} spending limit per run.")
                 return
         meta = load_meta(pid)
         meta["history"].append(request)
         meta["run"].update(status="done", current=None, running=[], updated=time.time())
         save_meta(meta)
         await broadcast(pid, {"type": "run_done"})
+        await email_after_run(pid, True)
     except asyncio.CancelledError:
         kill_procs(st)
         run = safely("Saving the stopped run", update_run, pid, status="stopped", running=[])
@@ -3466,10 +3591,26 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
         text = run_error_text(e, f"a run on project {pid}")
         run = safely("Saving the failed run", update_run, pid, status="error", running=[], error=text[-500:])
         await broadcast(pid, {"type": "error", "text": text, "run": run_summary(run or {})})
+        await email_after_run(pid, False, text)
     finally:
         kill_procs(st)
         if schedule is not None and not schedule.done():
             schedule.cancel()
+
+
+async def email_after_run(pid: str, ok: bool, why: str = ""):
+    """Builds take minutes and people leave the tab: email whoever started a long run, unless a studio tab is open."""
+    try:
+        st = live(pid)
+        run = (store.get(pid) or {}).get("run") or {}
+        seconds = time.time() - float(run.get("started") or time.time())
+        if seconds < config.RUN_EMAIL_AFTER or st["clients"]:
+            return
+        who = st.get("by") or (store.get(pid) or {}).get("owner")
+        if who:
+            await notices.run_finished(pid, who, ok, seconds, keys.scrub(why, "") if why else "")
+    except Exception:
+        log.exception("Couldn't email the end of a run on %s", pid)
 
 
 class OrchestratorUnavailable(RuntimeError):
@@ -3814,6 +3955,8 @@ async def ws_endpoint(ws: WebSocket, pid: str):
                     if problem:                         # nothing runs without a Claude API key: the studio shows how to add one
                         await ws.send_json({"type": "needs_key", **problem})
                         continue
+                if kind in (*RUN_ACTIONS, "answer"):
+                    st["by"] = str(user["id"])           # who to email if the run ends while nobody watches (email_after_run)
                 await handle_ws_message(ws, pid, st, msg)
             except HTTPException as e:
                 await ws.send_json({"type": "error", "text": e.detail})

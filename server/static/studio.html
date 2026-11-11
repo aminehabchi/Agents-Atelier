@@ -17,7 +17,7 @@
   body { display: grid; grid-template-columns: minmax(380px, 34%) 1fr; height: 100vh; overflow: hidden; }
 
   /* ---------- Chat column ---------- */
-  .chat { position: relative; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--paper); min-height: 0; }
+  .chat { position: relative; display: flex; flex-direction: column; border-inline-end: 1px solid var(--line); background: var(--paper); min-height: 0; }
   .bar { display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 64px; border-bottom: 1px solid var(--line); flex: none; }
   .title { flex: 1; min-width: 0; }
   .title .name { font-size: 15px; font-weight: 500; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -32,7 +32,8 @@
   .title .pid { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--stone); background: none; border: 0; padding: 0; flex: none; }
   .title .pid:hover { color: var(--ink); }
   .conn { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); flex: none; }
-  .conn.on { background: var(--ink); }
+  .conn.on { background: var(--ok); box-shadow: 0 0 0 3px rgb(var(--zellige-rgb) / .18); }
+  .conn:not(.on) { animation: blink 1.4s infinite; }
 
   .chat { overflow: hidden; }
 
@@ -65,7 +66,9 @@
   .msg.keycard p, .msg.limitcard p { margin: 4px 0 10px; color: var(--graphite); font-size: 13px; }
   .msg.limitcard .lnk { font-size: 13px; }
   .msg.bcheck { padding: 12px 14px; border-radius: 8px; box-shadow: var(--ring); background: var(--paper); font-size: 13px; color: var(--graphite); }
-  .msg.bcheck .head { display: flex; gap: 8px; align-items: center; }
+  .msg.bcheck .head { display: flex; gap: 8px; align-items: flex-start; line-height: 1.5; }
+  .msg.bcheck .head > .ic { margin-top: calc((1lh - 16px) / 2); color: var(--ok); }
+  .msg.bcheck.warn .head > .ic { color: var(--saffron); }
   .msg.bcheck .shots { display: flex; gap: 8px; margin-top: 10px; }
   .msg.bcheck .shots a { flex: none; border-radius: 8px; overflow: hidden; box-shadow: var(--ring); }
   .msg.bcheck .shots img { display: block; height: 72px; width: auto; }
@@ -75,7 +78,24 @@
   .msg.user { align-self: flex-end; background: var(--espresso); color: var(--on-espresso); padding: 10px 16px; border-radius: var(--r) 2px 2px 2px; max-width: 85%; white-space: pre-wrap; }
   .msg.agent { background: var(--paper); box-shadow: var(--ring); border-radius: var(--r); padding: 14px 16px; scroll-margin: 16px; transition: box-shadow .3s; }
   .msg.agent.highlight { box-shadow: inset 0 0 0 2px var(--ink); }
-  .msg.agent.working { box-shadow: inset 0 0 0 1px var(--line-strong); }
+  /* states: working = blue outline and blue dots; done = green check; stopped = pause, quieter card */
+  .msg.agent.working { box-shadow: inset 0 0 0 1.5px rgb(var(--sky-rgb) / .75); }
+  .msg.agent.working .who .state { color: var(--sky); }
+  .msg.agent.working .typing span { background: var(--sky); }
+  .msg.agent .who .state > .ic:first-child { color: var(--ok); }
+  .msg.agent.stopped .who .state, .msg.agent.stopped .who .state > .ic:first-child { color: var(--danger); }
+  .msg.agent.stopped { box-shadow: inset 0 0 0 1px var(--line-strong); }
+  /* agents working side by side: a blue rail on the cards that ran together */
+  .msg.agent.par { border-inline-start: 3px solid rgb(var(--sky-rgb) / .6); }
+  /* cards of earlier requests fold to their summary; the chevron opens the steps again */
+  .msg.agent.past { padding-block: 10px; }
+  .msg.agent.past .tile { width: 30px; height: 30px; }
+  .msg.agent.past .who .nm { font-size: 14px; }
+  .msg.agent.past:not(.open) .actions, .msg.agent.past:not(.open) .rate { display: none; }
+  .msg.agent.past:not(.open) .text:not(:empty) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 6px; font-size: 13.5px; }
+  .who .fold { width: 28px; height: 28px; color: var(--stone); }
+  .who .fold .ic { transition: transform .2s; }
+  .msg.agent.open .who .fold .ic { transform: rotate(180deg); }
   .who { display: flex; align-items: center; gap: 12px; }
   .tile { width: 36px; height: 36px; border-radius: var(--r); display: grid; place-items: center; flex: none; color: var(--ink);
     background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
@@ -98,22 +118,32 @@
   .more { align-self: flex-start; background: none; border: 0; padding: 2px 0; font-size: 12px; color: var(--ash); }
   .more:hover { color: var(--ink); text-decoration: underline; }
   .msg.system { align-self: center; font-size: 13px; color: var(--stone); text-align: center; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
-  .msg.done-card { align-self: stretch; background: var(--paper); box-shadow: var(--ring); border-radius: var(--r); padding: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .msg.done-card .lbl { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 14px; min-width: 160px; }
-  .msg.done-card .lbl .tile { --c: var(--ink); }
+  .msg.done-card { align-self: stretch; background: var(--paper); box-shadow: var(--ring); border-radius: var(--r); padding: 12px 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .msg.done-card .lbl { flex: 1; display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; min-width: 160px; }
+  .msg.done-card .lbl .tile { --t: var(--zellige); --t-rgb: var(--zellige-rgb); width: 32px; height: 32px; }
   .msg.error { color: var(--danger); background: var(--paper); box-shadow: inset 0 0 0 1px var(--danger); border-radius: var(--r); padding: 10px 14px; font-size: 13px;
     white-space: pre-wrap; display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
   .msg.error > .ic { margin-top: calc((1lh - 16px) / 2); }
 
   /* composer */
+  /* one field: the prompt on top, its tools (attach, keys, team size, send) on a row below */
   .composer { padding: 12px 16px 14px; border-top: 1px solid var(--line); background: var(--paper); flex: none; }
-  .composer .row { display: flex; gap: 8px; align-items: flex-end; }
-  .composer textarea { flex: 1; resize: none; max-height: 180px; min-height: 46px; line-height: 1.45; }
-  .send { height: 46px; width: 46px; border: 0; border-radius: var(--r); background: var(--espresso); color: var(--on-espresso); display: grid; place-items: center; flex: none; transition: background .2s; }
-  .send:hover { background: var(--charcoal); }
-  .send:disabled { opacity: .35; cursor: default; }
-  .send.stop { background: var(--paper); color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
-  .hint { font-size: 11px; color: var(--stone); margin-top: 8px; display: flex; justify-content: space-between; gap: 8px; }
+  .composer .box { display: flex; flex-direction: column; border-radius: var(--r-card); background: var(--field); box-shadow: 0 0 0 1px var(--line-strong); transition: box-shadow .15s; }
+  .composer .box:focus-within { box-shadow: 0 0 0 1.5px var(--sky); }
+  .composer textarea, .composer textarea.input, .composer textarea.input:focus { flex: 1; resize: none; max-height: 200px; min-height: 44px; line-height: 1.5; width: 100%;
+    background: transparent; box-shadow: none; border: 0; padding: 11px 14px 2px; font-size: 15px; }
+  .composer textarea:disabled { cursor: default; }
+  .composer .row { display: flex; gap: 6px; align-items: center; padding: 2px 6px 6px; min-width: 0; }
+  .composer .row .spacer { flex: 1; }
+  .send { height: 36px; width: 36px; border: 0; border-radius: var(--r-pill); background: var(--sky); color: var(--on-sky); display: grid; place-items: center; flex: none; transition: background .2s, opacity .2s; }
+  .send:hover { filter: brightness(1.12); }
+  .send:disabled { opacity: .35; cursor: default; filter: none; background: var(--steel); color: var(--stone); }
+  .send.stop { background: var(--paper); color: var(--danger); box-shadow: inset 0 0 0 1.5px var(--danger); }
+  .composer .hint { font-size: 11.5px; color: var(--stone); min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .composer .team-hint { font-size: 12px; color: var(--stone); white-space: nowrap; }
+  .composer .attach { width: 34px; height: 34px; color: var(--graphite); }
+  body.viewer .composer .row { display: none; }
+  body.viewer .composer textarea { padding-bottom: 11px; min-height: 68px; }   /* room for the two-line "you're a viewer" note */
   kbd { font: 11px ui-monospace, monospace; background: var(--linen); border-radius: var(--r); padding: 1px 5px; box-shadow: var(--ring); }
 
   /* ---------- Stage column ---------- */
@@ -140,6 +170,8 @@
 
   .code { position: absolute; inset: 0; display: none; grid-template-columns: 200px 1fr; background: var(--paper); }
   .code.on { display: grid; }
+  .code.nofiles { grid-template-columns: 1fr; }
+  .code.nofiles .files, .code.nofiles .codehead { display: none; }
   .research { position: absolute; inset: 0; display: none; overflow: auto; background: var(--paper); }
   .research.on { display: block; }
   .research .doc { max-width: 780px; margin: 0 auto; padding: 32px 24px 64px; color: var(--graphite); font-size: 15px; line-height: 1.65; }
@@ -147,21 +179,24 @@
   .research .doc h2 { font-size: 19px; color: var(--ink); font-weight: 600; margin: 32px 0 10px; padding-top: 16px; border-top: 1px solid var(--line); }
   .research .doc h3 { font-size: 16px; color: var(--ink); font-weight: 600; margin: 20px 0 6px; }
   .research .doc p { margin: 0 0 12px; }
-  .research .doc ul, .research .doc ol { margin: 0 0 12px; padding-left: 22px; }
+  .research .doc ul, .research .doc ol { margin: 0 0 12px; padding-inline-start: 22px; }
   .research .doc li { margin: 4px 0; }
   .research .doc a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
   .research .doc a.cite { text-decoration: none; font-size: 12px; vertical-align: super; line-height: 0; padding: 0 1px; }
   .research .doc code { font: 13px ui-monospace, monospace; background: var(--linen); padding: 1px 5px; border-radius: var(--r); }
-  .research .doc blockquote { margin: 0 0 12px; padding: 4px 14px; border-left: 3px solid var(--line-strong); color: var(--stone); }
+  .research .doc blockquote { margin: 0 0 12px; padding: 4px 14px; border-inline-start: 3px solid var(--line-strong); color: var(--stone); }
   .research .doc hr { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
   .research .doc .tbl { overflow-x: auto; margin: 0 0 14px; }
   .research .doc table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
   .research .doc th, .research .doc td { text-align: start; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
   .research .doc th { color: var(--ink); font-weight: 600; background: var(--linen); }
   .research .doc li:target { background: var(--linen); }
-  .research .bar { position: sticky; top: 0; display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--paper);
+  .research .bar { position: sticky; top: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; height: auto; padding: 14px 24px 12px; background: var(--paper);
     border-bottom: 1px solid var(--line); font-size: 13px; color: var(--stone); z-index: 1; }
-  .files { border-right: 1px solid var(--line); padding: 10px; overflow-y: auto; background: var(--linen); }
+  .research .bar h2 { margin: 0; font-size: 20px; font-weight: 500; color: var(--ink); }
+  .placeholder .ph-acts { display: flex; justify-content: center; gap: 8px; margin-top: 16px; }
+  .files { border-inline-end: 1px solid var(--line); padding: 10px; overflow-y: auto; background: var(--linen); }
+  [dir="rtl"] .files { border-inline-end: 0; border-inline-start: 1px solid var(--line); }   /* the list reads left to right, but sits on the right */
   .files button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: start; background: transparent; border: 0; padding: 8px 12px; border-radius: var(--r);
     font: 13px ui-monospace, monospace; color: var(--graphite); }
   .files button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
@@ -172,10 +207,11 @@
   pre { margin: 0; padding: 20px; overflow: auto; flex: 1; font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--charcoal); tab-size: 2; }
 
   /* ---------- page switcher ---------- */
-  .page-pick { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 30px 0 12px; border-radius: var(--r);
+  .page-pick { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding-inline: 12px 30px; border-radius: var(--r);
     background: var(--linen); box-shadow: var(--ring); color: var(--stone); font-size: 13px; max-width: 220px; }
-  .page-pick select { appearance: none; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; outline: none; cursor: pointer; min-width: 0; text-overflow: ellipsis; }
-  .page-pick::after { content: ""; position: absolute; right: 12px; top: 50%; width: 6px; height: 6px; border: solid var(--stone); border-width: 0 1.5px 1.5px 0; transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+  .page-pick select { appearance: none; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; outline: none; cursor: pointer; min-width: 0; width: 100%; text-overflow: ellipsis; }
+  .page-pick:focus-within { box-shadow: inset 0 0 0 1.5px var(--sky); }
+  .page-pick::after { content: ""; position: absolute; inset-inline-end: 12px; top: 50%; width: 6px; height: 6px; border: solid var(--stone); border-width: 0 1.5px 1.5px 0; transform: translateY(-70%) rotate(45deg); pointer-events: none; }
   .page-pick select option { background: var(--paper); color: var(--ink); }
 
   /* ---------- editor ---------- */
@@ -204,23 +240,28 @@
   .fatal .row { display: flex; gap: 8px; justify-content: center; }
 
   /* ---------- attachments ---------- */
-  .attachments { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  /* attached images: chips with a thumbnail, the file name and where the upload is */
+  .attachments { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
   .attachments[hidden] { display: none; }
-  .att { position: relative; width: 64px; height: 64px; border-radius: var(--r); overflow: hidden; background: var(--linen); box-shadow: var(--ring); }
-  .att img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .att.failed { box-shadow: inset 0 0 0 2px var(--danger); }
+  .att { position: relative; display: inline-flex; align-items: center; gap: 8px; max-width: 220px; min-width: 0; padding: 4px; padding-inline-end: 4px;
+    border-radius: var(--r-pill); background: var(--linen); box-shadow: var(--ring); font-size: 12px; }
+  .att img { width: 32px; height: 32px; object-fit: cover; display: block; border-radius: 5px; background: var(--bone); flex: none; }
+  .att .att-meta { display: grid; min-width: 0; line-height: 1.25; }
+  .att .att-meta b { font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .att .att-meta small { color: var(--stone); font-size: 11px; white-space: nowrap; }
+  .att.failed { box-shadow: inset 0 0 0 1.5px var(--danger); }
+  .att.failed .att-meta small { color: var(--danger); }
   .att.failed img { opacity: .45; }
-  .att .reup { top: auto; right: auto; bottom: 4px; left: 4px; background: var(--danger); }
-  .att.loading::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--paper) 60%, transparent); animation: blink 1s infinite; }
-  .att button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: var(--r); border: 0; background: rgba(22,15,12,.75); color: #fff;
-    display: grid; place-items: center; padding: 0; }
-  .composer .attach { width: 46px; height: 46px; }
-  .composer.drag { box-shadow: inset 0 0 0 2px var(--ink); }
+  .att.loading img { animation: blink 1s infinite; }
+  .att button { width: 24px; height: 24px; border-radius: var(--r); border: 0; background: transparent; color: var(--stone); display: grid; place-items: center; padding: 0; flex: none; }
+  .att button:hover { background: var(--ice); color: var(--ink); }
+  .att .reup { color: var(--danger); }
+  .composer.drag .box { box-shadow: 0 0 0 2px var(--sky); background: var(--ice); }
   .msg.user .imgs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
   .msg.user .imgs img { width: 72px; height: 72px; object-fit: cover; border-radius: var(--r); display: block; background: rgb(var(--on-espresso-rgb) / .15); }
 
   /* ---------- retry + cost on agent cards ---------- */
-  .who .retry { margin-left: 4px; width: 28px; height: 28px; }
+  .who .retry { margin-inline-start: 4px; width: 28px; height: 28px; }
   .msg.agent.working .retry { display: none; }
   .msg.agent .rate { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--stone); }
   .msg.agent .rate .icon-btn { width: 28px; height: 28px; }
@@ -255,46 +296,91 @@
   .note > .ic { margin-top: calc((1lh - 14px) / 2); }
 
   .vlist { display: flex; flex-direction: column; gap: 6px; }
-  .vrow { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center; background: var(--paper); border-radius: var(--r); padding: 12px 14px; }
+  .vrow { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 14px; align-items: center; background: var(--paper); border-radius: var(--r); padding: 10px 14px; }
   .vrow .vn { font: 12px ui-monospace, monospace; color: var(--stone); text-align: center; }
-  .vrow .vn .tile { width: 36px; height: 36px; border-radius: var(--r); margin: 0 auto 4px; }
-  .vrow b { font-weight: 500; font-size: 15px; }
-  .vrow small { display: block; font-size: 12px; color: var(--stone); margin-top: 2px; }
-  .vrow .vact { display: flex; gap: 2px; }
-  .vrow.current { box-shadow: inset 0 0 0 1px var(--line-strong); }
-  .difffile { background: var(--paper); border-radius: var(--r); margin-bottom: 10px; overflow: hidden; }
-  .difffile summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 16px; font: 13px ui-monospace, monospace; }
+  .vrow .vn .tile { width: 34px; height: 34px; border-radius: var(--r); margin: 0 auto 4px; }
+  .vrow b { font-weight: 500; font-size: 14.5px; }
+  .vrow small { display: block; font-size: 12px; color: var(--stone); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vrow .vact { display: flex; gap: 2px; align-items: center; }
+  .vrow.current { box-shadow: inset 0 0 0 1.5px rgb(var(--sky-rgb) / .5); }
+  .vrow.current .badge { background: var(--ice); color: var(--sky); }
+  #versionsBody, #statsBody { container-type: inline-size; min-width: 0; display: grid; gap: 12px; align-content: start; }
+  #versionsBody > *, #statsBody > * { margin-block: 0; min-width: 0; }
+  @container (max-width: 560px) {
+    .vrow { grid-template-columns: 36px minmax(0, 1fr); gap: 8px 12px; }
+    .vrow .vn .tile { width: 30px; height: 30px; }
+    .vrow .vact { grid-column: 1 / -1; justify-content: flex-end; border-top: 1px solid var(--line); padding-top: 6px; }
+  }
+  /* the diff: a toolbar, then one block per file with old / new line numbers on the side */
+  .diff-head { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; }
+  .diff-head .note { margin: 0; }
+  .diff-head .chk { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--graphite); cursor: pointer; }
+  .diff-head .chk input { width: 16px; height: 16px; margin: 0; accent-color: var(--sky); }
+  .diff-sum { display: inline-flex; gap: 8px; font: 12px ui-monospace, monospace; }
+  .plus { color: var(--ok); } .minus { color: var(--danger); }
+  .diffs { display: grid; gap: 10px; min-width: 0; }
+  .difffile { background: var(--paper); border-radius: var(--r); overflow: hidden; box-shadow: var(--ring); min-width: 0; }
+  .difffile summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 10px 14px; font: 13px ui-monospace, monospace; min-width: 0; }
+  .difffile summary:hover { background: var(--mist); }
+  .difffile[open] summary { border-bottom: 1px solid var(--line); }
   .difffile summary::-webkit-details-marker { display: none; }
-  .difffile .plus { color: var(--ok); } .difffile .minus { color: var(--danger); }
-  .difffile pre { margin: 0; padding: 0 0 12px; font: 12px/1.6 ui-monospace, monospace; overflow-x: auto; }
-  .difffile pre span { display: block; padding: 0 16px; white-space: pre; }
-  .difffile pre .a { background: var(--add-bg); color: var(--add-fg); } .difffile pre .r { background: var(--del-bg); color: var(--del-fg); } .difffile pre .h { color: var(--stone); background: var(--linen); }
+  .difffile summary .chev { color: var(--stone); transition: transform .2s; transform: rotate(-90deg); }
+  [dir="rtl"] .difffile summary .chev { transform: rotate(90deg); }
+  .difffile[open] summary .chev { transform: none; }
+  .difffile .dpath { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .difffile.added .badge { background: var(--add-bg); color: var(--add-fg); }
+  .difffile.removed .badge { background: var(--del-bg); color: var(--del-fg); }
+  .difffile pre { margin: 0; padding: 0 0 8px; font: 12px/1.65 ui-monospace, monospace; overflow-x: auto; color: var(--charcoal); }
+  .difffile .dl { display: grid; grid-template-columns: 3.6em 3.6em max-content; width: max-content; min-width: 100%; background: var(--paper); }
+  .difffile .ln { position: sticky; inset-inline-start: 0; font-style: normal; text-align: end; padding-inline-end: 10px; color: var(--stone); opacity: .8; background: inherit; user-select: none; }
+  .difffile .ln + .ln { inset-inline-start: 3.6em; box-shadow: inset -1px 0 0 var(--line); }
+  .difffile .tx { white-space: pre; padding-inline: 10px 16px; }
+  .difffile .dl.a { background: var(--add-bg); color: var(--add-fg); }
+  .difffile .dl.r { background: var(--del-bg); color: var(--del-fg); }
+  .difffile .dl.h { background: var(--linen); color: var(--stone); }
+  .diffs.wrap .dl { grid-template-columns: 3.6em 3.6em minmax(0, 1fr); width: auto; }
+  .diffs.wrap .tx { white-space: pre-wrap; overflow-wrap: anywhere; }
 
-  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
-  .kpi { background: var(--paper); border-radius: var(--r); padding: 16px 18px; }
-  .kpi b { display: block; font-weight: 400; font-size: 28px; letter-spacing: 0; line-height: 1.1; font-feature-settings: "tnum"; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .kpi { background: var(--paper); border-radius: var(--r); padding: 14px 16px; min-width: 0; }
+  .kpi b { display: block; font-weight: 400; font-size: 26px; letter-spacing: 0; line-height: 1.15; font-feature-settings: "tnum"; }
   .kpi span { font-size: 12px; color: var(--stone); }
-  .stable { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--paper); border-radius: var(--r); overflow: hidden; font-size: 13.5px; margin-bottom: 16px; }
-  .stable th { text-align: start; font-weight: 500; font-size: 12px; color: var(--stone); background: var(--paper); padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-  .stable td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; font-feature-settings: "tnum"; white-space: nowrap; }
+  .tbl-wrap { overflow-x: auto; border-radius: var(--r-card); box-shadow: var(--ring); background: var(--paper); }
+  .stable { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--paper); font-size: 13.5px; }
+  .stable th { text-align: start; font-weight: 500; font-size: 11.5px; color: var(--stone); background: var(--mist); padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .stable td { padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; font-feature-settings: "tnum"; white-space: nowrap; }
+  .stable tbody tr:hover td { background: var(--mist); }
   .stable tr:last-child td { border-bottom: 0; }
-  .stable td.num, .stable th.num { text-align: right; }
+  .stable td.num, .stable th.num { text-align: end; }
+  .stable td.num b { font-weight: 500; }
+  .stable .muted { color: var(--stone); }
+  .stable td.c-model { font-size: 12px; color: var(--graphite); }
+  .stable td.c-req { max-width: 280px; overflow: hidden; text-overflow: ellipsis; color: var(--graphite); }
   .stable .ag { display: flex; align-items: center; gap: 10px; }
-  .stable .ag .tile { width: 28px; height: 28px; border-radius: var(--r); }
-  .sbar { height: 6px; border-radius: var(--r); background: var(--linen); min-width: 80px; overflow: hidden; }
-  .sbar i { display: block; height: 100%; border-radius: var(--r); background: var(--ink); }
-  .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 6px; }
+  .stable .ag .tile { width: 26px; height: 26px; border-radius: var(--r); }
+  .sbar { height: 6px; border-radius: var(--r); background: var(--linen); min-width: 72px; overflow: hidden; }
+  .sbar i { display: block; height: 100%; border-radius: var(--r); background: var(--sky); }
+  .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-inline-end: 8px; vertical-align: 1px; }
   .status-dot.stopped { background: var(--stone); } .status-dot.error { background: var(--danger); }
-  h4.sec { margin: 8px 0 10px; font-weight: 500; font-size: 14px; color: var(--charcoal); }
-  @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  h4.sec { margin: 8px 0 0; font-weight: 500; font-size: 14px; color: var(--charcoal); }
+  #statsBody h4.sec { margin-top: 12px; }
+  @container (max-width: 720px) {
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stable .c-bar, .stable .c-avg { display: none; }
+  }
+  @container (max-width: 480px) {
+    .stable .c-model, .stable .c-tok { display: none; }
+    .stable td.c-req { max-width: 120px; }
+    .stable th, .stable td { padding-inline: 10px; }
+  }
 
   /* security warnings */
   .msg.security { align-self: stretch; background: var(--paper); border-radius: var(--r); padding: 14px 16px;
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 40%, transparent); }
   .msg.security .head { display: flex; gap: 10px; align-items: flex-start; color: var(--danger); font-size: 14px; line-height: 1.45; }
   .msg.security .head b { font-weight: 500; }
-  .msg.security ul { margin: 8px 0 0 28px; padding: 0; font: 12px/1.6 ui-monospace, monospace; color: var(--graphite); }
-  .msg.security p { margin: 8px 0 0 28px; font-size: 13px; color: var(--stone); }
+  .msg.security ul { margin: 8px 0 0; margin-inline-start: 28px; padding: 0; font: 12px/1.6 ui-monospace, monospace; color: var(--graphite); }
+  .msg.security p { margin: 8px 0 0; margin-inline-start: 28px; font-size: 13px; color: var(--stone); }
   .msg.orch { align-self: stretch; background: var(--paper); box-shadow: var(--ring); border-radius: var(--r); padding: 14px 16px; }
   .msg.orch .head { display: flex; gap: 10px; align-items: center; font-size: 14px; }
   .msg.orch .head b { font-weight: 500; }
@@ -351,39 +437,43 @@
   .resume-card.error .rc-text .tile { --c: var(--danger); color: var(--danger); }
   .resume-card b { display: block; font-weight: 500; font-size: 15px; }
   .resume-card small { display: block; font-size: 13px; color: var(--stone); margin-top: 2px; line-height: 1.4; }
-  .resume-card .rc-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-left: 48px; }
+  .resume-card .rc-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-inline-start: 48px; }
   .resume-card.used { box-shadow: var(--ring); opacity: .75; }
   .resume-card.used .rc-actions { display: none; }
 
   /* ---------- team panel ---------- */
   .team { border-top: 1px solid var(--line); background: var(--paper); flex: none; position: relative; }
   .progress { position: absolute; top: -1px; left: 0; height: 3px; background: var(--sky); box-shadow: 0 0 0 1px var(--line-strong); width: 0; transition: width .6s cubic-bezier(.2, .7, .2, 1); }
-  .team-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; min-height: 56px; flex-wrap: wrap; }
-  .team-head h3 { margin: 0; font-size: 15px; font-weight: 500; letter-spacing: 0; display: flex; align-items: center; gap: 8px; }
+  .team-head { display: flex; align-items: center; gap: 8px 10px; padding: 8px 16px; min-height: 50px; flex-wrap: wrap; }
+  .team-head h3 { margin: 0; font-size: 14px; font-weight: 500; letter-spacing: 0; display: flex; align-items: center; gap: 8px; }
   .team-head .count { font-size: 13px; color: var(--stone); }
-  .team-head .now { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--graphite); }
+  /* one run of text (not flex items), so "Step 2 of 4 · …" keeps normal word spacing */
+  .team-head .now { display: block; min-width: 0; font-size: 13px; color: var(--graphite); line-height: 1.4; }
+  .team-head .now .typing { margin-inline-end: 6px; vertical-align: middle; }
+  .team-head .now .typing span { background: var(--sky); }
   .team-head .now b { color: var(--ink); font-weight: 500; }
   .team-head .clock { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--graphite); background: var(--linen); border-radius: var(--r); padding: 5px 10px; font-feature-settings: "tnum"; }
   .team-head a.lnk { color: var(--graphite); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 10px; border-radius: var(--r); }
   .team-head a.lnk:hover { color: var(--ink); background: var(--linen); }
   .team.collapsed .team-row { display: none; }
-  .team.collapsed .team-head { min-height: 52px; }
+  .team.collapsed .team-head { min-height: 50px; }
 
-  .team-row { display: flex; gap: 10px; padding: 0 16px 16px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding: 16px; }
-  .agent-tile { position: relative; flex: none; width: 210px; min-height: 148px; border-radius: var(--r); padding: 12px; background: var(--linen); box-shadow: var(--ring);
-    display: flex; flex-direction: column; gap: 4px; cursor: pointer; scroll-snap-align: start; text-align: start; transition: background .25s, color .25s, opacity .25s, transform .15s; }
+  /* compact tiles: icon, name, number and model on top, the state below; the description is in the tooltip */
+  .team-row { display: flex; gap: 8px; padding: 2px 16px 12px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding: 16px; }
+  .agent-tile { position: relative; flex: none; width: 196px; min-height: 0; border-radius: var(--r); padding: 10px 10px 9px; background: var(--linen); box-shadow: var(--ring);
+    display: flex; flex-direction: column; gap: 6px; cursor: pointer; scroll-snap-align: start; text-align: start; transition: background .25s, color .25s, opacity .25s, transform .15s; }
   .agent-tile:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
   .agent-tile:active { transform: scale(.985); }
-  .agent-tile .t-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .agent-tile .tile { width: 34px; height: 34px; border-radius: var(--r); }
-  .agent-tile .t-num { font: 11px ui-monospace, monospace; color: var(--stone); margin-inline-end: auto; }
-  .agent-tile .t-name { font-size: 14px; font-weight: 500; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .agent-tile .t-status { font-size: 12px; color: var(--stone); display: flex; align-items: center; gap: 6px; font-feature-settings: "tnum"; }
-  .agent-tile .t-last { font: 11.5px ui-monospace, monospace; color: var(--stone); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 15px; }
-  .agent-tile .t-desc { font-size: 12px; line-height: 1.45; color: var(--graphite); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; }
-  .agent-tile.off .t-desc { color: var(--stone); }
-  .agent-tile.s-working .t-desc { display: none; }
-  .agent-tile.s-done .t-desc, .agent-tile.s-stopped .t-desc { -webkit-line-clamp: 2; }
+  .agent-tile .t-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .agent-tile .tile { width: 30px; height: 30px; border-radius: var(--r); }
+  .agent-tile .t-id { flex: 1; min-width: 0; display: grid; gap: 1px; }
+  .agent-tile .t-meta { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .agent-tile .t-num { font: 10.5px ui-monospace, monospace; color: var(--stone); }
+  .agent-tile .t-name { font-size: 13.5px; font-weight: 500; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+  .agent-tile .t-status { font-size: 12px; color: var(--stone); display: flex; align-items: center; gap: 6px; font-feature-settings: "tnum"; min-width: 0; white-space: nowrap; }
+  .agent-tile .t-last { font: 11.5px ui-monospace, monospace; color: var(--stone); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 15px; margin-top: -2px; }
+  .agent-tile .t-desc { display: none; }
+  .agent-tile .model-badge { max-width: 96px; }
 
   .sw { width: 32px; height: 20px; border-radius: var(--r-field); border: 0; padding: 0; background: var(--line-strong); position: relative; flex: none; transition: background .2s; }
   .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--knob); transition: transform .2s; }
@@ -392,21 +482,23 @@
   .sw:disabled { opacity: .5; cursor: default; }
 
   .agent-tile.s-skipped { opacity: .6; }
-  .agent-tile .t-remove { width: 26px; height: 26px; margin: -4px -4px -4px 0; color: var(--stone); }
+  .agent-tile .t-remove { width: 26px; height: 26px; margin-block: -4px; margin-inline-end: -4px; color: var(--stone); align-self: flex-start; }
+  .agent-tile .t-lock { align-self: flex-start; padding-top: 2px; }
   .agent-tile .t-remove:hover { color: var(--danger); }
   .agent-tile .t-lock { color: var(--stone); display: inline-flex; }
   .agent-tile.s-working .t-remove, .agent-tile.s-working .t-lock { color: inherit; }
-  .add-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; text-decoration: none;
+  .add-tile { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; text-align: start; text-decoration: none;
     background: transparent; box-shadow: none; border: 1px dashed var(--line-strong); color: var(--graphite); }
   .add-tile:hover { box-shadow: none; border-color: var(--graphite); background: var(--paper); color: var(--ink); }
-  .add-tile b { font-size: 14px; font-weight: 500; }
-  .add-tile small { font-size: 12px; color: var(--stone); }
+  .add-tile b { display: block; font-size: 13px; font-weight: 500; }
+  .add-tile small { display: block; margin-top: 2px; }
+  .add-tile small { font-size: 11.5px; color: var(--stone); line-height: 1.35; }
   .agent-tile.off { opacity: .5; background: transparent; box-shadow: inset 0 0 0 1px var(--line); border: 1px dashed transparent; }
   .agent-tile.off .tile { background: var(--linen); color: var(--stone); }
   .agent-tile.s-waiting { background: var(--paper); }
   /* the working agent: Majorelle blue, lifted onto its hard shadow, with a scribbling crayon line along the bottom */
   .agent-tile.s-working { --on-espresso: var(--on-sky); --on-espresso-rgb: var(--on-sky-rgb); background: var(--sky); color: var(--on-sky);
-    box-shadow: inset 0 0 0 2px var(--on-sky), var(--hard-sm); transform: translate(3px, -3px); overflow: hidden; }
+    box-shadow: inset 0 0 0 2px var(--on-sky), var(--hard-sm); transform: translateY(-2px); overflow: hidden; }
   .agent-tile.s-working::after { content: ""; position: absolute; left: 0; bottom: 0; height: 4px; width: 40%; background: var(--on-sky); animation: scribble 1.3s ease-in-out infinite alternate; }
   @keyframes scribble { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
   .agent-tile { transition: transform .2s ease, box-shadow .2s ease, background .2s; }
@@ -422,7 +514,8 @@
   .agent-tile.s-stopped .t-status { color: var(--danger); }
   .agent-tile.s-pending { background: var(--paper); }
   .agent-tile.s-pending .t-status { color: var(--ash); }
-  .team-head .paused { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--graphite); }
+  .team-head .paused { display: block; min-width: 0; font-size: 13px; color: var(--graphite); line-height: 1.4; }
+  .team-head .paused > .ic:first-child { display: inline-block; vertical-align: -2px; margin-inline-end: 6px; color: var(--danger); }
   .team-head .paused b { color: var(--ink); font-weight: 500; }
 
   /* ---------- toolbar groups: tabs · preview tools (Preview tab only) · project actions ---------- */
@@ -436,14 +529,17 @@
 
 
   /* ---------- several agents at once, roles, Share tab ---------- */
-  .msg.system.par { display: inline-flex; align-items: center; gap: 6px; }
+  .msg.system.par { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: var(--r-pill); background: rgb(var(--sky-rgb) / .1); color: var(--graphite); font-size: 12.5px; }
+  .msg.system.par > .ic { color: var(--sky); }
   .note.par { margin: 8px 0 0; align-items: center; }
   .role-tag { align-self: center; font-size: 11px; font-weight: 500; padding: 1px 8px; border-radius: var(--r-pill); background: var(--ice); color: var(--sky); white-space: nowrap; }
   .bar .title { display: flex; flex-wrap: wrap; column-gap: 8px; }
   .bar .title .sub { flex-basis: 100%; }
   .bar .title .name { min-width: 0; flex: 0 1 auto; }
   body.viewer #send, body.viewer #attach, body.viewer .retry, body.viewer #saveVersion, body.viewer [data-vrestore],
-  body.viewer .t-remove, body.viewer .sw, body.viewer #saveFile, body.viewer .autosave, body.viewer .rate { display: none !important; }
+  body.viewer .t-remove, body.viewer .sw, body.viewer #saveFile, body.viewer .autosave, body.viewer .rate,
+  body.viewer .team [data-hire-link], body.viewer #saveTeam, body.viewer [data-research-ask], body.viewer [data-ask-qr], body.viewer .pj-bar [data-save-contact],
+  body.viewer .pj-bar [data-apply-contact], body.viewer [data-brand] { display: none !important; }
   .sh-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
   .sh-list > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 12px; border-radius: var(--r); background: var(--linen); }
   .sh-list > li.off { opacity: .6; }
@@ -457,7 +553,11 @@
   .sh-form { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; }
   .sh-form .input { min-width: 0; height: 38px; padding: 0 12px; font-size: 14px; }
   #shNew { grid-template-columns: minmax(0, 1fr) auto; }
-  #shNew [name="label"] { grid-column: 1 / -1; }
+  #shNew [name="label"], #shNew [name="version"], #shNew .sh-help { grid-column: 1 / -1; }
+  .sh-help { margin: 0; font-size: 12px; line-height: 1.5; color: var(--stone); }
+  .sh-tag .ic, .sh-tag svg { vertical-align: -1px; margin-inline-end: 3px; }
+  .sh-tag { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .sh-tag .ic, .sh-tag svg { margin: 0; }
   .sh-form label.chk { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--graphite); }
   @container (max-width: 520px) { .sh-form { grid-template-columns: 1fr; } }
   .sh-filter { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r); background: var(--linen); }
@@ -471,6 +571,80 @@
   .sh-c p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
   .sh-c .acts { display: flex; flex-wrap: wrap; gap: 6px; }
 
+  /* ---------- Share tab: three sections behind a segmented switch, one calm column ---------- */
+  .sh .sh-nav { justify-self: start; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .sh-nav button { gap: 8px; padding: 7px 14px; font-size: 13.5px; white-space: nowrap; flex: none; }
+  .sh-n { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 6px; border-radius: 9px; background: var(--bone); color: var(--graphite);
+    font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .sh-nav button.on .sh-n { background: var(--sky); color: var(--on-sky); }
+  .sh .sh-body { width: 100%; max-width: 860px; min-width: 0; }
+  .sh-sec > header .acts { flex-wrap: wrap; }
+  .sh-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .sh-filter button { display: inline-flex; align-items: center; gap: 6px; }
+  .sh-filter button .sh-n { height: 16px; min-width: 18px; font-size: 10.5px; }
+  .sh-tools select.input { width: auto; max-width: 220px; height: 32px; padding: 0 10px; font-size: 13px; }
+  .sh-group { display: grid; gap: 8px; min-width: 0; }
+  .sh-group + .sh-group { margin-top: 6px; }
+  .sh-group h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+  .sh-gn { font-size: 12px; color: var(--stone); font-variant-numeric: tabular-nums; }
+  .sh-reply { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: var(--r); background: var(--paper); border-inline-start: 3px solid rgb(var(--sky-rgb) / .6); }
+  .sh-reply > .ic { color: var(--sky); margin-top: 2px; }
+  .sh-reply small { font-size: 11.5px; color: var(--stone); }
+  .sh-reply p { margin: 2px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .sh-replyform { display: grid; gap: 8px; }
+  .sh-replyform textarea { width: 100%; min-height: 68px; resize: vertical; font-size: 14px; line-height: 1.5; }
+  .sh-replyform .acts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sh-links { display: grid; gap: 10px; }
+  .sh-link { display: grid; gap: 8px; padding: 12px 14px; border-radius: var(--r-card); background: var(--linen); min-width: 0; }
+  .sh-lhead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+  .sh-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; padding: 2px 6px; margin-inline-start: -6px; border: 0; border-radius: var(--r);
+    background: none; color: var(--ink); cursor: text; }
+  .sh-name b { font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sh-name .ic { color: var(--stone); opacity: .55; }
+  .sh-name:hover, .sh-name:focus-visible { background: var(--ice); }
+  .sh-name:hover .ic { opacity: 1; }
+  .sh-rename { display: flex; gap: 6px; flex: 1 1 280px; min-width: 0; }
+  .sh-rename .input { flex: 1; min-width: 0; height: 34px; padding: 0 10px; font-size: 14px; }
+  .sh-link > code { display: block; font-size: 11.5px; color: var(--graphite); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sh-lmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 12.5px; color: var(--stone); }
+  .sh-lmeta > span { display: inline-flex; align-items: center; gap: 5px; }
+  .sh-lc { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; color: var(--graphite); font: inherit; cursor: pointer;
+    text-decoration: underline; text-underline-offset: 2px; }
+  .sh-lc:disabled { color: var(--stone); text-decoration: none; cursor: default; }
+  .sh-lctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .sh-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--graphite); cursor: pointer; }
+  .sh-switch input { appearance: none; position: relative; width: 32px; height: 20px; margin: 0; border-radius: var(--r-field); background: var(--line-strong); cursor: pointer; transition: background .2s; flex: none; }
+  .sh-switch input::after { content: ""; position: absolute; top: 3px; inset-inline-start: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--knob); transition: transform .2s; }
+  .sh-switch input:checked { background: var(--sky); }
+  .sh-switch input:checked::after { transform: translateX(12px); }
+  [dir="rtl"] .sh-switch input:checked::after { transform: translateX(-12px); }
+  .sh-end { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--graphite); margin-inline-start: auto; }
+  .sh-end select.input { width: auto; height: 32px; padding: 0 10px; font-size: 13px; }
+  .sh-old summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13.5px; color: var(--graphite); cursor: pointer; }
+  .sh-old summary::-webkit-details-marker { display: none; }
+  .sh-old summary .chev { color: var(--stone); transform: rotate(-90deg); transition: transform .2s; }
+  [dir="rtl"] .sh-old summary .chev { transform: rotate(90deg); }
+  .sh-old[open] summary .chev { transform: none; }
+  .sh-old > .sh-help { margin: 2px 0 8px; }
+  .sh-old .sh-list small { white-space: normal; }
+  h4.sh-sub { margin: 4px 0 -4px; font-size: 12px; font-weight: 500; color: var(--stone); }
+  @container (min-width: 700px) {
+    #shNew.sh-newlink { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, .9fr) auto; }
+    #shNew.sh-newlink [name="label"], #shNew.sh-newlink [name="version"] { grid-column: auto; }
+  }
+  @container (max-width: 520px) {
+    .sh .sh-nav { width: 100%; }
+    .sh-nav button { flex: 1 0 auto; justify-content: center; padding-inline: 10px; }
+    .sh-nav button > .ic { display: none; }
+    .sh-end { margin-inline-start: 0; }
+    .sh-lhead .btn-dark { order: 5; }
+    .sh-sec > header { flex-wrap: wrap; }
+    .sh-sec > header .acts { flex-basis: 100%; margin-inline-start: 0; }
+    .sh-sec > header .acts .btn { white-space: normal; height: auto; min-height: 32px; padding-block: 6px; text-align: start; }
+  }
+  .sh-sec { min-width: 0; }
+  .sh-c { min-width: 0; }
+
   /* ---------- Project tab ---------- */
   .pane { position: absolute; inset: 0; display: none; overflow: auto; background: var(--linen); }
   .pane.on { display: block; }
@@ -478,6 +652,10 @@
   .pane-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
   .pane-head h2 { margin: 0; font-size: 20px; font-weight: 500; color: var(--ink); }
   .pane-head .meta { font-size: 13px; color: var(--stone); }
+  /* on a wide screen the pane's title row stays on top while its content scrolls */
+  @media (min-width: 901px) and (min-height: 560px) {
+    .pane .pane-head { position: sticky; top: 0; z-index: 3; margin: -24px -24px 0; padding: 16px 24px 12px; background: var(--linen); box-shadow: 0 1px 0 var(--line); }
+  }
   .pane-head .acts { margin-inline-start: auto; display: flex; flex-wrap: wrap; gap: 8px; }
   .pcard2 { background: var(--paper); box-shadow: var(--ring); border-radius: var(--r-card); padding: 20px; display: grid; gap: 14px; min-width: 0; align-content: start; }
   .pcard2 > header { display: flex; align-items: center; gap: 10px; }
@@ -490,6 +668,9 @@
   .pempty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 32px 16px; color: var(--stone); font-size: 14px; line-height: 1.5; }
   .pempty .tile { width: 48px; height: 48px; border-radius: var(--r); display: grid; place-items: center; background: var(--paper); box-shadow: var(--ring); color: var(--ink); }
   .pempty b { color: var(--ink); font-weight: 500; font-size: 16px; }
+  .pempty p { margin: 0; max-width: 440px; }
+  .pempty .acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
+  .pane > .pane-in > .pempty, #versionsBody > .pempty, #statsBody > .pempty { padding-block: 48px; background: var(--paper); border-radius: var(--r-card); box-shadow: var(--ring); }
 
   /* project */
   .pj { container-type: inline-size; }
@@ -576,9 +757,10 @@
     .chat, .stage { grid-row: 2; grid-column: 1; }
     body[data-m="chat"] .stage, body:not([data-m]) .stage { display: none; }
     body[data-m="site"] .chat { display: none; }
-    .chat { border-right: 0; }
-    .url, .seg .lbl { display: none; }
+    .chat { border-inline-end: 0; }
     .code { grid-template-columns: 140px 1fr; }
+    .m-switch { position: relative; }
+    .m-progress { position: absolute; inset-inline-start: 0; bottom: -1px; height: 2px; width: 0; background: var(--sky); transition: width .6s cubic-bezier(.2, .7, .2, 1); }
   }
   body > * { min-width: 0; }               /* a column never grows past the screen because of its content */
   @media (max-width: 520px) {
@@ -586,12 +768,34 @@
     .team-head { flex-wrap: nowrap; }
     .bar { gap: 6px; padding: 0 10px; }
     .title .pid, .title .sub > span[aria-hidden] { display: none; }
-    .toolbar { overflow-x: auto; scrollbar-width: none; }
-    .toolbar > * { flex: none; }
-    .toolbar .spacer { flex: 1 0 0; }
-    .pv-bar { overflow-x: auto; scrollbar-width: none; padding: 8px 10px; }
-    .pv-bar > * { flex: none; }
+    .composer { padding: 10px 10px 12px; }
+    .composer .hint { display: none; }          /* phones have no Enter / Shift+Enter to explain */
   }
+
+  /* ---------- the tab bar and preview tools fit any width: labels give way to icons (the open tab keeps its name) ---------- */
+  .stage { container: stage / inline-size; }
+  .chat { container: chat / inline-size; }
+  .toolbar { min-width: 0; }
+  #tabs { min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; }
+  #tabs::-webkit-scrollbar { display: none; }
+  #tabs button { flex: none; white-space: nowrap; }
+  .pv-bar .page-pick { flex: 0 1 auto; min-width: 0; }
+  #download { flex: none; }
+  @container stage (max-width: 820px) {
+    #tabs button:not(.on) .lbl { display: none; }
+    #tabs button { padding-inline: 10px; }
+  }
+  @container stage (max-width: 600px) {
+    .toolbar { height: 52px; padding: 0 10px; gap: 6px; }
+    #download { width: 36px; padding: 0; }
+    #download .lbl { display: none; }
+    .pv-bar { padding: 6px 10px; gap: 6px; }
+    .pv-bar .url { display: none; }
+    .frame-wrap { padding: 8px; }
+    .flash { inset: 8px; }
+  }
+  @container chat (max-width: 450px) { .title .pid, .title .sub > span[aria-hidden] { display: none; } }
+  @container chat (max-width: 420px) { .composer .hint { display: none; } }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 </head>
@@ -600,6 +804,7 @@
 <nav class="m-switch" id="mSwitch" role="tablist" aria-label="Show">
   <button type="button" role="tab" data-m="chat" aria-selected="true"><i data-icon="message" data-size="16"></i>Chat</button>
   <button type="button" role="tab" data-m="site" aria-selected="false"><i data-icon="monitor" data-size="16"></i>Site<span class="m-dot" hidden></span></button>
+  <span class="m-progress" id="mProgress" aria-hidden="true"></span>
 </nav>
 
 <section class="chat">
@@ -618,20 +823,24 @@
 
   <form class="composer" id="composer">
     <div class="attachments" id="attachments" hidden></div>
-    <div class="row">
-      <button type="button" class="icon-btn attach" id="attach" title="Attach reference images (or paste / drop them)" aria-label="Attach images"><i data-icon="paperclip" data-size="17"></i></button>
-      <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+    <div class="box">
       <textarea class="input" id="input" rows="1" maxlength="10000" placeholder="Describe what to build…" aria-label="Prompt"></textarea>
-      <button class="send" id="send" type="submit" title="Send" aria-label="Send"></button>
+      <div class="row">
+        <button type="button" class="icon-btn plain attach" id="attach" title="Attach reference images (or paste / drop them)" aria-label="Attach images"><i data-icon="paperclip" data-size="17"></i></button>
+        <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+        <span class="hint"><kbd>Enter</kbd> send · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line</span>
+        <span class="spacer"></span>
+        <span class="team-hint" id="teamHint"></span>
+        <button class="send" id="send" type="submit" title="Send" aria-label="Send"></button>
+      </div>
     </div>
-    <div class="hint"><span><kbd>Enter</kbd> send · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line</span><span id="teamHint"></span></div>
   </form>
 </section>
 
 <section class="stage">
   <div class="toolbar">
     <div class="seg" id="tabs" role="tablist">
-      <button role="tab" data-tab="preview" class="on"><i data-icon="eye" data-size="16"></i><span class="lbl">Preview</span></button>
+      <button role="tab" data-tab="preview" class="on" aria-selected="true"><i data-icon="eye" data-size="16"></i><span class="lbl">Preview</span></button>
       <button role="tab" data-tab="code"><i data-icon="code" data-size="16"></i><span class="lbl">Code</span></button>
       <button role="tab" data-tab="project" title="Contact details, images, QR codes, brand kit and brief"><i data-icon="briefcase" data-size="16"></i><span class="lbl">Project</span></button>
       <button role="tab" data-tab="research" title="The Research agent's report"><i data-icon="search" data-size="16"></i><span class="lbl">Research</span></button>
@@ -640,14 +849,14 @@
       <button role="tab" data-tab="share" title="Share links, comments from the people you shared with, and who works on this project"><i data-icon="share" data-size="16"></i><span class="lbl">Share</span><span class="badge" id="shareBadge" hidden></span></button>
     </div>
     <span class="spacer"></span>
-    <a class="btn btn-ghost btn-sm" id="download" title="Download the code as .zip"><i data-icon="download" data-size="16"></i>.zip</a>
+    <a class="btn btn-ghost btn-sm" id="download" title="Download the code as .zip" aria-label="Download the code as .zip"><i data-icon="download" data-size="16"></i><span class="lbl">.zip</span></a>
   </div>
 
   <div class="pv-bar" id="pvTools">
     <div class="seg" id="devices">
-      <button data-device="desktop" class="on" title="Desktop"><i data-icon="monitor" data-size="16"></i></button>
-      <button data-device="tablet" title="Tablet · 768px"><i data-icon="tablet" data-size="16"></i></button>
-      <button data-device="phone" title="Phone · 375px"><i data-icon="phone" data-size="16"></i></button>
+      <button data-device="desktop" class="on" title="Desktop" aria-label="Desktop" aria-pressed="true"><i data-icon="monitor" data-size="16"></i></button>
+      <button data-device="tablet" title="Tablet · 768px" aria-label="Tablet · 768px" aria-pressed="false"><i data-icon="tablet" data-size="16"></i></button>
+      <button data-device="phone" title="Phone · 375px" aria-label="Phone · 375px" aria-pressed="false"><i data-icon="phone" data-size="16"></i></button>
     </div>
     <label class="page-pick" title="Page shown in the preview"><i data-icon="file" data-size="15"></i>
       <select id="pageSel" aria-label="Page shown in the preview"></select></label>
@@ -938,6 +1147,7 @@ function handle(ev) {
     case "user":
       if (!replaying) pendingPrompt = null;   // the server took it
       closeAsks(ev.answers ? "Answered" : "You sent a new message instead");
+      foldPastCards();
       addMsg(`<div class="msg user">${(ev.images || []).length ? `<div class="imgs">${ev.images.map(i =>
         `<a href="${esc(mediaUrl(i))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(i))}" loading="lazy" decoding="async" alt="Reference image"></a>`).join("")}</div>` : ""}${
         ev.answers ? `<dl class="qa">${ev.answers.map(p => `<dt>${esc(p.question)}</dt><dd>${esc(p.answer)}</dd>`).join("")}</dl>` : esc(ev.text)}</div>`);
@@ -1154,6 +1364,7 @@ function addMsg(html) {
 }
 const scrollDown = () => {
   const m = $("messages");
+  if ($("empty")) { m.scrollTop = 0; return; }   // a new project starts at the top of its welcome, not under the use cases
   m.scrollTop = m.scrollHeight;
 };
 const addSystem = (t) => addMsg(`<div class="msg system">${esc(t)}</div>`);
@@ -1163,7 +1374,7 @@ const agentNames = (ids) => {
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] || "";
 };
 function addAgentCard(a, started, step, total, fix = false, alongside = []) {
-  const el = addMsg(`<div class="msg agent working" data-agent="${esc(a.id)}" style="--c:${a.color}">
+  const el = addMsg(`<div class="msg agent working ${alongside.length ? "par" : ""}" data-agent="${esc(a.id)}" style="--c:${a.color}">
     <div class="who"><span class="tile">${icon(a.icon, { size: 18 })}</span>
       <span class="nm" title="${esc(a.description || "")}">${esc(a.name)} agent${fix ? `<small>Fixing the Critic's feedback</small>` : step ? `<small>Step ${step} of ${total}${alongside.length ? ` · alongside ${esc(agentNames(alongside))}` : ""}</small>` : ""}</span>
       <span class="state"><span class="timer">0s</span><span class="typing"><span></span><span></span><span></span></span></span>
@@ -1205,7 +1416,7 @@ function finishCard(id, text, ended, stat) {
   addRateRow(card, id);
 }
 
-$("messages").addEventListener("click", (e) => { if (e.target.closest("[data-goto-share]")) showTab("share"); });
+$("messages").addEventListener("click", (e) => { if (e.target.closest("[data-goto-share]")) { shareSec = "links"; showTab("share"); } });
 $("messages").addEventListener("change", async (e) => {
   const box = e.target.closest("[data-showcase]"); if (!box) return;
   try {
@@ -1262,9 +1473,28 @@ function markStopped() {
   });
   document.querySelectorAll(".msg.agent.working").forEach(c => {
     c.classList.remove("working");
-    c.querySelector(".state").textContent = "Stopped";
+    c.classList.add("stopped");
+    c.querySelector(".state").innerHTML = `${icon("pause", { size: 14 })}Stopped`;
   });
 }
+/* A new request: the cards of the earlier ones fold to their summary, so the chat stays readable. */
+function foldPastCards() {
+  document.querySelectorAll(".msg.agent:not(.past):not(.working)").forEach(c => {
+    c.classList.add("past");
+    c.querySelector(".who .retry")?.insertAdjacentHTML("beforebegin", `<button class="icon-btn plain fold" type="button" data-fold aria-expanded="false"
+      title="Show the steps" aria-label="Show the steps">${icon("chevron-down", { size: 15 })}</button>`);
+  });
+}
+function openCard(card, open = true) {
+  card.classList.toggle("open", open);
+  const b = card.querySelector("[data-fold]"); if (!b) return;
+  b.setAttribute("aria-expanded", String(open));
+  b.title = open ? "Hide the steps" : "Show the steps"; b.setAttribute("aria-label", b.title);
+}
+$("messages").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-fold]"); if (!b) return;
+  const card = b.closest(".msg.agent"); openCard(card, !card.classList.contains("open"));
+});
 /* ---------- the Orchestrator ----------
    It runs before the team on follow-up prompts and picks the agents the request needs (or answers / asks a question).
    The Brief agent is required: it always runs when any agent runs, so its switch is locked on. */
@@ -1409,7 +1639,8 @@ function setBusy(b) {
   const dl = $("download");
   dl.setAttribute("aria-disabled", b ? "true" : "false");
   dl.title = b ? "Available when the agents finish" : "Download the code as .zip";
-  dl.innerHTML = icon(b ? "lock" : "download", { size: 16 }) + ".zip";
+  dl.innerHTML = icon(b ? "lock" : "download", { size: 16 }) + `<span class="lbl">.zip</span>`;
+  dl.setAttribute("aria-label", dl.title);
   document.querySelectorAll(".t-remove").forEach(x => x.disabled = b);
   updateEditorLock();
   updateSend();
@@ -1604,15 +1835,15 @@ function tileHTML(a, i) {
   else if (state === "pending") line = `${icon("clock", { size: 12 })}Not started`;
   else if (state === "skipped") line = "Not needed this time";
   const locked = REQUIRED.includes(a.id);
-  return `<div class="agent-tile s-${state} ${on || st ? "" : "off"}" data-id="${esc(a.id)}" style="--c:${a.color}"
+  return `<div class="agent-tile s-${state} ${on || st ? "" : "off"}" data-id="${esc(a.id)}" style="--c:${a.color}" ${cards[a.id] ? 'tabindex="0"' : ""}
       role="group" aria-label="${esc(a.name)} agent, ${state}${a.description ? ": " + esc(a.description) : ""}"
       title="${esc(a.description ? a.description + "\n\n" : "")}${locked ? "Required: always runs when the team works" : cards[a.id] ? "Click to show in chat" : ""}">
-    <div class="t-top"><span class="tile">${icon(a.icon, { size: 17 })}</span><span class="t-num">${String(i + 1).padStart(2, "0")}</span>
+    <div class="t-top"><span class="tile">${icon(a.icon, { size: 16 })}</span>
+      <span class="t-id"><span class="t-name">${esc(a.name)}</span><span class="t-meta"><span class="t-num">${String(i + 1).padStart(2, "0")}</span>
       ${a.model_ok === false ? `<a class="model-badge" style="color:var(--danger)" href="/agents/${encodeURIComponent(a.id)}/edit" title="Not a known model. Click to fix">${icon("alert", { size: 10 })}${esc(a.model)}</a>`
-        : a.model ? `<span class="model-badge" title="Runs on ${esc(a.model)}" data-no-i18n>${esc(a.model.replace(/^claude-/, ""))}</span>` : ""}
+        : a.model ? `<span class="model-badge" title="Runs on ${esc(a.model)}" data-no-i18n>${esc(a.model.replace(/^claude-/, ""))}</span>` : ""}</span></span>
       ${locked ? `<span class="t-lock" title="Required: always runs">${icon("lock", { size: 13 })}</span>`
         : on ? `<button class="icon-btn plain t-remove" data-remove title="Remove ${esc(a.name)} from this project's team" aria-label="Remove ${esc(a.name)} from the team" ${busy ? "disabled" : ""}>${icon("x", { size: 14 })}</button>` : ""}</div>
-    <div class="t-name">${esc(a.name)}</div>
     <div class="t-status">${line}</div>
     ${state === "working" ? `<div class="t-last">${esc(last)}</div>` : `<div class="t-desc">${esc(a.description || "")}</div>`}
   </div>`;
@@ -1634,7 +1865,7 @@ function renderTile(id) {
 function renderTeam() {
   $("team").classList.toggle("collapsed", collapsed);
   $("teamRow").innerHTML = teamList().map(tileHTML).join("") + (busy ? "" : `
-    <a class="agent-tile add-tile" href="/hire" data-hire-link="agents">${icon("plus", { size: 20 })}<b>Add an agent</b><small>Pick a specialist in the marketplace</small></a>`);
+    <a class="agent-tile add-tile" href="/hire" data-hire-link="agents">${icon("plus", { size: 18 })}<span><b>Add an agent</b><small>Pick a specialist in the marketplace</small></span></a>`);
   renderTeamHead();
   // keep the working agent in view
   const working = Object.keys(status).find(id => status[id].state === "working");
@@ -1678,6 +1909,7 @@ function renderTeamHead() {
       <a class="btn btn-ghost btn-sm" href="/hire?tab=teams" data-hire-link="teams" aria-label="Choose a team" title="Choose a team">${icon("layers", { size: 14 })}<span class="tlbl">Choose a team</span></a>
       <button class="icon-btn plain" id="saveTeam" title="Save this team to use it in other projects" aria-label="Save as a team">${icon("save", { size: 15 })}</button>${chevron}`;
   }
+  $("mProgress").style.width = $("progress").style.width;      // phones in the chat see the run's progress too
 }
 async function saveSelection() {
   renderTeam();
@@ -1700,6 +1932,7 @@ document.addEventListener("click", (e) => {
 });
 function showCard(id) {
   const card = cards[id]; if (!card) return false;
+  if (card.classList.contains("past")) openCard(card);
   card.scrollIntoView({ behavior: "smooth", block: "start" });
   card.classList.add("highlight"); setTimeout(() => card.classList.remove("highlight"), 1400);
   return true;
@@ -1779,7 +2012,7 @@ $("reload").onclick = reloadPreview;
 $("open").onclick = () => window.open(workUrl(), "_blank");
 $("devices").onclick = (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  [...$("devices").children].forEach(x => x.classList.toggle("on", x === b));
+  [...$("devices").children].forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
   $("frameWrap").className = "frame-wrap " + b.dataset.device;
   saveState();
 };
@@ -1794,6 +2027,7 @@ function restoreState() {
   if (page && /^[\w.-]+\.html?$/i.test(page)) currentPage = page;
   if (file && SAFE_FILE.test(file) && !file.split("/").includes("..")) currentFile = file;
   if (device) document.querySelector(`#devices [data-device="${CSS.escape(device)}"]`)?.click();
+  if (["comments", "links", "people"].includes(q.get("section"))) shareSec = q.get("section");
   const tab = q.get("tab") || location.hash.slice(1);
   return PANES[tab] ? tab : null;
 }
@@ -1806,6 +2040,7 @@ function saveState() {
   if (currentPage !== "index.html") q.set("page", currentPage);
   if (device && device !== "desktop") q.set("device", device);
   if (tab === "code" && currentFile !== "index.html") q.set("file", currentFile);
+  if (tab === "share" && shareSec && shareSec !== "comments") q.set("section", shareSec);
   const url = location.pathname + (q.size ? `?${q}` : "");
   if (url !== location.pathname + location.search + location.hash) history.replaceState(history.state, "", url);
 }
@@ -1823,8 +2058,19 @@ $("tabs").onclick = (e) => {
   if (b.dataset.tab === "stats") loadStats();
   if (b.dataset.tab === "project") renderProject();
   if (b.dataset.tab === "share") loadShare();
+  b.scrollIntoView({ block: "nearest", inline: "nearest" });   // a narrow tab bar scrolls to the open tab
   saveState();
 };
+/* Arrow keys, Home and End move between the tabs (and open them), as in any tab list. */
+$("tabs").addEventListener("keydown", (e) => {
+  const all = [...$("tabs").querySelectorAll("[role=tab]")], i = all.indexOf(document.activeElement);
+  if (i < 0) return;
+  const rtl = document.documentElement.dir === "rtl";
+  const step = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1 }[e.key];
+  const to = e.key === "Home" ? 0 : e.key === "End" ? all.length - 1 : step ? (i + step + all.length) % all.length : -1;
+  if (to < 0) return;
+  e.preventDefault(); all[to].focus(); all[to].click();
+});
 
 /* Fresh project data for the Project tab (the chat events don't carry it). */
 async function syncProject() {
@@ -1834,6 +2080,7 @@ async function syncProject() {
   } catch (err) { console.warn("Couldn't refresh the project", err); }
 }
 function fillComposer(text) {
+  if (onPhone()) showM("chat");          // on a phone the prompt box is on the Chat side
   $("input").value = text; autosize(); $("input").focus();
   toast("Your request is ready: check it, then press Enter");
 }
@@ -1860,7 +2107,7 @@ async function renderProject() {
       <span class="pj-count">${savedN} of ${CONTACT_FIELDS.length}</span></header>
     <p class="lead">The WhatsApp, Email contact, Click-to-call, Telegram and QR codes agents use these. Changes apply from your next request.</p>
     <form class="pj-form" novalidate>${CONTACT_FIELDS.map(f => `<label><span>${icon(f.ic, { size: 14 })}${f.label}${status(f.key)}</span>
-      <input class="input" name="${f.key}" type="${f.type}" value="${esc(contact[f.key] || "")}" placeholder="${esc(f.placeholder)}" autocomplete="off" data-no-i18n></label>`).join("")}</form>
+      <input class="input" name="${f.key}" type="${f.type}" value="${esc(contact[f.key] || "")}" placeholder="${esc(f.placeholder)}" autocomplete="off" data-no-i18n ${canEdit ? "" : "disabled"}></label>`).join("")}</form>
     <div class="pj-bar"><button class="btn btn-dark btn-sm" type="button" data-save-contact>${icon("save", { size: 14 })}Save</button>
       <button class="btn btn-ghost btn-sm" type="button" data-apply-contact>Update the site with these</button>
       <span class="msg-line" role="status" aria-live="polite"></span></div></section>`;
@@ -2000,22 +2247,26 @@ async function refreshResearch() {
   try { res = await fetch(`/work/${PID}/research.md?t=${Date.now()}`, { cache: "no-store" }); }
   catch { return showError(box, new Error(navigator.onLine === false ? "You're offline. Check your connection, then try again." : "Can't reach the server. Check your connection, then try again in a moment."), refreshResearch, "Couldn't load the report"); }
   if (res.status === 404) {
-    const on = selected.has("research");
+    const on = selected.has("research"), known = !!BY_ID.research;
     box.innerHTML = `<div class="placeholder"><div class="box"><div class="tile">${icon("search", { size: 24 })}</div>
-      <b>No research yet</b>${BY_ID.research
-        ? on ? "The Research agent is switched on: its report appears here after the next build."
-             : "Switch on the Research agent in the team below, or ask for it (“research competitors”). It searches the web and writes a sourced report here."
-        : "Add an agent with web research to get a report here."}</div></div>`;
+      <b>No research yet</b>${known
+        ? on ? "The Research agent is in this project's team. Ask for research and its sourced report appears here."
+             : "Add the Research agent to this project's team. It searches the web and writes a sourced report here."
+        : "Add an agent with web research to get a report here."}
+      ${canEdit && known ? `<div class="ph-acts">${on
+        ? `<button class="btn btn-dark btn-sm" type="button" data-research-ask>${icon("search", { size: 14 })}Ask for research</button>`
+        : `<a class="btn btn-dark btn-sm" href="/hire" data-hire-link="agents">${icon("plus", { size: 14 })}Add the Research agent</a>`}</div>` : ""}</div></div>`;
     return;
   }
   if (!res.ok) return showError(box, new Error(res.status >= 500 ? "The server had a problem. Try again in a moment." : `Request failed (${res.status}).`), refreshResearch, "Couldn't load the report");
   let md;
   try { md = await res.text(); } catch { return showError(box, new Error("The connection dropped while loading. Try again."), refreshResearch, "Couldn't load the report"); }
   const sources = (md.match(/^\s*(?:\d+[.)]\s+)?\[\d{1,3}\]/gm) || []).length;
-  box.innerHTML = `<div class="bar">${icon("search", { size: 14 })}<span>research.md${sources ? ` · ${sources} source${sources === 1 ? "" : "s"}` : ""} · links open in a new tab</span></div>
+  box.innerHTML = `<div class="bar"><h2>Research</h2><span class="meta">research.md${sources ? ` · ${sources} source${sources === 1 ? "" : "s"}` : ""} · links open in a new tab</span></div>
     <article class="doc">${renderMarkdown(md)}</article>`;
 }
 $("research").addEventListener("click", (e) => {
+  if (e.target.closest("[data-research-ask]")) return fillComposer(t("Research the market and the main competitors for this site, then use what you learn in the copy and the page structure."));
   const cite = e.target.closest("[data-cite]"); if (!cite) return;
   const target = $("research").querySelector(`#src-${cite.dataset.cite}`);
   if (target) { e.preventDefault(); target.scrollIntoView({ behavior: "smooth", block: "center" }); target.classList.add("hl"); }
@@ -2034,8 +2285,9 @@ async function refreshCode(force = false) {
   }
   if (fileCache.length && !fileCache.some(f => f.path === currentFile)) { currentFile = fileCache[0].path; saveState(); }
   const total = fileCache.reduce((n, f) => n + f.size, 0);
+  $("code").classList.toggle("nofiles", !fileCache.length);
   $("files").innerHTML = fileCache.map(f =>
-    `<button data-path="${esc(f.path)}" class="${f.path === currentFile ? "on" : ""} ${changed.has(f.path) ? "changed" : ""}" title="${esc(f.path)} · ${fmtSize(f.size)}">
+    `<button data-path="${esc(f.path)}" class="${f.path === currentFile ? "on" : ""} ${changed.has(f.path) ? "changed" : ""}" ${f.path === currentFile ? 'aria-current="true"' : ""} title="${esc(f.path)} · ${fmtSize(f.size)}">
       ${icon(f.kind === "image" ? "image" : f.path.endsWith(".md") ? "file" : "code", { size: 14 })}<span>${esc(f.path)}</span><small>${fmtSize(f.size)}</small></button>`
   ).join("") + (fileCache.length ? `<div class="files-total">${fileCache.length} file${fileCache.length === 1 ? "" : "s"} · ${fmtSize(total)}</div>`
                                   : `<div class="msg system" style="padding:12px">No files yet</div>`);
@@ -2043,6 +2295,11 @@ async function refreshCode(force = false) {
   $("codeName").textContent = f ? `${f.path} · ${fmtSize(f.size)}` : "";
   if (editor.dirty && editor.path === currentFile && !force) return;   // never overwrite unsaved typing
   showFileBody(f);
+  if (!fileCache.length) {           // a new project: say where the files will come from
+    $("source").hidden = true; $("fileNote").hidden = false;
+    $("fileNote").innerHTML = `<div><span class="tile">${icon("code", { size: 22 })}</span><b>No files yet</b>
+      <p>The agents write the site's files here: HTML, CSS, JavaScript and images. Once they exist, open any of them to read or edit it.</p></div>`;
+  }
 }
 function showFileBody(f) {
   const text = f && f.content !== null && f.content !== undefined;
@@ -2156,8 +2413,10 @@ function renderAttachments() {
   $("attachments").hidden = !attachments.length;
   $("attachments").innerHTML = attachments.map((a, i) => `<div class="att ${a.loading ? "loading" : ""} ${a.failed ? "failed" : ""}"
     title="${a.loading ? "Uploading…" : a.failed ? esc(`${a.name}: ${a.error}`) : esc(a.path)}">
-    <img src="${a.preview}" alt="${a.failed ? "Image not uploaded" : "Attached image"}"><button type="button" data-rm="${i}" aria-label="Remove image">${icon("x", { size: 12, stroke: 2 })}</button>
-    ${a.failed ? `<button type="button" class="reup" data-reup="${i}" aria-label="Upload this image again" title="Upload again">${icon("refresh", { size: 12, stroke: 2 })}</button>` : ""}</div>`).join("");
+    <img src="${a.preview}" alt="${a.failed ? "Image not uploaded" : "Attached image"}">
+    <span class="att-meta"><b data-no-i18n>${esc(a.name || String(a.path || "").split("/").pop() || "image")}</b><small>${a.loading ? "Uploading…" : a.failed ? "Image not uploaded" : "Ready"}</small></span>
+    ${a.failed ? `<button type="button" class="reup" data-reup="${i}" aria-label="Upload this image again" title="Upload again">${icon("refresh", { size: 13, stroke: 2 })}</button>` : ""}
+    <button type="button" data-rm="${i}" aria-label="Remove image" title="Remove image">${icon("x", { size: 13, stroke: 2 })}</button></div>`).join("");
 }
 /* Upload one attached image. A failed one stays in the tray, marked, with a button to try again. */
 async function uploadAttachment(item) {
@@ -2223,25 +2482,44 @@ async function loadVersions() {
   catch (err) { return showError(body, err, loadVersions, "Couldn't load the versions"); }
   vPage = res.page;
   const list = res.items, first = res.page === 1;
+  if (!list.length) {
+    body.innerHTML = `<div class="pempty"><span class="tile">${icon("history", { size: 22 })}</span><b>No versions yet</b>
+      <p>A version is saved before every run and after each agent. Compare any of them with the current code, or go back to one.</p></div>`;
+    return;
+  }
   body.innerHTML = `<p class="note">${icon("alert", { size: 14 })}<span>A version is saved before every run and after each agent. Restoring saves the current code first, so you can always come back.</span></p>` +
-    (list.length ? `<div class="vlist">${list.map((v, i) => {
+    `<div class="vlist">${list.map((v, i) => {
       const a = BY_ID[v.agent];
       const ic = a ? a.icon : v.kind === "manual" ? "save" : v.kind === "backup" ? "history" : "file";
       const latest = first && i === 0;
       return `<div class="vrow ${latest ? "current" : ""}">
         <div class="vn"><span class="tile" style="--c:${a?.color || "#766a7c"}">${icon(ic, { size: 16 })}</span>v${v.n}</div>
-        <div><b>${esc(v.label)}</b> ${latest ? `<span class="badge">latest</span>` : ""}
-          <small>${ago(v.ts)} · ${v.files} file${v.files === 1 ? "" : "s"} · ${(v.size / 1024).toFixed(1)} KB${v.request ? ` · “${esc(v.request)}”` : ""}</small></div>
+        <div class="vtx"><b>${esc(v.label)}</b> ${latest ? `<span class="badge">latest</span>` : ""}
+          <small>${ago(v.ts)} · ${v.files} file${v.files === 1 ? "" : "s"} · ${(v.size / 1024).toFixed(1)} KB${v.request ? ` · <span class="vreq" data-no-i18n>“${esc(v.request)}”</span>` : ""}</small></div>
         <div class="vact">
-          <a class="icon-btn plain" href="${vfolder(v.n)}" target="_blank" rel="noopener" title="Open this version">${icon("external", { size: 16 })}</a>
-          <button class="icon-btn plain" data-vdiff="${v.n}" title="Compare with the current code">${icon("compare", { size: 16 })}</button>
-          <a class="icon-btn plain" href="/api/projects/${PID}/versions/${v.n}/download" title="Download this version as .zip">${icon("download", { size: 16 })}</a>
+          <a class="icon-btn plain" href="${vfolder(v.n)}" target="_blank" rel="noopener" title="Open this version" aria-label="Open this version">${icon("external", { size: 16 })}</a>
+          <button class="icon-btn plain" data-vdiff="${v.n}" title="Compare with the current code" aria-label="Compare with the current code">${icon("compare", { size: 16 })}</button>
+          <a class="icon-btn plain" href="/api/projects/${PID}/versions/${v.n}/download" title="Download this version as .zip" aria-label="Download this version as .zip">${icon("download", { size: 16 })}</a>
           <button class="btn btn-ghost btn-sm" data-vrestore="${v.n}">Restore</button>
         </div></div>`;
-    }).join("")}</div><nav class="pager compact" id="vPager" aria-label="Pages of versions">${pagerHTML({ ...res, perPage: res.per_page }, { sizes: [10, 25, 50], noun: "versions" })}</nav>`
-      : `<p class="note">No versions yet. They appear when the first run starts.</p>`);
+    }).join("")}</div>
+    ${res.total === 1 ? `<p class="note">${icon("history", { size: 14 })}<span>Only one version so far. The next run adds one after each agent, so you can compare and go back.</span></p>` : ""}
+    <nav class="pager compact" id="vPager" aria-label="Pages of versions">${pagerHTML({ ...res, perPage: res.per_page }, { sizes: [10, 25, 50], noun: "versions" })}</nav>`;
   const pager = $("vPager");
   if (pager) bindPager(pager, (p) => { vPage = p; loadVersions(); }, (n) => { vPer = n; savePerPage("versions", n); vPage = 1; loadVersions(); });
+}
+let diffWrap = false;
+try { diffWrap = localStorage.getItem("diffWrap") === "1"; } catch {}
+/* One diff line per row: the old and new line numbers stay on the side while a long line scrolls (or wraps). */
+function diffRows(diff) {
+  let o = 0, nw = 0;
+  return diff.split("\n").map(l => {
+    const h = l.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (h) { o = +h[1]; nw = +h[2]; return `<span class="dl h"><i class="ln"></i><i class="ln"></i><span class="tx">${esc(l)}</span></span>`; }
+    const kind = l.startsWith("+") ? "a" : l.startsWith("-") ? "r" : "";
+    const left = kind === "a" ? "" : o++, right = kind === "r" ? "" : nw++;
+    return `<span class="dl ${kind}"><i class="ln">${left}</i><i class="ln">${right}</i><span class="tx">${esc(l) || " "}</span></span>`;
+  }).join("");
 }
 async function showDiff(n) {
   const body = $("versionsBody");
@@ -2249,16 +2527,26 @@ async function showDiff(n) {
   let files;
   try { files = await api(`/api/projects/${PID}/versions/${n}/diff`); }
   catch (err) { return showError(body, err, () => showDiff(n), `Couldn't compare v${n}`); }
-  body.innerHTML = `<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+  const plus = files.reduce((t, f) => t + f.added, 0), minus = files.reduce((t, f) => t + f.removed, 0);
+  body.innerHTML = `<div class="diff-head">
       <button class="btn btn-ghost btn-sm" data-vback>${icon("arrow-right", { size: 14, cls: "flip" })}All versions</button>
-      <span class="note" style="margin:0">Changes from <b>v${n}</b> to the current code</span><span class="spacer"></span>
+      <span class="note">Changes from <b>v${n}</b> to the current code</span>
+      ${files.length ? `<span class="diff-sum" aria-hidden="true"><span class="plus">+${plus}</span><span class="minus">−${minus}</span></span>` : ""}
+      <span class="spacer"></span>
+      ${files.length ? `<label class="chk"><input type="checkbox" data-diff-wrap ${diffWrap ? "checked" : ""}>Wrap long lines</label>` : ""}
       <button class="btn btn-dark btn-sm" data-vrestore="${n}">Restore v${n}</button></div>` +
-    (files.length ? files.map((f, i) => `<details class="difffile" ${i < 4 ? "open" : ""}>
-      <summary>${icon(f.status === "added" ? "file-plus" : f.status === "removed" ? "trash" : "pencil", { size: 14 })}${esc(f.path)}
+    (files.length ? `<div class="diffs ${diffWrap ? "wrap" : ""}">${files.map((f, i) => `<details class="difffile ${f.status}" ${i < 4 ? "open" : ""}>
+      <summary>${icon("chevron-down", { size: 14, cls: "chev" })}${icon(f.status === "added" ? "file-plus" : f.status === "removed" ? "trash" : "pencil", { size: 14 })}<span class="dpath" data-no-i18n>${esc(f.path)}</span>
         <span class="badge">${f.status}</span><span class="spacer"></span><span class="plus">+${f.added}</span><span class="minus">−${f.removed}</span></summary>
-      <pre>${f.diff.split("\n").map(l => `<span class="${l.startsWith("@@") ? "h" : l.startsWith("+") ? "a" : l.startsWith("-") ? "r" : ""}">${esc(l) || " "}</span>`).join("")}</pre>
-    </details>`).join("") : `<p class="note">No differences: the current code is identical to v${n}.</p>`);
+      <pre>${diffRows(f.diff)}</pre>
+    </details>`).join("")}</div>` : `<div class="pempty"><span class="tile">${icon("check", { size: 22 })}</span><b>No differences</b><p>The current code is identical to v${n}.</p></div>`);
 }
+$("versionsBody").addEventListener("change", (e) => {
+  if (!e.target.matches("[data-diff-wrap]")) return;
+  diffWrap = e.target.checked;
+  try { localStorage.setItem("diffWrap", diffWrap ? "1" : "0"); } catch {}
+  $("versionsBody").querySelector(".diffs")?.classList.toggle("wrap", diffWrap);
+});
 document.addEventListener("click", async (e) => {
   const diff = e.target.closest("[data-vdiff]"), restore = e.target.closest("[data-vrestore]");
   if (e.target.closest("[data-vback]")) return loadVersions();
@@ -2314,11 +2602,17 @@ async function openBrand() {
   d.showModal();
 }
 
-/* ---------- Share tab: share links, the comments people pin on the shared site, and who works on the project ----------
-   Links and comments live in share.py, people in collab.py. Comments arrive live ("comment" events). */
+/* ---------- Share tab: three sections: the comments people pin on the shared site, the share links, and who works on it ----------
+   Links and comments live in share.py, people in collab.py. Comments and replies arrive live ("comment" events) and the tab
+   re-renders: the open section, the filters, the open reply or rename box and everything being typed survive that. */
 let shareFilter = "open", shareData = null;
+let shareSec = null;                       // "comments" | "links" | "people"; null until chosen: the most useful one opens
+const shareUI = { page: "", link: "", replying: null, renaming: null, oldOpen: false };
+const shareDrafts = {};                    // what's typed in the share forms, kept across re-renders and section changes
+const SHARE_SECS = [["comments", "chat", "Comments"], ["links", "link", "Share links"], ["people", "users", "People"]];
 const EXPIRY = [[7, "In 7 days"], [1, "In 1 day"], [30, "In 30 days"], [90, "In 90 days"], [0, "Never"]];
 const shareUrl = (l) => `${location.origin}/s/${l.token}`;
+const linkOld = (l) => l.state !== "active" || (!!l.expires && l.expires <= Date.now() / 1000);
 function setShareBadge(comments) {
   const n = comments.filter(c => !c.resolved).length, b = $("shareBadge");
   b.hidden = !n; b.textContent = n; b.title = `${n} open comment${n === 1 ? "" : "s"}`;
@@ -2341,10 +2635,11 @@ async function loadShare() {
   const box = $("sharePane");
   if (!shareData) box.innerHTML = `<div class="pane-in"><p class="note">Loading…</p></div>`;
   try {
-    const [comments, people, links] = await Promise.all([
+    const [comments, people, links, versions] = await Promise.all([
       api(`/api/projects/${PID}/comments`), api(`/api/projects/${PID}/people`),
-      canEdit ? api(`/api/projects/${PID}/share`) : Promise.resolve(null)]);
-    shareData = { comments, people, links };
+      canEdit ? api(`/api/projects/${PID}/share`) : Promise.resolve(null),
+      canEdit ? api(`/api/projects/${PID}/versions`).catch(() => []) : Promise.resolve([])]);
+    shareData = { comments, people, links, versions };
   } catch (err) {
     // a refresh (a new comment arrived, an action finished) that fails keeps what's on screen
     if (shareData && box.querySelector(".pj")) return toast(`Couldn't refresh the Share tab: ${err.message}`, "err");
@@ -2353,33 +2648,129 @@ async function loadShare() {
   setShareBadge(shareData.comments);
   renderShare();
 }
+/* The same request as "Ask the team" on one comment, for every open comment at once. */
+const commentAsk = (c) => `on ${c.page}${c.snippet ? `, on the part that reads “${c.snippet}”` : ""}${c.selector ? ` (element: ${c.selector})` : ""}:\n“${c.text}”`;
+function askAllText(list) {
+  const text = `People reviewing the site left ${list.length} comments. Make the change each one asks for and keep everything else as it is.\n\n`
+    + list.map((c, i) => `${i + 1}. On${commentAsk(c).slice(2)}`).join("\n\n");
+  return text.slice(0, 10000);
+}
+const draftKey = (el) => el.dataset?.keep ? `k:${el.dataset.keep}` : el.form && ["shNew", "shInvite"].includes(el.form.id) && el.name ? `${el.form.id}:${el.name}` : null;
+
 function renderShare() {
   const { comments, people, links } = shareData;
   const manage = ["owner", "admin"].includes(people.my_role);
-  const active = (links || []).filter(l => l.state === "active");
-  const linksCard = `<section class="pcard2"><header><span class="tile">${icon("link", { size: 18 })}</span><h3>Share links</h3>
-      ${links ? `<span class="pj-count">${active.length} active</span>` : ""}</header>
-    <p class="lead">Anyone with a link sees the site as it is now, without an account, until the link expires. They can pin comments on the page; they appear here.</p>
-    ${links ? `<form class="sh-form" id="shNew">
+  const all = links || [], active = all.filter(l => !linkOld(l)), old = all.filter(linkOld);
+  const byLink = Object.fromEntries(all.map(l => [l.id, l]));
+  const open = comments.filter(c => !c.resolved), resolved = comments.filter(c => c.resolved);
+  if (!SHARE_SECS.some(s => s[0] === shareSec)) shareSec = open.length || !canEdit || active.length ? "comments" : "links";
+  const count = { comments: open.length, links: links ? active.length : "", people: 1 + people.members.length + people.invites.length };
+  const nav = `<div class="seg sh-nav" role="tablist" aria-label="Share sections">${SHARE_SECS.map(([k, ic, label]) =>
+    `<button type="button" role="tab" data-sec="${k}" class="${shareSec === k ? "on" : ""}" aria-selected="${shareSec === k}">${icon(ic, { size: 15 })}<span>${label}</span>${count[k] !== "" ? `<span class="sh-n">${count[k]}</span>` : ""}</button>`).join("")}</div>`;
+
+  // ---- comments: open or resolved, by page and by link, newest first, grouped by page
+  const pages = [...new Set(comments.map(c => c.page))].sort();
+  if (shareUI.page && !pages.includes(shareUI.page)) shareUI.page = "";
+  const linkIds = [...new Set(comments.map(c => c.link).filter(id => byLink[id]))];
+  if (shareUI.link && !linkIds.includes(shareUI.link)) shareUI.link = "";
+  const filtered = !!(shareUI.page || shareUI.link);
+  const shown = (shareFilter === "open" ? open : resolved).filter(c => (!shareUI.page || c.page === shareUI.page) && (!shareUI.link || c.link === shareUI.link)).slice().reverse();
+  const groups = new Map(); shown.forEach(c => { if (!groups.has(c.page)) groups.set(c.page, []); groups.get(c.page).push(c); });
+  const commentHTML = (c) => {
+    const l = byLink[c.link], live = l && !linkOld(l), replying = canEdit && shareUI.replying === c.id;
+    return `<article class="sh-c ${c.resolved ? "done" : ""}" data-cid="${esc(c.id)}">
+      <header>${icon("pin", { size: 14 })}<b data-no-i18n>${esc(c.author)}</b><span>${ago(c.created)}</span>
+        ${l ? `<span class="sh-tag" title="The link this comment came from">${icon("link", { size: 11 })}<span data-no-i18n>${esc(l.label || "Share link")}</span></span>` : ""}
+        ${c.resolved ? `<span class="sh-tag ok">${icon("check", { size: 11 })}Resolved</span>` : ""}</header>
+      ${c.snippet ? `<q data-no-i18n>${esc(c.snippet)}</q>` : ""}
+      <p data-no-i18n>${esc(c.text)}</p>
+      ${c.reply && !replying ? `<div class="sh-reply">${icon("message", { size: 14 })}<div><small><span>Team reply</span>${c.reply_at ? ` · <span>${ago(c.reply_at)}</span>` : ""}</small>
+        <p data-no-i18n>${esc(c.reply)}</p></div></div>` : ""}
+      ${replying ? `<form class="sh-replyform" data-reply-form="${esc(c.id)}">
+        <textarea class="input" rows="2" maxlength="2000" data-keep="reply-${esc(c.id)}" aria-label="Reply" placeholder="Write a reply. ${esc(c.author)} sees it under the comment, on the shared page.">${esc(c.reply || "")}</textarea>
+        <div class="acts"><button class="btn btn-dark btn-sm" type="submit">${icon("send", { size: 14 })}Send reply</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-reply-cancel>Cancel</button>
+          ${c.reply ? `<button class="btn btn-ghost btn-sm" type="button" data-reply-remove="${esc(c.id)}">${icon("trash", { size: 14 })}Remove reply</button>` : ""}</div></form>` : ""}
+      ${canEdit && !replying ? `<div class="acts">
+        ${c.resolved ? "" : `<button class="btn btn-dark btn-sm" type="button" data-ask-comment="${esc(c.id)}">${icon("send", { size: 14 })}Ask the team</button>`}
+        <button class="btn btn-ghost btn-sm" type="button" data-reply-open="${esc(c.id)}">${icon("message", { size: 14 })}${c.reply ? "Edit reply" : "Reply"}</button>
+        ${live ? `<a class="btn btn-ghost btn-sm" href="${esc(shareUrl(l))}?c=${encodeURIComponent(c.id)}" target="_blank" rel="noopener" title="Open the shared page at this comment's pin">${icon("external", { size: 14 })}Show on page</a>` : ""}
+        <button class="btn btn-ghost btn-sm" type="button" data-resolve="${esc(c.id)}" data-done="${c.resolved ? "0" : "1"}">${icon(c.resolved ? "refresh" : "check", { size: 14 })}${c.resolved ? "Reopen" : "Resolve"}</button>
+        <button class="icon-btn plain" type="button" data-del-comment="${esc(c.id)}" title="Delete this comment" aria-label="Delete this comment">${icon("trash", { size: 15 })}</button></div>` : ""}
+    </article>`;
+  };
+  const commentsSec = `<section class="pcard2 sh-sec" aria-label="Comments">
+    <header><span class="tile">${icon("chat", { size: 18 })}</span><h3>Comments</h3><span class="pj-count">${open.length} open</span>
+      ${canEdit && open.length > 1 ? `<span class="acts"><button class="btn btn-dark btn-sm" type="button" data-ask-all>${icon("send", { size: 14 })}Ask the team about all open comments</button></span>` : ""}</header>
+    ${comments.length ? `<div class="sh-tools">
+        <span class="sh-filter" role="group" aria-label="Show">
+          <button type="button" data-cfilter="open" class="${shareFilter === "open" ? "on" : ""}" aria-pressed="${shareFilter === "open"}"><span>Open</span><span class="sh-n">${open.length}</span></button>
+          <button type="button" data-cfilter="resolved" class="${shareFilter === "resolved" ? "on" : ""}" aria-pressed="${shareFilter === "resolved"}"><span>Resolved</span><span class="sh-n">${resolved.length}</span></button></span>
+        ${pages.length > 1 ? `<select class="input" data-cpage aria-label="Page"><option value="">All pages</option>${pages.map(p => `<option value="${esc(p)}" ${p === shareUI.page ? "selected" : ""} data-no-i18n>${esc(p)}</option>`).join("")}</select>` : ""}
+        ${linkIds.length > 1 ? `<select class="input" data-clink aria-label="Link"><option value="">All links</option>${linkIds.map(id => `<option value="${esc(id)}" ${id === shareUI.link ? "selected" : ""} data-no-i18n>${esc(byLink[id].label || "Share link")}</option>`).join("")}</select>` : ""}
+        ${filtered ? `<button class="btn btn-ghost btn-sm" type="button" data-filter-reset>${icon("x", { size: 13 })}Clear filters</button>` : ""}</div>` : ""}
+    ${!comments.length
+      ? `<div class="pempty"><span class="tile">${icon("pin", { size: 22 })}</span><b>No comments yet</b>
+          <p>Send someone a share link: they can click any spot of the page and write what should change. Their comments arrive here, live.</p>
+          ${canEdit ? `<div class="acts"><button class="btn btn-dark btn-sm" type="button" data-sec="links">${icon("link", { size: 14 })}Create a share link</button></div>` : ""}</div>`
+      : shown.length ? [...groups].map(([page, list]) => `<div class="sh-group">
+          <h4><button type="button" class="pj-page" data-show-page="${esc(page)}" title="Preview this page">${icon("file", { size: 13 })}<code data-no-i18n>${esc(page)}</code></button><span class="sh-gn">${list.length}</span></h4>
+          ${list.map(commentHTML).join("")}</div>`).join("")
+      : `<div class="pj-empty">${icon("chat", { size: 18 })}<p>${filtered ? "No comments match these filters." : shareFilter === "open" ? "No open comments. People you share a link with can click any spot of the page to leave one." : "No resolved comments yet."}</p></div>`}
+  </section>`;
+
+  // ---- share links: a form for a new one, a card per active link, the old ones folded away
+  const days = (id, first) => `<select class="input" data-link-days="${esc(id)}" aria-label="Change end date"><option value="">${first}</option>${EXPIRY.map(([d, t]) => `<option value="${d}">${t}</option>`).join("")}</select>`;
+  const linkCard = (l) => `<article class="sh-link" data-lid="${esc(l.id)}">
+      <div class="sh-lhead">${shareUI.renaming === l.id
+        ? `<form class="sh-rename" data-rename-form="${esc(l.id)}"><input class="input" name="label" maxlength="80" data-keep="rename-${esc(l.id)}" value="${esc(l.label || "")}" aria-label="Link name" placeholder="Who it's for, e.g. Client review">
+            <button class="btn btn-dark btn-sm" type="submit">Save</button><button class="btn btn-ghost btn-sm" type="button" data-rename-cancel>Cancel</button></form>`
+        : `<button type="button" class="sh-name" data-rename="${esc(l.id)}" title="Rename this link"><b data-no-i18n>${esc(l.label || "Share link")}</b>${icon("pencil", { size: 13 })}</button>`}
+        ${l.version_n ? `<span class="sh-tag" title="This link always shows this version">${icon("lock", { size: 11 })}Version ${l.version_n}</span>` : `<span class="sh-tag ok" title="This link shows every change as it happens">${icon("zap", { size: 11 })}Live</span>`}
+        <span class="spacer"></span>
+        <button class="btn btn-dark btn-sm" type="button" data-copy-link="${esc(l.token)}">${icon("copy", { size: 14 })}Copy link</button>
+        <a class="icon-btn plain" href="${esc(shareUrl(l))}" target="_blank" rel="noopener" title="Open as a visitor" aria-label="Open as a visitor">${icon("external", { size: 15 })}</a>
+        <button class="icon-btn plain danger" type="button" data-revoke="${esc(l.id)}" title="Turn this link off" aria-label="Turn this link off">${icon("trash", { size: 15 })}</button></div>
+      <code data-no-i18n>${esc(shareUrl(l))}</code>
+      <div class="sh-lmeta">
+        <span>${icon("clock", { size: 13 })}${expiresText(l)}</span>
+        <span>${icon("eye", { size: 13 })}${l.views} view${l.views === 1 ? "" : "s"}</span>
+        ${l.last_viewed ? `<span><span>Last viewed</span> <span>${ago(l.last_viewed)}</span></span>` : ""}
+        <button type="button" class="sh-lc" data-link-filter="${esc(l.id)}" ${l.comment_count ? "" : "disabled"} title="Show the comments from this link">${icon("chat", { size: 13 })}${l.comment_count} comment${l.comment_count === 1 ? "" : "s"}</button></div>
+      <div class="sh-lctl">
+        <label class="sh-switch"><input type="checkbox" data-link-comments="${esc(l.id)}" ${l.comments ? "checked" : ""}><span>Visitors can pin comments</span></label>
+        <label class="sh-end"><span>End date</span>${days(l.id, "Change end date…")}</label></div>
+    </article>`;
+  const oldRow = (l) => `<li><div><b data-no-i18n>${esc(l.label || "Share link")}</b>${l.version_n ? `<span class="sh-tag">Version ${l.version_n}</span>` : `<span class="sh-tag">Live</span>`}
+      <small>${expiresText(l)} · ${l.views} view${l.views === 1 ? "" : "s"} · ${l.comment_count} comment${l.comment_count === 1 ? "" : "s"}${l.comments ? "" : " · comments off"}</small></div>
+      <div class="acts">${l.state === "active" ? `<label class="sh-end">${days(l.id, "Open it again…")}</label>` : ""}</div></li>`;
+  const linksSec = `<section class="pcard2 sh-sec" aria-label="Share links">
+    <header><span class="tile">${icon("link", { size: 18 })}</span><h3>Share links</h3>${links ? `<span class="pj-count">${active.length} active</span>` : ""}</header>
+    ${links ? `<p class="lead">Anyone with a link sees the site as it is now, without an account, until the link expires. They can pin comments on the page; they appear here.</p>
+      <h4 class="sh-sub">New link</h4>
+      <form class="sh-form sh-newlink" id="shNew">
         <input class="input" name="label" maxlength="80" placeholder="Who it's for, e.g. Client review" aria-label="Link name">
+        <select class="input" name="version" aria-label="What the link shows">
+          <option value="now">The site as it is now (frozen)</option>
+          <option value="live">The live site, with every change</option>
+          ${(shareData.versions || []).slice(0, 30).map(v => `<option value="${v.n}">Version ${v.n} · ${esc(v.label)}</option>`).join("")}
+        </select>
         <select class="input" name="days" aria-label="Expires">${EXPIRY.map(([d, t]) => `<option value="${d}">${t}</option>`).join("")}</select>
         <button class="btn btn-dark btn-sm" type="submit">${icon("plus", { size: 14 })}Create link</button>
+        <p class="sh-help">A frozen link always shows the same version, so your client never sees work in progress. The live site changes as the agents work.</p>
         <label class="chk"><input type="checkbox" name="comments" checked>Let visitors pin comments</label></form>
-      ${links.length ? `<ul class="sh-list">${links.map(l => `<li class="${l.state === "active" ? "" : "off"}">
-        <div><b data-no-i18n>${esc(l.label || "Share link")}</b>
-          <small>${expiresText(l)} · ${l.views} view${l.views === 1 ? "" : "s"} · ${l.comment_count} comment${l.comment_count === 1 ? "" : "s"}${l.comments ? "" : " · comments off"}</small>
-          ${l.state === "active" ? `<code data-no-i18n>${esc(shareUrl(l))}</code>` : ""}</div>
-        <div class="acts">${l.state === "active" ? `
-          <button class="icon-btn plain" type="button" data-copy-link="${esc(l.token)}" title="Copy link" aria-label="Copy link">${icon("copy", { size: 15 })}</button>
-          <a class="icon-btn plain" href="${esc(shareUrl(l))}" target="_blank" rel="noopener" title="Open as a visitor" aria-label="Open as a visitor">${icon("external", { size: 15 })}</a>
-          <button class="icon-btn plain" type="button" data-revoke="${esc(l.id)}" title="Turn this link off" aria-label="Turn this link off">${icon("trash", { size: 15 })}</button>` : ""}</div></li>`).join("")}</ul>`
-        : `<div class="pj-empty">${icon("link", { size: 18 })}<p>No links yet. Create one for a client or a colleague: they won't need an account.</p></div>`}`
-      : `<div class="pj-empty">${icon("lock", { size: 18 })}<p>The project's owner and editors create share links.</p></div>`}</section>`;
+      ${active.length ? `<h4 class="sh-sub">Active links</h4><div class="sh-links">${active.map(linkCard).join("")}</div>`
+        : `<div class="pj-empty">${icon("link", { size: 18 })}<p>No links yet. Create one for a client or a colleague: they won't need an account.</p></div>`}
+      ${old.length ? `<details class="sh-old" ${shareUI.oldOpen ? "open" : ""}><summary>${icon("chevron-down", { size: 14, cls: "chev" })}<span>Old links</span><span class="sh-n">${old.length}</span></summary>
+        <p class="sh-help">Expired or turned off: nobody can open them, and their comments stay under Comments. Give an expired link a new end date to open it again.</p>
+        <ul class="sh-list">${old.map(oldRow).join("")}</ul></details>` : ""}`
+    : `<div class="pj-empty">${icon("lock", { size: 18 })}<p>The project's owner and editors create share links.</p></div>`}</section>`;
 
+  // ---- people
   const roleSel = (m) => `<select class="input" data-role="${esc(m.id)}" aria-label="Role of ${esc(m.email)}">
       <option value="editor" ${m.role === "editor" ? "selected" : ""}>Editor</option><option value="viewer" ${m.role === "viewer" ? "selected" : ""}>Viewer</option></select>`;
   const roleName = (r) => r === "editor" ? "Editor" : "Viewer";
-  const peopleCard = `<section class="pcard2"><header><span class="tile">${icon("users", { size: 18 })}</span><h3>People</h3>
+  const peopleSec = `<section class="pcard2 sh-sec" aria-label="People"><header><span class="tile">${icon("users", { size: 18 })}</span><h3>People</h3>
       <span class="pj-count">${1 + people.members.length}</span></header>
     <p class="lead">Editors work on this project like its owner: requests, code, versions and links. The agents run on the owner's Claude account. Viewers watch and read.</p>
     ${!people.active && people.members.length ? `<p class="note">${icon("alert", { size: 14 })}<span>The owner's plan no longer includes working with other people, so they can't open this project until it's back on Agency.</span></p>` : ""}
@@ -2388,10 +2779,11 @@ function renderShare() {
       ${people.members.map(m => `<li><div><b data-no-i18n>${esc(m.name || m.email)}</b><small data-no-i18n>${esc(m.email)}</small></div>
         <div class="acts">${manage ? `${roleSel(m)}<button class="icon-btn plain" type="button" data-remove-person="${esc(m.id)}" title="Remove from the project" aria-label="Remove ${esc(m.email)}">${icon("x", { size: 15 })}</button>`
           : `<span class="sh-tag">${roleName(m.role)}</span>`}</div></li>`).join("")}
-      ${people.invites.map(i => `<li class="off"><div><b data-no-i18n>${esc(i.email)}</b><small>Invited as ${roleName(i.role).toLowerCase()} · joins when they create their account</small></div>
-        <div class="acts">${manage ? `<button class="icon-btn plain" type="button" data-cancel-invite="${esc(i.email)}" title="Cancel the invitation" aria-label="Cancel the invitation">${icon("x", { size: 15 })}</button>` : ""}</div></li>`).join("")}
     </ul>
-    ${manage && people.can_invite ? `<form class="sh-form" id="shInvite">
+    ${people.invites.length ? `<h4 class="sh-sub">Waiting invitations</h4><ul class="sh-list">${people.invites.map(i => `<li class="off"><div><b data-no-i18n>${esc(i.email)}</b><small>Invited as ${roleName(i.role).toLowerCase()} · joins when they create their account</small></div>
+        <div class="acts">${manage ? `<button class="icon-btn plain" type="button" data-cancel-invite="${esc(i.email)}" title="Cancel the invitation" aria-label="Cancel the invitation">${icon("x", { size: 15 })}</button>` : ""}</div></li>`).join("")}</ul>` : ""}
+    ${manage && people.can_invite ? `${people.members.length || people.invites.length ? "" : `<p class="sh-help">Nobody else works on this project yet. Invite an editor or a viewer by email: they join as soon as they have an account.</p>`}
+      <form class="sh-form" id="shInvite">
         <input class="input" type="email" name="email" required maxlength="254" placeholder="Email address" aria-label="Email address">
         <select class="input" name="role" aria-label="Role"><option value="editor">Editor</option><option value="viewer">Viewer</option></select>
         <button class="btn btn-dark btn-sm" type="submit">${icon("mail", { size: 14 })}Invite</button></form>`
@@ -2400,37 +2792,37 @@ function renderShare() {
     ${["editor", "viewer"].includes(people.my_role) ? `<div class="pj-bar"><button class="btn btn-ghost btn-sm" type="button" data-leave>${icon("log-out", { size: 14 })}Leave this project</button></div>` : ""}
   </section>`;
 
-  const open = comments.filter(c => !c.resolved), shown = (shareFilter === "open" ? open : comments.filter(c => c.resolved)).slice().reverse();
-  const commentsCard = `<section class="pcard2"><header><span class="tile">${icon("chat", { size: 18 })}</span><h3>Comments</h3>
-      <span class="pj-count">${open.length} open</span>
-      <span class="acts"><span class="sh-filter" role="group" aria-label="Show">
-        <button type="button" data-cfilter="open" class="${shareFilter === "open" ? "on" : ""}">Open</button>
-        <button type="button" data-cfilter="resolved" class="${shareFilter === "resolved" ? "on" : ""}">Resolved</button></span></span></header>
-    ${shown.length ? shown.map(c => `<article class="sh-c ${c.resolved ? "done" : ""}">
-        <header>${icon("pin", { size: 14 })}<b data-no-i18n>${esc(c.author)}</b><span>${ago(c.created)}</span>
-          <button type="button" class="pj-page" data-show-page="${esc(c.page)}" title="Preview this page">${icon("file", { size: 13 })}<code data-no-i18n>${esc(c.page)}</code></button></header>
-        ${c.snippet ? `<q data-no-i18n>${esc(c.snippet)}</q>` : ""}
-        <p data-no-i18n>${esc(c.text)}</p>
-        ${canEdit ? `<div class="acts">
-          ${c.resolved ? "" : `<button class="btn btn-dark btn-sm" type="button" data-ask-comment="${esc(c.id)}">${icon("send", { size: 14 })}Ask the team</button>`}
-          <button class="btn btn-ghost btn-sm" type="button" data-resolve="${esc(c.id)}" data-done="${c.resolved ? "0" : "1"}">${icon(c.resolved ? "refresh" : "check", { size: 14 })}${c.resolved ? "Reopen" : "Resolve"}</button>
-          <button class="icon-btn plain" type="button" data-del-comment="${esc(c.id)}" title="Delete this comment" aria-label="Delete this comment">${icon("trash", { size: 15 })}</button></div>` : ""}
-      </article>`).join("")
-      : `<div class="pj-empty">${icon("chat", { size: 18 })}<p>${shareFilter === "open" ? "No open comments. People you share a link with can click any spot of the page to leave one." : "No resolved comments yet."}</p></div>`}
-  </section>`;
-
-  // a live refresh must not wipe what's being typed in the link or invitation form
-  const kept = [...$("sharePane").querySelectorAll("#shNew [name], #shInvite [name]")].map(el => ({ form: el.form.id, name: el.name,
-    value: el.type === "checkbox" ? el.checked : el.value, focused: el === document.activeElement }));
-  $("sharePane").innerHTML = `<div class="pane-in pj">
+  // a live refresh must not wipe what's being typed, nor move the cursor
+  const focused = document.activeElement && $("sharePane").contains(document.activeElement) ? document.activeElement : null;
+  const focusKey = focused && draftKey(focused), caret = focusKey && "selectionStart" in focused ? [focused.selectionStart, focused.selectionEnd] : null;
+  $("sharePane").innerHTML = `<div class="pane-in pj sh">
     <div class="pane-head"><h2>Share</h2><span class="meta">Show the site to people without an account, collect their comments, and choose who works on it</span></div>
-    <div class="pj-cols"><div class="pj-col">${commentsCard}</div><div class="pj-col">${linksCard}${peopleCard}</div></div></div>`;
-  for (const k of kept) {
-    const el = $(k.form)?.elements[k.name]; if (!el) continue;
-    if (el.type === "checkbox") el.checked = k.value; else el.value = k.value;
-    if (k.focused) el.focus();
+    ${nav}
+    <div class="sh-body">${shareSec === "links" ? linksSec : shareSec === "people" ? peopleSec : commentsSec}</div></div>`;
+  for (const el of $("sharePane").querySelectorAll("#shNew [name], #shInvite [name], [data-keep]")) {
+    const k = draftKey(el);
+    if (k && k in shareDrafts) { if (el.type === "checkbox") el.checked = shareDrafts[k]; else el.value = shareDrafts[k]; }
+    if (k && k === focusKey) { el.focus({ preventScroll: true }); if (caret) try { el.setSelectionRange(...caret); } catch {} }
   }
 }
+const clearDrafts = (prefix) => Object.keys(shareDrafts).forEach(k => { if (k.startsWith(prefix)) delete shareDrafts[k]; });
+const showShareSec = (sec) => { shareSec = sec; if (shareData) renderShare(); saveState(); };
+$("sharePane").addEventListener("input", (e) => {
+  e.target.removeAttribute?.("aria-invalid");
+  const k = draftKey(e.target); if (k) shareDrafts[k] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+});
+$("sharePane").addEventListener("toggle", (e) => { if (e.target.matches?.(".sh-old")) shareUI.oldOpen = e.target.open; }, true);
+$("sharePane").addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && e.target.closest("[data-reply-form], [data-rename-form]")) {
+    e.preventDefault(); e.target.closest("form").querySelector("[data-reply-cancel], [data-rename-cancel]")?.click(); return;
+  }
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && e.target.closest("[data-reply-form]")) { e.preventDefault(); e.target.form.requestSubmit(); return; }
+  const tab = e.target.closest(".sh-nav [role=tab]"); if (!tab) return;   // arrow keys between the three sections
+  const all = [...tab.parentElement.children], rtl = document.documentElement.dir === "rtl";
+  const step = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1 }[e.key]; if (!step) return;
+  e.preventDefault(); const to = all[(all.indexOf(tab) + step + all.length) % all.length];
+  showShareSec(to.dataset.sec); $("sharePane").querySelector(`.sh-nav [data-sec="${to.dataset.sec}"]`)?.focus();
+});
 $("sharePane").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target, btn = f.querySelector("button[type=submit]");
@@ -2438,11 +2830,22 @@ $("sharePane").addEventListener("submit", async (e) => {
   try {
     if (f.id === "shNew") {
       const l = await api(`/api/projects/${PID}/share`, { method: "POST", body: JSON.stringify({
-        label: f.label.value.trim(), days: +f.days.value, comments: f.comments.checked }) });
+        label: f.label.value.trim(), days: +f.days.value, comments: f.comments.checked, version: f.version.value }) });
+      clearDrafts("shNew:");
       await navigator.clipboard?.writeText(shareUrl(l)).then(() => toast("Link created and copied"), () => toast("Link created"));
     } else if (f.id === "shInvite") {
       const r = await api(`/api/projects/${PID}/people`, { method: "POST", body: JSON.stringify({ email: f.email.value.trim(), role: f.role.value }) });
+      clearDrafts("shInvite:");
       toast(r.joined ? `${r.email} can open this project now` : `Invitation sent to ${r.email}: they join when they create their account`);
+    } else if (f.dataset.replyForm) {
+      const text = f.querySelector("textarea").value.trim();
+      await api(`/api/projects/${PID}/comments/${f.dataset.replyForm}/reply`, { method: "POST", body: JSON.stringify({ text }) });
+      clearDrafts(`k:reply-${f.dataset.replyForm}`); shareUI.replying = null;
+      toast(text ? "Reply sent: the visitor sees it under their comment" : "Reply removed");
+    } else if (f.dataset.renameForm) {
+      await api(`/api/projects/${PID}/share/${f.dataset.renameForm}`, { method: "PATCH", body: JSON.stringify({ label: f.label.value.trim() }) });
+      clearDrafts(`k:rename-${f.dataset.renameForm}`); shareUI.renaming = null;
+      toast("Link renamed");
     }
     f.reset();
     await loadShare();
@@ -2451,8 +2854,23 @@ $("sharePane").addEventListener("submit", async (e) => {
     if (f.id === "shInvite" && err.status >= 400 && err.status < 500 && err.status !== 429) { f.email.setAttribute("aria-invalid", "true"); f.email.focus(); }
   }
 });
-$("sharePane").addEventListener("input", (e) => e.target.removeAttribute?.("aria-invalid"));
 $("sharePane").addEventListener("change", async (e) => {
+  const k = draftKey(e.target); if (k) shareDrafts[k] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+  if (e.target.matches("[data-cpage]")) { shareUI.page = e.target.value; return renderShare(); }
+  if (e.target.matches("[data-clink]")) { shareUI.link = e.target.value; return renderShare(); }
+  const sw = e.target.closest("[data-link-comments]");
+  if (sw) return withBusy(sw, async () => {
+    await api(`/api/projects/${PID}/share/${sw.dataset.linkComments}`, { method: "PATCH", body: JSON.stringify({ comments: sw.checked }) });
+    toast(sw.checked ? "Visitors of this link can pin comments" : "Comments are off for this link"); await loadShare();
+  }, { onError: (err) => { sw.checked = !sw.checked; toast(err.message, "err"); } });
+  const end = e.target.closest("[data-link-days]");
+  if (end) {
+    if (end.value === "") return;
+    return withBusy(end, async () => {
+      await api(`/api/projects/${PID}/share/${end.dataset.linkDays}`, { method: "PATCH", body: JSON.stringify({ days: +end.value }) });
+      toast(+end.value ? "New end date saved" : "This link never expires now"); await loadShare();
+    }, { onError: (err) => { end.value = ""; toast(err.message, "err"); } });
+  }
   const sel = e.target.closest("[data-role]"); if (!sel) return;
   await withBusy(sel, async () => { await api(`/api/projects/${PID}/people/${sel.dataset.role}`, { method: "PATCH", body: JSON.stringify({ role: sel.value }) }); toast("Role changed"); },
     { onError: (err) => { toast(err.message, "err"); loadShare(); } });
@@ -2461,7 +2879,21 @@ $("sharePane").addEventListener("click", async (e) => {
   const t = (sel) => e.target.closest(sel);
   const btn = e.target.closest("button");
   const call = (path, opts, done) => withBusy(btn, async () => { await api(path, opts); if (done) toast(done); await loadShare(); });
+  const focusIn = (sel) => { const el = $("sharePane").querySelector(sel); if (el) { el.focus(); el.select?.(); } };
+  if (t("[data-sec]")) { showShareSec(t("[data-sec]").dataset.sec); if (shareSec === "links" && !$("sharePane").querySelector(".sh-link")) focusIn("#shNew [name=label]"); return; }
   if (t("[data-cfilter]")) { shareFilter = t("[data-cfilter]").dataset.cfilter; return renderShare(); }
+  if (t("[data-filter-reset]")) { shareUI.page = shareUI.link = ""; return renderShare(); }
+  if (t("[data-link-filter]")) { shareUI.link = t("[data-link-filter]").dataset.linkFilter; shareUI.page = ""; return showShareSec("comments"); }
+  if (t("[data-reply-open]")) { shareUI.replying = t("[data-reply-open]").dataset.replyOpen; renderShare(); return focusIn(`[data-reply-form="${CSS.escape(shareUI.replying)}"] textarea`); }
+  if (t("[data-reply-cancel]")) { clearDrafts(`k:reply-${shareUI.replying}`); shareUI.replying = null; return renderShare(); }
+  if (t("[data-reply-remove]")) {
+    const id = t("[data-reply-remove]").dataset.replyRemove;
+    if (!await confirmDialog({ title: "Remove your reply?", text: "The visitor won't see it on the shared page any more.", ok: "Remove", danger: true })) return;
+    return withBusy(btn, async () => { await api(`/api/projects/${PID}/comments/${id}/reply`, { method: "POST", body: JSON.stringify({ text: "" }) });
+      clearDrafts(`k:reply-${id}`); shareUI.replying = null; toast("Reply removed"); await loadShare(); });
+  }
+  if (t("[data-rename]")) { shareUI.renaming = t("[data-rename]").dataset.rename; renderShare(); return focusIn(`[data-rename-form="${CSS.escape(shareUI.renaming)}"] input`); }
+  if (t("[data-rename-cancel]")) { clearDrafts(`k:rename-${shareUI.renaming}`); shareUI.renaming = null; return renderShare(); }
   if (t("[data-copy-link]")) {
     const url = `${location.origin}/s/${t("[data-copy-link]").dataset.copyLink}`;
     return navigator.clipboard?.writeText(url).then(() => toast("Link copied"), () => toast(url));
@@ -2485,8 +2917,11 @@ $("sharePane").addEventListener("click", async (e) => {
   }
   if (t("[data-ask-comment]")) {
     const c = shareData.comments.find(x => x.id === t("[data-ask-comment]").dataset.askComment); if (!c) return;
-    return fillComposer(`Someone reviewing the site left this comment on ${c.page}${c.snippet ? `, on the part that reads “${c.snippet}”` : ""}`
-      + `${c.selector ? ` (element: ${c.selector})` : ""}:\n“${c.text}”\nMake the change it asks for and keep everything else as it is.`);
+    return fillComposer(`Someone reviewing the site left this comment ${commentAsk(c)}\nMake the change it asks for and keep everything else as it is.`);
+  }
+  if (t("[data-ask-all]")) {
+    const list = shareData.comments.filter(c => !c.resolved); if (!list.length) return;
+    return fillComposer(askAllText(list));
   }
   if (t("[data-remove-person]")) {
     if (!await confirmDialog({ title: "Remove this person?", text: "They won't be able to open this project any more.", ok: "Remove", danger: true })) return;
@@ -2509,6 +2944,11 @@ async function loadStats() {
   try { data = await api(`/api/stats?${qs}`); }
   catch (err) { return showError(body, err, loadStats, "Couldn't load the stats"); }
   const t = data.totals, maxCost = Math.max(...data.agents.map(a => a.cost), 1e-9), maxSec = Math.max(...data.agents.map(a => a.seconds), 1e-9);
+  if (!t.runs && !data.agents.length) {
+    body.innerHTML = `<div class="pempty"><span class="tile">${icon("chart", { size: 22 })}</span><b>No runs yet</b>
+      <p>Cost, time and tokens for each agent appear here after the team's first run, with the recent runs of this project.</p></div>`;
+    return;
+  }
   body.innerHTML = `
     <div class="kpis">
       <div class="kpi"><b>${money(t.cost)}</b><span>estimated cost</span></div>
@@ -2519,26 +2959,26 @@ async function loadStats() {
     <p class="note">${icon("alert", { size: 14 })}<span>Cost is the API-equivalent estimate Claude Code reports for each agent run. On a Claude subscription you aren't billed per call, but it shows which agents use the most.</span></p>
     ${data.agents.length ? `
     <h4 class="sec">Per agent</h4>
-    <table class="stable"><thead><tr><th>Agent</th><th>Model</th><th class="num">Runs</th><th class="num">Avg time</th><th>Time share</th><th class="num">Avg cost</th><th>Cost share</th><th class="num">Total cost</th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="stable"><thead><tr><th>Agent</th><th class="c-model">Model</th><th class="num">Runs</th><th class="num">Avg time</th><th class="c-bar">Time share</th><th class="num c-avg">Avg cost</th><th class="c-bar">Cost share</th><th class="num">Total cost</th></tr></thead><tbody>
     ${(agentsPg = paginate(data.agents, sPage, sPer), sPage = agentsPg.page, agentsPg).items.map(a => `<tr>
       <td><span class="ag"><span class="tile" style="--c:${a.color}">${icon(a.icon, { size: 14 })}</span>${esc(a.name)}</span></td>
-      <td class="mono">${esc(a.models.map(m => m.replace(/^claude-/, "")).join(", ") || "-")}</td>
-      <td class="num">${a.runs}${a.done < a.runs ? ` <span style="color:var(--stone)">(${a.runs - a.done} not finished)</span>` : ""}</td>
+      <td class="mono c-model">${esc(a.models.map(m => m.replace(/^claude-/, "")).join(", ") || "-")}</td>
+      <td class="num">${a.runs}${a.done < a.runs ? ` <span class="muted">(${a.runs - a.done} not finished)</span>` : ""}</td>
       <td class="num">${duration(a.avg_seconds)}</td>
-      <td><div class="sbar" title="${duration(a.seconds)}"><i style="width:${(a.seconds / maxSec * 100).toFixed(1)}%"></i></div></td>
-      <td class="num">${money(a.avg_cost)}</td>
-      <td><div class="sbar" title="${money(a.cost)}"><i style="width:${(a.cost / maxCost * 100).toFixed(1)}%"></i></div></td>
-      <td class="num">${money(a.cost)}</td></tr>`).join("")}
-    </tbody></table>
+      <td class="c-bar"><div class="sbar" title="${duration(a.seconds)}"><i style="width:${(a.seconds / maxSec * 100).toFixed(1)}%"></i></div></td>
+      <td class="num c-avg">${money(a.avg_cost)}</td>
+      <td class="c-bar"><div class="sbar" title="${money(a.cost)}"><i style="width:${(a.cost / maxCost * 100).toFixed(1)}%"></i></div></td>
+      <td class="num"><b>${money(a.cost)}</b></td></tr>`).join("")}
+    </tbody></table></div>
     <nav class="pager compact" id="sPager" aria-label="Pages of agents">${pagerHTML(agentsPg, { noun: "agents" })}</nav>
     <h4 class="sec">Recent agent runs</h4>
-    <table class="stable"><thead><tr><th>Agent</th><th>Request</th><th class="num">Time</th><th class="num">Tokens</th><th class="num">Cost</th><th class="num">When</th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="stable"><thead><tr><th>Agent</th><th class="c-req">Request</th><th class="num">Time</th><th class="num c-tok">Tokens</th><th class="num">Cost</th><th class="num">When</th></tr></thead><tbody>
     ${data.recent.map(e => `<tr>
       <td><span class="status-dot ${e.status}" title="${e.status}"></span>${esc(BY_ID[e.agent]?.name || e.agent)}</td>
-      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${esc(e.request || "")}">${esc(e.request || "")}</td>
-      <td class="num">${duration(e.seconds || 0)}</td><td class="num">${compact((e.tokens_in || 0) + (e.tokens_out || 0))}</td>
+      <td class="c-req" title="${esc(e.request || "")}" data-no-i18n>${esc(e.request || "")}</td>
+      <td class="num">${duration(e.seconds || 0)}</td><td class="num c-tok">${compact((e.tokens_in || 0) + (e.tokens_out || 0))}</td>
       <td class="num">${e.cost ? money(e.cost) : "-"}</td><td class="num">${ago(e.ts)}</td></tr>`).join("")}
-    </tbody></table>
+    </tbody></table></div>
     <nav class="pager compact" id="rPager" aria-label="Pages of agent runs">${data.recent_pager ? pagerHTML({ ...data.recent_pager, perPage: data.recent_pager.per_page }, { noun: "runs" }) : ""}</nav>`
     : `<p class="note">No agent has run in this project yet. Stats appear after the first run.</p>`}`;
   rPage = data.recent_pager?.page || 1;
@@ -2574,8 +3014,8 @@ registerCommands([
   { group: "This project", icon: "history", title: "Versions", hint: "open, compare, restore", run: () => showTab("versions") },
   { group: "This project", icon: "save", title: "Save a version now", when: () => !busy, run: () => { showTab("versions"); $("saveVersion").click(); } },
   { group: "This project", icon: "chart", title: "Cost & time", run: () => showTab("stats") },
-  { group: "This project", icon: "share", title: "Share links and comments", run: () => showTab("share") },
-  { group: "This project", icon: "users", title: "People on this project", run: () => { showTab("share"); } },
+  { group: "This project", icon: "share", title: "Share links and comments", run: () => { shareSec = "links"; showTab("share"); } },
+  { group: "This project", icon: "users", title: "People on this project", run: () => { shareSec = "people"; showTab("share"); } },
   { group: "This project", icon: "download", title: "Download the code (.zip)", when: () => !busy, run: () => location.href = `/api/projects/${PID}/download` },
   { group: "This project", icon: "pencil", title: "Edit name, description and pages", run: () => editDetails() },
   { group: "This project", icon: "paperclip", title: "Attach reference images", run: () => $("attach").click() },
@@ -2590,5 +3030,6 @@ registerCommands(() => [...new Set([...(project?.pages || []).map(p => p.file), 
 
 boot().catch(err => fatal(err));   // a bug must not leave a half-open studio
 </script>
+<script src="/static/studio-extras.js"></script>   <!-- the cost estimate and the studio tour -->
 </body>
 </html>

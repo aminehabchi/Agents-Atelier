@@ -42,6 +42,7 @@ class Versions:
     def __init__(self, store: "storage.Store"):
         self.store = store
         self.keep = lambda pid: None      # versions kept for this project (None: MAX_VERSIONS); main.py sets it
+        self.pinned = lambda pid: set()   # version ids a share link shows: never pruned (main.py sets it, see share.py)
 
     def _index(self, pid: str) -> list[dict]:
         return self.store.version_list(pid)
@@ -81,8 +82,11 @@ class Versions:
         self.store.index_files(pid, "version", dest, version_id=vid)
         items.append(v)
         keep = min(self.keep(pid) or MAX_VERSIONS, MAX_VERSIONS)   # the owner's plan may keep fewer
-        while len(items) > keep:                              # prune the oldest
-            old = items.pop(0)
+        pinned = self.pinned(pid)
+        prunable = [x for x in items if x["id"] not in pinned]
+        while len(items) > keep and len(prunable) > 1:        # prune the oldest, never one a share link shows nor the newest
+            old = prunable.pop(0)
+            items.remove(old)
             shutil.rmtree(storage.versions_dir(pid) / old["id"], ignore_errors=True)
             self.store.drop_version(pid, old["id"])
         return v

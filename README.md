@@ -318,7 +318,7 @@ command line wins over the file: `AGENT_MODEL=sonnet PORT=9000 ./run.sh`. Restar
 | `PUBLIC_URL` | *(empty)* | The app's public address (e.g. `https://atelier.example.com`), where PayPal and Google/GitHub send people back |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | *(empty)* | Show **Continue with Google** on the login and sign-up pages. Callback: `<PUBLIC_URL>/api/auth/oauth/google/callback` |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | *(empty)* | Show **Continue with GitHub**. Callback: `<PUBLIC_URL>/api/auth/oauth/github/callback` |
-| `API_REQUESTS_PER_MINUTE` | `300` | API calls per member (or per address when logged out) per minute; `0` = no limit |
+| `API_REQUESTS_PER_MINUTE` | `600` | API calls per member (or per address when logged out) per minute; `0` = no limit |
 | `RUNS_PER_HOUR` | `60` | Runs that start agents (prompt, Continue, Start again, retry) per member per hour |
 | `INVITES_PER_HOUR` / `SHARE_LINKS_PER_HOUR` / `CHECKOUTS_PER_HOUR` | `30` / `30` / `10` | Per member per hour |
 | `COMMENTS_PER_HOUR` | `30` | Comments through share links, per visitor address per hour |
@@ -600,6 +600,8 @@ migrations** in `server/migrations/`, which the server applies on startup, once 
 | `0015_members_and_share_links.sql` | editors and viewers on projects, waiting invitations, share links and pinned comments |
 | `0016_paypal_billing.sql` | PayPal subscriptions, payments received and the webhook events already handled |
 | `0017_oauth_identities.sql` | which Google or GitHub account belongs to which member |
+| `0018_yearly_billing.sql` · `0019_plan_request_period.sql` | paying monthly or yearly, and the period an upgrade request asks for |
+| `0020_frozen_share_links.sql` | a share link can show one saved version instead of the live site |
 
 To change the shared agents or teams, edit `agents/*.md` or `agents/_presets.json`, then run
 `.venv/bin/python server/manage.py make-agents-migration`. It writes the next migration with what changed, applied on
@@ -649,7 +651,9 @@ choose **Keep both** (imported as a copy), **Replace mine** or **Keep mine**.
 Everything is in the studio's **Share** tab.
 
 - **Share links:** **Create link** makes a read-only address (`/s/<token>`) for people without an account, valid for 1,
-  7, 30 or 90 days or with no end date. Visitors see the current site, page by page, at desktop, tablet or phone size.
+  7, 30 or 90 days or with no end date. It shows either **one saved version** (the site as it is now, or any version
+  from the Versions tab: frozen, so clients never see work in progress, and kept as long as the link exists) or the
+  **live site** with every change. Visitors see it page by page, at desktop, tablet or phone size.
   Each link shows its views and comments, and can be turned off at once.
 - **Pinned comments:** a visitor presses **Comment**, clicks a spot of the page and writes what should change; a
   numbered pin marks it. Comments arrive live in the Share tab (a badge counts the open ones). **Ask the team** turns one
@@ -659,6 +663,20 @@ Everything is in the studio's **Share** tab.
   Claude key and spending limit. Viewers watch the chat, preview, code and comments, and can't change anything. Only the
   owner invites, changes roles, removes people or deletes the project. Invited projects are under **Shared with me** on
   /projects.
+
+## Emails
+
+Besides confirmation codes and password notices, the app emails people on its own (`server/notify.py`), in their
+language. Nothing a person typed (project names, comments) goes in an email; links point to `PUBLIC_URL` when it's set.
+
+| When | Who |
+|---|---|
+| An account is confirmed (email code, Google or GitHub) | the new member: a welcome with three tips |
+| A run ends after `RUN_EMAIL_AFTER` seconds (default 90) and nobody has the studio open | whoever started it: finished, or stopped and why (they can turn this off on /profile) |
+| Someone invited to a project creates their account | the person who invited them |
+| A paid plan turns on (PayPal confirmed, or an admin approved the request) | the member |
+| A PayPal payment fails, or the subscription is cancelled, suspended or expires | the member |
+| A yearly plan renews in 7 days (checked every hour, once per renewal) | the member |
 
 ## Languages, theme and colours
 

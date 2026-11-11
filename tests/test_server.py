@@ -131,7 +131,7 @@ def setUpModule():
            "TRUST_PROXY": "1", "SIGNUPS_PER_HOUR": "100000", "LOGINS_PER_15_MIN": "100000", "RESETS_PER_HOUR": "5",
            "LEGAL_NAME": "Test Operator SARL", "LEGAL_EMAIL": "legal@example.com",
            "CLAUDE_KEYS": "user", "KEY_SECRET": "", "ACCOUNT_PURGE_SECONDS": "1",     # every member runs on their own key (see register())
-           **NO_RATE_LIMITS}
+           "RUN_EMAIL_AFTER": "0", **NO_RATE_LIMITS}
     env.pop("AGENT_MODEL", None)
     global SERVER_LOG
     SERVER_LOG = open(TMP / "server.log", "w")
@@ -3395,7 +3395,7 @@ class FlakyProxy:
     """A TCP proxy in front of Postgres that can be cut and restored, to see the server while its database is unreachable."""
 
     def __init__(self, host, port):
-        self.target, self.port, self.conns, self.listener = (host, port), free_port(), [], None
+        self.target, self.port, self.conns, self.listener, self.up = (host, port), free_port(), [], None, False
         self.restore()
 
     def restore(self):
@@ -3404,6 +3404,7 @@ class FlakyProxy:
         self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.listener.bind(("127.0.0.1", self.port))
         self.listener.listen(32)
+        self.up = True
         threading.Thread(target=self._accept, args=(self.listener,), daemon=True).start()
 
     def _accept(self, listener):
@@ -3414,6 +3415,10 @@ class FlakyProxy:
                 upstream = socket.create_connection(self.target, timeout=5)
                 upstream.settimeout(None)
             except OSError:
+                return
+            if not self.up:                    # cut meanwhile: refuse
+                client.close()
+                upstream.close()
                 return
             self.conns += [client, upstream]
             for a, b in ((client, upstream), (upstream, client)):
@@ -3434,6 +3439,11 @@ class FlakyProxy:
                     pass
 
     def cut(self):
+        self.up = False
+        try:
+            self.listener.shutdown(socket.SHUT_RDWR)   # wakes the thread blocked in accept()
+        except OSError:
+            pass
         self.listener.close()
         for s in self.conns:
             try:
@@ -3666,7 +3676,7 @@ class T46ErrorHandling(unittest.TestCase):
             s, r, _ = call("GET", "/api/projects", cookie=cookie)
             self.assertEqual(s, 503)
             s, page, _ = call("GET", "/projects", cookie=cookie, headers={"Accept": "text/html"})
-            self.assertEqual(s, 503)
+            self.assertEqual(s, 503, page)
             self.assertIn("database isn't reachable", page)
             self.assertLess(time.time() - started, 25, "no hang while the database is away")
             proxy.restore()
@@ -3704,3 +3714,150 @@ class T46YearlyRequests(unittest.TestCase):
         by_plan = {p["id"]: p for p in call("GET", "/api/admin/revenue?days=30")[1]["by_plan"]}
         self.assertGreaterEqual(by_plan["pro"]["yearly"], 1)
 
+
+
+class T47FrozenShareLinks(unittest.TestCase):
+    """A share link can show one saved version instead of the live site (share.py, versions.py pinned)."""
+
+    def test_a_frozen_link_keeps_showing_its_version(self):
+        owner = register(f"frozen-{time.time_ns()}@example.com")
+        pid = new_project(cookie=owner)
+        put = lambda text: call("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": f"<!doctype html><body><h1>{text}</h1></body>"}, cookie=owner)
+        put("First draft")
+        s, frozen, _ = call("POST", f"/api/projects/{pid}/share", {"days": 7, "version": "now"}, cookie=owner)
+        self.assertEqual(s, 200, frozen)
+        self.assertTrue(frozen["version_n"])
+        live = call("POST", f"/api/projects/{pid}/share", {"days": 7}, cookie=owner)[1]
+        self.assertIsNone(live["version_n"])
+        put("Work in progress")
+        self.assertIn("First draft", call("GET", f"/s/{frozen['token']}/site/", cookie=None)[1])
+        self.assertIn("Work in progress", call("GET", f"/s/{live['token']}/site/", cookie=None)[1])
+        info = call("GET", f"/s/{frozen['token']}/info", cookie=None)[1]
+        self.assertEqual(info["frozen"]["n"], frozen["version_n"])
+        self.assertIsNone(call("GET", f"/s/{live['token']}/info", cookie=None)[1]["frozen"])
+        # an existing version by its number; a missing one is refused
+        n = call("GET", f"/api/projects/{pid}/versions", cookie=owner)[1][0]["n"]
+        self.assertEqual(call("POST", f"/api/projects/{pid}/share", {"days": 7, "version": n}, cookie=owner)[1]["version_n"], n)
+        self.assertEqual(call("POST", f"/api/projects/{pid}/share", {"days": 7, "version": 9999}, cookie=owner)[0], 404)
+        listed = {l["id"]: l for l in call("GET", f"/api/projects/{pid}/share", cookie=owner)[1]}
+        self.assertEqual(listed[frozen["id"]]["version_n"], frozen["version_n"])
+
+
+def outbox_for(email):
+    return [json.loads(l) for l in OUTBOX.read_text().splitlines() if json.loads(l)["to"] == email]
+
+
+class T48NotificationsAndEstimates(unittest.TestCase):
+    """Emails the app sends on its own (notify.py) and the cost estimate before a run."""
+
+    def wait_run(self, pid, cookie, status=("done", "error", "stopped")):
+        for _ in range(100):
+            run = call("GET", f"/api/projects/{pid}", cookie=cookie)[1]["run"]
+            if run.get("status") in status:
+                return run
+            time.sleep(0.2)
+        self.fail("the run didn't end")
+
+    def start_and_leave(self, pid, cookie, text="a page [[slow]]"):
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": text, "agents": ["html"]}))
+            await recv(("agent_start",), timeout=30)       # then close the studio: nobody watches the rest
+        ws(pid, script, cookie=cookie)
+
+    def test_welcome_and_run_emails(self):
+        email = f"notify-{time.time_ns()}@example.com"
+        cookie = register(email)
+        self.assertTrue(any(m["subject"] == "Welcome to Agents Atelier" for m in outbox_for(email)))
+        self.assertTrue(call("GET", "/api/auth/me", cookie=cookie)[1]["user"]["notify_runs"])
+        pid = new_project(cookie=cookie)
+        self.start_and_leave(pid, cookie)
+        self.assertEqual(self.wait_run(pid, cookie)["status"], "done")
+        time.sleep(0.5)
+        mail = [m for m in outbox_for(email) if m["subject"] == "Your agents finished their work"]
+        self.assertEqual(len(mail), 1)
+        self.assertNotIn("Test project", mail[0]["text"], "nothing a person typed goes in an email")
+        # turned off on the profile: no more run emails
+        self.assertEqual(call("PATCH", "/api/auth/preferences", {"notify_runs": False}, cookie=cookie)[0], 200)
+        self.assertEqual(call("PATCH", "/api/auth/preferences", {"notify_runs": "no"}, cookie=cookie)[0], 400)
+        pid2 = new_project(name="Second", cookie=cookie)
+        self.start_and_leave(pid2, cookie)
+        self.wait_run(pid2, cookie)
+        time.sleep(0.5)
+        self.assertEqual(len([m for m in outbox_for(email) if m["subject"] == "Your agents finished their work"]), 1)
+
+    def test_no_run_email_while_the_studio_is_open(self):
+        email = f"watcher-{time.time_ns()}@example.com"
+        cookie = register(email)
+        pid = new_project(cookie=cookie)
+
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": "a page", "agents": ["html"]}))
+            return await recv(("run_done", "error"))
+        ws(pid, script, cookie=cookie)
+        time.sleep(0.5)
+        self.assertFalse([m for m in outbox_for(email) if m["subject"] == "Your agents finished their work"])
+
+    def test_the_owner_hears_when_an_invited_person_joins_and_an_approved_plan(self):
+        owner_mail, guest = f"inviter-{time.time_ns()}@example.com", f"guest-{time.time_ns()}@example.com"
+        owner = register(owner_mail)
+        pid = new_project(cookie=owner)
+        call("POST", f"/api/projects/{pid}/people", {"email": guest, "role": "editor"}, cookie=owner)
+        register(guest)
+        joined = [m for m in outbox_for(owner_mail) if m["subject"] == "Someone you invited joined your project"]
+        self.assertEqual(len(joined), 1)
+        self.assertIn(guest, joined[0]["text"])
+        member_mail = f"approved-{time.time_ns()}@example.com"
+        member = register(member_mail, plan="starter")
+        uid = call("GET", "/api/auth/me", cookie=member)[1]["user"]["id"]
+        call("POST", "/api/auth/plan", {"plan": "pro", "period": "yearly"}, cookie=member)
+        call("PATCH", f"/api/users/{uid}", {"plan": "pro"})
+        active = [m for m in outbox_for(member_mail) if m["subject"] == "Your Pro plan is active"]
+        self.assertEqual(len(active), 1)
+        self.assertIn("paid yearly", active[0]["text"])
+
+    def test_cost_estimate(self):
+        cookie = register(f"estimate-{time.time_ns()}@example.com")
+        pid = new_project(cookie=cookie)
+        est = call("GET", f"/api/projects/{pid}/estimate?agents=ux,html,nope", cookie=cookie)[1]
+        self.assertEqual([a["id"] for a in est["agents"]], ["brief", "ux", "html"], "Brief always, in team order, unknown ids dropped")
+        self.assertTrue(est["first_build"])
+        self.assertGreater(est["cost"], 0)
+        self.assertLessEqual(est["low"], est["cost"])
+        self.assertGreaterEqual(est["high"], est["cost"])
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": "a page", "agents": ["html"]}))
+            return await recv(("run_done", "error"))
+        ws(pid, script, cookie=cookie)
+        est = call("GET", f"/api/projects/{pid}/estimate?agents=html", cookie=cookie)[1]
+        html = next(a for a in est["agents"] if a["id"] == "html")
+        self.assertEqual((html["source"], est["first_build"]), ("project", False))
+        self.assertAlmostEqual(html["cost"], 0.0123, places=3)       # the fake CLI's cost per run
+        self.assertEqual(call("GET", f"/api/projects/{pid}/estimate", cookie=register(f"x-{time.time_ns()}@example.com"))[0], 404)
+
+
+
+class T49ShareManagement(unittest.TestCase):
+    """Changing a link after it's made, and the team's replies to comments (share.py)."""
+
+    def test_edit_a_link_and_reply_to_a_comment(self):
+        owner = register(f"manage-{time.time_ns()}@example.com")
+        pid = new_project(cookie=owner)
+        call("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": "<!doctype html><body><h1>Hi</h1></body>"}, cookie=owner)
+        link = call("POST", f"/api/projects/{pid}/share", {"label": "Old", "days": 1}, cookie=owner)[1]
+        s, r, _ = call("PATCH", f"/api/projects/{pid}/share/{link['id']}", {"label": "Client", "days": 30, "comments": False}, cookie=owner)
+        self.assertEqual((s, r["label"], r["comments"]), (200, "Client", False))
+        self.assertGreater(r["expires"], time.time() + 29 * 86400)
+        self.assertIsNone(call("PATCH", f"/api/projects/{pid}/share/{link['id']}", {"days": 0}, cookie=owner)[1]["expires"])
+        for bad in ({}, {"days": 3}, {"comments": "yes"}):
+            self.assertEqual(call("PATCH", f"/api/projects/{pid}/share/{link['id']}", bad, cookie=owner)[0], 400, bad)
+        self.assertEqual(call("POST", f"/s/{link['token']}/comments", {"text": "hi", "author": "A"}, cookie=None)[0], 403, "comments off now")
+        call("PATCH", f"/api/projects/{pid}/share/{link['id']}", {"comments": True}, cookie=owner)
+        time.sleep(0.1)
+        c = call("POST", f"/s/{link['token']}/comments", {"text": "Bigger title?", "author": "Sara"}, cookie=None)[1]
+        s, r, _ = call("POST", f"/api/projects/{pid}/comments/{c['id']}/reply", {"text": "Done in the next version."}, cookie=owner)
+        self.assertEqual((s, r["reply"]), (200, "Done in the next version."))
+        seen = call("GET", f"/s/{link['token']}/comments", cookie=None)[1]
+        self.assertEqual(seen[0]["reply"], "Done in the next version.", "the visitor sees the answer")
+        self.assertEqual(call("POST", f"/api/projects/{pid}/comments/{c['id']}/reply", {"text": ""}, cookie=owner)[1]["reply"], "")
+        call("DELETE", f"/api/projects/{pid}/share/{link['id']}", cookie=owner)
+        self.assertEqual(call("PATCH", f"/api/projects/{pid}/share/{link['id']}", {"label": "x"}, cookie=owner)[0], 404)

@@ -17,7 +17,7 @@
   :root { --chart: var(--sky); }
   .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
   .head .page-title { margin: 0; }
-  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 12px; margin-bottom: 12px; }
   .stat-tile { padding: 18px 20px; border-radius: var(--r-card); background: var(--paper); box-shadow: var(--ring); min-width: 0; }
   .stat-tile h2 { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--graphite); }
   .stat-tile b { display: block; font-size: 32px; font-weight: 400; line-height: 1.1; letter-spacing: -0.03em; font-feature-settings: "tnum"; }
@@ -29,7 +29,7 @@
   .panel .total { margin: 0 0 12px; font-size: 12px; color: var(--stone); }
   .plot { position: relative; height: 140px; margin-top: 20px; border-bottom: 1px solid var(--line-strong); }
   .plot .top-line { position: absolute; left: 0; right: 0; top: 0; border-top: 1px dashed var(--line); }
-  .plot .top-label { position: absolute; right: 0; top: -18px; font-size: 11px; color: var(--stone); font-feature-settings: "tnum"; }
+  .plot .top-label { position: absolute; inset-inline-end: 0; top: -18px; font-size: 11px; color: var(--stone); font-feature-settings: "tnum"; }
   .bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 2px; }
   .bar { position: relative; flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; background: none; border: 0; padding: 0; }
   .bar:hover, .bar:focus-visible { background: var(--ice); }
@@ -48,7 +48,7 @@
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th { padding: 8px 10px; text-align: start; font-weight: 500; color: var(--graphite); border-bottom: 1px solid var(--line-strong); }
   td { padding: 8px 10px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
-  td.num, th.num { text-align: right; font-feature-settings: "tnum"; white-space: nowrap; }
+  td.num, th.num { text-align: end; font-feature-settings: "tnum"; white-space: nowrap; }
   .table-wrap { overflow-x: auto; }
   .head-l { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
   .views button { display: inline-flex; align-items: center; gap: 6px; }
@@ -86,7 +86,13 @@
   #app[aria-busy="true"] { opacity: .6; transition: opacity .2s; }
   @media (max-width: 1100px) { .health { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 960px) { .grid.rev { grid-template-columns: minmax(0, 1fr); } .health { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 960px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid, .grid.two { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 960px) { .grid, .grid.two { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 600px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stat-tile { padding: 14px 16px; } .stat-tile b { font-size: 26px; } }
+  td.who { min-width: 170px; }
+  td.chg { white-space: nowrap; }
+  @media (max-width: 600px) { td.who { min-width: 140px; } .panel { padding: 16px; } }
+  .plans-t .yr { display: block; font-size: 12px; color: var(--stone); }
+  .pay-st { font-size: 12px; }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 </head>
@@ -146,6 +152,8 @@ const sum = (s) => s.reduce((n, d) => n + d.value, 0);
    The address keeps the view: /analytics?view=monitoring */
 let view = new URLSearchParams(location.search).get("view") === "monitoring" ? "monitoring" : "revenue";
 const usd = (n) => `$${Math.round(n).toLocaleString("en-US")}`;
+/* Monthly values can have cents (a yearly plan counts a twelfth of its price: $90 a year is $7.50 a month). */
+const usdc = (n) => Math.abs(n - Math.round(n)) < 0.005 ? usd(n) : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const PLAN_NAME = { starter: "Starter", pro: "Pro", agency: "Agency" };
 const PLAN_COLOR = { starter: "var(--stone)", pro: "var(--sky)", agency: "var(--ok)" };
 const bytes = (n) => n >= 1e12 ? `${(n / 1e12).toFixed(1)} TB` : n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`;
@@ -172,46 +180,58 @@ app.addEventListener("click", (e) => { const b = e.target.closest("[data-reload]
 async function loadRevenue(ticket) {
   const r = await api(`/api/admin/revenue?days=${days}`);
   if (ticket !== loads) return;
-  const first = r.series[0]?.value || 0, change = r.mrr - first;
+  const s0 = r.series[0]?.value || 0, s1 = r.series[r.series.length - 1]?.value || 0, change = s1 - s0;
   const total = r.by_plan.reduce((n, p) => n + p.members, 0) || 1;
+  const yearly = r.by_plan.reduce((n, p) => n + (p.yearly || 0), 0);
+  const paid = r.received?.enabled;
   app.innerHTML = `
-    <p class="note-line">${icon("alert", { size: 14 })}<span>${r.received?.enabled
-      ? "What the members' plans are worth each month, and the money PayPal actually collected in the period. Plans an admin set by hand count in the value but bring no payments."
-      : "What the members' plans are worth each month. Online payment isn't connected yet (set up PayPal in .env), so this is the plans' value, not money received."} Admins and deactivated accounts aren't counted.</span></p>
+    <p class="note-line">${icon("alert", { size: 14 })}<span>${paid
+      ? `<span>What the members' plans are worth each month, and the money PayPal actually collected in the period.</span> <span>Plans an admin set by hand count in the value but bring no payments.</span>`
+      : `<span>What the members' plans are worth each month.</span> <span>Online payment isn't connected yet (set up PayPal in .env), so this is the plans' value, not money received.</span>`}
+      <span>A plan paid yearly counts as a twelfth of its yearly price each month.</span> <span>Admins and deactivated accounts aren't counted.</span></span></p>
     <section class="tiles" aria-label="Revenue">
-      ${tile("Monthly revenue", usd(r.mrr), `${change === 0 ? "no change" : `${change > 0 ? "+" : "−"}${usd(Math.abs(change))}`} in ${r.days} days`, change > 0 ? "up" : change < 0 ? "down" : "")}
-      ${tile("Yearly run rate", usd(r.arr), "monthly revenue × 12")}
+      ${tile("Monthly revenue", usdc(r.mrr), yearly ? "yearly plans count as a twelfth of their price" : "what the plans bring in each month")}
+      ${tile("Yearly run rate", usdc(r.arr), "monthly revenue × 12")}
       ${tile("Paying members", `${r.paying}`, `${pct(r.paying, r.members)} of ${r.members} members`)}
-      ${tile("Revenue per member", `$${r.arpu.toFixed(2)}`, "monthly, across every member")}
-      ${r.received?.enabled ? tile("Received with PayPal", `$${r.received.total.toFixed(2)}`, `${r.received.count} payment${r.received.count === 1 ? "" : "s"} in ${r.days} days`) : ""}
+      ${tile("Revenue per member", usdc(r.arpu), "monthly, across every member")}
+      ${paid ? tile("Received with PayPal", `$${r.received.total.toFixed(2)}`, `${r.received.count} payment${r.received.count === 1 ? "" : "s"} in ${r.days} days`) : ""}
     </section>
     <div class="grid rev">
-      <section class="panel wide"><h2>Monthly revenue</h2><p class="total">Each day, what the plans were worth</p>${barChart(r.series, usd)}</section>
+      <section class="panel wide"><h2>Monthly revenue per day</h2><p class="total">${change === 0 ? `no change in ${r.days} days` : `${change > 0 ? "+" : "−"}${usdc(Math.abs(change))} in ${r.days} days`}</p>${barChart(r.series, usdc)}
+        ${yearly ? `<p class="foot">This chart counts every plan at its monthly price, so it can be higher than the monthly revenue above when members pay yearly.</p>` : ""}</section>
       <section class="panel"><h2>Members by plan</h2><p class="total">${r.members} members</p>
         <div class="stack" aria-hidden="true">${r.by_plan.map(p => p.members ? `<i style="flex:${p.members};background:${PLAN_COLOR[p.id]}"></i>` : "").join("")}</div>
-        <table class="plans-t"><tbody>${r.by_plan.map(p => `<tr><td><span class="sw" style="background:${PLAN_COLOR[p.id]}"></span>${esc(p.name)} <span class="muted">${p.price ? `$${p.price}` : "free"}</span></td>
-          <td class="num">${p.members} <span class="muted">(${pct(p.members, total)})</span></td><td class="num" data-no-i18n>${usd(p.mrr)}</td></tr>`).join("")}</tbody></table>
+        <table class="plans-t"><thead><tr><th>Plan</th><th class="num">Members</th><th class="num">A month</th></tr></thead>
+          <tbody>${r.by_plan.map(p => `<tr><td><span class="sw" style="background:${PLAN_COLOR[p.id]}"></span>${esc(p.name)} <span class="muted">${p.price ? `$${p.price} / month` : "free"}</span></td>
+          <td class="num"><span data-no-i18n>${p.members}</span> <span class="muted" data-no-i18n>(${pct(p.members, total)})</span>${p.yearly ? `<span class="yr">${p.yearly} paid yearly</span>` : ""}</td><td class="num" data-no-i18n>${usdc(p.mrr)}</td></tr>`).join("")}</tbody></table>
       </section>
     </div>
+    <h2 class="sec">Plan changes</h2>
     <section class="tiles" aria-label="Plan changes">
-      ${tile("Upgrades", `${r.moves.upgrades}`, `+${usd(r.moves.gained)} a month · last ${r.days} days`, r.moves.upgrades ? "up" : "")}
-      ${tile("Downgrades", `${r.moves.downgrades}`, `−${usd(r.moves.lost)} a month · last ${r.days} days`, r.moves.downgrades ? "down" : "")}
-      ${tile("Net change", `${r.moves.net >= 0 ? "+" : "−"}${usd(Math.abs(r.moves.net))}`, "monthly revenue from plan changes")}
-      ${tile("Waiting requests", `${r.pending.count}`, r.pending.count ? `+${usd(r.pending.mrr)} a month once approved` : "nobody is waiting", r.pending.count ? "warn" : "")}
+      ${tile("Upgrades", `${r.moves.upgrades}`, r.moves.upgrades ? `+${usd(r.moves.gained)} a month · last ${r.days} days` : `no change in ${r.days} days`, r.moves.upgrades ? "up" : "")}
+      ${tile("Downgrades", `${r.moves.downgrades}`, r.moves.downgrades ? `−${usd(r.moves.lost)} a month · last ${r.days} days` : `no change in ${r.days} days`, r.moves.downgrades ? "down" : "")}
+      ${tile("Net change", `${r.moves.net >= 0 ? "+" : "−"}${usd(Math.abs(r.moves.net))}`, "a month, from plan changes, at monthly prices")}
+      ${tile("Waiting requests", `${r.pending.count}`, r.pending.count ? `up to +${usd(r.pending.mrr)} a month once approved` : "nobody is waiting", r.pending.count ? "warn" : "")}
     </section>
     <div class="grid two">
       <section class="panel"><h2>Waiting for your approval</h2><p class="total">Members who asked for a higher plan</p>
         ${r.pending.items.length ? `<div class="table-wrap"><table><thead><tr><th>Member</th><th>Change</th><th class="num">Asked</th></tr></thead><tbody>
-          ${r.pending.items.map(i => `<tr><td data-no-i18n>${esc(i.email)}</td><td>${esc(PLAN_NAME[i.from])} → <b>${esc(PLAN_NAME[i.to])}</b></td><td class="num">${i.at ? esc(ago(i.at)) : "-"}</td></tr>`).join("")}
-          </tbody></table></div><a class="lnk more" href="/users">Approve on the Users page</a>` : `<p class="empty-note">No requests waiting.</p>`}
+          ${r.pending.items.map(i => `<tr><td class="who" data-no-i18n>${esc(i.email)}</td><td class="chg">${esc(PLAN_NAME[i.from])} → <b>${esc(PLAN_NAME[i.to])}</b>${i.period === "yearly" ? ` <span class="muted">· yearly</span>` : ""}</td><td class="num">${i.at ? esc(ago(i.at)) : "-"}</td></tr>`).join("")}
+          </tbody></table></div><a class="lnk more" href="/users?asks=1">Approve on the Users page</a>` : `<p class="empty-note">No requests waiting.</p>`}
       </section>
       <section class="panel"><h2>Latest plan changes</h2><p class="total">Newest first</p>
         ${r.recent.length ? `<div class="table-wrap"><table><thead><tr><th>Member</th><th>Change</th><th class="num">When</th></tr></thead><tbody>
-          ${r.recent.map(i => `<tr><td data-no-i18n>${esc(i.email)}</td><td><span class="mv ${plansRank(i.to) > plansRank(i.from) ? "up" : "down"}">${icon(plansRank(i.to) > plansRank(i.from) ? "arrow-up" : "arrow-right", { size: 12 })}</span>${esc(PLAN_NAME[i.from])} → ${esc(PLAN_NAME[i.to])}${i.by_admin ? "" : ` <span class="muted">by the member</span>`}</td><td class="num">${esc(ago(i.ts))}</td></tr>`).join("")}
+          ${r.recent.map(i => `<tr><td class="who" data-no-i18n>${esc(i.email)}</td><td class="chg"><span class="mv ${plansRank(i.to) > plansRank(i.from) ? "up" : "down"}">${icon(plansRank(i.to) > plansRank(i.from) ? "arrow-up" : "arrow-right", { size: 12 })}</span>${esc(PLAN_NAME[i.from])} → ${esc(PLAN_NAME[i.to])}${i.by_admin ? "" : ` <span class="muted">by the member</span>`}</td><td class="num">${esc(ago(i.ts))}</td></tr>`).join("")}
           </tbody></table></div>` : `<p class="empty-note">No plan changes yet.</p>`}
       </section>
-    </div>`;
+    </div>
+    ${paid ? `<section class="panel"><h2>Latest PayPal payments</h2><p class="total">In the last ${r.days} days, newest first. A refund shows as a negative amount and is taken off the total.</p>
+      ${r.received.recent?.length ? `<div class="table-wrap"><table><thead><tr><th>Member</th><th class="num">Amount</th><th>Status</th><th class="num">When</th></tr></thead><tbody>
+        ${r.received.recent.map(i => `<tr><td class="who" data-no-i18n>${esc(i.email || "-")}</td><td class="num" data-no-i18n>${esc(i.amount.toFixed(2))} ${esc(i.currency || "")}</td>
+          <td class="pay-st ${i.status === "completed" ? "" : "bad"}">${esc(PAY_STATUS[i.status] || i.status)}</td><td class="num">${i.ts ? esc(ago(i.ts)) : "-"}</td></tr>`).join("")}
+        </tbody></table></div>` : `<p class="empty-note">No payments in this period.</p>`}</section>` : ""}`;
 }
+const PAY_STATUS = { completed: "Received", refunded: "Refunded", pending: "Pending", denied: "Denied", reversed: "Reversed" };
 const plansRank = (p) => ({ starter: 0, pro: 1, agency: 2 })[p] ?? 0;
 
 async function loadMonitoring(ticket) {
@@ -233,7 +253,7 @@ function monitoringHTML(m) {
       <div class="hcard">${okc(h.database.ok, h.database.ok ? "Database" : "Database down")}<small>${h.database.ok ? `answers in ${h.database.ms} ms` : "the server can't reach Postgres"}</small></div>
       <div class="hcard">${okc(h.claude, h.claude ? "Claude Code" : "Claude Code missing")}<small>${h.keys === "user" ? "runs on each member's own key" : "runs on the server's login"}</small></div>
       <div class="hcard">${okc(h.chrome, h.chrome ? "Browser checks" : "No Chrome", true)}<small>${h.chrome ? "headless Chrome is ready" : "layout and accessibility checks are off"}</small></div>
-      <div class="hcard">${okc(diskPct < 0.9, `Disk ${Math.round(diskPct * 100)}% full`, diskPct < 0.97)}<small data-no-i18n>${esc(bytes(h.disk.free))} free of ${esc(bytes(h.disk.total))}</small></div>
+      <div class="hcard">${okc(diskPct < 0.9, `Disk ${Math.round(diskPct * 100)}% full`, diskPct < 0.97)}<small>${esc(bytes(h.disk.free))} free of ${esc(bytes(h.disk.total))}</small></div>
       <div class="hcard">${okc(true, "Up for " + uptime(h.uptime))}<small>${h.busy.length ? `${h.busy.length} project${h.busy.length === 1 ? "" : "s"} building now` : "nothing building now"} · ${h.viewers} studio${h.viewers === 1 ? "" : "s"} open</small></div>
     </section>
     ${h.busy.length ? `<p class="busy-line">${icon("zap", { size: 14 })}<span>Building now:</span> ${h.busy.map(p => `<a href="/p/${esc(p.id)}" data-no-i18n>${esc(p.name)}</a>`).join(", ")}</p>` : ""}
@@ -246,7 +266,7 @@ function monitoringHTML(m) {
     </section>
     <div class="grid two">
       <section class="panel"><h2>Failed or stopped runs per day</h2><p class="total">${sum(m.failures)} in ${m.days} days</p>${barChart(m.failures)}</section>
-      <section class="panel"><h2>Agents with the most problems</h2><p class="total">Last ${m.days} days</p>
+      <section class="panel"><h2>Agents with the most problems</h2><p class="total">${m.agents.some(a => a.failed) ? `Last ${m.days} days` : "No failures in this period. The busiest agents:"}</p>
         ${m.agents.length ? `<div class="table-wrap"><table><thead><tr><th>Agent</th><th class="num">Runs</th><th class="num">Failed</th><th class="num">Avg time</th></tr></thead><tbody>
           ${m.agents.map(a => `<tr><td data-no-i18n>${esc(a.agent)}</td><td class="num">${a.runs}</td><td class="num ${a.failed ? "bad" : ""}">${a.failed} <span class="muted">(${pct(a.failed, a.runs)})</span></td><td class="num">${duration(a.avg_seconds)}</td></tr>`).join("")}
           </tbody></table></div>` : `<p class="empty-note">No runs in this period.</p>`}
@@ -257,7 +277,7 @@ function monitoringHTML(m) {
         <code data-no-i18n>${esc(e.error || "No details")}</code></li>`).join("")}</ul>` : `<p class="empty-note">No errors in this period.</p>`}
     </section>
     ${m.accounts.leaving.length ? `<section class="panel"><h2>Accounts being deleted</h2><p class="total">Deactivated by their owners. They're deleted on this date unless they log in again.</p>
-      <div class="table-wrap"><table><tbody>${m.accounts.leaving.map(a => `<tr><td data-no-i18n>${esc(a.email)}</td><td class="num">${esc(new Date(a.delete_after * 1000).toLocaleDateString(getLocale(), { day: "numeric", month: "short", year: "numeric" }))}</td></tr>`).join("")}</tbody></table></div></section>` : ""}`;
+      <div class="table-wrap"><table><tbody>${m.accounts.leaving.map(a => `<tr><td class="who" data-no-i18n>${esc(a.email)}</td><td class="num">${esc(new Date(a.delete_after * 1000).toLocaleDateString(getLocale(), { day: "numeric", month: "short", year: "numeric" }))}</td></tr>`).join("")}</tbody></table></div></section>` : ""}`;
 }
 function usageHTML(d, keys) {
   const u = d.users, b = d.builds;
@@ -283,7 +303,7 @@ function usageHTML(d, keys) {
     </div>
     <section class="panel"><h2>Top accounts by AI cost</h2><p class="total">All time</p>
       ${d.top_users.length ? `<div class="table-wrap"><table><thead><tr><th>Account</th><th class="num">Projects</th><th class="num">Agent runs</th><th class="num">AI cost</th><th class="num">Last run</th></tr></thead>
-        <tbody>${d.top_users.map(r => `<tr><td data-no-i18n>${esc(r.email)}</td><td class="num">${r.projects}</td><td class="num">${r.runs}</td><td class="num" data-no-i18n>${money(r.cost)}</td><td class="num">${r.last ? ago(r.last) : "-"}</td></tr>`).join("")}</tbody></table></div>`
+        <tbody>${d.top_users.map(r => `<tr><td class="who" data-no-i18n>${esc(r.email)}</td><td class="num">${r.projects}</td><td class="num">${r.runs}</td><td class="num" data-no-i18n>${money(r.cost)}</td><td class="num">${r.last ? ago(r.last) : "-"}</td></tr>`).join("")}</tbody></table></div>`
         : `<p class="empty-note">No projects yet.</p>`}
     </section>`;
 }

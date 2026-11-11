@@ -27,6 +27,7 @@ import uuid
 
 import auth
 import config
+import notify
 import db
 import plans
 
@@ -234,6 +235,7 @@ async def apply(sub: dict) -> dict | None:
             return None
         changed = await _set_plan(user_id, plan, sub_id, period)
         log.info("%s is on %s (%s) through PayPal (%s)", user["email"], plan, period, sub_id)
+        await notify.plan_active(user_id, plan, period)
         if old and old != sub_id:                    # an upgrade or a switch: one subscription at a time
             try:
                 await _cancel_at_paypal(old, "Replaced by a new plan")
@@ -243,6 +245,7 @@ async def apply(sub: dict) -> dict | None:
     if status in ENDED and user["billing_subscription"] == sub_id:
         changed = await _set_plan(user_id, plans.DEFAULT, "")
         log.info("%s's PayPal subscription %s is %s: back to Starter", user["email"], sub_id, status.lower())
+        await notify.plan_ended(user_id, plan, status)
         return changed
     return None
 
@@ -282,7 +285,11 @@ async def webhook(headers, raw: bytes) -> dict:
         return {"duplicate": True}
     changed = None
     try:
-        if kind.startswith("BILLING.SUBSCRIPTION."):
+        if kind == "BILLING.SUBSCRIPTION.PAYMENT.FAILED":
+            row = await db.pool.fetchrow("SELECT user_id, plan FROM billing_subscriptions WHERE id = $1", str(res.get("id") or ""))
+            if row and row["user_id"]:
+                await notify.payment_failed(row["user_id"], row["plan"])
+        elif kind.startswith("BILLING.SUBSCRIPTION."):
             changed = await apply(res)
         elif kind in ("PAYMENT.SALE.COMPLETED", "PAYMENT.SALE.REFUNDED", "PAYMENT.SALE.REVERSED"):
             await record_payment(kind, res)

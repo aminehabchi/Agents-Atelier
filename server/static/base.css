@@ -358,10 +358,11 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
 .instr-locked p { margin: 6px 0 12px; font-size: 13.5px; line-height: 1.55; color: var(--graphite); max-width: 60ch; }
 
 /* ---------- offline / back online banner (ui.js) ---------- */
-.net-banner { position: fixed; inset-block-start: 12px; inset-inline: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 32px); z-index: 120;
+.net-banner { position: fixed; inset-block-end: 16px; inset-inline: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 32px); z-index: 120;
   display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: var(--r); font-size: 13px; line-height: 1.4;
   background: var(--del-bg); color: var(--del-fg); border: 1px solid var(--line-strong); box-shadow: var(--hard-sm); animation: toast-in .25s ease; }
 .net-banner.ok { background: var(--paper); color: var(--ink); }
+body:has(.net-banner) .toasts { bottom: 72px; }      /* toasts stack above the offline banner */
 .net-banner .ic { flex: none; }
 .toast { max-width: min(520px, calc(100vw - 32px)); line-height: 1.45; }
 .toast .ic { flex: none; }

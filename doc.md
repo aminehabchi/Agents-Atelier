@@ -441,6 +441,12 @@ publishing the Agency plan: otherwise `403 {"detail", "upgrade"}`, which `ui.js`
 | GET | `/api/admin/analytics?days=` | sign-ups, activity, runs, cost per day, audience, top accounts |
 | GET | `/api/admin/revenue?days=` | monthly revenue, run rate, paying members, revenue per member, by plan, upgrades/downgrades, waiting requests, revenue per day, latest changes, and `received` (money PayPal collected in the period) |
 
+### Run estimate
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/projects/<id>/estimate?agents=a,b` | about what a run of these agents (default: the project's team; Brief always) costs on the owner's Claude account and how long it takes: per agent its last 5 runs on this project, else its runs everywhere (`market.agent_estimate`), else a default for its model; `{agents, cost, low, high, seconds, first_build, limit, over_limit, measured, count}`. The studio shows it next to the composer and on the Orchestrator's plan card (`static/studio-extras.js`, which also holds the first-run studio tour) |
+
 ### People, share links and comments
 
 | Method | Path | Who | Notes |
@@ -449,7 +455,7 @@ publishing the Agency plan: otherwise `403 {"detail", "upgrade"}`, which `ui.js`
 | POST | `/api/projects/<id>/people` | owner | `{email, role: editor\|viewer}`: an existing account joins at once, any other email waits in `project_invites` until it confirms an account. Needs Agency (`403` + `upgrade`), 20 people at most |
 | PATCH / DELETE | `/api/projects/<id>/people/<user>` | owner | change the role / remove |
 | DELETE | `/api/projects/<id>/membership` · `/api/projects/<id>/invites?email=` | the member · owner | leave the project · cancel an invitation |
-| GET / POST | `/api/projects/<id>/share` | owner, editors | list links (with `views`, `comment_count`, `state`) · `{label, days: 1\|7\|30\|90\|0, comments}` creates one |
+| GET / POST | `/api/projects/<id>/share` | owner, editors | list links (with `views`, `comment_count`, `state`, `version_n`) · `{label, days: 1\|7\|30\|90\|0, comments, version}` creates one; `version` is `"live"` (default), `"now"` (saves the site as a version, refused with 409 while agents work) or a version number. A frozen link's version is never pruned while the link isn't revoked (`share.pinned`, `Versions.pinned`) |
 | DELETE | `/api/projects/<id>/share/<link>` | owner, editors | turn a link off |
 | GET | `/api/projects/<id>/comments` | anyone on it | every pinned comment |
 | PATCH / DELETE | `/api/projects/<id>/comments/<comment>` | owner, editors | `{resolved}` · delete |
@@ -553,20 +559,55 @@ Each agent run, whether it finished, was stopped or failed, appends an entry to 
 
 ### Server
 
+Every error is JSON `{"detail": "<one readable sentence>"}` for `/api/*` (plus `upgrade` on plan errors, `ref` when
+something was logged), and a styled HTML page for browser pages. No answer carries a traceback, SQL, a key or a server
+path (`keys.scrub` removes API keys, `scrub_paths` the app, storage and home folders).
+
 | Situation                        | Response                                                                 |
 |----------------------------------|--------------------------------------------------------------------------|
-| `HTTPException` (404, 409, …)    | JSON `{"detail"}` for `/api/*`; a styled HTML error page for browser pages |
-| Invalid JSON or wrong field types | `422` with one readable sentence                                        |
-| Request body over 8 MB           | `413`, checked from `Content-Length` before reading                      |
-| Any other exception              | `500` with `{"detail", "ref"}`; the traceback is logged under that ref. A full disk gives a specific message |
-| Damaged project file             | skipped in lists; opening it gives a `500` naming the file               |
-| Damaged chat line                | skipped                                                                  |
-| Versioning or stats failure      | logged, never stops a run (`safely()`)                                   |
-| Bad WebSocket message            | an `error` event; the connection stays open                              |
+| `HTTPException` (404, 409, …)    | its status and message                                                    |
+| Unknown `/api/` address          | `404` "There's nothing at this address. Check the URL."                  |
+| Wrong method                     | `405` "This address doesn't accept DELETE requests (it accepts GET, PATCH)." with an `Allow` header listing every route's methods |
+| Body that isn't a JSON object, missing, or invalid JSON | `422`: "Send the details as a JSON object, like {"name": "…"}." · "This request needs a JSON body." · "The request body isn't valid JSON." |
+| Wrong query or path types        | `422`: "“page” must be a whole number.", "“full” must be true or false.", "“x” is required." |
+| Wrong types inside a body        | `400` with the field's own message (lists that aren't lists, numbers too large, `Infinity`…) |
+| A malformed or unknown project id | `404` "This project doesn't exist (it may have been deleted)." — the same for another member's project |
+| A marketplace id no database can hold | `404` "This isn't in the marketplace (it may have been withdrawn)." |
+| A value Postgres refuses (NUL character, number out of range) | `400` "One of the values you sent can't be saved (it may contain invalid characters or be too large). Check it and try again." |
+| Postgres down, restarting or too slow (asyncpg connection errors, refused connections, timeouts) | `503` "The database isn't reachable right now. Try again in a minute." with `Retry-After: 30`; logged as one line with a ref, no traceback |
+| Busy project / size / rate        | `409` while agents work · `413` too large (`Content-Length` checked before reading) · `429` with `Retry-After` |
+| Upstream failures                 | `502` (PayPal, SMTP, OAuth providers: every outbound call has a timeout of 20–30 s) |
+| Full disk                         | `507` "The disk is full, so the server couldn't save. Free some space and try again." |
+| Any other exception (a bug)       | `500` "Something went wrong on the server. Details are in the server log under ref xxxxxx."; the traceback is logged under that ref |
+| Damaged .zip (import)             | `400` naming the file that couldn't be read (damaged or password-protected) |
+| Damaged project file / chat line  | skipped                                                                  |
+| Versioning or stats failure       | logged, never stops a run (`safely()`)                                   |
+
+`explain_exception()` in `main.py` makes this choice; `db.unavailable()` and `db.bad_value()` tell an outage or a refused
+value from a bug. The database errors are also registered by class, so uvicorn doesn't log a second traceback.
+
+**Database.** Connecting gives up after 10 s and every query after 30 s (`db.init`), so nothing hangs on a dead
+Postgres. The store's writer retries a change for about a minute while Postgres is unreachable, in order, before
+logging it as lost. When it's back, requests work again with no restart.
+
+**WebSocket.** A binary frame, a message over 256 KB, invalid JSON, a message that isn't an object, a missing or unknown
+`type`, `agents`/`images` that aren't lists or an unknown agent to retry each get `{"type": "error", "text"}` and the
+socket stays open. An unexpected failure answers "Something went wrong on the server (ref …)" (or the 503 text) and is
+logged. The session and the project are checked on every message: logged out → close `4401`; project deleted or no
+longer shared → `{"type": "error", "gone": true, "text": "This project doesn't exist (it may have been deleted)."}` then
+close `4404`. A tab that doesn't take an event within 10 s is closed (`1013`), so it reconnects and catches up.
+
+**Background work.** Every run task (`prompt`, plan, continue/restart, retry) runs inside `guarded_run()`: whatever
+escapes is logged with the project and what was running, a run left `running` is saved as `error`, and the studio gets
+an `error` event. `run_error_text()` shows our explained failures (`RuntimeError`) as they are and anything else as
+"The run stopped because of a problem on the server (ref …). Press Continue to try again; …". Odd lines from the Claude
+CLI are skipped instead of failing the run. `purge_loop` goes on after an account that can't be erased; a PayPal webhook
+that fails is forgotten so PayPal's retry handles it; background emails log their failures; a Chrome that fails to
+start is killed.
 
 Agent failures are turned into actionable messages by `explain_failure()`:
 - Claude Code not found or not executable (`CLAUDE_BIN`)
-- a refused API key, no credit left, or a key without access (`keys.explain`); any `sk-ant-…` text is scrubbed first
+- a refused API key, no credit left, or a key without access (`keys.explain`); any `sk-ant-…` text and server paths are scrubbed first
 - not logged in (`CLAUDE_KEYS=server`)
 - rate-limited or overloaded
 - unknown model

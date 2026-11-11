@@ -183,8 +183,11 @@ async def claim_invites(user: dict) -> int:
                 await con.execute("""INSERT INTO project_members (project_id, user_id, role, invited_by, created_at)
                                      VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING""",
                                   r["project_id"], user["id"], r["role"], r["invited_by"], time.time())
+    import notify                              # (not at the top: notify imports auth, like this module)
     for r in rows:
         members.setdefault(str(r["project_id"]), {}).setdefault(str(user["id"]), r["role"])
+        if r["invited_by"]:
+            await notify.joined(str(r["project_id"]), r["invited_by"], user["email"], r["role"])
     return len(rows)
 
 

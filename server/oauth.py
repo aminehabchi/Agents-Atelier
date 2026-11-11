@@ -146,6 +146,7 @@ async def account_for(pid: str, who: dict, language: str = "") -> dict:
     """The account to log in: linked, matched by verified email, or new."""
     if not who["subject"]:
         raise OAuthError("The provider didn't say who you are. Try again.")
+    created = False
     row = await db.pool.fetchrow("""SELECT u.* FROM user_identities i JOIN users u ON u.id = i.user_id
                                     WHERE i.provider = $1 AND i.subject = $2""", pid, who["subject"])
     if not row:
@@ -163,6 +164,7 @@ async def account_for(pid: str, who: dict, language: str = "") -> dict:
                    VALUES ($1, $2, '', $3, $4, $5, now(), now()) RETURNING *""",
                 uuid.uuid4(), email, " ".join(who["name"].split())[:80], role, language if language in auth.LANGUAGES else "")
             log.info("New account %s through %s", email, pid)
+            created = True
         await db.pool.execute("""INSERT INTO user_identities (provider, subject, user_id, email, created_at) VALUES ($1, $2, $3, $4, $5)
                                  ON CONFLICT (provider, subject) DO NOTHING""", pid, who["subject"], row["id"], email, time.time())
     if row["role"] == "unconfirmed":           # the provider verified this address
@@ -171,7 +173,7 @@ async def account_for(pid: str, who: dict, language: str = "") -> dict:
     back = bool(row["deactivated_at"])         # logging in during the 30 days cancels the deletion, as with a password
     row = await db.pool.fetchrow("""UPDATE users SET deactivated_at = NULL, delete_after = NULL, failed_logins = 0, locked_until = NULL
                                     WHERE id = $1 RETURNING *""", row["id"])
-    return {**dict(row), "reactivated": back}
+    return {**dict(row), "reactivated": back, "created": created}
 
 
 async def identities(user_id) -> list[dict]:

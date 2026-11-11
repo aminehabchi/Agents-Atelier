@@ -89,7 +89,7 @@ const OFFLINE_MSG = "You're offline. Check your connection, then try again.";
    `offline`, `timeout`. A 401 on a private page goes to the login page instead of throwing.
    opts: fetch options plus `timeout` (ms, default 30 s; uploads pass more) and an optional `signal` to cancel. */
 window.api = async (path, opts = {}) => {
-  const { timeout = 30000, signal, ...init } = opts;
+  const { timeout = 30000, signal, _retried, ...init } = opts;
   const ctrl = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, timeout);
@@ -113,6 +113,15 @@ window.api = async (path, opts = {}) => {
   if (toLogin && !noLoginRedirect() && !path.startsWith("/api/auth/")) {
     location.href = `/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`;
     return new Promise(() => {});                     // the page is leaving: nothing to show meanwhile
+  }
+  // A short rate limit on a read (opening a page, refreshing a panel): wait and try once more instead of failing.
+  const method = (init.method || "GET").toUpperCase();
+  if (res.status === 429 && (method === "GET" || method === "HEAD") && !opts._retried) {
+    const wait = retryAfterOf(res);
+    if (wait && wait <= 10) {
+      await new Promise(r => setTimeout(r, wait * 1000));
+      return window.api(path, { ...opts, _retried: true });
+    }
   }
   if (!res.ok) {
     if (res.status === 403 && data?.detail === "Confirm your email first." && !noLoginRedirect()) {
