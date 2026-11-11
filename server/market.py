@@ -26,7 +26,7 @@ SHARED_AGENT_CATEGORY = {
     "design": "design", "3d-design": "design", "depth": "design", "3d-scene": "code", "assets": "design", "dark-theme": "design", "anim": "design", "gallery": "design",
     "html": "code", "css": "code", "js": "code", "responsive": "code", "forms": "code", "tidy": "code",
     "seo": "growth", "conversion": "growth", "local": "growth", "pricing": "growth",
-    "whatsapp": "growth", "email": "growth", "call": "growth", "telegram": "growth",
+    "whatsapp": "growth", "email": "growth", "call": "growth", "telegram": "growth", "qr": "growth",
     "a11y": "quality", "perf": "quality", "qa": "quality", "critic": "quality",
 }
 SHARED_TEAM_CATEGORY = {

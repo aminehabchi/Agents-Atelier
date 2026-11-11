@@ -437,6 +437,97 @@
   .team-head .paused { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--graphite); }
   .team-head .paused b { color: var(--ink); font-weight: 500; }
 
+  /* ---------- toolbar groups: tabs · preview tools (Preview tab only) · project actions ---------- */
+  .pv-bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--paper); flex: none; min-width: 0; }
+  .pv-bar[hidden] { display: none; }
+  .pv-bar .url { flex: 1 1 auto; max-width: none; min-width: 0; }
+  .seg .badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-grid; place-items: center;
+                font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--danger); color: #fff; }
+  .seg .badge.ok { background: var(--ok); }
+  .seg .badge[hidden] { display: none; }
+
+  /* ---------- Checks and Project tabs ---------- */
+  .pane { position: absolute; inset: 0; display: none; overflow: auto; background: var(--linen); }
+  .pane.on { display: block; }
+  .pane-in { max-width: 1040px; margin: 0 auto; padding: 24px; display: grid; gap: 16px; }
+  .pane-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .pane-head h2 { margin: 0; font-size: 20px; font-weight: 500; color: var(--ink); }
+  .pane-head .meta { font-size: 13px; color: var(--stone); }
+  .pane-head .acts { margin-inline-start: auto; display: flex; flex-wrap: wrap; gap: 8px; }
+  .pcard2 { background: var(--paper); box-shadow: var(--ring); border-radius: var(--r-card); padding: 20px; display: grid; gap: 14px; min-width: 0; align-content: start; }
+  .pcard2 > header { display: flex; align-items: center; gap: 10px; }
+  .pcard2 > header h3 { margin: 0; font-size: 15px; font-weight: 500; color: var(--ink); }
+  .pcard2 > header .tile { width: 32px; height: 32px; border-radius: var(--r); display: grid; place-items: center; background: var(--ice); color: var(--sky); flex-shrink: 0; }
+  .pcard2 > header .tile svg { display: block; }
+  .pcard2 > header .acts { margin-inline-start: auto; display: flex; gap: 8px; }
+  .pcard2 .lead { margin: 0; font-size: 13px; line-height: 1.5; color: var(--stone); }
+  .pgrid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); align-items: start; }
+  .pempty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 32px 16px; color: var(--stone); font-size: 14px; line-height: 1.5; }
+  .pempty .tile { width: 48px; height: 48px; border-radius: var(--r); display: grid; place-items: center; background: var(--paper); box-shadow: var(--ring); color: var(--ink); }
+  .pempty b { color: var(--ink); font-weight: 500; font-size: 16px; }
+
+  /* checks */
+  .ck-sum { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .ck-kpi { background: var(--paper); box-shadow: var(--ring); border-radius: var(--r-card); padding: 14px 16px; display: grid; gap: 4px; }
+  .ck-kpi b { font-size: 22px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .ck-kpi span { font-size: 12px; color: var(--stone); display: inline-flex; align-items: center; gap: 6px; }
+  .ck-kpi span svg { flex-shrink: 0; display: block; }
+  .ck-kpi.bad b { color: var(--danger); }
+  .ck-shots { display: grid; grid-template-columns: 3fr 1fr; gap: 12px; align-items: start; }
+  .ck-shots a { display: block; border-radius: var(--r); overflow: hidden; box-shadow: var(--ring); background: var(--paper); max-height: 320px; }
+  .ck-shots img { display: block; width: 100%; height: auto; }
+  .ck-page { display: grid; gap: 12px; }
+  .ck-page > header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .ck-page > header .mono { font-size: 13px; color: var(--stone); }
+  .ck-page > header .acts { margin-inline-start: auto; }
+  .ck-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
+  .ck-col { display: grid; gap: 8px; align-content: start; min-width: 0; }
+  .ck-col h4 { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--stone); text-transform: uppercase; letter-spacing: .04em; }
+  .ck-col h4 svg { flex-shrink: 0; display: block; }
+  .ck-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .ck-list li { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: start; padding: 10px 12px; border-radius: var(--r); background: var(--linen); font-size: 13px; line-height: 1.45; color: var(--graphite); min-width: 0; }
+  .ck-list li .tag { grid-row: span 2; align-self: start; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: var(--r-pill); background: var(--paper); box-shadow: var(--ring); color: var(--ink); white-space: nowrap; }
+  .ck-list li .tag.a11y { color: var(--sky); } .ck-list li .tag.err { color: var(--danger); } .ck-list li .tag.layout { color: var(--saffron); }
+  .ck-list li span:last-child { overflow-wrap: anywhere; }
+  .ck-ok { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ok); padding: 10px 12px; border-radius: var(--r); background: var(--linen); }
+  .ck-ok svg { flex-shrink: 0; display: block; }
+
+  /* project */
+  .pj-form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
+  .pj-form label { display: grid; gap: 6px; font-size: 13px; color: var(--ink); min-width: 0; }
+  .pj-form label > span { display: flex; align-items: center; gap: 8px; }
+  .pj-form .st { margin-inline-start: auto; font-size: 11px; padding: 1px 8px; border-radius: var(--r-pill); background: var(--linen); color: var(--stone); white-space: nowrap; }
+  .pj-form .st.ok { background: var(--add-bg); color: var(--add-fg); }
+  .pj-form .input { width: 100%; min-width: 0; }
+  .pj-form .input[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px var(--danger); }
+  .pj-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .pj-bar .msg-line { font-size: 12px; color: var(--stone); }
+  .pj-bar .msg-line.err { color: var(--danger); }
+  .pj-imgs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .pj-imgs li { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; min-width: 0; }
+  .pj-imgs img { width: 64px; height: 64px; object-fit: cover; border-radius: var(--r); background: var(--linen); display: block; }
+  .pj-imgs .an { min-width: 0; display: grid; gap: 4px; }
+  .pj-imgs .an b { font: 500 13px var(--mono); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pj-imgs .an small { font-size: 12px; color: var(--stone); line-height: 1.4; }
+  .pj-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pj-chips span { font-size: 11px; padding: 2px 8px; border-radius: var(--r-pill); background: var(--linen); color: var(--graphite); white-space: nowrap; }
+  .pj-chips span.save { background: var(--add-bg); color: var(--add-fg); }
+  .pj-qrs { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .pj-qrs figure { margin: 0; display: grid; gap: 8px; justify-items: center; padding: 12px; border-radius: var(--r); background: var(--linen); text-align: center; }
+  .pj-qrs img { width: 112px; height: 112px; background: #fff; padding: 6px; border-radius: var(--r); display: block; }
+  .pj-qrs figcaption { font: 12px var(--mono); color: var(--graphite); overflow-wrap: anywhere; }
+  .pj-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pj-swatches span { width: 32px; height: 32px; border-radius: var(--r); box-shadow: var(--ring); display: block; }
+  .pj-brief { margin: 0; display: grid; grid-template-columns: minmax(110px, 30%) 1fr; gap: 8px 16px; font-size: 13px; line-height: 1.45; }
+  .pj-brief dt { color: var(--stone); }
+  .pj-brief dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+  @media (max-width: 640px) {
+    .pane-in { padding: 16px; }
+    .ck-shots { grid-template-columns: 1fr 1fr; }
+    .pj-brief { grid-template-columns: 1fr; gap: 2px; }
+    .pj-brief dd { margin-bottom: 8px; }
+  }
+
   @media (max-width: 900px) {
     body { grid-template-columns: 1fr; grid-template-rows: 55vh 45vh; }
     .chat { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -451,6 +542,8 @@
     .toolbar { overflow-x: auto; scrollbar-width: none; }
     .toolbar > * { flex: none; }
     .toolbar .spacer { flex: 1 0 0; }
+    .pv-bar { overflow-x: auto; scrollbar-width: none; padding: 8px 10px; }
+    .pv-bar > * { flex: none; }
   }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
@@ -500,8 +593,17 @@
     <div class="seg" id="tabs" role="tablist">
       <button data-tab="preview" class="on"><i data-icon="eye" data-size="16"></i><span class="lbl">Preview</span></button>
       <button data-tab="code"><i data-icon="code" data-size="16"></i><span class="lbl">Code</span></button>
+      <button data-tab="checks" title="What the server's browser found: layout, accessibility, errors and links"><i data-icon="gauge" data-size="16"></i><span class="lbl">Checks</span><span class="badge" id="checksBadge" hidden></span></button>
+      <button data-tab="project" title="Contact details, images, QR codes, brand kit and brief"><i data-icon="briefcase" data-size="16"></i><span class="lbl">Project</span></button>
       <button data-tab="research" title="The Research agent's report"><i data-icon="search" data-size="16"></i><span class="lbl">Research</span></button>
     </div>
+    <span class="spacer"></span>
+    <button class="icon-btn" id="historyBtn" title="Versions: history of the code" aria-label="Versions"><i data-icon="history" data-size="17"></i></button>
+    <button class="icon-btn" id="statsBtn" title="Cost &amp; time per agent" aria-label="Stats"><i data-icon="chart" data-size="17"></i></button>
+    <a class="btn btn-ghost btn-sm" id="download" title="Download the code as .zip"><i data-icon="download" data-size="16"></i>.zip</a>
+  </div>
+
+  <div class="pv-bar" id="pvTools">
     <div class="seg" id="devices">
       <button data-device="desktop" class="on" title="Desktop"><i data-icon="monitor" data-size="16"></i></button>
       <button data-device="tablet" title="Tablet · 768px"><i data-icon="tablet" data-size="16"></i></button>
@@ -509,14 +611,9 @@
     </div>
     <label class="page-pick" title="Page shown in the preview"><i data-icon="file" data-size="15"></i>
       <select id="pageSel" aria-label="Page shown in the preview"></select></label>
-    <span class="spacer"></span>
     <span class="url" id="url"></span>
     <button class="icon-btn" id="reload" title="Reload preview" aria-label="Reload preview"><i data-icon="refresh" data-size="16"></i></button>
     <button class="icon-btn" id="open" title="Open in a new tab" aria-label="Open in a new tab"><i data-icon="external" data-size="16"></i></button>
-    <button class="icon-btn" id="brandBtn" title="Brand kit: this project's logo, colours and fonts" aria-label="Brand kit"><i data-icon="palette" data-size="17"></i></button>
-    <button class="icon-btn" id="historyBtn" title="Versions: history of the code" aria-label="Versions"><i data-icon="history" data-size="17"></i></button>
-    <button class="icon-btn" id="statsBtn" title="Cost &amp; time per agent" aria-label="Stats"><i data-icon="chart" data-size="17"></i></button>
-    <a class="btn btn-ghost btn-sm" id="download" title="Download the code as .zip"><i data-icon="download" data-size="16"></i>.zip</a>
   </div>
 
   <div class="view">
@@ -525,7 +622,7 @@
       <b>Nothing to preview yet</b>
       The page appears here as soon as the HTML agent writes <span class="mono">index.html</span>.
     </div></div>
-    <div class="frame-wrap" id="frameWrap"><iframe id="frame" title="Live preview" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe></div>
+    <div class="frame-wrap" id="frameWrap"><iframe id="frame" title="Live preview" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-top-navigation-to-custom-protocols allow-popups-to-escape-sandbox"></iframe></div>
     <div class="flash" id="flash"></div>
     <div class="code" id="code">
       <nav class="files" id="files"></nav>
@@ -541,6 +638,8 @@
       </div>
     </div>
     <div class="research" id="research" role="region" aria-label="Research report" aria-live="polite"></div>
+    <div class="pane" id="checks" role="region" aria-label="Checks"></div>
+    <div class="pane" id="proj" role="region" aria-label="Project"></div>
   </div>
 
   <section class="team" id="team" aria-label="Agent team">
@@ -567,7 +666,9 @@ let run = null;   // { agents: [...ids], index, started }
 const status = {}; // agent id -> { state: waiting|working|done|stopped, started, ended, last }
 let collapsed = false, lastPrompt = "";
 let paused = null;  // saved run that was stopped / failed / interrupted: { agents, done, current, next, request, status, resumable }
-try { collapsed = localStorage.getItem("teamCollapsed") === "1"; } catch {}
+// Folded by default on small screens, where the open strip would cover the preview and the other tabs; a saved choice wins.
+try { const saved = localStorage.getItem("teamCollapsed"); collapsed = saved === null ? matchMedia("(max-width: 900px)").matches : saved === "1"; }
+catch { collapsed = matchMedia("(max-width: 900px)").matches; }
 
 // ================================================================ boot
 function fatal(err, title = "The studio couldn't open this project") {
@@ -650,9 +751,11 @@ async function boot() {
 
   reloadPreview();
   refreshPages();
+  setChecksBadge();
   // deep link to a tab: /p/<id>#code or /p/<id>#research
   const tab = document.querySelector(`#tabs [data-tab="${CSS.escape(location.hash.slice(1))}"]`);
   if (tab) tab.click();
+  addEventListener("hashchange", () => { if (PANES[location.hash.slice(1)] || location.hash === "#preview") showTab(location.hash.slice(1)); });
   connect();
   setInterval(tick, 1000);
   if (needsDetails()) editDetails({ required: true });
@@ -813,6 +916,7 @@ function handle(ev) {
       renderTeam();
       break;
     case "run_done": {
+      if (!replaying && (tabOn("project") || tabOn("checks"))) syncProject().then(() => tabOn("project") ? renderProject() : renderChecks());
       if (ev.retry) {
         setBusy(false); const r = run?.retry; run = null; renderTeam();
         addSystem(`${BY_ID[r]?.name || "Agent"} finished its retry`);
@@ -852,7 +956,9 @@ function handle(ev) {
     case "browser_check_start": break;
     case "browser_check": {
       const shots = (ev.screenshots || []).map(f => `<a href="${mediaUrl(f)}" target="_blank" rel="noopener"><img loading="lazy" src="${mediaUrl(f)}?v=${Date.now()}" alt="${esc(f.includes("phone") ? "Phone screenshot" : "Desktop screenshot")}"></a>`).join("");
-      addMsg(`<div class="msg bcheck ${ev.problems ? "warn" : ""}"><div class="head">${icon(ev.problems ? "alert" : "check", { size: 16 })}<span>${esc(ev.text)}</span></div>${shots ? `<div class="shots">${shots}</div>` : ""}</div>`);
+      addMsg(`<div class="msg bcheck ${ev.problems ? "warn" : ""}"><div class="head">${icon(ev.problems ? "alert" : "check", { size: 16 })}<span>${esc(ev.text)}</span>
+        ${ev.problems ? `<button class="btn btn-ghost btn-sm" type="button" data-goto="checks">See the list</button>` : ""}</div>${shots ? `<div class="shots">${shots}</div>` : ""}</div>`);
+      if (!replaying) syncProject().then(() => { if (tabOn("checks")) renderChecks(); });
       break;
     }
     case "security":
@@ -937,6 +1043,8 @@ $("messages").addEventListener("click", (e) => {
   if (e.target.closest("[data-usecases-more]")) { showAllUseCases = !showAllUseCases; showEmpty(); }
   const more = e.target.closest(".more");
   if (more) { const box = more.parentElement; box.classList.toggle("open"); updateMore(box); }
+  const go = e.target.closest("[data-goto]");
+  if (go) showTab(go.dataset.goto);
 });
 
 function addMsg(html) {
@@ -1091,7 +1199,7 @@ function showPlan(ev) {
   else if (asks) addQuestions(card, ev.questions);
   else if (!agents.length) card.insertAdjacentHTML("beforeend", `<p class="note">No agent ran. Reply here to go on.</p>`);
   orchCard = null;
-  if (!agents.length || ev.confirm) { setBusy(false); renderTeam(); }
+  if (!agents.length || ev.confirm || asks) { setBusy(false); renderTeam(); }
   if (!replaying) scrollDown();
 }
 
@@ -1553,14 +1661,196 @@ $("devices").onclick = (e) => {
   [...$("devices").children].forEach(x => x.classList.toggle("on", x === b));
   $("frameWrap").className = "frame-wrap " + b.dataset.device;
 };
+const PANES = { code: "code", research: "research", checks: "checks", project: "proj" };
+const tabOn = (tab) => !!$(PANES[tab])?.classList.contains("on");
+const showTab = (tab) => document.querySelector(`#tabs [data-tab="${tab}"]`)?.click();
 $("tabs").onclick = (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  [...$("tabs").children].forEach(x => x.classList.toggle("on", x === b));
-  $("code").classList.toggle("on", b.dataset.tab === "code");
-  $("research").classList.toggle("on", b.dataset.tab === "research");
+  [...$("tabs").children].forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+  for (const [tab, id] of Object.entries(PANES)) $(id).classList.toggle("on", b.dataset.tab === tab);
+  $("pvTools").hidden = b.dataset.tab !== "preview";          // the device, page and reload controls only make sense on the preview
   if (b.dataset.tab === "code") refreshCode();
   if (b.dataset.tab === "research") refreshResearch();
+  if (b.dataset.tab === "checks") renderChecks();
+  if (b.dataset.tab === "project") renderProject();
 };
+
+/* Fresh project data for the Checks and Project tabs (the chat events don't carry it). */
+async function syncProject() {
+  try {
+    const p = await api(`/api/projects/${PID}`);
+    for (const k of ["check", "contact", "contact_skipped", "assets", "brief", "brand", "pages"]) project[k] = p[k];
+  } catch (err) { console.warn("Couldn't refresh the project", err); }
+  setChecksBadge();
+}
+function fillComposer(text) {
+  $("input").value = text; autosize(); $("input").focus();
+  toast("Your request is ready: check it, then press Enter");
+}
+
+// ================================================================ checks
+/* The latest browser check: the server opened every page at desktop and phone width, measured the layout, ran axe-core
+   and collected errors and broken links. QA and the Critic get the same list; here the owner sees it too. */
+function setChecksBadge() {
+  const n = project?.check?.problems || 0, b = $("checksBadge");
+  b.hidden = !n; b.textContent = n > 99 ? "99+" : String(n);
+  b.title = n ? `${n} problem${n === 1 ? "" : "s"} in the latest check` : "";
+}
+function checkItems(r) {
+  const out = [];
+  const add = (cls, tag, text) => out.push({ cls, tag, text });
+  (r.errors || []).forEach(t => add("err", "Script error", t));
+  (r.missing_files || []).forEach(t => add("err", "Missing file", t));
+  (r.broken_images || []).forEach(t => add("err", "Broken image", t));
+  (r.dead_links || []).forEach(t => add("err", "Dead link", t));
+  (r.missing_anchors || []).forEach(t => add("err", "Broken anchor", `Links to ${t}, which doesn't exist`));
+  if (r.viewport === "phone" && r.overflow > 1) add("layout", "Sideways scroll", `The page scrolls sideways by ${r.overflow}px` + ((r.too_wide || []).length ? `: ${r.too_wide.join("; ")}` : ""));
+  (r.layout || []).forEach(t => add("layout", "Layout", t));
+  (r.a11y || []).forEach(t => {
+    const m = t.match(/^\[(\w+)\]\s*(.*)$/s);
+    add("a11y", m ? m[1][0].toUpperCase() + m[1].slice(1) : "Accessibility", m ? m[2] : t);
+  });
+  if (r.images_without_alt) add("a11y", "Alt text", `${r.images_without_alt} image${r.images_without_alt === 1 ? "" : "s"} without an alt attribute`);
+  return out;
+}
+function renderChecks() {
+  const box = $("checks"), c = project.check;
+  const runBtn = `<button class="btn btn-ghost btn-sm" type="button" data-run-check>${icon("refresh", { size: 14 })}Run check now</button>`;
+  if (!c) {
+    box.innerHTML = `<div class="pane-in"><div class="pempty"><span class="tile">${icon("gauge", { size: 22 })}</span><b>No check yet</b>
+      <span>The server opens your site in a real browser, at desktop and phone width, before QA and the Critic work. You can also run a check yourself.</span>
+      ${runBtn}</div></div>`;
+    return;
+  }
+  const pages = c.pages || [];
+  const all = pages.flatMap(r => checkItems(r).map(i => ({ ...i, page: r.page, viewport: r.viewport })));
+  const count = (cls) => all.filter(i => i.cls === cls).length;
+  const by = c.by === "you" ? "you" : `the ${BY_ID[c.by]?.name || c.by} agent`;
+  const shots = (c.screenshots || []).map(f => `<a href="${esc(mediaUrl(f))}" target="_blank" rel="noopener" title="Open full size">
+      <img loading="lazy" src="${esc(mediaUrl(f))}" alt="${f.includes("phone") ? "Phone screenshot" : "Desktop screenshot"}"></a>`).join("");
+  const kpi = (n, label, ic, bad) => `<div class="ck-kpi ${bad && n ? "bad" : ""}"><b>${n}</b><span>${icon(ic, { size: 14 })}${label}</span></div>`;
+  const files = [...new Set(pages.map(r => r.page))];
+  box.innerHTML = `<div class="pane-in">
+    <div class="pane-head"><h2>Checks</h2><span class="meta">${esc(ago(c.ts))} · run by ${esc(by)} · ${files.length} page${files.length === 1 ? "" : "s"} at desktop and phone width</span>
+      <div class="acts">${runBtn}${all.length ? `<button class="btn btn-dark btn-sm" type="button" data-fix-checks>${icon("sparkles", { size: 14 })}Ask the team to fix these</button>` : ""}</div></div>
+    <div class="ck-sum">${kpi(all.length, "problems in total", "alert", true)}${kpi(count("layout"), "layout", "grid", true)}${kpi(count("a11y"), "accessibility", "accessibility", true)}${kpi(count("err"), "errors and broken links", "bug", true)}</div>
+    ${shots ? `<div class="ck-shots">${shots}</div>` : ""}
+    ${files.map(file => {
+      const title = (project.pages || []).find(p => p.file === file)?.title || file;
+      const col = (vp, label, ic) => {
+        const r = pages.find(x => x.page === file && x.viewport === vp);
+        const items = r ? checkItems(r) : [];
+        return `<div class="ck-col"><h4>${icon(ic, { size: 14 })}${label}</h4>${items.length
+          ? `<ul class="ck-list">${items.map(i => `<li><span class="tag ${i.cls}">${esc(i.tag)}</span><span data-no-i18n>${esc(i.text)}</span></li>`).join("")}</ul>`
+          : `<span class="ck-ok">${icon("check", { size: 14 })}No problems</span>`}</div>`;
+      };
+      return `<section class="pcard2 ck-page"><header><h3>${esc(title)}</h3><span class="mono">${esc(file)}</span>
+        <span class="acts"><button class="btn btn-ghost btn-sm" type="button" data-show-page="${esc(file)}">${icon("eye", { size: 14 })}Preview</button></span></header>
+        <div class="ck-cols">${col("desktop", "Desktop · 1280px", "monitor")}${col("phone", "Phone · 390px", "phone")}</div></section>`;
+    }).join("")}
+  </div>`;
+}
+$("checks").addEventListener("click", async (e) => {
+  const run = e.target.closest("[data-run-check]");
+  if (run) {
+    if (busy) return toast("Agents are working. The check runs on its own after QA and the Critic.", "err");
+    run.disabled = true; run.setAttribute("aria-busy", "true"); run.lastChild.textContent = "Checking…";
+    try { project.check = await api(`/api/projects/${PID}/check`, { method: "POST", timeout: 120000 }); setChecksBadge(); renderChecks();
+          toast(project.check.problems ? `Check done: ${project.check.problems} problem${project.check.problems === 1 ? "" : "s"} found` : "Check done: no problems found"); }
+    catch (err) { toast(err.message, "err"); run.disabled = false; run.removeAttribute("aria-busy"); run.lastChild.textContent = "Run check now"; }
+    return;
+  }
+  if (e.target.closest("[data-fix-checks]")) {
+    const lines = (project.check.pages || []).flatMap(r => checkItems(r).map(i => `- ${r.page} (${r.viewport}): ${i.tag}: ${i.text}`));
+    fillComposer("Fix the problems the browser check found. Keep the content and the design as they are.\n" + lines.slice(0, 15).join("\n")
+      + (lines.length > 15 ? `\n…and ${lines.length - 15} more in the same kinds.` : ""));
+    return;
+  }
+  const page = e.target.closest("[data-show-page]");
+  if (page) { const sel = $("pageSel"); if ([...sel.options].some(o => o.value === page.dataset.showPage)) { sel.value = page.dataset.showPage; sel.dispatchEvent(new Event("change")); } showTab("preview"); }
+});
+
+// ================================================================ project
+/* What the agents work from besides the chat: contact details, the user's images (and their WebP copies),
+   the QR codes the server drew, the brand kit and the brief. */
+const CONTACT_FIELDS = [
+  { key: "whatsapp", label: "WhatsApp", placeholder: "+212 6 12 34 56 78", type: "tel", ic: "chat" },
+  { key: "phone", label: "Phone", placeholder: "+212 5 22 00 00 00", type: "tel", ic: "phone-call" },
+  { key: "email", label: "Email", placeholder: "contact@example.com", type: "email", ic: "mail" },
+  { key: "telegram", label: "Telegram", placeholder: "@your_username", type: "text", ic: "send" },
+];
+const BRIEF_LABELS = { colors: "Brand colours", fonts: "Fonts", ...Object.fromEntries((typeof BRIEF_QUESTIONS !== "undefined" ? BRIEF_QUESTIONS : []).map(q => [q.key, q.label])) };
+let projFiles = [];
+async function renderProject() {
+  const box = $("proj");
+  try { projFiles = await api(`/api/projects/${PID}/files`); } catch { projFiles = []; }
+  const size = Object.fromEntries(projFiles.map(f => [f.path, f.size]));
+  const contact = project.contact || {}, skipped = new Set(project.contact_skipped || []);
+  const status = (k) => contact[k] ? `<span class="st ok">Saved</span>` : skipped.has(k) ? `<span class="st">Not given: button hidden</span>` : `<span class="st">Asked when needed</span>`;
+  const contactCard = `<section class="pcard2" id="contactCard"><header><span class="tile">${icon("chat", { size: 18 })}</span><h3>Contact details</h3></header>
+    <p class="lead">The WhatsApp, Email contact, Click-to-call, Telegram and QR codes agents use these. Changes apply from your next request.</p>
+    <form class="pj-form" novalidate>${CONTACT_FIELDS.map(f => `<label><span>${icon(f.ic, { size: 14 })}${f.label}${status(f.key)}</span>
+      <input class="input" name="${f.key}" type="${f.type}" value="${esc(contact[f.key] || "")}" placeholder="${esc(f.placeholder)}" autocomplete="off" data-no-i18n></label>`).join("")}</form>
+    <div class="pj-bar"><button class="btn btn-dark btn-sm" type="button" data-save-contact>${icon("save", { size: 14 })}Save</button>
+      <button class="btn btn-ghost btn-sm" type="button" data-apply-contact>Update the site with these</button>
+      <span class="msg-line" role="status" aria-live="polite"></span></div></section>`;
+  const assets = (project.assets || []).filter(a => size[a.path] !== undefined);
+  const imagesCard = `<section class="pcard2"><header><span class="tile">${icon("image", { size: 18 })}</span><h3>Your images</h3></header>
+    ${assets.length ? `<ul class="pj-imgs">${assets.map(a => {
+      const v = a.variants || [], small = v[0], orig = size[a.path] || 0, smallSize = small ? size[small.path] : 0;
+      const saving = small && orig && smallSize ? `<span class="save">Phones load ${fmtSize(smallSize)} instead of ${fmtSize(orig)}</span>` : "";
+      return `<li><img loading="lazy" src="/work/${PID}/${a.path.split("/").map(encodeURIComponent).join("/")}" alt="">
+        <div class="an"><b data-no-i18n>${esc(a.path.replace(/^assets\//, ""))}</b><small>${a.kind === "logo" ? "Logo" : "Photo"} · ${fmtSize(orig)}${a.note ? ` · <span data-no-i18n>${esc(a.note)}</span>` : ""}</small>
+        ${v.length ? `<div class="pj-chips">${v.map(x => `<span>${x.width}w WebP${size[x.path] ? ` · ${fmtSize(size[x.path])}` : ""}</span>`).join("")}${saving}</div>` : ""}</div></li>`;
+    }).join("")}</ul>` : `<p class="lead">Images you add to the project (a logo, photos) appear here, with the smaller WebP copies the server makes for phones.</p>`}</section>`;
+  const qrFiles = projFiles.filter(f => /^assets\/qr-[^/]+\.svg$/.test(f.path));
+  const qrCard = `<section class="pcard2"><header><span class="tile">${icon("grid", { size: 18 })}</span><h3>QR codes</h3></header>
+    ${qrFiles.length ? `<div class="pj-qrs">${qrFiles.map(f => { const url = `/work/${PID}/${f.path.split("/").map(encodeURIComponent).join("/")}`;
+      return `<figure><img src="${esc(url)}" alt="QR code ${esc(f.path)}"><figcaption>${esc(f.path.replace(/^assets\//, ""))}</figcaption>
+        <a class="btn btn-ghost btn-sm" href="${esc(url)}" download>${icon("download", { size: 14 })}SVG</a></figure>`; }).join("")}</div>`
+      : `<p class="lead">No QR codes yet. The QR codes agent chooses them and the server draws them, so they always scan.</p>
+         <div class="pj-bar"><button class="btn btn-ghost btn-sm" type="button" data-ask-qr>${icon("plus", { size: 14 })}Ask for a QR code</button></div>`}</section>`;
+  const brand = project.brand || {}, logo = (project.assets || []).find(a => a.kind === "logo");
+  const brandCard = `<section class="pcard2"><header><span class="tile">${icon("palette", { size: 18 })}</span><h3>Brand kit</h3>
+      <span class="acts"><button class="btn btn-ghost btn-sm" type="button" data-brand>${icon("pencil", { size: 14 })}Edit</button></span></header>
+    ${(brand.colors || []).length ? `<div class="pj-swatches">${brand.colors.map(c => `<span style="background:${esc(c)}" title="${esc(c)}"></span>`).join("")}</div>` : `<p class="lead">No colours set: the Design System agent chooses them.</p>`}
+    <p class="lead">${brand.heading_font || brand.body_font ? `Fonts: <span data-no-i18n>${esc([brand.heading_font, brand.body_font].filter(Boolean).join(" · "))}</span>` : "Fonts: chosen by the team"}${logo ? " · Logo added" : " · No logo"}</p></section>`;
+  const brief = Object.entries(project.brief || {}).filter(([, v]) => v);
+  const briefCard = `<section class="pcard2" style="grid-column: 1 / -1"><header><span class="tile">${icon("clipboard", { size: 18 })}</span><h3>Brief</h3>
+      <span class="acts"><button class="btn btn-ghost btn-sm" type="button" data-edit-details>${icon("pencil", { size: 14 })}Edit</button></span></header>
+    <div class="pj-chips">${(project.pages || []).map(p => `<span data-no-i18n>${esc(p.title)} · ${esc(p.file)}</span>`).join("")}</div>
+    ${brief.length ? `<dl class="pj-brief">${brief.map(([k, v]) => `<dt>${esc(BRIEF_LABELS[k] || k)}</dt><dd data-no-i18n>${esc(v)}</dd>`).join("")}</dl>`
+      : `<p class="lead">No brief yet. Answer a few questions so every agent knows the audience, the goal and the tone.</p>`}</section>`;
+  box.innerHTML = `<div class="pane-in"><div class="pane-head"><h2>Project</h2><span class="meta">What the agents work from, besides the chat</span></div>
+    <div class="pgrid">${contactCard}${imagesCard}${qrCard}${brandCard}${briefCard}</div></div>`;
+}
+$("proj").addEventListener("click", async (e) => {
+  if (e.target.closest("[data-save-contact]")) {
+    const card = $("contactCard"), line = card.querySelector(".msg-line"), btn = e.target.closest("button");
+    // only what changed: an untouched empty field stays "asked when needed" instead of becoming "not given"
+    const saved = project.contact || {};
+    const body = Object.fromEntries(CONTACT_FIELDS.map(f => [f.key, card.querySelector(`[name="${f.key}"]`).value.trim()])
+      .filter(([k, v]) => v !== (saved[k] || "")));
+    card.querySelectorAll(".input").forEach(i => i.removeAttribute("aria-invalid"));
+    if (!Object.keys(body).length) { line.className = "msg-line"; line.textContent = "Nothing changed."; return; }
+    btn.disabled = true; line.className = "msg-line"; line.textContent = "Saving…";
+    try {
+      const res = await api(`/api/projects/${PID}/contact`, { method: "PUT", body: JSON.stringify(body) });
+      project.contact = res.contact; project.contact_skipped = res.contact_skipped;
+      await renderProject();
+      const l = $("contactCard").querySelector(".msg-line"); l.textContent = "Saved. The agents use these from your next request.";
+    } catch (err) {
+      btn.disabled = false; line.className = "msg-line err"; line.textContent = err.message;
+      const bad = CONTACT_FIELDS.find(f => body[f.key] && err.message.includes(body[f.key].split(" ")[0]));
+      if (bad) { const i = card.querySelector(`[name="${bad.key}"]`); i.setAttribute("aria-invalid", "true"); i.focus(); }
+    }
+    return;
+  }
+  if (e.target.closest("[data-apply-contact]")) return fillComposer("Update the contact buttons, links and forms on every page with the contact details saved in the project. Keep everything else as it is.");
+  if (e.target.closest("[data-ask-qr]")) return fillComposer("Add a QR code for WhatsApp in the contact section, with a text link under it for people on a phone.");
+  if (e.target.closest("[data-brand]")) return openBrand();
+  if (e.target.closest("[data-edit-details]")) { await editDetails(); if (tabOn("project")) renderProject(); }
+});
 
 // ================================================================ research report
 /* research.md, written by the Research agent, shown as a formatted page. A small Markdown subset, rendered safely:
@@ -1891,7 +2181,6 @@ document.addEventListener("click", async (e) => {
   }
 });
 $("historyBtn").onclick = openHistory;
-$("brandBtn").onclick = openBrand;
 
 /* ---------- this project's brand kit: saved as you change it; agents follow it from the next request ---------- */
 async function openBrand() {
@@ -1918,7 +2207,10 @@ async function openBrand() {
     copy: (from) => { logoChanged = true; return call(`/api/projects/${PID}/brand/copy`, "POST", { from }); },
   } });
   d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
-  d.addEventListener("close", () => { d.remove(); if (logoChanged) refreshCode?.(); });
+  d.addEventListener("close", async () => {
+    d.remove(); if (logoChanged) refreshCode?.();
+    if (tabOn("project")) { await syncProject(); renderProject(); }
+  });
   d.showModal();
 }
 
@@ -2041,6 +2333,9 @@ registerCommands([
   { group: "This project", icon: "eye", title: "Show the preview", run: () => document.querySelector('[data-tab="preview"]').click() },
   { group: "This project", icon: "code", title: "Show the code", run: () => document.querySelector('[data-tab="code"]').click() },
   { group: "This project", icon: "search", title: "Show the research report", run: () => document.querySelector('[data-tab="research"]').click() },
+  { group: "This project", icon: "gauge", title: "Show the checks", run: () => showTab("checks") },
+  { group: "This project", icon: "briefcase", title: "Show contact details, images and QR codes", run: () => showTab("project") },
+  { group: "This project", icon: "palette", title: "Edit the brand kit", run: () => openBrand() },
   { group: "This project", icon: "monitor", title: "Preview: desktop width", run: () => document.querySelector('[data-device="desktop"]').click() },
   { group: "This project", icon: "tablet", title: "Preview: tablet width (768px)", run: () => document.querySelector('[data-device="tablet"]').click() },
   { group: "This project", icon: "phone", title: "Preview: phone width (375px)", run: () => document.querySelector('[data-device="phone"]').click() },

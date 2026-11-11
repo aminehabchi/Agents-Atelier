@@ -1784,3 +1784,61 @@ Object.assign(window.I18N.ary, {
   "WhatsApp number: [+212 6…]. Email: [hello@…]. Telegram username: [@…]. Phone: [05 22 …].": "نمرة واتساب: [+212 6…]. الإيميل: [hello@…]. سمية تيليغرام: [@…]. التيليفون: [05 22 …].",
   "Put the contact forms on the [Contact] page, and the buttons in the footer of every page.": "حط الفورموليرات ديال التواصل فصفحة [Contact]، والبوطونات فالتحت ديال كل صفحة.",
 });
+Object.assign(window.I18N.ary, {
+  "QR codes": "كودات QR",
+  "Adds QR codes that are sure to scan (WhatsApp chat, the website, a contact card), made by the server, placed where they help.": "كيزيد كودات QR مضمونين يتسكانو (شات واتساب، السيت، كارطة الاتصال)، كيصاوبهم السيرفر وكيتحطو فين كينفعو.",
+  "Your prompt still has blanks from the template. Fill them in, or skip any to let the team decide.": "الطلب ديالك باقي فيه فراغات من النموذج. عمّرهم، ولا دوز باش يقرّر الفريق.",
+  "Before the team starts, a few contact details. Skip any you don't have yet: its button stays hidden until you add it.": "قبل ما يبدا الفريق، شي معلومات ديال الاتصال. دوز اللي ما عندكش دابا: البوطونة ديالو غادي تبقى مخبية حتى تزيدو.",
+  "Your WhatsApp number (with the country code)": "نمرة الواتساب ديالك (مع رمز البلاد)", "The phone number visitors should call": "النمرة اللي خاص الزوار يعيطو ليها",
+  "The email address for contact messages": "الإيميل ديال رسائل الاتصال", "Your Telegram username": "سمية المستخدم ديالك فتيليغرام",
+  "Contact details": "معلومات الاتصال",
+});
+
+/* Studio: Checks and Project tabs */
+Object.assign(window.I18N.ary, {
+  "Checks": "الفحوصات", "Project": "المشروع",
+  "What the server's browser found: layout, accessibility, errors and links": "شنو لقى المتصفح ديال السيرفر: الترتيب، سهولة الاستعمال، الأخطاء والروابط",
+  "Contact details, images, QR codes, brand kit and brief": "معلومات الاتصال، التصاور، كودات QR، الهوية البصرية والبريف",
+  "Run check now": "فحص دابا", "Checking…": "كنفحصو…", "Ask the team to fix these": "طلب من الفريق يصلحهم", "No check yet": "باقي ما تدار حتى فحص",
+  "The server opens your site in a real browser, at desktop and phone width, before QA and the Critic work. You can also run a check yourself.": "السيرفر كيحل السيت ديالك فمتصفح حقيقي، بعرض الكمبيوتر والتيليفون، قبل ما يخدمو QA والناقد. تقدر حتى نتا تدير فحص.",
+  "problems in total": "مشكل فالمجموع", "layout": "الترتيب", "accessibility": "سهولة الاستعمال", "errors and broken links": "أخطاء وروابط مقطوعة",
+  "Desktop · 1280px": "الكمبيوتر · 1280px", "Phone · 390px": "التيليفون · 390px", "No problems": "حتى مشكل",
+  "Script error": "خطأ فالسكريبت", "Missing file": "فيشي ناقص", "Broken image": "تصويرة مقطوعة", "Dead link": "رابط ميت", "Broken anchor": "مرساة مقطوعة",
+  "Sideways scroll": "سكرول للجنب", "Layout": "الترتيب", "Accessibility": "سهولة الاستعمال", "Alt text": "النص البديل",
+  "Critical": "خطير بزاف", "Serious": "خطير", "Moderate": "متوسط", "Minor": "خفيف", "See the list": "شوف اللائحة",
+  "What the agents work from, besides the chat": "على شنو كيخدمو الوكلاء، من غير الشات",
+  "The WhatsApp, Email contact, Click-to-call, Telegram and QR codes agents use these. Changes apply from your next request.": "الوكلاء ديال واتساب، الإيميل، التعيط، تيليغرام وكودات QR كيستعملو هادشي. التبديلات كتطبق من الطلب الجاي.",
+  "Phone": "التيليفون", "Email": "الإيميل", "Saved": "تسجّل", "Not given: button hidden": "ما تعطاش: البوطونة مخبية", "Asked when needed": "كيتسوّل فاش يحتاج",
+  "Update the site with these": "حدّث السيت بهادو", "Saving…": "كنسجلو…", "Saved. The agents use these from your next request.": "تسجّل. الوكلاء غادي يستعملوهم من الطلب الجاي.",
+  "Your images": "التصاور ديالك", "Logo": "اللوغو", "Photo": "تصويرة",
+  "Images you add to the project (a logo, photos) appear here, with the smaller WebP copies the server makes for phones.": "التصاور اللي كتزيد للمشروع (لوغو، تصاور) كيبانو هنا، مع النسخ WebP الصغار اللي كيوجد السيرفر للتيليفونات.",
+  "No QR codes yet. The QR codes agent chooses them and the server draws them, so they always scan.": "باقي حتى كود QR. الوكيل ديال كودات QR كيختارهم والسيرفر كيرسمهم، باش ديما يتسكانو.",
+  "Ask for a QR code": "طلب كود QR", "Brand kit": "الهوية البصرية", "Edit": "بدّل",
+  "No colours set: the Design System agent chooses them.": "حتى لون ما تحدد: الوكيل ديال Design System كيختارهم.", "Fonts: chosen by the team": "الخطوط: كيختارها الفريق",
+  "Brief": "البريف", "No brief yet. Answer a few questions so every agent knows the audience, the goal and the tone.": "باقي ما كاين بريف. جاوب على شي أسئلة باش كل وكيل يعرف الجمهور، الهدف والأسلوب.",
+  "Your request is ready: check it, then press Enter": "الطلب ديالك واجد: شوفو، ومن بعد ضغط Enter", "Check done: no problems found": "الفحص سالا: حتى مشكل",
+  "Show the checks": "وري الفحوصات", "Show contact details, images and QR codes": "وري معلومات الاتصال، التصاور وكودات QR", "Edit the brand kit": "بدّل الهوية البصرية",
+});
+
+/* Landing page: questions, contact buttons, checks, photos and QR codes */
+Object.assign(window.I18N.ary, {
+  "This is the default team you hire for a new website. Twenty-five more are available when the job needs them, from a Site auditor and Research to a Translator, Pricing, Gallery, Forms, WhatsApp, Telegram, QR codes, Legal pages and 3D.": "هادا هو الفريق الافتراضي اللي كتخدّم لموقع جديد. خمسة وعشرين آخرين متوفرين فاش تحتاجهم الخدمة، من مدقق المواقع والبحث حتى للمترجم، الأثمنة، الغاليري، الفورمات، واتساب، تيليغرام، كودات QR، الصفحات القانونية و 3D.",
+  "It asks before it guesses": "كيسوّل قبل ما يخمّن",
+  "When a request is vague, or a template still has blanks like [your business], the Orchestrator asks a few quick questions with ready-made answers. Click one, type your own, or skip.": "فاش الطلب ما واضحش، ولا النموذج باقي فيه فراغات بحال [النشاط ديالك]، المنسّق كيسوّل شي أسئلة سريعة مع أجوبة واجدين. كليكي على واحد، كتب الجواب ديالك، ولا دوز.",
+  "Big changes wait for your yes": "التبديلات الكبار كيتسناو الموافقة ديالك",
+  "A full redesign or removing pages shows the plan first: what changes and which agents work. Nothing runs until you press Yes, start.": "إعادة التصميم الكاملة ولا حيدان الصفحات كيبيّنو الخطة الأول: شنو غادي يتبدّل وشكون الوكلاء اللي غادي يخدمو. حتى حاجة ما كتبدا حتى تضغط إيه، بدا.",
+  "Every page opens in a real browser at desktop and phone width. Overlapping elements, blank gaps, a header on two rows, accessibility problems, errors and broken links are measured, fixed by the agents and listed in the Checks tab.": "كل صفحة كتحل فمتصفح حقيقي بعرض الكمبيوتر والتيليفون. العناصر اللي طالعة على بعضها، الفراغات، الهيدر على جوج سطور، مشاكل سهولة الاستعمال، الأخطاء والروابط المقطوعة كيتقاسو، كيصلحوهم الوكلاء وكيبانو فالتبويبة ديال الفحوصات.",
+  "Layout and WCAG 2.2 AA": "الترتيب و WCAG 2.2 AA",
+  "Contact buttons that work": "بوطونات اتصال اللي خدامين",
+  "WhatsApp, email, call and Telegram buttons and forms open each app with the visitor's message ready. Your numbers are asked once, checked, and never invented.": "البوطونات والفورمات ديال واتساب، الإيميل، التعيط وتيليغرام كيحلو كل تطبيق والرسالة ديال الزائر واجدة. النمر ديالك كيتسوّلو مرة وحدة، كيتفحصو، وعمرهم ما كيتخترعو.",
+  "Asked once, checked": "كيتسوّل مرة، كيتفحص",
+  "Photos made light for phones": "تصاور خفاف للتيليفونات",
+  "Every photo you add gets smaller WebP copies, with the location data removed. A 1.2 MB photo loads as about 20 KB on a phone.": "كل تصويرة كتزيدها كتاخد نسخ WebP صغار، بلا معلومات الموقع. تصويرة ديال 1.2 ميغا كتشارجا بحوالي 20 كيلو فالتيليفون.",
+  "WebP in three sizes": "WebP بتلاتة ديال القياسات",
+  "QR codes that always scan": "كودات QR ديما كيتسكانو",
+  "The QR codes agent decides where a code helps, for WhatsApp, your site or a contact card. The server draws it, so it scans every time.": "الوكيل ديال كودات QR كيقرر فين ينفع الكود: واتساب، السيت ديالك ولا كارطة الاتصال. السيرفر كيرسمو، باش يتسكانا كل مرة.",
+  "Drawn by the server": "مرسوم من السيرفر",
+  "Can my site receive messages from visitors?": "واش السيت ديالي يقدر يستقبل رسائل من الزوار؟",
+  "The sites are front end only, so they don't store messages. Contact forms send them where you already read them: WhatsApp, Telegram or the visitor's email app opens with the message written, and they press send.": "السيتات فرونت إند غير، داكشي علاش ما كيحتافظوش بالرسائل. الفورمات ديال الاتصال كيصيفطوهم فين ديجا كتقراهم: واتساب، تيليغرام ولا تطبيق الإيميل ديال الزائر كيتحل والرسالة مكتوبة، وهو كيضغط صيفط.",
+});
+Object.assign(window.I18N.ary, { "Nothing changed.": "حتى حاجة ما تبدلات." });

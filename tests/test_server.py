@@ -754,7 +754,7 @@ class T06bOrchestrator(unittest.TestCase):
         async def script(sock, recv):
             await sock.send(send({"type": "prompt", "text": text, "agents": pool or self.POOL}))
             events = await recv(until)
-            if events[-1]["type"] == "plan" and events[-1]["agents"] and not events[-1].get("confirm"):
+            if events[-1]["type"] == "plan" and events[-1]["agents"] and not events[-1].get("confirm") and not events[-1].get("questions"):
                 events += await recv(("run_done", "error", "run_stopped"))
             return events
         return ws(pid, script)
@@ -810,7 +810,7 @@ class T06bOrchestrator(unittest.TestCase):
         async def script(sock, recv):
             await sock.send(send({"type": "answer", **msg}))
             events = await recv(until)
-            if events[-1]["type"] == "plan" and events[-1]["agents"] and not events[-1].get("confirm"):
+            if events[-1]["type"] == "plan" and events[-1]["agents"] and not events[-1].get("confirm") and not events[-1].get("questions"):
                 events += await recv(("run_done", "error", "run_stopped"))
             return events
         return ws(pid, script)
@@ -862,14 +862,69 @@ class T06bOrchestrator(unittest.TestCase):
 
     def test_contact_agents_can_be_picked_even_if_off(self):
         pid = self.built()
-        plan = self.prompt(pid, "add whatsapp, email, call and telegram buttons [[orch:whatsapp,email,call,telegram]]")[2]
+        events = self.prompt(pid, "add whatsapp, email, call and telegram buttons [[orch:whatsapp,email,call,telegram]]")
+        self.assertEqual(types(events), ["user", "orchestrating", "plan"])           # one card: the plan and its questions
+        plan = events[2]
         self.assertEqual(plan["agents"], ["brief", "whatsapp", "email", "call", "telegram", "qa", "critic"])
+        self.assertEqual(plan["needs"], ["whatsapp", "email", "phone", "telegram"])
+        events = self.answer(pid, {"action": "answers", "answers": {}})              # skip them all: the team still runs
+        self.assertEqual([e["agent"] for e in events if e["type"] == "agent_done"], ["brief", "whatsapp", "email", "call", "telegram", "qa", "critic"])
         agents = {a["id"]: a for a in call("GET", "/api/agents")[1]}
         for i in ("whatsapp", "email", "call", "telegram"):
             self.assertFalse(agents[i]["default"], i)                                   # helpers: off until needed
             self.assertIn("CONTACT", call("GET", f"/api/agents/{i}")[1]["role"], i)        # one shared place for the details
         teams = {t["id"]: t for t in call("GET", "/api/presets")[1]}
         self.assertEqual(teams["contact-options"]["agents"][:4], ["whatsapp", "email", "call", "telegram"])
+
+    def test_template_blanks_are_asked_then_filled_in(self):
+        pid = new_project()
+        events = self.prompt(pid, "Build a page for [your business, e.g. a café]. The one action: [book / buy / call]. [[orch:css]]")
+        plan = events[-1]
+        self.assertEqual((plan["type"], plan["agents"]), ("plan", []))
+        self.assertEqual([(q["kind"], q["options"]) for q in plan["questions"]], [("text", []), ("single", ["book", "buy", "call"])])
+        self.assertEqual(plan["questions"][0]["placeholder"], "e.g. a café")
+        self.assertNotIn("run_start", types(events))
+        events = self.answer(pid, {"action": "answers", "answers": {"q1": "Café Atlas", "q2": "call"}})
+        self.assertEqual(events[0]["answers"][1], {"question": "book / buy / call", "answer": "call"})
+        self.assertEqual(events[-1]["type"], "run_done")
+        history = call("GET", f"/api/projects/{pid}")[1]["history"]
+        self.assertEqual(history[-1], "Build a page for Café Atlas. The one action: call. [[orch:css]]")
+
+    def test_contact_details_are_asked_before_the_first_build(self):
+        pid = new_project()
+        events = self.prompt(pid, "first build", pool=["html", "css", "whatsapp", "email"])
+        plan = events[-1]
+        self.assertEqual(plan["needs"], ["whatsapp", "email"])                  # asked even though the Orchestrator didn't run
+        self.assertIn("whatsapp", plan["agents"])
+        self.assertNotIn("run_start", types(events))
+        bad = self.answer(pid, {"action": "answers", "answers": {"q1": "call me", "q2": ""}})
+        self.assertEqual(bad[-1]["type"], "error")
+        self.assertIn("doesn't look like a phone number", bad[-1]["text"])
+        LOG.write_text("")
+        events = self.answer(pid, {"action": "answers", "answers": {"q1": "00212 6-12 34 56 78", "q2": ""}})
+        self.assertEqual(events[0]["answers"][1]["answer"], "Not now: keep this button hidden")
+        self.assertEqual(events[-1]["type"], "run_done")
+        prompt = next(c for c in log_calls() if "You are the WhatsApp agent" in json.dumps(c["argv"]))["argv"]
+        text = prompt[prompt.index("-p") + 1]
+        self.assertIn("WhatsApp number (confirmed by the owner): +212612345678", text)
+        self.assertIn("Not given yet (leave it empty in CONTACT and keep its button hidden): Email address", text)
+        events = self.prompt(pid, "add an email form [[orch:email]]")
+        self.assertEqual(events[-1]["type"], "run_done")                         # a skipped detail isn't asked again
+
+    def test_qr_codes_are_drawn_by_the_server(self):
+        pid = self.built()
+        events = self.prompt(pid, "add a QR code for WhatsApp [[orch:qr]] [[qr]]")
+        done = next(e for e in events if e["type"] == "agent_done" and e["agent"] == "qr")
+        self.assertIn("The server made 1 QR code: assets/qr-whatsapp.svg.", done["text"])
+        self.assertIn("../evil.svg: the file must be assets/qr-<name>.svg", done["text"])
+        svg = (SITE(pid) / "assets" / "qr-whatsapp.svg").read_text()
+        self.assertTrue(svg.startswith("<svg") and "<title>Chat</title>" in svg)
+        self.assertFalse((SITE(pid) / "qr.json").exists())                      # never part of the site
+        self.assertFalse((SITE(pid).parent / "evil.svg").exists())
+
+    def test_page_names_with_accents_and_arabic_get_readable_files(self):
+        s, p, _ = call("POST", "/api/projects", {"name": "Pages", "description": "x", "pages": ["Accueil", "Équipe", "حجز", "Équipe"]})
+        self.assertEqual([x["file"] for x in p["pages"]], ["index.html", "equipe.html", "hjz.html", "equipe-2.html"])
 
     def test_broken_answer_falls_back_to_the_whole_team(self):
         pid = self.built()
@@ -894,6 +949,11 @@ class T06bOrchestrator(unittest.TestCase):
         self.assertTrue(d["reply"])
         d = orch.decide({"intent": "new_build"}, ["html"], order)
         self.assertEqual(d["agents"], ["brief", "html"])
+        text = "For [ your business ] and [book / buy]. Again [your business], [[orch:css]], [x], [a link](https://a.b) and [1]."
+        found = orch.blanks(text)
+        self.assertEqual(found, ["your business", "book / buy"])                 # spacing doesn't make a second blank
+        filled, _ = orch.fill_blanks(text, found, orch.blank_questions(found), {"q1": "Café", "q2": "buy"})
+        self.assertEqual(filled, "For Café and buy. Again Café, [[orch:css]], [x], [a link](https://a.b) and [1].")
         self.assertEqual(orch.parse('Sure: {"intent": "change"} done'), {"intent": "change"})
         self.assertIsNone(orch.parse("no json"))
 
@@ -1196,6 +1256,33 @@ class T03bBriefAndAssets(unittest.TestCase):
         self.assertEqual(m["brief"], {"colors": "#0e7c66"})
         s, m, _ = call("PATCH", f"/api/projects/{p['id']}", {"name": "Café 2"})       # no brief sent: kept
         self.assertEqual(m["brief"], {"colors": "#0e7c66"})
+
+    def test_contact_details_can_be_edited(self):
+        pid = new_project()
+        s, r, _ = call("PUT", f"/api/projects/{pid}/contact", {"whatsapp": "0612 34 56 78", "email": "", "telegram": "@clinique_amal"})
+        self.assertEqual(s, 200, r)
+        self.assertEqual(r["contact"], {"whatsapp": "0612345678", "telegram": "clinique_amal"})
+        self.assertEqual(r["contact_skipped"], ["email"])                             # empty = not given: its button stays hidden
+        s, r, _ = call("PUT", f"/api/projects/{pid}/contact", {"email": "not an email"})
+        self.assertEqual(s, 400)
+        self.assertIn("doesn't look like an email address", r["detail"])
+        s, r, _ = call("PUT", f"/api/projects/{pid}/contact", {"email": "hi@example.com", "whatsapp": ""})
+        self.assertEqual((r["contact"], r["contact_skipped"]), ({"telegram": "clinique_amal", "email": "hi@example.com"}, ["whatsapp"]))
+
+    def test_photos_get_smaller_webp_copies(self):
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new("RGB", (1200, 800), (200, 120, 60)).save(buf, "JPEG")
+        data = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+        pid = new_project()
+        s, a, _ = call("POST", f"/api/projects/{pid}/assets", {"name": "Terrace.jpg", "data": data, "kind": "photo"})
+        self.assertEqual(s, 200, a)
+        self.assertEqual([(v["path"], v["width"]) for v in a["variants"]],
+                         [("assets/terrace-480.webp", 480), ("assets/terrace-960.webp", 960), ("assets/terrace.webp", 1200)])
+        for v in a["variants"]:
+            self.assertTrue((SITE(pid) / v["path"]).is_file())
+        logo = call("POST", f"/api/projects/{pid}/assets", {"name": "logo.png", "data": self.PNG, "kind": "logo"})[1]
+        self.assertNotIn("variants", logo)                                       # the logo is left alone
 
     def test_assets_are_saved_in_the_site_and_listed(self):
         pid = new_project()
@@ -2051,6 +2138,41 @@ class T18BrowserCheck(unittest.TestCase):
         req = urllib.request.Request(BASE + f"/api/projects/{pid}/download", headers={"Cookie": ADMIN})
         with urllib.request.urlopen(req) as r:
             self.assertFalse(any(".checks" in n for n in zipfile.ZipFile(io.BytesIO(r.read())).namelist()))
+
+
+    def test_check_now_is_saved_with_the_project(self):
+        pid = call("POST", "/api/projects", {"name": "Check me", "description": "x"})[1]["id"]
+        self.assertEqual(call("POST", f"/api/projects/{pid}/check")[0], 400)           # nothing built yet
+        call("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": '<!doctype html><html lang="en"><title>x</title><img src="a.png">'})
+        s, c, _ = call("POST", f"/api/projects/{pid}/check")
+        self.assertEqual(s, 200, c)
+        self.assertEqual(c["by"], "you")
+        self.assertGreaterEqual(c["problems"], 1)
+        self.assertEqual(call("GET", f"/api/projects/{pid}")[1]["check"]["problems"], c["problems"])
+
+    def test_layout_and_accessibility_problems_are_measured(self):
+        sys.path.insert(0, str(ROOT / "server"))
+        import browser_check
+        site = TMP / "bad-layout"
+        site.mkdir(exist_ok=True)
+        (site / "index.html").write_text("""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Bad</title>
+<style>body{margin:0;font:16px sans-serif} header{display:flex;flex-wrap:wrap;width:600px} header a{padding:8px 40px}
+.over p{margin:0}.over p+p{margin-top:-14px} .gap{height:500px} .cards{display:grid;grid-template-columns:repeat(3,200px);gap:10px}
+.cards div{height:90px;background:#eee} .low{color:#bbb} details p{margin:0}</style></head><body>
+<header><a href="#">Home</a><a href="#">Services</a><a href="#">About us</a><a href="#">Contact</a><a href="#">Blog</a></header>
+<section class="over"><p>First line</p><p>Second line</p></section><div class="gap"></div>
+<details><summary>Closed</summary><p>Hidden one</p><p style="margin-top:-10px">Hidden two</p></details>
+<section><div class="cards"><div>1</div><div>2</div><div>3</div><div>4</div></div><p class="low">Faint text</p></section></body></html>""")
+        report = asyncio.run(browser_check.check_site(site, ["index.html"], TMP / "bad-shots"))
+        desktop = next(r for r in report["pages"] if r["viewport"] == "desktop")
+        layout = " | ".join(desktop["layout"])
+        self.assertIn('("First line") and section.over p ("Second line") overlap', layout)
+        self.assertIn("the header wraps onto two or more rows", layout)
+        self.assertIn("a blank band 500px tall", layout)
+        self.assertIn("holds a single item while the first row holds 3", layout)
+        self.assertNotIn("Hidden one", layout)                                    # closed <details> content isn't on screen
+        self.assertTrue(any("color-contrast" in a for a in desktop["a11y"]), desktop["a11y"])
+        self.assertIn("accessibility (axe-core", browser_check.prompt_block(report))
 
 
 class T19HelperAgents(unittest.TestCase):

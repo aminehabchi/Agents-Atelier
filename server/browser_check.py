@@ -65,6 +65,120 @@ PROBE = r"""(() => {
 })()"""
 
 
+# Layout problems the agents can't see from the code: elements on top of each other, a header that wraps onto two rows,
+# blank bands, sections whose content fills a small part of their width, and a grid whose last row holds one lonely card.
+LAYOUT = r"""(() => {
+  const vw = document.documentElement.clientWidth, sy = scrollY, desktop = vw >= 900, MAX = 8;
+  const name = (el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.classList.length ? "." + [...el.classList].slice(0, 2).join(".") : "");
+  const where = (el) => { const s = el.parentElement && el.parentElement.closest("section, header, footer, nav, aside, form, article"); return (s ? name(s) + " " : "") + name(el); };
+  const said = (el) => { const t = (el.textContent || el.getAttribute("alt") || "").trim().replace(/\s+/g, " "); return where(el) + (t ? " (\"" + t.slice(0, 30) + (t.length > 30 ? "…" : "") + "\")" : ""); };
+  const styled = (el) => getComputedStyle(el);
+  const laidOut = (el) => {
+    if (el.checkVisibility && !el.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true })) return false;   // closed <details>, display: none…
+    const s = styled(el); if (s.display === "none" || s.visibility === "hidden") return false;
+    const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1;
+  };
+  const shown = (el) => laidOut(el) && +styled(el).opacity > 0.05;
+  const floating = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) { const p = styled(e).position; if (p === "absolute" || p === "fixed" || p === "sticky") return true; } return false; };
+  const hidden = (el) => el.closest("[aria-hidden='true'], .sr-only, .visually-hidden, dialog:not([open]), [hidden]")
+    || (el.closest("details:not([open])") && !el.closest("summary"));
+  // the part of an element a visitor can see: cut by every ancestor that hides its overflow (closed accordions, sliders…)
+  const box = (el) => {
+    const r = el.getBoundingClientRect();
+    let l = r.left, rt = r.right, t = r.top, b = r.bottom;
+    for (let e = el.parentElement; e && e !== document.body; e = e.parentElement) {
+      const s = styled(e);
+      if (s.overflowX === "visible" && s.overflowY === "visible") continue;
+      const c = e.getBoundingClientRect();
+      l = Math.max(l, c.left); rt = Math.min(rt, c.right); t = Math.max(t, c.top); b = Math.min(b, c.bottom);
+    }
+    return { l, r: rt, t: t + sy, b: b + sy, w: Math.max(0, rt - l), h: Math.max(0, b - t), el };
+  };
+  const out = { overlaps: [], header: "", gaps: [], narrow: [], lonely: [] };
+
+  // 1. Elements drawn on top of each other (leaves only, nothing positioned on purpose)
+  let items = [...document.body.querySelectorAll("a, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, li, img, label, figcaption, blockquote, td, th, dt, dd")]
+    .filter((el) => shown(el) && !floating(el) && !hidden(el)).slice(0, 600);
+  const set = new Set(items);
+  items = items.filter((el) => ![...el.querySelectorAll("*")].some((c) => set.has(c)));
+  let boxes = items.map(box).filter((x) => x.w > 2 && x.h > 2);
+  items = boxes.map((x) => x.el);
+  for (let i = 0; i < items.length && out.overlaps.length < MAX; i++) for (let j = i + 1; j < items.length && out.overlaps.length < MAX; j++) {
+    const a = boxes[i], b = boxes[j];
+    const ix = Math.min(a.r, b.r) - Math.max(a.l, b.l), iy = Math.min(a.b, b.b) - Math.max(a.t, b.t);
+    if (ix > 2 && iy > 2 && ix * iy > Math.max(60, 0.2 * Math.min(a.w * a.h, b.w * b.h)))
+      out.overlaps.push(said(items[i]) + " and " + said(items[j]) + " overlap by " + Math.round(ix) + "x" + Math.round(iy) + "px");
+  }
+
+  // 2. A header row that wrapped: two of its items sit on different lines
+  const header = document.querySelector("body > header, header, [role='banner']");
+  if (header && laidOut(header)) {
+    const rows = [header, ...header.querySelectorAll("*")].filter((el) => { const s = styled(el); return laidOut(el) && s.display.includes("flex") && !s.flexDirection.startsWith("column"); });
+    for (const c of rows) {
+      const kids = [...c.children].filter(shown).map((k) => k.getBoundingClientRect());
+      if (kids.some((a) => kids.some((b) => b.top >= a.bottom - 2))) { out.header = (c === header ? "the header" : name(c) + " in the header") + " wraps onto two or more rows (the header is " + Math.round(header.getBoundingClientRect().height) + "px tall)"; break; }
+    }
+  }
+
+  // 3. Blank bands: tall stretches of the page with no text, image, control or background picture
+  const content = [];
+  for (const el of document.body.querySelectorAll("*")) {
+    if (!laidOut(el) || styled(el).position === "fixed" || hidden(el)) continue;
+    const tag = el.tagName, s = styled(el);
+    const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+    const media = /^(IMG|SVG|VIDEO|CANVAS|PICTURE|INPUT|BUTTON|SELECT|TEXTAREA|IFRAME)$/.test(tag);
+    const picture = s.backgroundImage !== "none" && el.getBoundingClientRect().width > 80;
+    if (own || media || picture) { const x = box(el); if (x.w > 0 && x.h > 0) content.push(x); }
+  }
+  content.sort((a, b) => a.t - b.t);
+  const limit = desktop ? 280 : 200;          // more than the space two sections normally leave between them
+  let bottom = content.length ? content[0].b : 0, last = content[0];
+  for (const c of content) {
+    if (c.t - bottom > limit && out.gaps.length < MAX)
+      out.gaps.push("a blank band " + Math.round(c.t - bottom) + "px tall between " + where(last.el) + " and " + where(c.el));
+    if (c.b > bottom) { bottom = c.b; last = c; }
+  }
+
+  // 4. Desktop: tall sections whose content fills a small part of their width
+  if (desktop) for (const sec of document.querySelectorAll("main > section, body > section, main > div, section:not(section section)")) {
+    if (!laidOut(sec) || out.narrow.length >= MAX) continue;
+    const r = sec.getBoundingClientRect(), inner = content.filter((c) => c.t >= r.top + sy && c.b <= r.bottom + sy + 1 && c.w < r.width);
+    if (r.width < 900 || r.height < 360 || !inner.length) continue;
+    const span = Math.max(...inner.map((c) => c.r)) - Math.min(...inner.map((c) => c.l));
+    if (span / r.width < 0.4) out.narrow.push(name(sec) + " is " + Math.round(r.height) + "px tall but its content fills only " + Math.round(100 * span / r.width) + "% of its width");
+  }
+
+  // 5. A grid or wrapping row whose last line holds a single card while the others hold three or more
+  for (const g of document.body.querySelectorAll("*")) {
+    const s = styled(g);
+    if (out.lonely.length >= MAX || !(s.display.includes("grid") || (s.display.includes("flex") && s.flexWrap === "wrap")) || !laidOut(g)) continue;
+    const kids = [...g.children].filter((k) => { const r = k.getBoundingClientRect(); return shown(k) && r.width >= 120 && r.height >= 80; });
+    if (kids.length < 4) continue;
+    const lines = {};
+    for (const k of kids) { const t = Math.round(k.getBoundingClientRect().top / 4); lines[t] = (lines[t] || 0) + 1; }
+    const counts = Object.keys(lines).map(Number).sort((a, b) => a - b).map((t) => lines[t]);
+    if (counts.length >= 2 && counts[counts.length - 1] === 1 && counts[0] >= 3) out.lonely.push("the last row of " + where(g) + " holds a single item while the first row holds " + counts[0]);
+  }
+  return out;
+})()"""
+
+# axe-core (server/vendor/axe.min.js, MPL-2.0) checks each page against WCAG 2.2 A and AA, inside the headless browser only:
+# it is never part of the site the agents build.
+AXE_FILE = Path(__file__).resolve().parent / "vendor" / "axe.min.js"
+AXE_RUN = r"""axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },
+  resultTypes: ["violations"] }).then((r) => r.violations.map((v) => ({ id: v.id, impact: v.impact || "minor", help: v.help,
+  count: v.nodes.length, targets: v.nodes.slice(0, 3).map((n) => [].concat(n.target).join(" ")) })))"""
+IMPACT = {"critical": 0, "serious": 1, "moderate": 2, "minor": 3}
+_axe_source = None
+
+
+def _axe() -> str | None:
+    global _axe_source
+    if _axe_source is None:
+        _axe_source = AXE_FILE.read_text() if AXE_FILE.is_file() else ""
+    return _axe_source or None
+
+
 class _Chrome:
     """One headless Chrome with its own profile, spoken to over the DevTools websocket."""
 
@@ -167,6 +281,17 @@ async def _check_page(chrome: _Chrome, folder: Path, page: str, viewport, shot: 
     await chrome.wait_load()
     await chrome.drain(SETTLE_SECONDS)
     probe = (await chrome.cmd("Runtime.evaluate", expression=PROBE, returnByValue=True))["result"].get("value") or {}
+    layout = (await chrome.cmd("Runtime.evaluate", expression=LAYOUT, returnByValue=True))["result"].get("value") or {}
+    a11y = []
+    if label == "desktop" and _axe():
+        try:
+            await chrome.cmd("Runtime.evaluate", expression=_axe())
+            found = (await chrome.cmd("Runtime.evaluate", expression=AXE_RUN, awaitPromise=True, returnByValue=True))["result"].get("value")
+            for v in sorted(found or [], key=lambda v: IMPACT.get(v.get("impact"), 4))[:MAX_ITEMS]:
+                a11y.append(f"[{v['impact']}] {v['id']}: {v['help']} ({v['count']} element{'s' if v['count'] != 1 else ''}, "
+                            f"e.g. {', '.join(v['targets'])})")
+        except Exception as e:          # the accessibility check is a bonus: the rest of the report still counts
+            log.warning("axe-core failed on %s: %s", page, e)
     errors, failed = [], []
     for e in chrome.events:
         p = e.get("params", {})
@@ -201,7 +326,10 @@ async def _check_page(chrome: _Chrome, folder: Path, page: str, viewport, shot: 
             "missing_files": uniq(missing), "broken_images": uniq(probe.get("images", [])),
             "missing_anchors": uniq(probe.get("anchors", [])), "dead_links": uniq(dead),
             "overflow": int(probe.get("overflow") or 0), "too_wide": uniq(probe.get("wide", [])),
-            "images_without_alt": int(probe.get("alt") or 0)}
+            "images_without_alt": int(probe.get("alt") or 0),
+            "layout": uniq([*layout.get("overlaps", []), *([layout["header"]] if layout.get("header") else []), *layout.get("gaps", []),
+                            *layout.get("narrow", []), *layout.get("lonely", [])]),
+            "a11y": [_clean(x, 300) for x in a11y]}
 
 
 async def check_site(folder: Path, pages: list[str] | None = None, shots_dir: Path | None = None, prefix: str | None = None) -> dict | None:
@@ -246,6 +374,7 @@ def problems(report: dict) -> int:
     for r in report.get("pages", []):
         n += len(r["errors"]) + len(r["missing_files"]) + len(r["broken_images"]) + len(r["missing_anchors"]) + len(r["dead_links"])
         n += 1 if r["viewport"] == "phone" and r["overflow"] > 1 else 0
+        n += len(r.get("layout", [])) + len(r.get("a11y", []))
     return n
 
 
@@ -276,6 +405,10 @@ def prompt_block(report: dict) -> str:
             found.append(f"the page scrolls sideways by {r['overflow']}px" + (": " + "; ".join(r["too_wide"]) if r["too_wide"] else ""))
         if r["images_without_alt"]:
             found.append(f"{r['images_without_alt']} image(s) without an alt attribute")
+        if r.get("layout"):
+            found.append("layout: " + "; ".join(r["layout"]))
+        if r.get("a11y"):
+            found.append("accessibility (axe-core, WCAG 2.2 AA): " + "; ".join(r["a11y"]))
         lines.append(f"- {r['page']} at {r['viewport']} width: " + (" | ".join(found) if found else "no problems"))
     shots = "\n".join(f"- {s}" for s in report.get("screenshots", []))
     return ("\n<browser_check>\nThe server opened the site in headless Chrome just now (desktop 1280px and phone 390px wide) "

@@ -61,11 +61,9 @@ Rules:
   - email: "add our email", "an email contact form", "let people email us".
   - call: "click to call", "a call button", "make the phone number tappable".
   - telegram: "add Telegram", "a Telegram contact form".
-  These four need a real contact detail. When you choose one and its detail (WhatsApp number, email address, phone
-  number, Telegram username) is not in the request, <project_brief> or <project_state>, don't choose any agent yet:
-  answer with "unclear" and a form with one "text" question per missing detail, with a "placeholder" showing the format
-  (e.g. "+212 6 12 34 56 78", "@clinique_alamal"). Once the user answered, choose the agents. If they skipped it,
-  choose them anyway: the agents leave the detail empty and hide that button until the owner adds it.
+  - qr: "add a QR code", "a QR code for WhatsApp / our site / our contact card".
+  The four contact agents need a real contact detail. Don't ask for it yourself: when one is missing, the server asks
+  the user for it before the agents start. Just choose the agents the request needs.
   - 3d-design, 3d-scene, depth: "add 3D", "a 3D logo", "a rotating product", "make it interactive in 3D", "tilting cards",
     "parallax". 3d-design plans first; 3d-scene builds a real 3D object (WebGL); depth adds CSS 3D effects (tilt, parallax,
     flip). For a light touch ("make the cards tilt") choose depth alone.

@@ -1061,3 +1061,61 @@ Object.assign(window.I18N.fr, {
   "WhatsApp number: [+212 6…]. Email: [hello@…]. Telegram username: [@…]. Phone: [05 22 …].": "Numéro WhatsApp : [+212 6…]. E-mail : [bonjour@…]. Nom d'utilisateur Telegram : [@…]. Téléphone : [05 22 …].",
   "Put the contact forms on the [Contact] page, and the buttons in the footer of every page.": "Mets les formulaires de contact sur la page [Contact], et les boutons dans le pied de page de chaque page.",
 });
+Object.assign(window.I18N.fr, {
+  "QR codes": "Codes QR",
+  "Adds QR codes that are sure to scan (WhatsApp chat, the website, a contact card), made by the server, placed where they help.": "Ajoute des codes QR qui se scannent à coup sûr (discussion WhatsApp, site web, carte de contact), créés par le serveur et placés là où ils servent.",
+  "Your prompt still has blanks from the template. Fill them in, or skip any to let the team decide.": "Votre demande contient encore des blancs du modèle. Complétez-les, ou passez pour laisser l'équipe décider.",
+  "Before the team starts, a few contact details. Skip any you don't have yet: its button stays hidden until you add it.": "Avant que l'équipe commence, quelques coordonnées. Passez celles que vous n'avez pas encore : leur bouton reste masqué jusqu'à ce que vous les ajoutiez.",
+  "Your WhatsApp number (with the country code)": "Votre numéro WhatsApp (avec l'indicatif du pays)", "The phone number visitors should call": "Le numéro que les visiteurs doivent appeler",
+  "The email address for contact messages": "L'adresse e-mail pour les messages de contact", "Your Telegram username": "Votre nom d'utilisateur Telegram",
+  "Contact details": "Coordonnées",
+});
+
+/* Studio: Checks and Project tabs */
+Object.assign(window.I18N.fr, {
+  "Checks": "Vérifications", "Project": "Projet",
+  "What the server's browser found: layout, accessibility, errors and links": "Ce que le navigateur du serveur a trouvé : mise en page, accessibilité, erreurs et liens",
+  "Contact details, images, QR codes, brand kit and brief": "Coordonnées, images, codes QR, charte et brief",
+  "Run check now": "Vérifier maintenant", "Checking…": "Vérification…", "Ask the team to fix these": "Demander à l'équipe de corriger", "No check yet": "Pas encore de vérification",
+  "The server opens your site in a real browser, at desktop and phone width, before QA and the Critic work. You can also run a check yourself.": "Le serveur ouvre votre site dans un vrai navigateur, en largeur ordinateur et téléphone, avant le travail de QA et du Critique. Vous pouvez aussi lancer une vérification vous-même.",
+  "problems in total": "problèmes au total", "layout": "mise en page", "accessibility": "accessibilité", "errors and broken links": "erreurs et liens cassés",
+  "Desktop · 1280px": "Ordinateur · 1280px", "Phone · 390px": "Téléphone · 390px", "No problems": "Aucun problème",
+  "Script error": "Erreur de script", "Missing file": "Fichier manquant", "Broken image": "Image cassée", "Dead link": "Lien mort", "Broken anchor": "Ancre cassée",
+  "Sideways scroll": "Défilement horizontal", "Layout": "Mise en page", "Accessibility": "Accessibilité", "Alt text": "Texte alternatif",
+  "Critical": "Critique", "Serious": "Sérieux", "Moderate": "Modéré", "Minor": "Mineur", "See the list": "Voir la liste",
+  "What the agents work from, besides the chat": "Ce sur quoi les agents s'appuient, en plus de la discussion",
+  "The WhatsApp, Email contact, Click-to-call, Telegram and QR codes agents use these. Changes apply from your next request.": "Les agents WhatsApp, Contact par e-mail, Appel en un clic, Telegram et Codes QR les utilisent. Les changements s'appliquent dès votre prochaine demande.",
+  "Phone": "Téléphone", "Email": "E-mail", "Saved": "Enregistré", "Not given: button hidden": "Non renseigné : bouton masqué", "Asked when needed": "Demandé si besoin",
+  "Update the site with these": "Mettre à jour le site avec ces coordonnées", "Saving…": "Enregistrement…", "Saved. The agents use these from your next request.": "Enregistré. Les agents les utilisent dès votre prochaine demande.",
+  "Your images": "Vos images", "Logo": "Logo", "Photo": "Photo",
+  "Images you add to the project (a logo, photos) appear here, with the smaller WebP copies the server makes for phones.": "Les images que vous ajoutez au projet (logo, photos) apparaissent ici, avec les copies WebP plus légères que le serveur prépare pour les téléphones.",
+  "No QR codes yet. The QR codes agent chooses them and the server draws them, so they always scan.": "Pas encore de code QR. L'agent Codes QR les choisit et le serveur les dessine, pour qu'ils se scannent toujours.",
+  "Ask for a QR code": "Demander un code QR", "Brand kit": "Charte graphique", "Edit": "Modifier",
+  "No colours set: the Design System agent chooses them.": "Aucune couleur définie : l'agent Design System les choisit.", "Fonts: chosen by the team": "Polices : choisies par l'équipe",
+  "Brief": "Brief", "No brief yet. Answer a few questions so every agent knows the audience, the goal and the tone.": "Pas encore de brief. Répondez à quelques questions pour que chaque agent connaisse le public, l'objectif et le ton.",
+  "Your request is ready: check it, then press Enter": "Votre demande est prête : vérifiez-la, puis appuyez sur Entrée", "Check done: no problems found": "Vérification terminée : aucun problème",
+  "Show the checks": "Afficher les vérifications", "Show contact details, images and QR codes": "Afficher les coordonnées, images et codes QR", "Edit the brand kit": "Modifier la charte graphique",
+});
+
+/* Landing page: questions, contact buttons, checks, photos and QR codes */
+Object.assign(window.I18N.fr, {
+  "This is the default team you hire for a new website. Twenty-five more are available when the job needs them, from a Site auditor and Research to a Translator, Pricing, Gallery, Forms, WhatsApp, Telegram, QR codes, Legal pages and 3D.": "C'est l'équipe par défaut que vous engagez pour un nouveau site. Vingt-cinq autres sont disponibles quand la mission l'exige, de l'Auditeur de site et la Recherche au Traducteur, Tarifs, Galerie, Formulaires, WhatsApp, Telegram, Codes QR, Pages légales et 3D.",
+  "It asks before it guesses": "Il demande avant de deviner",
+  "When a request is vague, or a template still has blanks like [your business], the Orchestrator asks a few quick questions with ready-made answers. Click one, type your own, or skip.": "Quand une demande est vague, ou qu'un modèle a encore des blancs comme [votre activité], l'Orchestrateur pose quelques questions rapides avec des réponses toutes prêtes. Cliquez-en une, écrivez la vôtre, ou passez.",
+  "Big changes wait for your yes": "Les grands changements attendent votre accord",
+  "A full redesign or removing pages shows the plan first: what changes and which agents work. Nothing runs until you press Yes, start.": "Une refonte complète ou la suppression de pages montre d'abord le plan : ce qui change et quels agents travaillent. Rien ne démarre avant que vous appuyiez sur Oui, commencer.",
+  "Every page opens in a real browser at desktop and phone width. Overlapping elements, blank gaps, a header on two rows, accessibility problems, errors and broken links are measured, fixed by the agents and listed in the Checks tab.": "Chaque page s'ouvre dans un vrai navigateur, en largeur ordinateur et téléphone. Éléments superposés, espaces vides, en-tête sur deux lignes, problèmes d'accessibilité, erreurs et liens cassés sont mesurés, corrigés par les agents et listés dans l'onglet Vérifications.",
+  "Layout and WCAG 2.2 AA": "Mise en page et WCAG 2.2 AA",
+  "Contact buttons that work": "Des boutons de contact qui marchent",
+  "WhatsApp, email, call and Telegram buttons and forms open each app with the visitor's message ready. Your numbers are asked once, checked, and never invented.": "Les boutons et formulaires WhatsApp, e-mail, appel et Telegram ouvrent chaque application avec le message du visiteur prêt. Vos numéros sont demandés une fois, vérifiés, et jamais inventés.",
+  "Asked once, checked": "Demandé une fois, vérifié",
+  "Photos made light for phones": "Des photos légères pour les téléphones",
+  "Every photo you add gets smaller WebP copies, with the location data removed. A 1.2 MB photo loads as about 20 KB on a phone.": "Chaque photo ajoutée reçoit des copies WebP plus légères, sans les données de localisation. Une photo de 1,2 Mo se charge en environ 20 Ko sur un téléphone.",
+  "WebP in three sizes": "WebP en trois tailles",
+  "QR codes that always scan": "Des codes QR qui se scannent toujours",
+  "The QR codes agent decides where a code helps, for WhatsApp, your site or a contact card. The server draws it, so it scans every time.": "L'agent Codes QR décide où un code est utile : WhatsApp, votre site ou une carte de contact. Le serveur le dessine, donc il se scanne à chaque fois.",
+  "Drawn by the server": "Dessiné par le serveur",
+  "Can my site receive messages from visitors?": "Mon site peut-il recevoir des messages des visiteurs ?",
+  "The sites are front end only, so they don't store messages. Contact forms send them where you already read them: WhatsApp, Telegram or the visitor's email app opens with the message written, and they press send.": "Les sites sont uniquement front-end, ils ne stockent donc pas de messages. Les formulaires de contact les envoient là où vous les lisez déjà : WhatsApp, Telegram ou l'application e-mail du visiteur s'ouvre avec le message écrit, et il appuie sur envoyer.",
+});
+Object.assign(window.I18N.fr, { "Nothing changed.": "Rien n'a changé." });

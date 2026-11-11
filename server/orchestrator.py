@@ -24,7 +24,7 @@ FINISHERS = ("qa", "critic")            # run after any change to the code, when
 READ_ONLY = {"brief", "critic", "qa", "research"}   # agents whose choice alone doesn't count as a code change
 # Helpers that may be chosen when the request clearly asks for what they do, even if switched off (never in a fallback).
 ON_REQUEST = {"research", "auditor", "content", "translator", "legal", "dark-theme", "pricing", "gallery", "forms", "conversion", "local", "tidy",
-              "3d-design", "3d-scene", "depth", "whatsapp", "email", "call", "telegram"}
+              "3d-design", "3d-scene", "depth", "whatsapp", "email", "call", "telegram", "qr"}
 INTENTS = {"new_build", "change", "redo_agent", "question", "off_topic", "unclear", "confirm"}
 TALK = {"question", "off_topic", "unclear"}   # intents where no agent runs: the Orchestrator answers in the chat
 # "confirm": the agents are chosen but wait until the user says yes (a big or ambiguous request). "unclear" may carry a
@@ -169,6 +169,51 @@ def answers_text(request: str, qs: list[dict], given: dict) -> tuple[str, list[d
         pairs.append({"question": q["text"], "answer": ", ".join(values) or "No preference: decide for me"})
     lines = "\n".join(f"- {p['question']} {p['answer']}" for p in pairs)
     return f"{request}\n\nMy answers to your questions:\n{lines}", pairs
+
+
+# A team's starting prompt has blanks like "[product or offer]" or "[book a demo / buy / join the waitlist]".
+# Not [[markers]], [links](url), "[ ]" / "[x]" checkboxes or "[1]" footnotes: the text needs a letter and 3+ characters.
+BLANK_RE = re.compile(r"(?<!\[)\[([^\[\]\n]{3,120})\](?![\]\(])")
+MAX_BLANKS = 8
+
+
+def blanks(text: str) -> list[str]:
+    """The unfilled template blanks in a prompt (their exact text between the brackets), in order, without duplicates."""
+    found = []
+    for m in BLANK_RE.finditer(text or ""):
+        inner = " ".join(m.group(1).split())          # "[ your business ]" and "[your business]" are the same blank
+        if re.search(r"[^\W\d_]", inner) and inner not in found:
+            found.append(inner)
+    return found[:MAX_BLANKS]
+
+
+def blank_questions(found: list[str]) -> list[dict]:
+    """One question per blank: choices when the blank lists them ("a / b / c"), else a short text with its example."""
+    qs = []
+    for i, inner in enumerate(found):
+        example = re.split(r",?\s+(?:e\.g\.|ex\.|par ex\.|for example)\s*", inner, maxsplit=1)
+        label = example[0].strip(" ,:") or inner
+        parts = [p.strip() for p in label.split(" / ")]
+        if 2 <= len(parts) <= MAX_OPTIONS and all(0 < len(p) <= 60 for p in parts):
+            qs.append({"id": f"q{i + 1}", "text": f"Fill in: {label}", "kind": "single", "options": parts, "other": True, "placeholder": ""})
+        else:
+            hint = example[1].strip(" \"“”«»") if len(example) > 1 else ""
+            qs.append({"id": f"q{i + 1}", "text": f"Fill in: {label}", "kind": "text", "options": [], "other": False,
+                       "placeholder": _short(f"e.g. {hint}" if hint else label, 80)})
+    return qs
+
+
+def fill_blanks(text: str, found: list[str], qs: list[dict], given: dict) -> tuple[str, list[dict]]:
+    """Put the user's answers in the blanks. A skipped blank tells the team to decide. Returns (text, [{question, answer}])."""
+    pairs, fill = [], {}
+    for inner, q in zip(found, qs):
+        value = given.get(q["id"])
+        value = ", ".join(_short(v, 300) for v in value if _short(v, 300)) if isinstance(value, list) else _short(value, 300)
+        fill[inner] = value or f"(not given: decide from the project brief: {inner})"
+        pairs.append({"question": inner, "answer": value or "No preference: decide for me"})
+    # every copy of a blank, however it is spaced; blanks that weren't asked (over MAX_BLANKS) stay as they are
+    text = BLANK_RE.sub(lambda m: fill.get(" ".join(m.group(1).split()), m.group(0)), text)
+    return text, pairs
 
 
 def decide(raw: dict | None, pool: list[str], order: list[str]) -> dict:

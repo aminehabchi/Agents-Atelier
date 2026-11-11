@@ -17,6 +17,7 @@ Markers inside the prompt choose what happens during an agent run:
   [[redo]]          the Critic sends work back (REDO lines) whenever <send_back> lists agents
   [[research-escape]]  the Research agent also edits index.html and creates evil.html (the server must undo both)
   (the Critic always ends with "Score: 8.5/10.")
+  [[qr]]            the QR codes agent writes qr.json (one good code, one with a bad file name)
   [[new-page]]      the HTML agent also creates about.html (titled "About us") and a page with a bad name, Bad Name.html
 
 The Research agent writes research.md (with a WebSearch step) instead of touching index.html.
@@ -152,6 +153,9 @@ if "[[inject-script]]" in prompt:
 out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": tid, "name": "Write",
                                                    "input": {"file_path": str(page.resolve()), "content": content}}]}})
 page.write_text(content)
+if "[[qr]]" in prompt and agent == "QR codes":
+    Path("qr.json").write_text(json.dumps([{"file": "assets/qr-whatsapp.svg", "data": "https://wa.me/212612345678", "label": "Chat"},
+                                           {"file": "../evil.svg", "data": "https://example.com"}]))
 if "[[new-page]]" in prompt and agent == "HTML":
     Path("about.html").write_text("<!doctype html><title>About us</title><h1>About</h1>\n")
     Path("Bad Name.html").write_text("<!doctype html><title>Bad</title>\n")

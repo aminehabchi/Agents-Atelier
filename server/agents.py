@@ -33,6 +33,7 @@ Agent file format (also used for export and import):
 
 import json
 import re
+import unicodedata
 import time
 from pathlib import Path
 
@@ -56,8 +57,21 @@ def is_admin(user: dict | None) -> bool:
     return bool(user) and user.get("role") == "admin"
 
 
+# Arabic letters in Latin, so a Darija page or team name still gives a readable file name ("حجز" -> "hjz").
+ARABIC = dict(zip("ابتثجحخدذرزسشصضطظعغفقكلمنهوي", ["a", "b", "t", "th", "j", "h", "kh", "d", "dh", "r", "z", "s", "sh", "s", "d", "t",
+                                                  "z", "a", "gh", "f", "q", "k", "l", "m", "n", "h", "w", "y"]))
+ARABIC.update({"ء": "", "أ": "a", "إ": "i", "آ": "a", "ؤ": "w", "ئ": "y", "ى": "a", "ة": "a", "ڭ": "g", "ڤ": "v", "پ": "p", "چ": "ch"})
+LIGATURES = {"ß": "ss", "æ": "ae", "œ": "oe", "ø": "o", "ð": "d", "þ": "th", "ł": "l", "đ": "d", "ı": "i"}
+
+
+def ascii_text(text: str) -> str:
+    """Letters with accents become plain letters (Équipe -> Equipe), Arabic letters are spelled in Latin."""
+    text = "".join(LIGATURES.get(c, ARABIC.get(c, c)) for c in str(text).lower())
+    return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+
+
 def slugify(text: str, fallback: str = "item") -> str:
-    return re.sub(r"[^a-z0-9]+", "-", str(text).lower()).strip("-")[:32] or fallback
+    return re.sub(r"[^a-z0-9]+", "-", ascii_text(text)).strip("-")[:32] or fallback
 
 
 # ---------------------------------------------------------------- files: parsing, shared rules, first fill
