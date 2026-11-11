@@ -32,7 +32,7 @@
 .m-stack { display: flex; flex-wrap: wrap; gap: 4px; }
 .m-stack .mini { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--bone); color: var(--graphite); }
 
-.badge.official { background: rgb(var(--sky-rgb) / .16); color: var(--sky); }
+.badge.official { background: rgb(var(--sky-rgb) / .16); color: #3a43b5; }
 [data-theme="dark"] .badge.official { color: #a9b0ff; }
 .badge.community { background: rgb(var(--saffron-rgb) / .18); color: var(--saffron); }
 .badge.pending { background: rgb(var(--saffron-rgb) / .18); color: var(--saffron); }
@@ -167,7 +167,8 @@ dialog.job-pick { width: min(620px, calc(100vw - 32px)); }
   background: var(--linen); transition: box-shadow .2s, padding .2s; }
 .mk-bar.stuck { padding: 10px 12px; margin-inline: -12px; border-radius: 0 0 var(--r-card) var(--r-card); box-shadow: 0 1px 0 var(--line), 0 12px 24px -16px rgb(0 0 0 / .4); }
 .mk-tabs button { display: inline-flex; align-items: center; gap: 6px; }
-.mk-tabs .n { font: 12px var(--mono); opacity: .7; }
+.mk-tabs .n { font: 12px var(--mono); color: var(--stone); }
+.mk-tabs button.on .n, .mk-tabs [aria-selected="true"] .n { color: inherit; }
 .mk-src { display: flex; gap: 6px; }
 .mk-bar .spacer { flex: 1; }
 .mk-count { font-size: 13px; color: var(--stone); font-feature-settings: "tnum"; }

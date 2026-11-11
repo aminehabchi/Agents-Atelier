@@ -1395,3 +1395,16 @@ Object.assign(window.I18N.fr, {
   "The Starter plan includes one project. Delete it, or move to Pro for unlimited projects.": "L'offre Starter comprend un projet. Supprimez-le, ou passez à Pro pour des projets illimités.",
   "<b>Starter</b> (free): one project, the official agents and ready teams.": "<b>Starter</b> (gratuit) : un projet, les agents officiels et les équipes prêtes.",
 });
+Object.assign(window.I18N.fr, {
+  "A name and a short description, like a job post.": "Un nom et une courte description, comme une offre de mission.",
+  "Send your first request": "Envoyez votre première demande",
+  "Pick a ready team or describe the page you want.": "Choisissez une équipe prête ou décrivez la page voulue.",
+  "Add my key": "Ajouter ma clé",
+  "Open the studio": "Ouvrir le studio",
+  "Get started": "Pour commencer",
+  "Upgrade": "Passer à l'offre supérieure",
+  "on your Claude account": "sur votre compte Claude",
+  "Plan requests waiting": "Demandes d'offre en attente",
+});
+window.I18N_PATTERNS.fr.push([/^(\d+) of (\d+) done$/, "$1 sur $2 faits"]);
+Object.assign(window.I18N.fr, { "A team is a set of agents that run together, always in the agents' order. Use one for a project with <b>Choose a team</b> in the studio. Times and costs are estimates from past runs (about 40s for agents that haven't run yet).": "Une équipe est un groupe d'agents qui travaillent ensemble, toujours dans l'ordre des agents. Choisissez-en une pour un projet avec <b>Choisir une équipe</b> dans le studio. Les temps et coûts sont estimés d'après les exécutions passées (environ 40 s pour les agents qui n'ont pas encore tourné)." });

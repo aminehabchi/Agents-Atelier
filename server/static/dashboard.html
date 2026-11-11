@@ -84,6 +84,26 @@
     .panel { padding: 16px; }
     .prow .when { display: none; }
   }
+  .plan-chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--r-pill); font-size: 13px; text-decoration: none;
+    background: var(--ice); color: var(--sky); }
+  .plan-chip b { font-weight: 500; color: var(--ink); padding-inline-start: 8px; border-inline-start: 1px solid var(--line-strong); }
+  .plan-chip:hover b { text-decoration: underline; }
+  .head-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .start { background: var(--paper); box-shadow: var(--ring); border-radius: var(--r-card); padding: 20px 24px; margin-bottom: 12px; }
+  .start-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .start-head h2 { margin: 0; font-size: 16px; font-weight: 500; }
+  .start-head span { font-size: 13px; color: var(--stone); }
+  .start ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; }
+  .start li { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: start; padding: 14px; border-radius: var(--r); background: var(--mist); }
+  .start li.now { box-shadow: inset 0 0 0 1.5px var(--sky); background: var(--paper); }
+  .start li .btn { grid-column: 2; justify-self: start; margin-top: 6px; }
+  .start .mark { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 500; background: var(--linen); color: var(--graphite); box-shadow: var(--ring); }
+  .start li.done .mark { background: var(--ok); color: #fff; box-shadow: none; }
+  .start li.done .txt b { color: var(--stone); text-decoration: line-through; }
+  .start .txt { display: grid; gap: 2px; min-width: 0; }
+  .start .txt b { font-weight: 500; font-size: 14px; }
+  .start .txt small { font-size: 13px; color: var(--stone); line-height: 1.45; }
+  .count-row.hot b { color: var(--danger); }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 </head>
@@ -152,27 +172,45 @@ function timeChart(agents) {
 }
 
 async function load() {
-  let me, projects, stats, agents, teams, users = null;
+  let me, projects, stats, agents, teams, users = null, planInfo;
   try {
-    me = await getMe();
-    [projects, stats, agents, teams, users] = await Promise.all([
+    me = (await api("/api/auth/me")).user;
+    [projects, stats, agents, teams, users, planInfo] = await Promise.all([
       api("/api/projects?page=1&per_page=5&mine=true"), api("/api/stats?mine=true"), api("/api/agents"), api("/api/presets"),
-      me?.role === "admin" ? api("/api/users") : null]);
+      me?.role === "admin" ? api("/api/users") : null, api("/api/plans")]);
   } catch (err) { return showError(app, err, load, "Couldn't load your dashboard"); }
   const { totals } = stats, counts = projects.counts;
   document.getElementById("topNew").hidden = !counts.all;           // one "new project" button per screen: the empty state has its own
   const own = (list) => list.filter(x => x.scope === "mine").length;
   const first = (me.name || "").split(" ")[0];
   const waiting = users ? users.filter(u => u.role === "unconfirmed").length : 0;
+  const asks = users ? users.filter(u => u.plan_request).length : 0;
+  const byKey = planInfo.keys === "user", plan = planInfo.plans.find(p => p.id === me.plan);
+  // the first steps, until they're all done
+  const steps = [
+    ...(byKey ? [{ done: !!me.claude_key?.set, title: "Add your Claude API key", text: "The agents run on your own Claude account.", href: "/profile#claude-key", cta: "Add my key" }] : []),
+    { done: counts.all > 0, title: "Create a project", text: "A name and a short description, like a job post.", href: "/projects/new", cta: "New project" },
+    { done: projects.prompts > 0 || totals.runs > 0, title: "Send your first request", text: "Pick a ready team or describe the page you want.", href: projects.items[0] ? `/p/${projects.items[0].id}` : "/projects/new", cta: "Open the studio" },
+  ];
+  const next = steps.find(s => !s.done);
   document.title = "Dashboard · Agents Atelier";
   app.innerHTML = `
     <div class="head"><h1 class="page-title">${first ? `Welcome back, ${esc(first)}` : "Welcome back"}</h1>
-      <div class="head-acts"><a class="btn btn-ghost" href="/hire">${icon("users", { size: 16 })}Browse agents</a></div></div>
+      <div class="head-acts">${me.role === "admin" ? "" : `<a class="plan-chip" href="/profile#plan">${icon("sparkles", { size: 14 })}<span>${esc(plan?.name || "Starter")} plan</span>${me.plan !== "agency" ? `<b>Upgrade</b>` : ""}</a>`}
+        <a class="btn btn-ghost" href="/hire">${icon("users", { size: 16 })}Browse agents</a></div></div>
+
+    ${next ? `<section class="start" aria-label="Get started">
+      <div class="start-head"><h2>Get started</h2><span>${steps.filter(s => s.done).length} of ${steps.length} done</span></div>
+      <ol>${steps.map((s, i) => `<li class="${s.done ? "done" : s === next ? "now" : ""}">
+        <span class="mark">${s.done ? icon("check", { size: 14 }) : i + 1}</span>
+        <span class="txt"><b>${esc(s.title)}</b><small>${esc(s.text)}</small></span>
+        ${s === next ? `<a class="btn btn-dark btn-sm" href="${s.href}">${esc(s.cta)}${icon("arrow-right", { size: 14 })}</a>` : ""}</li>`).join("")}</ol>
+    </section>` : ""}
 
     <section class="tiles" aria-label="Your numbers">
       <div class="tile"><h2>Projects</h2><b>${counts.all}</b><small>${counts.working ? `${counts.working} building now` : `${counts.built} built`}</small></div>
       <div class="tile"><h2>Agent runs</h2><b>${totals.runs}</b><small>${totals.failed ? `${totals.failed} stopped or failed` : `${projects.prompts} ${projects.prompts === 1 ? "prompt" : "prompts"} sent`}</small></div>
-      <div class="tile"><h2>Estimated cost</h2><b>${money(totals.cost)}</b><small>API equivalent, not a bill</small></div>
+      <div class="tile"><h2>AI cost</h2><b>${money(totals.cost)}</b><small>${byKey ? "on your Claude account" : "API equivalent, not a bill"}</small></div>
       <div class="tile"><h2>Agent time</h2><b data-no-i18n>${duration(totals.seconds)}</b><small>Total across all your runs</small></div>
     </section>
 
@@ -198,7 +236,8 @@ async function load() {
         <a class="count-row" href="/agents?show=shared"><span>Shared agents</span><b>${agents.length - own(agents)}</b></a>
         ${users ? `<div class="panel-head side-gap"><h2>Accounts</h2></div>
           <a class="count-row" href="/users"><span>Users</span><b>${users.length}</b></a>
-          <a class="count-row" href="/users"><span>Not confirmed</span><b>${waiting}</b></a>` : ""}
+          <a class="count-row" href="/users"><span>Not confirmed</span><b>${waiting}</b></a>
+          <a class="count-row ${asks ? "hot" : ""}" href="/users"><span>Plan requests waiting</span><b>${asks}</b></a>` : ""}
       </section>
     </div>`;
 }

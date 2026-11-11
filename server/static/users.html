@@ -59,17 +59,17 @@ function draw() {
     <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Company</th><th scope="col">Occupation</th><th scope="col">Builds for</th><th scope="col">Heard from</th><th scope="col">Joined</th><th scope="col">Claude key</th><th scope="col">Plan</th><th scope="col">Role</th></tr></thead>
     <tbody>${pg.items.map(u => `<tr>
       <td class="who"><b data-no-i18n>${esc(u.name || "-")}</b>${u.id === me.id ? ` <span class="badge">you</span>` : ""}</td>
-      <td data-no-i18n>${esc(u.email)}</td>
+      <td class="em" data-no-i18n>${esc(u.email)}</td>
       <td data-no-i18n>${cell(u.company)}</td>
-      <td>${cell(u.job_role)}</td><td>${cell(u.use_case)}</td><td>${cell(u.referral)}</td>
-      <td class="muted">${ago(u.created)}</td>
-      <td>${u.claude_key?.set ? `<span class="badge listed" title="Runs on their own Claude account">${icon("check", { size: 12 })}Added</span>` : `<span class="muted">None</span>`}</td>
-      <td>${u.role === "admin" ? `<span class="muted">Every feature</span>` : `<select class="input" data-plan="${esc(u.id)}" aria-label="Plan of ${esc(u.email)}">
+      <td class="opt">${cell(u.job_role)}</td><td class="opt">${cell(u.use_case)}</td><td class="opt">${cell(u.referral)}</td>
+      <td class="muted opt">${ago(u.created)}</td>
+      <td class="key"><span class="cl">Claude key</span>${u.claude_key?.set ? `<span class="badge listed" title="Runs on their own Claude account">${icon("check", { size: 12 })}Added</span>` : `<span class="muted">None</span>`}</td>
+      <td class="pl"><span class="cl">Plan</span>${u.role === "admin" ? `<span class="muted">Every feature</span>` : `<select class="input" data-plan="${esc(u.id)}" aria-label="Plan of ${esc(u.email)}">
         ${Object.keys(PLAN).map(r => `<option value="${r}" ${r === u.plan ? "selected" : ""}>${PLAN[r]}</option>`).join("")}
       </select>${u.plan_request ? `<div class="ask"><span class="badge req">${icon("clock", { size: 12 })}Asks for ${esc(PLAN[u.plan_request] || u.plan_request)}${u.plan_request_at ? ` · ${esc(ago(u.plan_request_at))}` : ""}</span>
         <span class="ask-acts"><button class="btn btn-dark btn-sm" type="button" data-approve="${esc(u.id)}" data-to="${esc(u.plan_request)}">Approve</button>
         <button class="btn btn-ghost btn-sm" type="button" data-decline="${esc(u.id)}">Decline</button></span></div>` : ""}`}</td>
-      <td><select class="input" data-id="${esc(u.id)}" aria-label="Role of ${esc(u.email)}" ${u.id === me.id ? 'disabled title="You can\'t change your own role"' : ""}>
+      <td class="rl"><span class="cl">Role</span><select class="input" data-id="${esc(u.id)}" aria-label="Role of ${esc(u.email)}" ${u.id === me.id ? 'disabled title="You can\'t change your own role"' : ""}>
         ${Object.keys(LABEL).map(r => `<option value="${r}" ${r === u.role ? "selected" : ""}>${LABEL[r]}</option>`).join("")}
       </select></td></tr>`).join("")}</tbody></table></div>`;
   $pager.innerHTML = pagerHTML(pg, { noun: "users" });
@@ -114,6 +114,20 @@ load();
   .utable .ask { display: grid; gap: 6px; margin-top: 8px; }
   .utable .ask .badge.req { display: inline-flex; align-items: center; gap: 4px; background: var(--ice); color: var(--sky); justify-self: start; }
   .utable .ask-acts { display: flex; gap: 6px; }
+  .utable .cl { display: none; }
+  @media (max-width: 760px) {
+    .utable thead { display: none; }
+    .utable, .utable tbody { display: block; min-width: 0; }
+    .utable tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 12px; padding: 14px; border-bottom: 1px solid var(--line); }
+    .utable td { display: block; padding: 0; border: 0; min-width: 0; }
+    .utable td.who, .utable td.em { grid-column: 1 / -1; }
+    .utable td.em { margin-top: -8px; color: var(--stone); overflow-wrap: anywhere; }
+    .utable td.opt { display: none; }
+    .utable td:nth-child(3) { display: none; }
+    .utable td.rl { grid-column: 1 / -1; }
+    .utable .cl { display: block; font-size: 12px; color: var(--stone); margin-bottom: 4px; }
+    .utable select.input { width: 100%; }
+  }
 </style>
 </body>
 </html>

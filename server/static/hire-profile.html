@@ -115,7 +115,7 @@ function agentPage(a) {
   ${a.teams.length ? `<section class="p-sec"><h2>Teams it's part of</h2><p class="hint">Hire the whole team for a kind of job.</p>
     <div class="p-teams">${a.teams.map(t => `<a class="fchip" href="/hire/teams/${t.pk}">${icon("layers", { size: 14 })}${esc(t.name)}</a>`).join("")}</div></section>` : ""}
   <section class="p-sec"><h2>How it works</h2><p class="hint">The instructions it follows, after the shared rules every agent receives.</p>
-    <pre class="p-role" data-no-i18n>${esc(a.role)}</pre></section>`;
+    <pre class="p-role" tabindex="0" aria-label="Instructions" data-no-i18n>${esc(a.role)}</pre></section>`;
 }
 
 function teamPage(t) {

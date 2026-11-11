@@ -202,8 +202,9 @@
   }
   /* the build timeline lights up as you scroll through it */
   ol.timeline li { transition: opacity .4s, background .4s; }
-  .motion ol.timeline li { opacity: .35; }
-  .motion ol.timeline li.lit { opacity: 1; }
+  /* steps not reached yet: quieter colours, never below readable contrast (opacity would fade the text too far) */
+  .motion ol.timeline li:not(.lit) b, .motion ol.timeline li:not(.lit) span:last-child { color: var(--stone); }
+  .motion ol.timeline li { transition: color .3s; }
   ol.timeline li.lit .num { color: var(--sky); }
 
   /* entrance */
@@ -415,8 +416,8 @@
       </aside>
     </div>
     <ul class="proof">
-      <li><b data-count="30">30</b><span>specialist agents</span></li>
-      <li><b data-count="22">22</b><span>ready teams to hire</span></li>
+      <li><b data-count="35">35</b><span>specialist agents</span></li>
+      <li><b data-count="23">23</b><span>ready teams to hire</span></li>
       <li><b>150</b><span>versions saved per project</span></li>
       <li><b>RTL</b><span>any language, right-to-left included</span></li>
     </ul>

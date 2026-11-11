@@ -2,21 +2,29 @@
 (function () {
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   const pref = () => { try { return localStorage.getItem("theme") || "dark"; } catch { return "dark"; } };
-  const apply = () => {
+  // the phone's browser bar takes the page's colour, in both themes
+  const bar = () => { const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = document.documentElement.dataset.theme === "dark" ? "#0f1117" : "#f3f4f8"; };
+  const apply = (animate = false) => {
     const p = pref();
+    if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) {   // a short cross-fade instead of a flash
+      document.documentElement.classList.add("theme-anim");
+      setTimeout(() => document.documentElement.classList.remove("theme-anim"), 350);
+    }
     document.documentElement.dataset.theme = p === "system" ? (media.matches ? "dark" : "light") : p;
+    bar();
     document.documentElement.dataset.themePref = p;
     document.querySelectorAll("[data-theme-btn]").forEach(b => { b.innerHTML = icon(themeIcon(), { size: 17 }); b.title = themeTitle(); });
   };
   const themeIcon = () => ({ light: "sun", dark: "moon", system: "monitor" })[pref()];
   const themeTitle = () => `Theme: ${pref()}. Click to change`;
   window.getTheme = pref;
-  window.setTheme = (p, save = true) => { try { localStorage.setItem("theme", p); } catch {} apply(); if (save) window.savePreferences?.({ theme: p }); };
+  window.setTheme = (p, save = true) => { try { localStorage.setItem("theme", p); } catch {} apply(true); if (save) window.savePreferences?.({ theme: p }); };
   window.cycleTheme = () => { const order = ["system", "light", "dark"]; setTheme(order[(order.indexOf(pref()) + 1) % 3]); toast(`Theme: ${pref()}`); };
   window.themeIcon = themeIcon; window.themeTitle = themeTitle;
-  media.addEventListener?.("change", () => pref() === "system" && apply());
+  media.addEventListener?.("change", () => pref() === "system" && apply(true));
   window.addEventListener("storage", (e) => e.key === "theme" && apply());
   document.documentElement.dataset.theme = pref() === "system" ? (media.matches ? "dark" : "light") : pref();
+  bar();
   window.applyTheme = apply;
 })();
 
@@ -248,10 +256,10 @@ const BRIEF_QUESTIONS = [
   { key: "tone", label: "Tone and style", type: "select",
     options: ["Friendly and warm", "Professional and trustworthy", "Minimal and calm", "Bold and energetic", "Luxurious and elegant", "Playful and fun", "Technical and precise"] },
   { key: "language", label: "Language(s) of the site", max: 80, placeholder: "e.g. French, with an Arabic version" },
+  { key: "inspiration", label: "Sites or styles you like", max: 300, placeholder: "e.g. apple.com for the calm layout" },
   { key: "sections", label: "Must-have content", max: 600, type: "textarea",
     placeholder: "e.g. Menu with prices, opening hours, map and address, customer reviews, booking button" },
-  { key: "inspiration", label: "Sites or styles you like", max: 300, placeholder: "e.g. apple.com for the calm layout" },
-  { key: "avoid", label: "Anything to avoid?", max: 200, placeholder: "e.g. no stock-photo look, no pop-ups" },
+  { key: "avoid", label: "Anything to avoid?", max: 200, wide: true, placeholder: "e.g. no stock-photo look, no pop-ups" },
 ];
 const briefField = (q, value = "") => q.type === "select"
   ? `<label class="pfield"><span>${esc(q.label)}</span><select class="input" name="b_${q.key}">
@@ -259,7 +267,7 @@ const briefField = (q, value = "") => q.type === "select"
       ${value && !q.options.includes(value) ? `<option selected>${esc(value)}</option>` : ""}</select></label>`
   : q.type === "textarea"
     ? `<label class="pfield wide"><span>${esc(q.label)}</span><textarea class="input" name="b_${q.key}" maxlength="${q.max}" rows="3" placeholder="${esc(q.placeholder)}">${esc(value)}</textarea></label>`
-    : `<label class="pfield"><span>${esc(q.label)}</span><input class="input" name="b_${q.key}" maxlength="${q.max}" placeholder="${esc(q.placeholder)}" value="${esc(value)}"></label>`;
+    : `<label class="pfield ${q.wide ? "wide" : ""}"><span>${esc(q.label)}</span><input class="input" name="b_${q.key}" maxlength="${q.max}" placeholder="${esc(q.placeholder)}" value="${esc(value)}"></label>`;
 /* ---------- a project's brand kit: logo, colours and fonts ----------
    brandFieldsHTML() draws it; bindBrandFields() runs it and returns { values(), state } (state.logoFile, state.removeLogo,
    state.from = the kit to copy the logo from). `live` (the studio) saves each change through `live` callbacks instead. */

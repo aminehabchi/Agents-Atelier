@@ -22,10 +22,11 @@
   .title { flex: 1; min-width: 0; }
   .title .name { font-size: 15px; font-weight: 500; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     outline: none; border-radius: var(--r); padding: 1px 4px; margin-inline-start: -4px; cursor: text; }
+  .title .name { min-height: 24px; }
   .title .name:hover { background: var(--linen); }
   .title .name:focus { background: var(--mist); box-shadow: 0 0 0 1px var(--espresso); }
   .title .sub { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--stone); line-height: 1.3; }
-  .title .desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; background: none; border: 0; padding: 0; color: inherit; font-size: inherit; text-align: start; }
+  .title .desc { min-height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; background: none; border: 0; padding: 0; color: inherit; font-size: inherit; text-align: start; }
   .title .desc:hover { color: var(--ink); }
   .title .desc.missing { color: var(--danger); }
   .title .pid { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--stone); background: none; border: 0; padding: 0; flex: none; }
@@ -521,14 +522,25 @@
     .pj-brief dd { margin-bottom: 8px; }
   }
 
+  .m-switch { display: none; }
   @media (max-width: 900px) {
-    body { grid-template-columns: 1fr; grid-template-rows: 55vh 45vh; }
-    .chat { border-right: 0; border-bottom: 1px solid var(--line); }
+    body { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); height: 100vh; height: 100dvh; }
+    .m-switch { display: flex; gap: 4px; padding: 6px 10px; background: var(--paper); border-bottom: 1px solid var(--line); grid-row: 1; }
+    .m-switch button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; position: relative;
+      padding: 8px; border: 0; border-radius: var(--r); background: transparent; color: var(--graphite); font: inherit; font-size: 14px; cursor: pointer; }
+    .m-switch button[aria-selected="true"] { background: var(--linen); color: var(--ink); font-weight: 500; box-shadow: var(--ring); }
+    .m-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sky); }
+    .chat, .stage { grid-row: 2; grid-column: 1; }
+    body[data-m="chat"] .stage, body:not([data-m]) .stage { display: none; }
+    body[data-m="site"] .chat { display: none; }
+    .chat { border-right: 0; }
     .url, .seg .lbl { display: none; }
     .code { grid-template-columns: 140px 1fr; }
   }
   body > * { min-width: 0; }               /* a column never grows past the screen because of its content */
   @media (max-width: 520px) {
+    .team-head .tlbl { display: none; }
+    .team-head { flex-wrap: nowrap; }
     .bar { gap: 6px; padding: 0 10px; }
     .title .pid, .title .sub > span[aria-hidden] { display: none; }
     .toolbar { overflow-x: auto; scrollbar-width: none; }
@@ -541,6 +553,11 @@
 <link rel="stylesheet" href="/static/theme.css">
 </head>
 <body>
+
+<nav class="m-switch" id="mSwitch" role="tablist" aria-label="Show">
+  <button type="button" role="tab" data-m="chat" aria-selected="true"><i data-icon="message" data-size="16"></i>Chat</button>
+  <button type="button" role="tab" data-m="site" aria-selected="false"><i data-icon="monitor" data-size="16"></i>Site<span class="m-dot" hidden></span></button>
+</nav>
 
 <section class="chat">
   <div class="bar">
@@ -571,12 +588,12 @@
 <section class="stage">
   <div class="toolbar">
     <div class="seg" id="tabs" role="tablist">
-      <button data-tab="preview" class="on"><i data-icon="eye" data-size="16"></i><span class="lbl">Preview</span></button>
-      <button data-tab="code"><i data-icon="code" data-size="16"></i><span class="lbl">Code</span></button>
-      <button data-tab="project" title="Contact details, images, QR codes, brand kit and brief"><i data-icon="briefcase" data-size="16"></i><span class="lbl">Project</span></button>
-      <button data-tab="research" title="The Research agent's report"><i data-icon="search" data-size="16"></i><span class="lbl">Research</span></button>
-      <button data-tab="versions" title="Every saved version of the code: open, compare, restore"><i data-icon="history" data-size="16"></i><span class="lbl">Versions</span></button>
-      <button data-tab="stats" title="Cost and time per agent in this project"><i data-icon="chart" data-size="16"></i><span class="lbl">Stats</span></button>
+      <button role="tab" data-tab="preview" class="on"><i data-icon="eye" data-size="16"></i><span class="lbl">Preview</span></button>
+      <button role="tab" data-tab="code"><i data-icon="code" data-size="16"></i><span class="lbl">Code</span></button>
+      <button role="tab" data-tab="project" title="Contact details, images, QR codes, brand kit and brief"><i data-icon="briefcase" data-size="16"></i><span class="lbl">Project</span></button>
+      <button role="tab" data-tab="research" title="The Research agent's report"><i data-icon="search" data-size="16"></i><span class="lbl">Research</span></button>
+      <button role="tab" data-tab="versions" title="Every saved version of the code: open, compare, restore"><i data-icon="history" data-size="16"></i><span class="lbl">Versions</span></button>
+      <button role="tab" data-tab="stats" title="Cost and time per agent in this project"><i data-icon="chart" data-size="16"></i><span class="lbl">Stats</span></button>
     </div>
     <span class="spacer"></span>
     <a class="btn btn-ghost btn-sm" id="download" title="Download the code as .zip"><i data-icon="download" data-size="16"></i>.zip</a>
@@ -903,6 +920,7 @@ function handle(ev) {
     case "agent_text": setCardText(ev.agent, ev.text); break;
     case "file_changed":
       changed.add(ev.file);
+      if (!replaying && onPhone() && document.body.dataset.m === "chat") $("mSwitch").querySelector(".m-dot").hidden = false;   // the site changed
       if (/\.html?$/i.test(ev.file || "") && !replaying) refreshPagesSoon();
       if (a) flash(a.color);
       reloadPreview(); refreshCode();
@@ -1419,6 +1437,16 @@ document.addEventListener("click", (e) => {
   if (b) resumeRun(b.dataset.resume);
 });
 
+// ================================================================ phones: Chat or Site
+function showM(which) {
+  document.body.dataset.m = which;
+  $("mSwitch").querySelectorAll("button").forEach(b => b.setAttribute("aria-selected", b.dataset.m === which ? "true" : "false"));
+  if (which === "site") { $("mSwitch").querySelector(".m-dot").hidden = true; reloadPreview(); }
+}
+document.body.dataset.m = "chat";
+$("mSwitch").addEventListener("click", (e) => { const b = e.target.closest("[data-m]"); if (b) showM(b.dataset.m); });
+const onPhone = () => matchMedia("(max-width: 900px)").matches;
+
 // ================================================================ team panel
 const tileEl = (id) => document.querySelector(`.agent-tile[data-id="${CSS.escape(id)}"]`);
 
@@ -1438,8 +1466,8 @@ function tileHTML(a, i) {
   else if (state === "pending") line = `${icon("clock", { size: 12 })}Not started`;
   else if (state === "skipped") line = "Not needed this time";
   const locked = REQUIRED.includes(a.id);
-  return `<div class="agent-tile s-${state} ${on || st ? "" : "off"}" data-id="${esc(a.id)}" style="--c:${a.color}" tabindex="0"
-      role="button" aria-label="${esc(a.name)} agent, ${state}${a.description ? ": " + esc(a.description) : ""}"
+  return `<div class="agent-tile s-${state} ${on || st ? "" : "off"}" data-id="${esc(a.id)}" style="--c:${a.color}"
+      role="group" aria-label="${esc(a.name)} agent, ${state}${a.description ? ": " + esc(a.description) : ""}"
       title="${esc(a.description ? a.description + "\n\n" : "")}${locked ? "Required: always runs when the team works" : cards[a.id] ? "Click to show in chat" : ""}">
     <div class="t-top"><span class="tile">${icon(a.icon, { size: 17 })}</span><span class="t-num">${String(i + 1).padStart(2, "0")}</span>
       ${a.model_ok === false ? `<a class="model-badge" style="color:var(--danger)" href="/agents/${encodeURIComponent(a.id)}/edit" title="Not a known model. Click to fix">${icon("alert", { size: 10 })}${esc(a.model)}</a>`
@@ -1476,7 +1504,7 @@ function renderTeam() {
 }
 function renderTeamHead() {
   const team = AGENTS.filter(a => selected.has(a.id));
-  $("teamHint").textContent = `${team.length} agent${team.length === 1 ? "" : "s"} on`;
+  $("teamHint").textContent = `${team.length} agent${team.length === 1 ? "" : "s"} in the team`;
   const chevron = `<button class="icon-btn plain" id="collapse" title="${collapsed ? "Show" : "Hide"} the team" aria-expanded="${!collapsed}">
     ${icon(collapsed ? "chevron-up" : "chevron-down", { size: 16 })}</button>`;
   if (run && busy) {
@@ -1507,8 +1535,8 @@ function renderTeamHead() {
     $("teamHead").innerHTML = `<h3>${icon("users", { size: 16 })}Team</h3>
       <span class="count">${team.length} agent${team.length === 1 ? "" : "s"}${matchingPreset() ? ` · <span data-no-i18n>${esc(matchingPreset().name)}</span>` : ""}</span>
       <span class="spacer"></span>
-      <a class="btn btn-ghost btn-sm" href="/hire" data-hire-link="agents">${icon("plus", { size: 14 })}Add agents</a>
-      <a class="btn btn-ghost btn-sm" href="/hire?tab=teams" data-hire-link="teams">${icon("layers", { size: 14 })}Choose a team</a>
+      <a class="btn btn-ghost btn-sm" href="/hire" data-hire-link="agents" aria-label="Add agents" title="Add agents">${icon("plus", { size: 14 })}<span class="tlbl">Add agents</span></a>
+      <a class="btn btn-ghost btn-sm" href="/hire?tab=teams" data-hire-link="teams" aria-label="Choose a team" title="Choose a team">${icon("layers", { size: 14 })}<span class="tlbl">Choose a team</span></a>
       <button class="icon-btn plain" id="saveTeam" title="Save this team to use it in other projects" aria-label="Save as a team">${icon("save", { size: 15 })}</button>${chevron}`;
   }
 }
@@ -1647,7 +1675,7 @@ const tabOn = (tab) => !!$(PANES[tab])?.classList.contains("on");
 const showTab = (tab) => document.querySelector(`#tabs [data-tab="${tab}"]`)?.click();
 $("tabs").onclick = (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  [...$("tabs").children].forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+  [...$("tabs").children].forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-selected", x === b ? "true" : "false"); });
   for (const [tab, id] of Object.entries(PANES)) $(id).classList.toggle("on", b.dataset.tab === tab);
   $("pvTools").hidden = b.dataset.tab !== "preview";          // the device, page and reload controls only make sense on the preview
   if (b.dataset.tab === "code") refreshCode();

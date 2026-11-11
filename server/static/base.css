@@ -344,3 +344,8 @@ dialog.brand-modal { width: min(720px, calc(100vw - 32px)); }
 .bk-grid > *, .bk-fonts > *, .bk-main > * { min-width: 0; }
 .bk .input { width: 100%; }
 dialog.brand-modal { overflow-x: hidden; }
+
+/* switching theme: colours cross-fade for a moment (ui.js adds the class) */
+html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
+  transition: background-color .3s ease, color .3s ease, border-color .3s ease, fill .3s ease, box-shadow .3s ease !important;
+}

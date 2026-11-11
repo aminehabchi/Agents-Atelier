@@ -2118,3 +2118,16 @@ Object.assign(window.I18N.ary, {
   "The Starter plan includes one project. Delete it, or move to Pro for unlimited projects.": "باقة Starter فيها مشروع واحد. مسحو، ولا دوز لـ Pro باش تاخد مشاريع بلا حدود.",
   "<b>Starter</b> (free): one project, the official agents and ready teams.": "<b>Starter</b> (فابور): مشروع واحد، الوكلاء الرسميين والفرق الواجدين.",
 });
+Object.assign(window.I18N.ary, {
+  "A name and a short description, like a job post.": "سمية ووصف قصير، بحال إعلان ديال خدمة.",
+  "Send your first request": "صيفط أول طلب ديالك",
+  "Pick a ready team or describe the page you want.": "ختار فريق واجد ولا وصف الصفحة اللي بغيتي.",
+  "Add my key": "زيد المفتاح ديالي",
+  "Open the studio": "حل الستوديو",
+  "Get started": "باش تبدا",
+  "Upgrade": "رقّي",
+  "on your Claude account": "من الحساب ديالك ف Claude",
+  "Plan requests waiting": "طلبات الباقة كتسنى",
+});
+window.I18N_PATTERNS.ary.push([/^(\d+) of (\d+) done$/, "$1 من $2 سالاو"]);
+Object.assign(window.I18N.ary, { "A team is a set of agents that run together, always in the agents' order. Use one for a project with <b>Choose a team</b> in the studio. Times and costs are estimates from past runs (about 40s for agents that haven't run yet).": "الفريق هو مجموعة ديال الوكلاء كيخدمو مع بعضهم، ديما بالترتيب ديال الوكلاء. ختار وحدة لمشروع ب<b>ختار فريق</b> فالستوديو. الأوقات والتكاليف تقديرات من الخدمات اللي فاتو (تقريباً 40 ثانية للوكلاء اللي مازال ما خدمو)." });

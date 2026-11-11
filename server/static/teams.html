@@ -182,7 +182,7 @@ async function listView() {
       <button class="btn btn-ghost" id="importBtn" title="Import a team (.json), an agent (.md) or an export (.zip)">${icon("file-plus", { size: 16 })}Import</button>
       <a class="btn btn-ghost" href="/api/export" title="All agents, shared rules and your teams as a .zip">${icon("download", { size: 16 })}Export all</a>
       <a class="btn btn-dark" href="/teams/new">${icon("plus", { size: 16 })}New team</a></div>
-    <p class="note">${icon("alert", { size: 14 })}<span>A team is a set of agents that run together, always in the agents' order. Pick one in a project's Team panel. Times and costs are estimates from past runs (about ${DEFAULT_SECONDS}s for agents that haven't run yet).</span></p>
+    <p class="note">${icon("alert", { size: 14 })}<span>A team is a set of agents that run together, always in the agents' order. Use one for a project with <b>Choose a team</b> in the studio. Times and costs are estimates from past runs (about ${DEFAULT_SECONDS}s for agents that haven't run yet).</span></p>
     <div class="fgroup team-filter" role="group" aria-label="Whose teams">
       ${[["all", "All teams", teams.length], ["mine", "Mine", mine.length], ["shared", "Shared", shared.length + builtin.length]].map(([k, label, n]) =>
         `<button class="fchip ${owner === k ? "on" : ""}" data-owner="${k}" aria-pressed="${owner === k}">${label} <span>${n}</span></button>`).join("")}

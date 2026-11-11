@@ -18,14 +18,14 @@
   /* the brand side: what you're signing up for */
   .pitch { position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; gap: 40px; padding: 40px 48px; background: var(--canary); color: var(--on-accent); border-right: 1px solid var(--line-strong); overflow: hidden; }
   .brand { display: inline-flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; font-weight: 600; align-self: flex-start; }
-  .brand .mark { display: grid; place-items: center; width: 32px; height: 32px; background: var(--on-accent); color: #fff; border-radius: var(--r); }
+  .brand .mark { display: grid; place-items: center; width: 32px; height: 32px; background: var(--on-accent); color: var(--canary); border-radius: var(--r); }
   .pitch-body { margin: auto 0; }
   .pitch h2 { margin: 0 0 32px; font-weight: 400; font-size: clamp(30px, 3.4vw, 44px); line-height: 1.08; }
   .points { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
   .points li { display: flex; gap: 12px; align-items: center; font-size: 15px; line-height: 1.5; }
-  .points .tile { flex: none; display: grid; place-items: center; width: 32px; height: 32px; background: #fff; border: 1.5px solid var(--on-accent); border-radius: var(--r); }
+  .points .tile { flex: none; display: grid; place-items: center; width: 32px; height: 32px; background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); }
   .crew { display: flex; flex-wrap: wrap; gap: 6px; min-height: 26px; }
-  .crew span { background: #fff; border: 1.5px solid var(--on-accent); border-radius: var(--r); padding: 2px 8px; font-size: 12px; }
+  .crew span { background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 2px 8px; font-size: 12px; }
 
   /* the form side */
   .auth-main { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 40px 24px; min-width: 0; position: relative; }
