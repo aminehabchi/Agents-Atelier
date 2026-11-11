@@ -106,6 +106,7 @@ IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "i
 TEXT_EXT = {".html", ".css", ".js", ".md", ".svg", ".json", ".txt", ".xml", ".webmanifest"}
 
 CLAUDE = config.CLAUDE_BIN
+STARTED = time.time()           # for the monitoring page's uptime
 MODEL = config.AGENT_MODEL  # e.g. "sonnet" for faster runs; default = your Claude Code default
 
 @contextlib.asynccontextmanager
@@ -116,7 +117,9 @@ async def lifespan(_app):
     if imported:
         log.info("Imported %d projects from %s into %s", imported, config.LEGACY_WORK_DIR, storage.ROOT)
     mark_interrupted_runs()
+    purger = asyncio.create_task(purge_loop())
     yield
+    purger.cancel()
     await store.stop()
     await db.close()
 
@@ -742,6 +745,126 @@ async def analytics(request: Request, days: int = 30):
     }
 
 
+def _day_span(days: int):
+    import datetime as dt
+    today = dt.datetime.now(dt.timezone.utc).date()
+    span = [today - dt.timedelta(days=days - 1 - i) for i in range(days)]
+    return span, dt.datetime.combine(span[0], dt.time(), dt.timezone.utc).timestamp()
+
+
+@app.get("/api/admin/revenue")
+async def revenue(request: Request, days: int = 30):
+    """What the members' plans are worth per month, and how it moved. Payments aren't collected online yet, so this is
+    the plans' value, not money received. Admins and deactivated accounts don't count."""
+    require_admin(request)
+    import datetime as dt
+    days = max(7, min(days, 365))
+    span, since = _day_span(days)
+    price = {k: v["price"] for k, v in plans.PLANS.items()}
+    users = await db.pool.fetch("SELECT id, email, name, role, plan, plan_request, plan_request_at, deactivated_at, created_at FROM users")
+    members = [u for u in users if u["role"] == "user" and not u["deactivated_at"]]
+    events = await db.pool.fetch("""SELECT e.user_id, e.from_plan, e.to_plan, e.by_admin, e.ts, u.email
+                                    FROM plan_events e JOIN users u ON u.id = e.user_id ORDER BY e.ts""")
+    counted = {u["id"] for u in members}
+    mrr = sum(price.get(u["plan"], 0) for u in members)
+    by_plan = [{"id": k, "name": v["name"], "price": v["price"], "members": sum(u["plan"] == k for u in members),
+                "mrr": sum(price.get(u["plan"], 0) for u in members if u["plan"] == k)} for k, v in plans.PLANS.items()]
+    paying = sum(u["plan"] != "starter" for u in members)
+    pending = [u for u in members if u["plan_request"]]
+
+    # the monthly value on each day: each member's plan as it stood at the end of that day
+    def plan_on(uid, end_ts, now_plan):
+        mine = [e for e in events if e["user_id"] == uid]
+        before = [e for e in mine if e["ts"] <= end_ts]
+        if before:
+            return before[-1]["to_plan"]
+        return mine[0]["from_plan"] if mine else now_plan
+    series = []
+    for d in span:
+        end = dt.datetime.combine(d, dt.time.max, dt.timezone.utc).timestamp()
+        series.append({"date": d.isoformat(), "value": sum(price.get(plan_on(u["id"], end, u["plan"]), 0)
+                                                            for u in members if u["created_at"].timestamp() <= end)})
+    moves = [e for e in events if e["ts"] >= since and e["user_id"] in counted]
+    up = [e for e in moves if plans.rank(e["to_plan"]) > plans.rank(e["from_plan"])]
+    down = [e for e in moves if plans.rank(e["to_plan"]) < plans.rank(e["from_plan"])]
+    gained = sum(price.get(e["to_plan"], 0) - price.get(e["from_plan"], 0) for e in up)
+    lost = sum(price.get(e["from_plan"], 0) - price.get(e["to_plan"], 0) for e in down)
+    return {
+        "days": days, "mrr": mrr, "arr": mrr * 12, "members": len(members), "paying": paying,
+        "conversion": round(paying / len(members), 4) if members else 0,
+        "arpu": round(mrr / len(members), 2) if members else 0,
+        "by_plan": by_plan,
+        "pending": {"count": len(pending), "mrr": sum(price.get(u["plan_request"], 0) - price.get(u["plan"], 0) for u in pending),
+                    "items": [{"email": u["email"], "from": u["plan"], "to": u["plan_request"], "at": u["plan_request_at"]} for u in pending]},
+        "moves": {"upgrades": len(up), "downgrades": len(down), "gained": gained, "lost": lost, "net": gained - lost},
+        "series": series,
+        "recent": [{"email": e["email"], "from": e["from_plan"], "to": e["to_plan"], "by_admin": e["by_admin"], "ts": e["ts"]}
+                   for e in reversed(events[-20:])],
+    }
+
+
+@app.get("/api/admin/monitoring")
+async def monitoring(request: Request, days: int = 30):
+    """Is everything working: the server's parts, runs failing, members who can't build, accounts on their way out."""
+    require_admin(request)
+    days = max(7, min(days, 365))
+    span, since = _day_span(days)
+    t0 = time.perf_counter()
+    try:
+        await db.pool.fetchval("SELECT 1")
+        db_ms, db_ok = round((time.perf_counter() - t0) * 1000, 1), True
+    except Exception:
+        db_ms, db_ok = None, False
+    disk = shutil.disk_usage(config.STORAGE_DIR)
+    import datetime as dt
+    day_of = lambda ts: dt.datetime.fromtimestamp(ts, dt.timezone.utc).date()
+    statuses, by_agent, fail_days, seconds = {}, {}, {}, []
+    errors = []
+    for m in store.all():
+        run = m.get("run") or {}
+        if run.get("status") == "error" and run.get("updated", 0) >= since:
+            errors.append({"project": m["name"], "id": m["id"], "error": (run.get("error") or "")[-300:], "ts": run.get("updated"),
+                           "agent": run.get("current") or ""})
+        for e in m.get("stats", []):
+            if e.get("ts", 0) < since:
+                continue
+            s = e.get("status") or "done"
+            statuses[s] = statuses.get(s, 0) + 1
+            a = by_agent.setdefault(e.get("agent") or "?", {"agent": e.get("agent") or "?", "runs": 0, "failed": 0, "seconds": 0.0})
+            a["runs"] += 1; a["seconds"] += e.get("seconds") or 0
+            if s != "done":
+                a["failed"] += 1
+                fail_days[day_of(e["ts"])] = fail_days.get(day_of(e["ts"]), 0) + 1
+            if s == "done" and e.get("seconds"):
+                seconds.append(e["seconds"])
+    agents_rows = sorted(by_agent.values(), key=lambda a: (-a["failed"], -a["runs"]))[:10]
+    for a in agents_rows:
+        a["avg_seconds"] = round(a["seconds"] / a["runs"], 1) if a["runs"] else 0
+        a["seconds"] = round(a["seconds"], 1)
+    users = await db.pool.fetch("SELECT email, role, claude_key, deactivated_at, delete_after FROM users")
+    members = [u for u in users if u["role"] == "user" and not u["deactivated_at"]]
+    seconds.sort()
+    busy = [{"id": m["id"], "name": m["name"]} for m in store.all() if is_busy(m["id"])]
+    return {
+        "days": days,
+        "health": {"database": {"ok": db_ok, "ms": db_ms}, "chrome": browser_check.available(),
+                   "claude": bool(shutil.which(CLAUDE)), "keys": config.CLAUDE_KEYS,
+                   "disk": {"free": disk.free, "total": disk.total}, "uptime": round(time.time() - STARTED),
+                   "busy": busy, "viewers": sum(len(s.get("clients") or ()) for s in runs.values())},
+        "runs": {"total": sum(statuses.values()), "statuses": statuses,
+                 "failed": sum(v for k, v in statuses.items() if k != "done"),
+                 "median_seconds": seconds[len(seconds) // 2] if seconds else 0,
+                 "p90_seconds": seconds[int(len(seconds) * 0.9)] if seconds else 0},
+        "failures": [{"date": d.isoformat(), "value": fail_days.get(d, 0)} for d in span],
+        "agents": agents_rows,
+        "errors": sorted(errors, key=lambda e: -(e["ts"] or 0))[:15],
+        "accounts": {"members": len(members), "with_key": sum(bool(u["claude_key"]) for u in members),
+                     "unconfirmed": sum(u["role"] == "unconfirmed" for u in users),
+                     "leaving": [{"email": u["email"], "delete_after": u["delete_after"]}
+                                 for u in sorted(users, key=lambda u: u["delete_after"] or 0) if u["delete_after"]]},
+    }
+
+
 @app.get("/users")
 async def users_page(request: Request):
     if request.state.user["role"] != "admin":
@@ -858,19 +981,42 @@ async def end_other_sessions(request: Request):
 
 @app.post("/api/auth/delete")
 async def delete_account(request: Request, body: dict):
-    """Your account, your private agents and teams, and your projects with their files. It can't be undone."""
+    """Deactivate your account: you're logged out everywhere, and it's deleted for good after ACCOUNT_DELETE_DAYS
+    (your private agents and teams, your projects and their files) unless you log in again before then."""
     user = _confirmed_user(request)
     await auth.check_can_delete(user, body.get("password"))
     owned = [m["id"] for m in store.all() if m.get("owner") == str(user["id"])]
     if any(is_busy(pid) for pid in owned):
         raise HTTPException(409, "Agents are working on one of your projects. Stop them first.")
+    when = await auth.deactivate(user)
+    res = JSONResponse({"ok": True, "delete_after": when, "days": config.ACCOUNT_DELETE_DAYS})
+    res.delete_cookie(auth.COOKIE, path="/")
+    return res
+
+
+async def erase_account(user: dict):
+    """The end of the 30 days: the account and everything it owns, for good."""
+    owned = [m["id"] for m in store.all() if m.get("owner") == str(user["id"])]
+    if any(is_busy(pid) for pid in owned):
+        return                                   # can't happen without a session; try again next round
     await auth.delete_user(user)
     for pid in owned:
         _remove_project_files(pid)
     shutil.rmtree(BRAND_DIR / str(user["id"]), ignore_errors=True)
-    res = JSONResponse({"ok": True})
-    res.delete_cookie(auth.COOKIE, path="/")
-    return res
+    shutil.rmtree(Path(config.STORAGE_DIR) / "claude-home" / str(user["id"]), ignore_errors=True)
+
+
+async def purge_loop():
+    """Every ACCOUNT_PURGE_SECONDS: delete the accounts whose time is up."""
+    while True:
+        try:
+            for user in await auth.due_for_deletion():
+                await erase_account(user)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("Deleting expired accounts failed")
+        await asyncio.sleep(config.ACCOUNT_PURGE_SECONDS)
 
 
 @app.get("/api/auth/export")
@@ -951,6 +1097,8 @@ async def users_set_role(request: Request, user_id: str, body: dict):
     """An admin changes a member's role and/or plan."""
     actor = require_admin(request)
     out = None
+    if body.get("decline_request"):
+        return await auth.decline_plan_request(actor, user_id)
     if "plan" in body:
         out = await auth.set_plan(actor, user_id, str(body.get("plan") or ""))
     if "role" in body or out is None:
@@ -961,8 +1109,24 @@ async def users_set_role(request: Request, user_id: str, body: dict):
 # ---------------------------------------------------------------- plans and the member's own Claude key
 
 @app.get("/api/plans")
-async def list_plans():
-    return {"plans": plans.public(), "keys": config.CLAUDE_KEYS}
+async def list_plans(request: Request):
+    """The plans, and for a logged-in member what they use of theirs."""
+    out = {"plans": plans.public(), "keys": config.CLAUDE_KEYS}
+    user = request.state.user
+    if user:
+        out["usage"] = {"projects": sum(m.get("owner") == str(user["id"]) for m in store.all())}
+    return out
+
+
+@app.post("/api/auth/plan")
+async def change_my_plan(request: Request, body: dict):
+    """Move to another plan: lower at once, higher as a request the admins approve."""
+    return {"user": await auth.change_my_plan(_confirmed_user(request), str(body.get("plan") or ""))}
+
+
+@app.delete("/api/auth/plan-request")
+async def cancel_plan_request(request: Request):
+    return {"user": await auth.cancel_plan_request(_confirmed_user(request))}
 
 
 @app.put("/api/auth/claude-key")
@@ -1165,7 +1329,8 @@ def check_project_limit(user: dict):
     """Starter accounts keep a few projects; deleting one frees a place."""
     most = plans.of(user)["projects"]
     if most is not None and sum(m.get("owner") == str(user["id"]) for m in store.all()) >= most:
-        raise plans.PlanError(f"The Starter plan holds {most} projects. Delete one, or move to Pro for unlimited projects.")
+        raise plans.PlanError("The Starter plan includes one project. Delete it, or move to Pro for unlimited projects." if most == 1 else
+                              f"The Starter plan holds {most} projects. Delete one, or move to Pro for unlimited projects.")
 
 
 @app.post("/api/projects")
@@ -2636,8 +2801,8 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
     await broadcast(pid, {"type": "run_start", "request": request, "name": meta["name"],
                           "agents": meta["run"]["agents"], "pool": meta.get("agents") or [], "done": done, "resumed": resume})
     if no_web:
-        await broadcast(pid, {"type": "notice", "text": f"{', '.join(a['name'] for a in no_web)} skipped: agents that search "
-                                                        "the web come with the Pro plan."})
+        await broadcast(pid, {"type": "notice", "upgrade": "pro",
+                              "text": f"{', '.join(a['name'] for a in no_web)} skipped: agents that search the web come with the Pro plan."})
     seen_findings = set(safely("Scan", scan_site, site_dir(pid)) or [])
     if safely("Snapshot", VERS.snapshot, pid, f"Before: {request[:60]}", kind="before", request=request):
         await broadcast(pid, {"type": "versions"})

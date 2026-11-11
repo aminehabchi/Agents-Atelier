@@ -24,7 +24,7 @@
 window.esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 class ApiError extends Error {
-  constructor(message, status = 0) { super(message); this.name = "ApiError"; this.status = status; }
+  constructor(message, status = 0, upgrade = "") { super(message); this.name = "ApiError"; this.status = status; this.upgrade = upgrade; }
 }
 window.ApiError = ApiError;
 
@@ -85,7 +85,8 @@ window.api = async (path, opts = {}) => {
     if (!msg) msg = res.status === 413 ? "That's too large for the server to accept."
       : res.status >= 500 ? `The server had a problem (${res.status}). Check the server log.`
       : `Request failed (${res.status} ${res.statusText}).`;
-    throw new ApiError(msg, res.status);
+    if (res.status === 403 && data?.upgrade) planPrompt(msg, data.upgrade);    // a feature of a higher plan
+    throw new ApiError(msg, res.status, data?.upgrade || "");
   }
   if (data === null) throw new ApiError("The server sent an unexpected answer.", res.status);
   return data;
@@ -129,7 +130,28 @@ window.duration = (sec) => {
   return sec < 60 ? `${sec}s` : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 };
 
+/* "Available on Pro": when the server refuses something the member's plan doesn't include, offer the plans
+   instead of a bare error. The page's own error toast for the same message is skipped. */
+const PLAN_NAMES = { pro: "Pro", agency: "Agency" };
+let planPromptShown = { text: "", at: 0 };
+window.planPrompt = (text, needs) => {
+  planPromptShown = { text, at: Date.now() };
+  if (document.querySelector("dialog.plan-prompt")) return;
+  const name = PLAN_NAMES[needs] || "a higher plan";
+  const d = document.createElement("dialog");
+  d.className = "modal plan-prompt";
+  d.innerHTML = `<span class="pp-ic">${icon("sparkles", { size: 22 })}</span>
+    <h3>${needs === "agency" ? "Available on Agency" : "Available on Pro"}</h3><p>${esc(text)}</p>
+    <div class="row"><button class="btn btn-ghost" value="no">Not now</button>
+      <a class="btn btn-dark" href="/profile?upgrade=${encodeURIComponent(needs)}#plan">${icon("arrow-right", { size: 15 })}See the ${esc(name)} plan</a></div>`;
+  document.body.append(d);
+  d.addEventListener("click", (e) => { if (e.target === d || e.target.closest("[value=no]")) d.close(); });
+  d.addEventListener("close", () => d.remove());
+  d.showModal();
+};
+
 window.toast = (text, kind = "") => {
+  if (kind === "err" && text === planPromptShown.text && Date.now() - planPromptShown.at < 4000) return;
   let box = document.querySelector(".toasts");
   if (!box) { box = document.createElement("div"); box.className = "toasts"; document.body.append(box); }
   const el = document.createElement("div");
@@ -153,9 +175,9 @@ window.accountButton = (user, { compact = false } = {}) => {
       ${compact ? "" : icon("chevron-down", { size: 14 })}
     </button>
     <div class="acct-menu" role="menu" hidden>
-      <div class="acct-head"><b data-no-i18n>${esc(user.name || user.email)}</b>${user.name ? `<small data-no-i18n>${esc(user.email)}</small>` : ""}<span class="badge">${esc(ROLE[user.role] || user.role)}</span></div>
+      <div class="acct-head"><b data-no-i18n>${esc(user.name || user.email)}</b>${user.name ? `<small data-no-i18n>${esc(user.email)}</small>` : ""}<span class="badge">${esc(ROLE[user.role] || user.role)}</span>${user.role === "user" && user.plan ? ` <span class="badge plan-badge">${esc({ starter: "Starter", pro: "Pro", agency: "Agency" }[user.plan] || user.plan)}</span>` : ""}</div>
       <div class="acct-links">
-        ${user.confirmed ? item("/profile", "user", "Profile") + item("/guide", "book", "Guide") : item("/confirm", "check", "Confirm your email")}
+        ${user.confirmed ? item("/profile", "user", "Profile") + item("/profile#plan", "sparkles", user.role === "user" && user.plan !== "agency" ? "Plan and upgrade" : "Plan") + item("/guide", "book", "Guide") : item("/confirm", "check", "Confirm your email")}
         ${user.role === "admin" ? item("/users", "users", "Users") : ""}
       </div>
       <div class="acct-links"><button type="button" role="menuitem" data-out>${icon("log-out", { size: 15 })}<span>Log out</span></button></div>

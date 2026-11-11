@@ -105,6 +105,7 @@
     .recipe { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     article h2 { font-size: 34px; }
   }
+  .callout { padding: 12px 16px; border-radius: var(--r); background: var(--paper); box-shadow: var(--ring); font-size: 14px; line-height: 1.55; }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 </head>
@@ -137,32 +138,35 @@
       <a href="#projects"><i data-icon="folder" data-size="16"></i>Projects &amp; files</a>
       <a href="#keys"><i data-icon="keyboard" data-size="16"></i>Shortcuts</a>
       <a href="#market"><i data-icon="briefcase" data-size="16"></i>The marketplace</a>
+      <a href="#plans"><i data-icon="sparkles" data-size="16"></i>Plans &amp; your Claude key</a>
       <a href="#faq"><i data-icon="help" data-size="16"></i>FAQ</a>
     </nav>
 
     <article>
       <section id="start">
         <h2><span class="num">01</span>Quick start</h2>
-        <p>Agents Atelier works like a freelance platform where every specialist is an AI agent: you describe the job, hire a team, and watch it build the <b>front end</b> of your website in plain HTML, CSS and JavaScript. Every agent runs on Claude Code, so there's no API key to set up.</p>
+        <p>Agents Atelier works like a freelance platform where every specialist is an AI agent: you describe the job, hire a team, and watch it build the <b>front end</b> of your website in plain HTML, CSS and JavaScript. Every agent runs on Claude Code, on your own Claude account: add your Claude API key once in your profile, and Anthropic bills you directly for what your agents use.</p>
+        <p class="callout"><b>Before your first build:</b> open <a href="/profile#claude-key">Profile → Claude and spending</a> and paste your Claude API key (from console.anthropic.com). The studio reminds you if it's missing.</p>
         <div class="steps">
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="message" data-size="20"></i></span><span class="n">STEP 1</span></div>
             <h3>Describe the job</h3><p>Click <b>New project</b> and give it a name and a short description, like a job post. To improve a site you already have, use <b>Existing site</b> and pick its folder or a .zip (HTML, CSS, JS, Markdown and assets only).</p></div>
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="users" data-size="20"></i></span><span class="n">STEP 2</span></div>
             <h3>Hire a team</h3><p>In the studio, <b>Add agents</b> and <b>Choose a team</b> open the marketplace for this project: pick a specialist or a ready team and it joins the project. Duplicate any agent on the <a href="/agents">Agents page</a> to make your own version, or save a team for a kind of job.</p></div>
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="eye" data-size="20"></i></span><span class="n">STEP 3</span></div>
-            <h3>Watch &amp; refine</h3><p>Agents build it one after another. Ask for changes anytime, then download the .zip.</p></div>
+            <h3>Watch &amp; refine</h3><p>Agents build it one after another. If something is missing, they ask in a short form first. Ask for changes anytime, then download the .zip.</p></div>
         </div>
       </section>
 
       <section id="studio">
         <h2><span class="num">02</span>The studio</h2>
-        <p>Each project opens in the studio: the chat on the left, the live page on the right, and the team at the bottom.</p>
+        <p>Each project opens in the studio: the chat on the left, the project's tabs on the right (Preview, Code, Project, Research, Versions, Stats), and the team at the bottom. The address keeps the tab, page and device you're on, so a reload or a shared link opens the same view.</p>
         <div class="anatomy">
           <div class="part"><span class="ico"><i data-icon="message" data-size="20"></i></span><h3>Chat</h3>
             <ul>
               <li><i data-icon="check" data-size="16"></i><span>Every agent posts a card with each file it reads or edits, a timer and a short summary.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>While agents work, the send button turns into a stop button. After a stop you can <b>Continue</b> or <b>Start again</b>.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>Follow-up prompts build on the files that are already there.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>When your request is unclear, the Orchestrator asks a short form; for a big change, it shows its plan and waits for <b>Yes, start</b>.</span></li>
             </ul></div>
           <div class="part"><span class="ico"><i data-icon="monitor" data-size="20"></i></span><h3>Preview</h3>
             <ul>
@@ -170,9 +174,14 @@
               <li><i data-icon="check" data-size="16"></i><span>Switch between desktop, tablet (768px) and phone (375px).</span></li>
               <li><i data-icon="check" data-size="16"></i><span>The <b>Code</b> tab shows every file, with a dot on the ones that changed.</span></li>
             </ul></div>
-          <div class="part"><span class="ico"><i data-icon="users" data-size="20"></i></span><h3>Team panel</h3>
+          <div class="part"><span class="ico"><i data-icon="briefcase" data-size="20"></i></span><h3>Project tab</h3>
             <ul>
-              <li><i data-icon="check" data-size="16"></i><span>One tile per agent: ready, waiting, working (with a live timer and current action), done or off.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Contact details (WhatsApp, phone, email, Telegram) for the contact agents. Change them, then ask the team to update the site.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Your images with the lighter WebP copies made for phones, the QR codes, the brand kit and the brief.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="users" data-size="20"></i></span><h3>Team strip</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>One tile per agent in the project's team: ready, waiting, working (with a live timer and current action) or done.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>The team strip shows this project's agents only. Use × on a tile to remove an agent; add more from the marketplace.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>Click a tile that already worked to jump to its card in the chat.</span></li>
             </ul></div>
@@ -181,7 +190,7 @@
               <li><i data-icon="check" data-size="16"></i><span>A version is saved before every run and after each agent, or whenever you click <b>Save version now</b>.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>Open, compare with the current code, download, or restore any version. Restoring saves the current code first.</span></li>
             </ul></div>
-          <div class="part"><span class="ico"><i data-icon="chart" data-size="20"></i></span><h3>Cost &amp; time</h3>
+          <div class="part"><span class="ico"><i data-icon="chart" data-size="20"></i></span><h3>Stats</h3>
             <ul>
               <li><i data-icon="check" data-size="16"></i><span>The Stats tab shows the estimated cost, time and tokens per agent in this project.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>Each agent card shows how long it took and what it cost.</span></li>
@@ -195,7 +204,7 @@
           <div class="part"><span class="ico"><i data-icon="folder" data-size="20"></i></span><h3>Header</h3>
             <ul>
               <li><i data-icon="check" data-size="16"></i><span>Click the title to rename the project, or the <code>#id</code> to copy it.</span></li>
-              <li><i data-icon="check" data-size="16"></i><span>The folder button opens every project, with search.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>The grid button goes back to all your projects.</span></li>
               <li><i data-icon="check" data-size="16"></i><span><b>.zip</b> downloads the code. It's locked while agents are working.</span></li>
             </ul></div>
         </div>
@@ -244,7 +253,7 @@
           <div class="advice-card"><span class="ico"><i data-icon="clipboard" data-size="18"></i></span><div><h3>Answer the project questions</h3><p>Audience, goal, tone and must-have content go to every agent with every prompt, so you don't repeat them.</p></div></div>
           <div class="advice-card"><span class="ico"><i data-icon="palette" data-size="18"></i></span><div><h3>Set up your brand kit once</h3><p>Your logo, colours and fonts then go into every new project automatically.</p></div></div>
           <div class="advice-card"><span class="ico"><i data-icon="image" data-size="18"></i></span><div><h3>Show, don't only tell</h3><p>Attach a sketch or a screenshot of a page you like, and add your real photos. Agents look at them before they work.</p></div></div>
-          <div class="advice-card"><span class="ico"><i data-icon="zap" data-size="18"></i></span><div><h3>Use the smallest team for small changes</h3><p>A wording fix needs the Copywriter, not twelve agents. Switch off agents you don't need: runs are faster and cheaper.</p></div></div>
+          <div class="advice-card"><span class="ico"><i data-icon="zap" data-size="18"></i></span><div><h3>Use the smallest team for small changes</h3><p>A wording fix needs the Copywriter, not twelve agents. Remove agents you don't need from the team: runs are faster and cheaper.</p></div></div>
           <div class="advice-card"><span class="ico"><i data-icon="refresh" data-size="18"></i></span><div><h3>Retry one agent instead of starting over</h3><p>Not happy with the colours? Retry only the CSS agent with an extra instruction, like “warmer palette, bigger headings”.</p></div></div>
           <div class="advice-card"><span class="ico"><i data-icon="history" data-size="18"></i></span><div><h3>Save a version before big changes</h3><p>Versions are saved automatically, but naming one (“before the redesign”) makes it easy to come back to.</p></div></div>
           <div class="advice-card"><span class="ico"><i data-icon="eye" data-size="18"></i></span><div><h3>Check before you publish</h3><p>Read every text, test the page on your phone, and look at the browser check in the chat. AI can make mistakes.</p></div></div>
@@ -254,7 +263,7 @@
 
       <section id="team">
         <h2><span class="num">05</span>The agent team</h2>
-        <p>These are the specialists you can hire. Agents run in order, and each one does a single job. Faded agents are off by default; switch them on per project in the Team panel, or hire them with a ready team.</p>
+        <p>These are the specialists you can hire. Agents run in order, and each one does a single job. Faded agents aren't in a new project's team; add them from the marketplace (<b>Add agents</b> in the studio), or hire them with a ready team.</p>
         <div class="team-list" id="teamList"></div>
       </section>
 
@@ -282,8 +291,9 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
           <tr><th>Where</th><th>What</th></tr>
           <tr><td><code>/p/&lt;uuid&gt;</code></td><td>The studio for one project</td></tr>
           <tr><td><code>/projects</code></td><td>All projects with live thumbnails, search and sort</td></tr>
-          <tr><td><code>work/&lt;uuid&gt;/</code></td><td>The site itself: <code>index.html</code>, <code>style.css</code>, <code>script.js</code>, <code>plan.md</code></td></tr>
-          <tr><td><code>work/.projects/</code></td><td>Project name, chosen agents and the saved chat log</td></tr>
+          <tr><td><code>storage/works/&lt;uuid&gt;/site/</code></td><td>The site itself: <code>index.html</code>, <code>style.css</code>, <code>script.js</code>, <code>plan.md</code></td></tr>
+          <tr><td><code>storage/works/&lt;uuid&gt;/versions/</code></td><td>A full copy of the site for each saved version</td></tr>
+          <tr><td>Postgres</td><td>Project details, team, chat, versions list and stats</td></tr>
         </table>
       </section>
 
@@ -295,7 +305,7 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
           <tr><td><kbd>Enter</kbd></td><td>Send the prompt</td></tr>
           <tr><td><kbd>Shift</kbd> + <kbd>Enter</kbd></td><td>New line in the prompt</td></tr>
           <tr><td><kbd>Ctrl</kbd> + <kbd>S</kbd></td><td>Save the file in the Code tab</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>Close the projects menu, or cancel renaming</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close a menu or dialog, or cancel renaming</td></tr>
           <tr><td><kbd>Alt</kbd> + <kbd>↑</kbd> / <kbd>↓</kbd></td><td>Move the selected agent up or down on the Agents page</td></tr>
           <tr><td><kbd>/</kbd></td><td>Search projects on the Projects page</td></tr>
           <tr><td><kbd>N</kbd></td><td>New project from the Projects page</td></tr>
@@ -312,6 +322,7 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
               <li><i data-icon="check" data-size="16"></i><span>On an agent or a team, press <b>Start a job</b> and choose one of your projects.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>The studio opens with that agent added to the project's team, or with that team selected. Describe the work and press Enter.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>No project yet? <b>Start a new project instead</b> opens the project form, and the agent or team is ready when the project opens.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>From the studio, <b>Add agents</b> and <b>Choose a team</b> open the marketplace for that project: <b>Add to the team</b> brings you straight back, with no project to pick.</span></li>
             </ul></div>
           <div class="part"><span class="ico"><i data-icon="star" data-size="20"></i></span><h3>Profiles</h3>
             <ul>
@@ -334,12 +345,40 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
         </div>
       </section>
 
+      <section id="plans">
+        <h2><span class="num">10</span>Plans &amp; your Claude key</h2>
+        <p>You pay for the studio; the AI runs on your own Claude account. Your plan only unlocks features.</p>
+        <div class="anatomy">
+          <div class="part"><span class="ico"><i data-icon="zap" data-size="20"></i></span><h3>Your Claude key</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>Add it once on <b>Profile → Claude and spending</b>. It's checked with one tiny call and kept encrypted; only its last four characters are shown.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>A full site costs about $1.50–2 on your account, a small change about $0.20–0.50.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="sparkles" data-size="20"></i></span><h3>Plans</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span><b>Starter</b> (free): one project, the official agents and ready teams.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span><b>Pro</b>: unlimited projects, your own agents and teams, web research, more checks and versions.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span><b>Agency</b>: everything in Pro, every version kept, and publishing to the marketplace.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="pause" data-size="20"></i></span><h3>Spending limit</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>A run stops when it reaches your limit per run; press <b>Continue</b> to keep going.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>It's $3 on Starter; on Pro and Agency you choose it in your profile.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="refresh" data-size="20"></i></span><h3>Changing plan</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>On <b>Profile → Plan</b>, <b>Upgrade</b> sends a request that an admin confirms with you.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Moving to a lower plan applies at once. Hit a limit? A window shows which plan has the feature.</span></li>
+            </ul></div>
+        </div>
+      </section>
+
       <section id="faq">
-        <h2><span class="num">10</span>FAQ</h2>
+        <h2><span class="num">11</span>FAQ</h2>
         <details><summary>How long does a run take?<i data-icon="chevron-down" data-size="18"></i></summary>
-          <div>Each agent takes about 20–60 seconds, so the default team of 10 needs roughly 5–8 minutes. Switch off agents you don't need, or start the server with <code>AGENT_MODEL=sonnet ./run.sh</code> for faster runs.</div></details>
+          <div>Each agent takes about 20–60 seconds, so the default team of 10 needs roughly 5–8 minutes. Remove agents you don't need from the team, and later prompts only run the agents they need.</div></details>
         <details><summary>Does it cost anything?<i data-icon="chevron-down" data-size="18"></i></summary>
-          <div>Agents use your Claude Code plan, and each agent counts as one Claude Code session. A run with 10 agents is about 10 sessions.</div></details>
+          <div>Two parts: your plan (Starter is free), and the AI itself, billed by Anthropic on your own Claude API key. A full site costs about $1.50–2, a small change about $0.20–0.50, and every agent card shows its cost.</div></details>
         <details><summary>Can agents touch other files on my computer?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>Each agent runs inside its project folder with file tools only (read, write, edit, search). Shell commands and sub-agents are blocked, and only agents set to web research (like Research) can use the web.</div></details>
         <details><summary>What happens when I stop the agents?<i data-icon="chevron-down" data-size="18"></i></summary>
@@ -355,7 +394,9 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
         <details><summary>Why can't I edit a shared agent?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>Shared agents and teams are the same for everyone, so only an admin can change them. Duplicate one to get your own copy, then change anything you like.</div></details>
         <details><summary>Can I edit the generated code myself?<i data-icon="chevron-down" data-size="18"></i></summary>
-          <div>Yes. The files live in <code>work/&lt;uuid&gt;/</code>. Edit them in any editor; the next prompt's agents read the current files first.</div></details>
+          <div>Yes, in the <b>Code</b> tab of the studio. The next prompt's agents read the current files first.</div></details>
+        <details><summary>What happens if I delete my account?<i data-icon="chevron-down" data-size="18"></i></summary>
+          <div>It's deactivated at once and deleted for good after 30 days, with your projects, agents and teams. Log in before then and everything comes back as it was.</div></details>
       </section>
 
       <div class="cta">

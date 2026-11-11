@@ -125,7 +125,7 @@ def setUpModule():
            # every test comes from 127.0.0.1: limits high enough for the suite, except resets, tested per fake address
            "TRUST_PROXY": "1", "SIGNUPS_PER_HOUR": "100000", "LOGINS_PER_15_MIN": "100000", "RESETS_PER_HOUR": "5",
            "LEGAL_NAME": "Test Operator SARL", "LEGAL_EMAIL": "legal@example.com",
-           "CLAUDE_KEYS": "user", "KEY_SECRET": ""}     # every member runs on their own key (see register())
+           "CLAUDE_KEYS": "user", "KEY_SECRET": "", "ACCOUNT_PURGE_SECONDS": "1"}     # every member runs on their own key (see register())
     env.pop("AGENT_MODEL", None)
     global SERVER_LOG
     SERVER_LOG = open(TMP / "server.log", "w")
@@ -1857,13 +1857,38 @@ class T13PasswordsAndProfile(unittest.TestCase):
         self.assertEqual(s, 200, a)
         self.assertEqual(call("POST", "/api/auth/delete", {"password": "wrong password"}, cookie=cookie)[0], 400)
         self.assertEqual(call("GET", "/api/projects", cookie=cookie)[0], 200)
-        self.assertEqual(call("POST", "/api/auth/delete", {"password": "the old password"}, cookie=cookie)[0], 200)
-        self.assertEqual(call("GET", "/api/projects", cookie=cookie)[0], 401)
+        s, r, _ = call("POST", "/api/auth/delete", {"password": "the old password"}, cookie=cookie)
+        self.assertEqual((s, r["days"]), (200, 30))
+        self.assertAlmostEqual(r["delete_after"], time.time() + 30 * 86400, delta=60)
+        self.assertEqual(call("GET", "/api/projects", cookie=cookie)[0], 401, "logged out everywhere")
+        self.assertEqual(call("GET", f"/api/projects/{p['id']}")[0], 200, "nothing is removed during the 30 days")
+        self.assertTrue(any(json.loads(l)["to"] == email and "will be deleted" in json.loads(l)["subject"]
+                            for l in OUTBOX.read_text().splitlines()))
+        # the time is up: the server removes it on its next round
+        self.db("UPDATE users SET delete_after = $2 WHERE email = $1", email, time.time() - 1)
+        for _ in range(50):
+            if not self.db("SELECT 1 FROM users WHERE email = $1", email):
+                break
+            time.sleep(0.1)
         self.assertEqual(self.login(email, "the old password")[0], 401)
         self.assertEqual(call("GET", f"/api/projects/{p['id']}")[0], 404)
         self.assertEqual(call("GET", f"/api/projects/{kept}")[0], 200)
         self.assertFalse(self.db("SELECT 1 FROM agents WHERE slug = 'my-own'"))
         self.assertFalse(self.db("SELECT 1 FROM users WHERE email = $1", email))
+
+    def test_logging_in_again_cancels_the_deletion(self):
+        email = self.email()
+        cookie = register(email, "the old password")
+        pid = call("POST", "/api/projects", {"name": "Still here", "description": "x"}, cookie=cookie)[1]["id"]
+        self.assertEqual(call("POST", "/api/auth/delete", {"password": "the old password"}, cookie=cookie)[0], 200)
+        self.assertTrue(self.db("SELECT delete_after FROM users WHERE email = $1", email)[0]["delete_after"])
+        s, r = self.login(email, "the old password")[:2]
+        self.assertEqual(s, 200, r)
+        self.assertTrue(r["user"]["reactivated"])
+        self.assertIsNone(r["user"]["delete_after"])
+        self.assertIsNone(self.db("SELECT delete_after FROM users WHERE email = $1", email)[0]["delete_after"])
+        time.sleep(1.5)                                  # a purge round passes: nothing happens to it
+        self.assertEqual(call("GET", f"/api/projects/{pid}")[0], 200)
 
     def test_the_only_admin_cant_delete_their_account(self):
         admins = self.db("SELECT count(*) AS n FROM users WHERE role = 'admin'")[0]["n"]
@@ -2679,10 +2704,10 @@ class T30KeysAndPlans(unittest.TestCase):
 
     def test_starter_limits(self):
         me = self.member()
-        for i in range(3):
-            new_project(name=f"S{i}", cookie=me)
-        s, r, _ = call("POST", "/api/projects", {"name": "Fourth", "description": "x"}, cookie=me)
+        new_project(name="The one", cookie=me)
+        s, r, _ = call("POST", "/api/projects", {"name": "Second", "description": "x"}, cookie=me)
         self.assertEqual((s, r["upgrade"]), (403, "pro"))
+        self.assertIn("one project", r["detail"])
         s, r, _ = call("POST", "/api/agents", {"id": f"st-{time.time_ns() % 10**8}", "name": "Mine", "role": "You do a thing well."}, cookie=me)
         self.assertEqual((s, r["upgrade"]), (403, "pro"))
         s, r, _ = call("POST", "/api/presets", {"name": "Mine", "agents": ["html"]}, cookie=me)
@@ -2725,4 +2750,47 @@ class T30KeysAndPlans(unittest.TestCase):
         s, r, _ = call("PATCH", f"/api/users/{uid}", {"plan": "pro"})
         self.assertEqual((s, r["plan"]), (200, "pro"))
         self.assertEqual([p["id"] for p in call("GET", "/api/plans")[1]["plans"]], ["starter", "pro", "agency"])
+
+    def test_admins_see_revenue_and_monitoring(self):
+        me = self.member()
+        uid = call("GET", "/api/auth/me", cookie=me)[1]["user"]["id"]
+        before = call("GET", "/api/admin/revenue")[1]
+        call("PATCH", f"/api/users/{uid}", {"plan": "agency"})
+        r = call("GET", "/api/admin/revenue?days=7")[1]
+        self.assertEqual(r["mrr"] - before["mrr"], 29)
+        self.assertEqual(r["arr"], r["mrr"] * 12)
+        self.assertEqual(r["series"][-1]["value"], r["mrr"], "today's point is the current monthly value")
+        self.assertEqual(r["moves"]["upgrades"] - before["moves"]["upgrades"], 1)
+        self.assertEqual((r["recent"][0]["email"], r["recent"][0]["to"]), (call("GET", "/api/auth/me", cookie=me)[1]["user"]["email"], "agency"))
+        call("POST", "/api/auth/plan", {"plan": "starter"}, cookie=me)
+        r = call("GET", "/api/admin/revenue")[1]
+        self.assertEqual(r["mrr"], before["mrr"])
+        self.assertGreaterEqual(r["moves"]["downgrades"], 1)
+        m = call("GET", "/api/admin/monitoring")[1]
+        self.assertTrue(m["health"]["database"]["ok"])
+        self.assertIn("with_key", m["accounts"])
+        self.assertEqual(len(m["failures"]), 30)
+        self.assertEqual(call("GET", "/api/admin/revenue", cookie=me)[0], 403)
+        self.assertEqual(call("GET", "/api/admin/monitoring", cookie=me)[0], 403)
+
+    def test_members_ask_for_a_higher_plan_and_move_down_at_once(self):
+        me = self.member()
+        uid = call("GET", "/api/auth/me", cookie=me)[1]["user"]["id"]
+        self.assertEqual(call("POST", "/api/auth/plan", {"plan": "starter"}, cookie=me)[0], 400)    # already on it
+        s, r, _ = call("POST", "/api/auth/plan", {"plan": "pro"}, cookie=me)
+        self.assertEqual((s, r["user"]["plan"], r["user"]["plan_request"]), (200, "starter", "pro"), "a request, not a switch")
+        self.assertTrue(any(json.loads(l)["to"] == ADMIN_EMAIL and "asked for the Pro plan" in json.loads(l)["subject"]
+                            for l in OUTBOX.read_text().splitlines()), "the admins hear about it")
+        self.assertEqual(call("GET", "/api/plans", cookie=me)[1]["usage"]["projects"], 0)
+        s, r, _ = call("DELETE", "/api/auth/plan-request", cookie=me)
+        self.assertEqual(r["user"]["plan_request"], "")
+        call("POST", "/api/auth/plan", {"plan": "agency"}, cookie=me)
+        s, r, _ = call("PATCH", f"/api/users/{uid}", {"decline_request": True})
+        self.assertEqual((r["plan"], r["plan_request"]), ("starter", ""))
+        call("POST", "/api/auth/plan", {"plan": "agency"}, cookie=me)
+        s, r, _ = call("PATCH", f"/api/users/{uid}", {"plan": "agency"})
+        self.assertEqual((r["plan"], r["plan_request"]), ("agency", ""), "approving clears the request")
+        s, r, _ = call("POST", "/api/auth/plan", {"plan": "pro"}, cookie=me)
+        self.assertEqual((s, r["user"]["plan"]), (200, "pro"), "moving down applies at once")
+        self.assertEqual(call("POST", "/api/auth/plan", {"plan": "pro"})[0], 400, "admins have every feature")
 

@@ -6,7 +6,7 @@ Admins have every feature. The limits are enforced by the server; the pages only
 PLANS = {
     "starter": {
         "name": "Starter", "price": 0,
-        "projects": 3,              # at most this many projects (None = no limit)
+        "projects": 1,              # at most this many projects (None = no limit)
         "custom_agents": False,     # create, duplicate and edit your own agents and teams
         "publish": False,           # publish agents and teams to the marketplace
         "research": False,          # agents with web search (Research)
@@ -43,6 +43,10 @@ def run_limit(user: dict | None) -> float:
     p = of(user)
     chosen = (user or {}).get("run_limit")
     return min(float(chosen), p["run_limit_max"]) if chosen else p["run_limit"]
+
+
+def rank(plan: str) -> int:
+    return list(PLANS).index(plan) if plan in PLANS else 0
 
 
 def public() -> list[dict]:

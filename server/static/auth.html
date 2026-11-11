@@ -242,6 +242,9 @@ function loginView() {
     const done = busy($("go"), "Logging in…");
     try {
       const { user } = await post("/api/auth/login", { email, password: $("password").value });
+      if (user.reactivated) {                   // logged in during the 30 days: the deletion is off
+        try { sessionStorage.setItem("atelier-toast", "Welcome back! Your account is active again and won't be deleted."); } catch {}
+      }
       location.href = user.confirmed ? next : withNext("/confirm");
     } catch (err) { $("err").textContent = err.message; done(); $("password").select(); }
   };

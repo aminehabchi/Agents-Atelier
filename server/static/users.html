@@ -66,7 +66,9 @@ function draw() {
       <td>${u.claude_key?.set ? `<span class="badge listed" title="Runs on their own Claude account">${icon("check", { size: 12 })}Added</span>` : `<span class="muted">None</span>`}</td>
       <td>${u.role === "admin" ? `<span class="muted">Every feature</span>` : `<select class="input" data-plan="${esc(u.id)}" aria-label="Plan of ${esc(u.email)}">
         ${Object.keys(PLAN).map(r => `<option value="${r}" ${r === u.plan ? "selected" : ""}>${PLAN[r]}</option>`).join("")}
-      </select>`}</td>
+      </select>${u.plan_request ? `<div class="ask"><span class="badge req">${icon("clock", { size: 12 })}Asks for ${esc(PLAN[u.plan_request] || u.plan_request)}${u.plan_request_at ? ` · ${esc(ago(u.plan_request_at))}` : ""}</span>
+        <span class="ask-acts"><button class="btn btn-dark btn-sm" type="button" data-approve="${esc(u.id)}" data-to="${esc(u.plan_request)}">Approve</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-decline="${esc(u.id)}">Decline</button></span></div>` : ""}`}</td>
       <td><select class="input" data-id="${esc(u.id)}" aria-label="Role of ${esc(u.email)}" ${u.id === me.id ? 'disabled title="You can\'t change your own role"' : ""}>
         ${Object.keys(LABEL).map(r => `<option value="${r}" ${r === u.role ? "selected" : ""}>${LABEL[r]}</option>`).join("")}
       </select></td></tr>`).join("")}</tbody></table></div>`;
@@ -76,12 +78,24 @@ const $pager = document.getElementById("pager");
 async function load() {
   try { [users, me] = await Promise.all([api("/api/users"), getMe()]); }
   catch (err) { return showError(list, err, load, "Couldn't load the users"); }
+  users.sort((a, b) => (b.plan_request ? 1 : 0) - (a.plan_request ? 1 : 0));   // plan requests first
+  const asks = users.filter(u => u.plan_request).length;
   const waiting = users.filter(u => u.role === "unconfirmed").length;
-  document.getElementById("summary").textContent = `${users.length} account${users.length === 1 ? "" : "s"}${waiting ? `, ${waiting} not confirmed yet` : ""}. Admins can change the shared agents, teams and rules, and open every project.`;
+  document.getElementById("summary").textContent = `${users.length} account${users.length === 1 ? "" : "s"}${waiting ? `, ${waiting} not confirmed yet` : ""}${asks ? `, ${asks} plan request${asks === 1 ? "" : "s"} waiting` : ""}. Admins can change the shared agents, teams and rules, and open every project.`;
   draw();
 }
 bindPager($pager, (p) => { page = p; draw(); list.scrollIntoView({ block: "nearest", behavior: "smooth" }); },
   (n) => { perPage = n; savePerPage("users", n); page = 1; draw(); });
+list.addEventListener("click", async (e) => {
+  const ok = e.target.closest("[data-approve]"), no = e.target.closest("[data-decline]");
+  if (!ok && !no) return;
+  const body = ok ? { plan: ok.dataset.to } : { decline_request: true };
+  try {
+    const u = await api(`/api/users/${(ok || no).dataset[ok ? "approve" : "decline"]}`, { method: "PATCH", body: JSON.stringify(body) });
+    Object.assign(users.find(x => x.id === u.id), u); draw();
+    toast(ok ? `${u.email} is now on ${PLAN[u.plan]}` : "Request declined");
+  } catch (err) { toast(err.message, "err"); load(); }
+});
 list.addEventListener("change", async (e) => {
   const plan = e.target.closest("select[data-plan]");
   if (plan) {
@@ -96,5 +110,10 @@ list.addEventListener("change", async (e) => {
 });
 load();
 </script>
+<style>
+  .utable .ask { display: grid; gap: 6px; margin-top: 8px; }
+  .utable .ask .badge.req { display: inline-flex; align-items: center; gap: 4px; background: var(--ice); color: var(--sky); justify-self: start; }
+  .utable .ask-acts { display: flex; gap: 6px; }
+</style>
 </body>
 </html>

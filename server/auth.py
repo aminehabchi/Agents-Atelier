@@ -139,7 +139,10 @@ def public(row) -> dict:
             "plan": row.get("plan") or plans.DEFAULT,
             "claude_key": {"set": bool(row.get("claude_key")), "hint": row.get("claude_key_hint") or "",
                            "checked": row.get("claude_key_at")},
-            "run_limit": plans.run_limit(dict(row))}
+            "run_limit": plans.run_limit(dict(row)),
+            "plan_request": row.get("plan_request") or "", "plan_request_at": row.get("plan_request_at"),
+            "deactivated_at": row.get("deactivated_at"), "delete_after": row.get("delete_after"),
+            **({"reactivated": True} if row.get("reactivated") else {})}   # just logged in during the 30 days
 
 
 def _hash(text: str) -> str:
@@ -192,12 +195,16 @@ async def login(email, password) -> dict:
         if row:
             await _note_failed_password(row)
         raise AuthError("Wrong email or password.", 401)
-    row = await db.pool.fetchrow("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = $1 RETURNING *", row["id"])
+    back = bool(row["deactivated_at"])          # logging in during the 30 days cancels the deletion
+    row = await db.pool.fetchrow("UPDATE users SET failed_logins = 0, locked_until = NULL, deactivated_at = NULL, delete_after = NULL "
+                                 "WHERE id = $1 RETURNING *", row["id"])
+    if back:
+        log.info("%s logged in again: their account deletion is cancelled", row["email"])
     if row["role"] == "unconfirmed":
         await send_code(row, quiet=True)          # a fresh code, unless one was sent less than a minute ago
     elif config.ADMIN_EMAIL and row["email"] == config.ADMIN_EMAIL and row["role"] != "admin":
         row = await db.pool.fetchrow("UPDATE users SET role = 'admin' WHERE id = $1 RETURNING *", row["id"])
-    return dict(row)
+    return {**dict(row), "reactivated": back}
 
 
 async def create_session(user_id) -> str:
@@ -466,6 +473,29 @@ async def check_can_delete(user: dict, password):
         raise AuthError("You're the only admin. Make someone else an admin before deleting your account.")
 
 
+async def deactivate(user: dict) -> float:
+    """Step one of deleting an account: logged out everywhere, then removed for good after ACCOUNT_DELETE_DAYS
+    unless they log in again. Returns when it will be deleted."""
+    now = time.time()
+    when = now + config.ACCOUNT_DELETE_DAYS * 86400
+    async with db.pool.acquire() as con, con.transaction():
+        await con.execute("UPDATE users SET deactivated_at = $2, delete_after = $3 WHERE id = $1", user["id"], now, when)
+        await con.execute("DELETE FROM sessions WHERE user_id = $1", user["id"])
+    day = dt.datetime.fromtimestamp(when, dt.timezone.utc).strftime("%-d %B %Y")
+    _send_later(user["email"], "Your Agents Atelier account will be deleted",
+                f"Hello,\n\nYour Agents Atelier account is deactivated. It will be deleted for good on {day}, "
+                "with your projects, agents and teams.\n\nChanged your mind? Log in before then and everything comes back "
+                "as it was.\n")
+    log.info("Deactivated account %s (deleted after %s)", user["email"], day)
+    return when
+
+
+async def due_for_deletion() -> list[dict]:
+    """Deactivated accounts whose 30 days are over."""
+    rows = await db.pool.fetch("SELECT * FROM users WHERE delete_after IS NOT NULL AND delete_after <= $1", time.time())
+    return [dict(r) for r in rows]
+
+
 async def delete_user(user: dict):
     """Removes the account; its sessions, private agents and teams go with it (ON DELETE CASCADE)."""
     await db.pool.execute("DELETE FROM users WHERE id = $1", user["id"])
@@ -502,10 +532,64 @@ async def set_plan(actor: dict, user_id: str, plan: str) -> dict:
         uid = uuid.UUID(str(user_id))
     except ValueError:
         raise AuthError("Unknown user.", 404)
-    row = await db.pool.fetchrow("UPDATE users SET plan = $2 WHERE id = $1 RETURNING *", uid, plan)
+    before = await db.pool.fetchval("SELECT plan FROM users WHERE id = $1", uid)
+    row = await db.pool.fetchrow("UPDATE users SET plan = $2, plan_request = '', plan_request_at = NULL WHERE id = $1 RETURNING *",
+                                 uid, plan)
     if not row:
         raise AuthError("Unknown user.", 404)
+    await _plan_event(uid, before, plan, by_admin=True)
     log.info("%s set the plan of %s to %s", actor["email"], row["email"], plan)
+    return public(row)
+
+
+async def _plan_event(user_id, before: str | None, after: str, by_admin: bool):
+    if before and before != after:
+        await db.pool.execute("INSERT INTO plan_events (user_id, from_plan, to_plan, by_admin, ts) VALUES ($1, $2, $3, $4, $5)",
+                              user_id, before, after, by_admin, time.time())
+
+
+async def decline_plan_request(actor: dict, user_id: str) -> dict:
+    try:
+        uid = uuid.UUID(str(user_id))
+    except ValueError:
+        raise AuthError("Unknown user.", 404)
+    row = await db.pool.fetchrow("UPDATE users SET plan_request = '', plan_request_at = NULL WHERE id = $1 RETURNING *", uid)
+    if not row:
+        raise AuthError("Unknown user.", 404)
+    log.info("%s declined the plan request of %s", actor["email"], row["email"])
+    return public(row)
+
+
+async def change_my_plan(user: dict, plan: str) -> dict:
+    """A member's own choice: a lower plan applies at once; a higher one is a request an admin approves
+    (no online payment yet). The admins get an email about it."""
+    if plan not in plans.PLANS:
+        raise AuthError("Pick Starter, Pro or Agency.")
+    if user["role"] == "admin":
+        raise AuthError("Admins already have every feature.")
+    current = user.get("plan") or plans.DEFAULT
+    if plan == current:
+        raise AuthError(f"You're already on {plans.PLANS[plan]['name']}.")
+    if plans.rank(plan) < plans.rank(current):
+        row = await db.pool.fetchrow("UPDATE users SET plan = $2, plan_request = '', plan_request_at = NULL WHERE id = $1 RETURNING *",
+                                     user["id"], plan)
+        await _plan_event(user["id"], current, plan, by_admin=False)
+        log.info("%s moved down to %s", user["email"], plan)
+        return public(row)
+    row = await db.pool.fetchrow("UPDATE users SET plan_request = $2, plan_request_at = $3 WHERE id = $1 RETURNING *",
+                                 user["id"], plan, time.time())
+    log.info("%s asked for the %s plan", user["email"], plan)
+    admins = await db.pool.fetch("SELECT email FROM users WHERE role = 'admin'")
+    name = plans.PLANS[plan]["name"]
+    for a in admins:
+        _send_later(a["email"], f"{user['email']} asked for the {name} plan",
+                    f"Hello,\n\n{user.get('name') or user['email']} ({user['email']}) asked to move from "
+                    f"{plans.PLANS[current]['name']} to {name}.\n\nOpen the Users page in Agents Atelier to approve or decline it.\n")
+    return public(row)
+
+
+async def cancel_plan_request(user: dict) -> dict:
+    row = await db.pool.fetchrow("UPDATE users SET plan_request = '', plan_request_at = NULL WHERE id = $1 RETURNING *", user["id"])
     return public(row)
 
 

@@ -845,7 +845,8 @@ function handle(ev) {
         ${ev.mine ? `<a class="btn btn-dark btn-sm" href="/profile#claude-key">${icon("arrow-right", { size: 14 })}Add my API key</a>` : ""}</div></div>`);
       break;
     case "notice":
-      addSystem(ev.text);
+      if (ev.upgrade) addMsg(`<div class="msg system">${esc(ev.text)} <a href="/profile?upgrade=${encodeURIComponent(ev.upgrade)}#plan">See the plans</a></div>`);
+      else addSystem(ev.text);
       break;
     case "limit":                         // the run reached the member's spending limit: run_stopped follows
       addMsg(`<div class="msg limitcard"><span class="tile">${icon("pause", { size: 18 })}</span>

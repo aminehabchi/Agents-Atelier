@@ -50,6 +50,42 @@
   td { padding: 8px 10px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
   td.num, th.num { text-align: right; font-feature-settings: "tnum"; white-space: nowrap; }
   .table-wrap { overflow-x: auto; }
+  .head-l { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+  .views button { display: inline-flex; align-items: center; gap: 6px; }
+  .note-line { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 16px; font-size: 13px; line-height: 1.5; color: var(--stone); }
+  .note-line svg { flex: none; margin-top: 3px; }
+  .stat-tile.up b { color: var(--ok); }
+  .stat-tile.down b { color: var(--danger); }
+  .stat-tile.warn b { color: var(--saffron, var(--danger)); }
+  .grid.rev { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  .stack { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--line); margin: 8px 0 16px; gap: 2px; }
+  .stack i { display: block; }
+  .plans-t td { padding: 8px 4px; }
+  .plans-t .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-inline-end: 8px; vertical-align: -1px; }
+  .muted { color: var(--stone); }
+  .lnk.more { display: inline-block; margin-top: 12px; font-size: 13px; }
+  .mv { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; margin-inline-end: 6px; vertical-align: -4px; }
+  .mv.up { background: var(--add-bg, var(--ice)); color: var(--ok); }
+  .mv.down { background: var(--linen, var(--mist)); color: var(--danger); }
+  .mv.down svg { transform: rotate(90deg); }
+  .sec { margin: 8px 0 12px; font-size: 16px; font-weight: 500; }
+  .sec:not(:first-child) { margin-top: 32px; }
+  .health { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .hcard { padding: 14px 16px; border-radius: var(--r-card); background: var(--paper); box-shadow: var(--ring); display: grid; gap: 6px; min-width: 0; }
+  .hcard small { font-size: 12px; color: var(--stone); line-height: 1.4; }
+  .st { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; }
+  .st.ok { color: var(--ok); } .st.warn { color: var(--saffron, var(--danger)); } .st.bad { color: var(--danger); }
+  .busy-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--graphite); margin: 0 0 12px; }
+  td.bad { color: var(--danger); }
+  .errs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .errs li { display: grid; gap: 6px; padding: 12px; border-radius: var(--r); background: var(--mist, var(--linen)); font-size: 13px; }
+  .errs li > div { display: flex; gap: 6px; flex-wrap: wrap; align-items: baseline; }
+  .errs .when { margin-inline-start: auto; font-size: 12px; }
+  .errs code { font-size: 12px; color: var(--danger); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .panel .foot { margin: 8px 0 0; font-size: 12px; color: var(--stone); }
+  #app[aria-busy="true"] { opacity: .6; transition: opacity .2s; }
+  @media (max-width: 1100px) { .health { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 960px) { .grid.rev { grid-template-columns: minmax(0, 1fr); } .health { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 960px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid, .grid.two { grid-template-columns: minmax(0, 1fr); } }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
@@ -68,7 +104,11 @@
 </header>
 <main class="wrap page">
   <div class="head">
-    <h1 class="page-title">Analytics</h1>
+    <div class="head-l"><h1 class="page-title">Analytics</h1>
+      <div class="seg views" role="tablist" aria-label="What to see" id="views">
+        <button type="button" role="tab" data-view="revenue"><i data-icon="chart" data-size="15"></i>Revenue</button>
+        <button type="button" role="tab" data-view="monitoring"><i data-icon="gauge" data-size="15"></i>Monitoring</button>
+      </div></div>
     <div class="seg" role="radiogroup" aria-label="Period" id="range">
       <button type="button" role="radio" data-days="7">7 days</button>
       <button type="button" role="radio" data-days="30">30 days</button>
@@ -102,29 +142,117 @@ function hbars(rows) {
 const LANG = { en: "English", fr: "Français", ary: "الدارجة", "": "Not set" };
 const sum = (s) => s.reduce((n, d) => n + d.value, 0);
 
+/* Two views: Revenue (what the plans are worth) and Monitoring (is everything working, and how it's used).
+   The address keeps the view: /analytics?view=monitoring */
+let view = new URLSearchParams(location.search).get("view") === "monitoring" ? "monitoring" : "revenue";
+const usd = (n) => `$${Math.round(n).toLocaleString("en-US")}`;
+const PLAN_NAME = { starter: "Starter", pro: "Pro", agency: "Agency" };
+const PLAN_COLOR = { starter: "var(--stone)", pro: "var(--sky)", agency: "var(--ok)" };
+const bytes = (n) => n >= 1e12 ? `${(n / 1e12).toFixed(1)} TB` : n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`;
+const uptime = (s) => s >= 86400 ? `${Math.floor(s / 86400)} d ${Math.floor(s % 86400 / 3600)} h` : s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor(s % 3600 / 60)} min` : `${Math.max(1, Math.round(s / 60))} min`;
+const tile = (title, value, note, cls = "") => `<div class="stat-tile ${cls}"><h2>${title}</h2><b data-no-i18n>${value}</b><small>${note}</small></div>`;
+
 async function load() {
   document.querySelectorAll("#range button").forEach(b => { const on = +b.dataset.days === days; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
-  let d;
-  try { d = await api(`/api/admin/analytics?days=${days}`); }
-  catch (err) { return showError(app, err, load, "Couldn't load the analytics"); }
-  const u = d.users, b = d.builds;
+  document.querySelectorAll("#views button").forEach(b => { const on = b.dataset.view === view; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
+  history.replaceState(null, "", view === "monitoring" ? "?view=monitoring" : location.pathname);
+  app.setAttribute("aria-busy", "true");
+  try { view === "revenue" ? await loadRevenue() : await loadMonitoring(); }
+  catch (err) { showError(app, err, load, "Couldn't load the analytics"); }
+  app.removeAttribute("aria-busy");
+}
+
+async function loadRevenue() {
+  const r = await api(`/api/admin/revenue?days=${days}`);
+  const first = r.series[0]?.value || 0, change = r.mrr - first;
+  const total = r.by_plan.reduce((n, p) => n + p.members, 0) || 1;
   app.innerHTML = `
-    <section class="tiles" aria-label="Accounts">
-      <div class="stat-tile"><h2>Accounts</h2><b>${u.total}</b><small>${u.confirmed} confirmed (${pct(u.confirmed, u.total)}) · ${u.admins} admin${u.admins === 1 ? "" : "s"}</small></div>
-      <div class="stat-tile"><h2>New accounts</h2><b>${u.new}</b><small>in the last ${d.days} days</small></div>
-      <div class="stat-tile"><h2>Active users</h2><b>${u.active_7}</b><small>logged in during the last 7 days · ${u.active_1} today · ${u.active_30} in 30 days</small></div>
-      <div class="stat-tile"><h2>Not confirmed</h2><b>${u.unconfirmed}</b><small>accounts waiting for their email code</small></div>
+    <p class="note-line">${icon("alert", { size: 14 })}<span>What the members' plans are worth each month. Online payment isn't connected yet, so this is the plans' value, not money received. Admins and deactivated accounts aren't counted.</span></p>
+    <section class="tiles" aria-label="Revenue">
+      ${tile("Monthly revenue", usd(r.mrr), `${change === 0 ? "no change" : `${change > 0 ? "+" : "−"}${usd(Math.abs(change))}`} in ${r.days} days`, change > 0 ? "up" : change < 0 ? "down" : "")}
+      ${tile("Yearly run rate", usd(r.arr), "monthly revenue × 12")}
+      ${tile("Paying members", `${r.paying}`, `${pct(r.paying, r.members)} of ${r.members} members`)}
+      ${tile("Revenue per member", `$${r.arpu.toFixed(2)}`, "monthly, across every member")}
     </section>
-    <section class="tiles" aria-label="Builds">
-      <div class="stat-tile"><h2>Projects created</h2><b>${b.projects_in_range}</b><small>${b.projects} in total</small></div>
-      <div class="stat-tile"><h2>Agent runs</h2><b>${b.runs_in_range}</b><small>${b.runs} in total</small></div>
-      <div class="stat-tile"><h2>Estimated cost</h2><b>${money(b.cost_in_range)}</b><small>${money(b.cost)} in total · API equivalent</small></div>
-      <div class="stat-tile"><h2>Failed or stopped runs</h2><b>${pct(b.failed_in_range, b.runs_in_range)}</b><small>${b.failed_in_range} of ${b.runs_in_range} in this period</small></div>
+    <div class="grid rev">
+      <section class="panel wide"><h2>Monthly revenue</h2><p class="total">Each day, what the plans were worth</p>${barChart(r.series, usd)}</section>
+      <section class="panel"><h2>Members by plan</h2><p class="total">${r.members} members</p>
+        <div class="stack" aria-hidden="true">${r.by_plan.map(p => p.members ? `<i style="flex:${p.members};background:${PLAN_COLOR[p.id]}"></i>` : "").join("")}</div>
+        <table class="plans-t"><tbody>${r.by_plan.map(p => `<tr><td><span class="sw" style="background:${PLAN_COLOR[p.id]}"></span>${esc(p.name)} <span class="muted">${p.price ? `$${p.price}` : "free"}</span></td>
+          <td class="num">${p.members} <span class="muted">(${pct(p.members, total)})</span></td><td class="num" data-no-i18n>${usd(p.mrr)}</td></tr>`).join("")}</tbody></table>
+      </section>
+    </div>
+    <section class="tiles" aria-label="Plan changes">
+      ${tile("Upgrades", `${r.moves.upgrades}`, `+${usd(r.moves.gained)} a month · last ${r.days} days`, r.moves.upgrades ? "up" : "")}
+      ${tile("Downgrades", `${r.moves.downgrades}`, `−${usd(r.moves.lost)} a month · last ${r.days} days`, r.moves.downgrades ? "down" : "")}
+      ${tile("Net change", `${r.moves.net >= 0 ? "+" : "−"}${usd(Math.abs(r.moves.net))}`, "monthly revenue from plan changes")}
+      ${tile("Waiting requests", `${r.pending.count}`, r.pending.count ? `+${usd(r.pending.mrr)} a month once approved` : "nobody is waiting", r.pending.count ? "warn" : "")}
+    </section>
+    <div class="grid two">
+      <section class="panel"><h2>Waiting for your approval</h2><p class="total">Members who asked for a higher plan</p>
+        ${r.pending.items.length ? `<div class="table-wrap"><table><thead><tr><th>Member</th><th>Change</th><th class="num">Asked</th></tr></thead><tbody>
+          ${r.pending.items.map(i => `<tr><td data-no-i18n>${esc(i.email)}</td><td>${esc(PLAN_NAME[i.from])} → <b>${esc(PLAN_NAME[i.to])}</b></td><td class="num">${i.at ? esc(ago(i.at)) : "-"}</td></tr>`).join("")}
+          </tbody></table></div><a class="lnk more" href="/users">Approve on the Users page</a>` : `<p class="empty-note">No requests waiting.</p>`}
+      </section>
+      <section class="panel"><h2>Latest plan changes</h2><p class="total">Newest first</p>
+        ${r.recent.length ? `<div class="table-wrap"><table><thead><tr><th>Member</th><th>Change</th><th class="num">When</th></tr></thead><tbody>
+          ${r.recent.map(i => `<tr><td data-no-i18n>${esc(i.email)}</td><td><span class="mv ${plansRank(i.to) > plansRank(i.from) ? "up" : "down"}">${icon(plansRank(i.to) > plansRank(i.from) ? "arrow-up" : "arrow-right", { size: 12 })}</span>${esc(PLAN_NAME[i.from])} → ${esc(PLAN_NAME[i.to])}${i.by_admin ? "" : ` <span class="muted">by the member</span>`}</td><td class="num">${esc(ago(i.ts))}</td></tr>`).join("")}
+          </tbody></table></div>` : `<p class="empty-note">No plan changes yet.</p>`}
+      </section>
+    </div>`;
+}
+const plansRank = (p) => ({ starter: 0, pro: 1, agency: 2 })[p] ?? 0;
+
+async function loadMonitoring() {
+  const [m, d] = await Promise.all([api(`/api/admin/monitoring?days=${days}`), api(`/api/admin/analytics?days=${days}`)]);
+  const h = m.health, u = d.users, b = d.builds;
+  const okc = (ok, text, warn = false) => `<span class="st ${ok ? "ok" : warn ? "warn" : "bad"}">${icon(ok ? "check" : "alert", { size: 13 })}${text}</span>`;
+  const diskPct = h.disk.total ? (1 - h.disk.free / h.disk.total) : 0;
+  const failRate = m.runs.total ? m.runs.failed / m.runs.total : 0;
+  app.innerHTML = `
+    <h2 class="sec">Is everything working?</h2>
+    <section class="health" aria-label="Server health">
+      <div class="hcard">${okc(h.database.ok, h.database.ok ? "Database" : "Database down")}<small>${h.database.ok ? `answers in ${h.database.ms} ms` : "the server can't reach Postgres"}</small></div>
+      <div class="hcard">${okc(h.claude, h.claude ? "Claude Code" : "Claude Code missing")}<small>${h.keys === "user" ? "runs on each member's own key" : "runs on the server's login"}</small></div>
+      <div class="hcard">${okc(h.chrome, h.chrome ? "Browser checks" : "No Chrome", true)}<small>${h.chrome ? "headless Chrome is ready" : "layout and accessibility checks are off"}</small></div>
+      <div class="hcard">${okc(diskPct < 0.9, `Disk ${Math.round(diskPct * 100)}% full`, diskPct < 0.97)}<small data-no-i18n>${esc(bytes(h.disk.free))} free of ${esc(bytes(h.disk.total))}</small></div>
+      <div class="hcard">${okc(true, "Up for " + uptime(h.uptime))}<small>${h.busy.length ? `${h.busy.length} project${h.busy.length === 1 ? "" : "s"} building now` : "nothing building now"} · ${h.viewers} studio${h.viewers === 1 ? "" : "s"} open</small></div>
+    </section>
+    ${h.busy.length ? `<p class="busy-line">${icon("zap", { size: 14 })}<span>Building now:</span> ${h.busy.map(p => `<a href="/p/${esc(p.id)}" data-no-i18n>${esc(p.name)}</a>`).join(", ")}</p>` : ""}
+
+    <section class="tiles" aria-label="Runs">
+      ${tile("Agent runs", `${m.runs.total}`, `in the last ${m.days} days`)}
+      ${tile("Failed or stopped", pct(m.runs.failed, m.runs.total), `${m.runs.failed} of ${m.runs.total} runs`, failRate > 0.15 ? "down" : "")}
+      ${tile("Typical agent time", duration(m.runs.median_seconds), `9 in 10 finish within ${duration(m.runs.p90_seconds)}`)}
+      ${tile("Members ready to build", pct(m.accounts.with_key, m.accounts.members), `${m.accounts.with_key} of ${m.accounts.members} added a Claude key`, m.accounts.members && m.accounts.with_key / m.accounts.members < 0.5 ? "warn" : "")}
+    </section>
+    <div class="grid two">
+      <section class="panel"><h2>Failed or stopped runs per day</h2><p class="total">${sum(m.failures)} in ${m.days} days</p>${barChart(m.failures)}</section>
+      <section class="panel"><h2>Agents with the most problems</h2><p class="total">Last ${m.days} days</p>
+        ${m.agents.length ? `<div class="table-wrap"><table><thead><tr><th>Agent</th><th class="num">Runs</th><th class="num">Failed</th><th class="num">Avg time</th></tr></thead><tbody>
+          ${m.agents.map(a => `<tr><td data-no-i18n>${esc(a.agent)}</td><td class="num">${a.runs}</td><td class="num ${a.failed ? "bad" : ""}">${a.failed} <span class="muted">(${pct(a.failed, a.runs)})</span></td><td class="num">${duration(a.avg_seconds)}</td></tr>`).join("")}
+          </tbody></table></div>` : `<p class="empty-note">No runs in this period.</p>`}
+      </section>
+    </div>
+    <section class="panel"><h2>Latest errors</h2><p class="total">Runs that ended with an error, newest first</p>
+      ${m.errors.length ? `<ul class="errs">${m.errors.map(e => `<li><div><a href="/p/${esc(e.id)}" data-no-i18n>${esc(e.project)}</a>${e.agent ? ` <span class="muted" data-no-i18n>· ${esc(e.agent)}</span>` : ""}<span class="muted when">${e.ts ? esc(ago(e.ts)) : ""}</span></div>
+        <code data-no-i18n>${esc(e.error || "No details")}</code></li>`).join("")}</ul>` : `<p class="empty-note">No errors in this period.</p>`}
+    </section>
+    ${m.accounts.leaving.length ? `<section class="panel"><h2>Accounts being deleted</h2><p class="total">Deactivated by their owners. They're deleted on this date unless they log in again.</p>
+      <div class="table-wrap"><table><tbody>${m.accounts.leaving.map(a => `<tr><td data-no-i18n>${esc(a.email)}</td><td class="num">${esc(new Date(a.delete_after * 1000).toLocaleDateString(getLocale(), { day: "numeric", month: "short", year: "numeric" }))}</td></tr>`).join("")}</tbody></table></div></section>` : ""}
+
+    <h2 class="sec">Usage</h2>
+    <section class="tiles" aria-label="Accounts">
+      ${tile("Accounts", `${u.total}`, `${u.confirmed} confirmed (${pct(u.confirmed, u.total)}) · ${u.admins} admin${u.admins === 1 ? "" : "s"}`)}
+      ${tile("New accounts", `${u.new}`, `in the last ${d.days} days`)}
+      ${tile("Active users", `${u.active_7}`, `logged in during the last 7 days · ${u.active_1} today · ${u.active_30} in 30 days`)}
+      ${tile("Projects created", `${b.projects_in_range}`, `${b.projects} in total`)}
     </section>
     <div class="grid">
       <section class="panel"><h2>New accounts per day</h2><p class="total">${sum(d.series.signups)} in ${d.days} days</p>${barChart(d.series.signups)}</section>
       <section class="panel"><h2>Agent runs per day</h2><p class="total">${sum(d.series.runs)} in ${d.days} days</p>${barChart(d.series.runs)}</section>
-      <section class="panel"><h2>Estimated cost per day</h2><p class="total" data-no-i18n>${money(sum(d.series.cost))}</p>${barChart(d.series.cost, money)}</section>
+      <section class="panel"><h2>AI cost per day</h2><p class="total" data-no-i18n>${money(sum(d.series.cost))}</p>${barChart(d.series.cost, money)}
+        <p class="foot">${h.keys === "user" ? "Paid by members on their own Claude accounts." : "API-equivalent estimate."}</p></section>
     </div>
     <div class="grid two">
       <section class="panel"><h2>What best describes them</h2><p class="total">Confirmed accounts</p>${hbars(d.breakdown.job_role)}</section>
@@ -132,12 +260,18 @@ async function load() {
       <section class="panel"><h2>How they heard about us</h2><p class="total">Confirmed accounts</p>${hbars(d.breakdown.referral)}</section>
       <section class="panel"><h2>Language</h2><p class="total">Confirmed accounts</p>${hbars(d.breakdown.language.map(r => ({ ...r, label: LANG[r.label === "Not answered" ? "" : r.label] || r.label })))}</section>
     </div>
-    <section class="panel"><h2>Top accounts by estimated cost</h2><p class="total">All time</p>
-      ${d.top_users.length ? `<div class="table-wrap"><table><thead><tr><th>Account</th><th class="num">Projects</th><th class="num">Agent runs</th><th class="num">Estimated cost</th><th class="num">Last run</th></tr></thead>
+    <section class="panel"><h2>Top accounts by AI cost</h2><p class="total">All time</p>
+      ${d.top_users.length ? `<div class="table-wrap"><table><thead><tr><th>Account</th><th class="num">Projects</th><th class="num">Agent runs</th><th class="num">AI cost</th><th class="num">Last run</th></tr></thead>
         <tbody>${d.top_users.map(r => `<tr><td data-no-i18n>${esc(r.email)}</td><td class="num">${r.projects}</td><td class="num">${r.runs}</td><td class="num" data-no-i18n>${money(r.cost)}</td><td class="num">${r.last ? ago(r.last) : "-"}</td></tr>`).join("")}</tbody></table></div>`
         : `<p class="empty-note">No projects yet.</p>`}
     </section>`;
 }
+document.getElementById("views").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-view]");
+  if (!b || b.dataset.view === view) return;
+  view = b.dataset.view;
+  load();
+});
 document.getElementById("range").addEventListener("click", (e) => {
   const b = e.target.closest("[data-days]");
   if (!b) return;

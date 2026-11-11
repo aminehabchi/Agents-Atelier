@@ -107,6 +107,12 @@ if CLAUDE_KEYS not in ("user", "server"):
 # encrypts the members' API keys in the database (a Fernet key). Empty: one is made and kept in STORAGE_DIR/.secrets/.
 KEY_SECRET = os.environ.get("KEY_SECRET", "").strip()
 
+# ---- account deletion
+# "Delete my account" deactivates it; everything is removed this many days later unless the member logs in again.
+ACCOUNT_DELETE_DAYS = _int("ACCOUNT_DELETE_DAYS", 30, low=0)
+# how often the server looks for accounts whose time is up
+ACCOUNT_PURGE_SECONDS = _int("ACCOUNT_PURGE_SECONDS", 3600, low=1)
+
 # ---- database (Postgres: users, sessions, email codes, agents, teams) — see database/docker-compose.yaml
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip() or "postgresql://atelier:atelier@127.0.0.1:5432/atelier"
 

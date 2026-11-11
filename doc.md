@@ -1,7 +1,8 @@
 # Agents Atelier — technical documentation
 
-This document explains how Agents Atelier works inside: its architecture, the agent run pipeline, what is stored on
-disk, the HTTP and WebSocket APIs, the agent file format, versioning, stats and error handling.
+This document explains how Agents Atelier works inside: its architecture, the agent run pipeline, what is stored in
+Postgres and on disk, the HTTP and WebSocket APIs, the agent file format, members' Claude keys and plans, versioning,
+stats, error handling and security.
 For what the app does and how to run it, see [README.md](README.md).
 
 ---
@@ -10,52 +11,71 @@ For what the app does and how to run it, see [README.md](README.md).
 
 ```
  Browser (vanilla HTML/CSS/JS, no build step)
-   ├─ HTTP  /api/…   JSON API: projects, files, versions, stats, agents, presets
-   ├─ WS    /ws/<id> live events for one project; prompts and run commands go up the same socket
-   └─ HTTP  /work/<id>/…   the generated site, served as static files (live preview iframe)
+   ├─ HTTP  /api/…        JSON API: accounts, projects, files, versions, stats, agents, teams, marketplace, plans, admin
+   ├─ WS    /ws/<id>      live events for one project; prompts, answers and run commands go up the same socket
+   ├─ HTTP  /work/<id>/…  the generated site, served sandboxed (live preview iframe)
+   └─ HTTP  /media/<id>/… reference images and browser-check screenshots (owner and admins only)
         │
  FastAPI server (server/main.py, one process, asyncio)
-   ├─ per project: at most one running task (a run or a retry)
-   ├─ per agent:   one `claude -p` subprocess, its JSON stream parsed line by line
-   └─ storage:     plain files under work/ and agents/ (no database)
+   ├─ per project:  at most one running task (a run or a retry); live state in memory
+   ├─ per agent:    one `claude -p` subprocess, its JSON stream parsed line by line
+   ├─ background:   the hourly purge of accounts whose 30 days are over
+   ├─ Postgres:     accounts, projects, chat, versions, stats, agents, teams, marketplace, plans (server/db.py)
+   └─ storage/:     files only: agents' instructions and each project's site, versions, uploads, checks
         │
- Claude Code CLI (`claude`), using the user's own login and plan
+ Claude Code CLI (`claude`), run with the project owner's own Claude API key (CLAUDE_KEYS=user)
+ or the server's login (CLAUDE_KEYS=server); headless Chrome for the browser checks
 ```
 
 | Part              | Technology                                                        |
 |-------------------|-------------------------------------------------------------------|
-| Server            | Python 3.10+, FastAPI, Uvicorn (`uvicorn[standard]` for WebSockets) |
+| Server            | Python 3.10+, FastAPI, Uvicorn (`uvicorn[standard]` for WebSockets), asyncpg |
 | Agents            | Claude Code CLI in print mode (`claude -p … --output-format stream-json`) |
-| Front end         | Static HTML pages with inline CSS and JS, plus shared `base.css`, `site.css`, `ui.js`, `icons.js` |
-| Storage           | JSON and JSONL files, project folders, Markdown agent files       |
+| Database          | Postgres 14+ (`database/docker-compose.yaml`), schema and shared agents by numbered migrations |
+| Files             | `STORAGE_DIR` (default `storage/`), each file listed with its SHA-256 in the `files` table |
+| Front end         | Static HTML pages with inline CSS and JS, plus shared `base.css`, `site.css`, `theme.css`, `ui.js`, `icons.js`, `market.js`, `i18n*.js` |
+| Other libraries   | Pillow (WebP copies), segno (QR codes), cryptography (members' keys), axe-core 4.10.2 (vendored, accessibility audit) |
 | Generated sites   | Plain HTML, CSS and JS, which the agents' shared rules enforce    |
 
 ### Source files
 
 ```
 server/
-├── config.py     settings: reads .env (shell variables win), parses and checks every value
-├── serve.py      starts uvicorn with HOST/PORT/LOG_LEVEL from config (used by run.sh)
-├── main.py       FastAPI app: pages, JSON API, WebSocket, run pipeline, stats, error handling
-├── agents.py     agents/ loader and editor (frontmatter parser, validation, ordering, presets)
-├── versions.py   code snapshots: create, list, diff, restore, prune
+├── config.py         settings: reads .env (shell variables win), parses and checks every value
+├── serve.py          starts uvicorn with HOST/PORT/LOG_LEVEL from config (used by run.sh)
+├── main.py           FastAPI app: pages, JSON API, WebSocket, run pipeline, stats, analytics, error handling
+├── db.py · migrate.py · manage.py   the connection pool, the migrations runner, the admin commands
+├── storage.py        Postgres-backed project store (cached in memory) and the storage/ folder layout
+├── legacy.py         imports projects from an earlier version's work/ folder, once
+├── auth.py           accounts, sessions, email codes, profile, plans and plan requests, keys, deactivation
+├── keys.py           members' Claude API keys: check, encrypt (Fernet), clean environment for each run
+├── plans.py          the three plans and their limits
+├── limits.py         per-IP limits and throwaway email domains
+├── agents.py         agents and teams: parser, validation, ordering, export and import
+├── orchestrator.py   the Orchestrator's prompt, its decision rules, forms, confirmations and template blanks
+├── market.py         the marketplace: catalogue, profiles, publishing and review, hires, ratings, estimates
+├── models.py         the model list and model checks
+├── versions.py       code snapshots: create, list, diff, restore, prune
+├── browser_check.py  headless Chrome over CDP: errors, layout measurements, axe-core, screenshots
+├── contact.py        the contact details the contact agents need, and the form that asks for them
+├── images.py         WebP copies of the user's photos
+├── qr.py             QR codes drawn from the QR agent's qr.json
+├── vendor/axe.min.js axe-core (MPL-2.0)
 └── static/
-    ├── landing.html  /            home page
-    ├── projects.html /projects    projects list (server-side pagination, lazy thumbnails)
-    ├── studio.html   /p/<uuid>    the studio: chat, preview, code editor, team, versions, stats
-    ├── agents.html   /agents      agent editor
-    ├── guide.html    /guide       user guide
-    ├── base.css      design tokens + shared components (buttons, inputs, dialogs, toasts, error states)
-    ├── site.css      layout for content pages (header, nav, page)
-    ├── teams.html    /teams…      team pages
-    ├── ui.js         api(), toast(), dialogs, showError(), fmtSize(), theme (setTheme/cycleTheme),
-    │                 command palette (openPalette, registerCommands), importFlow()
-    │                 pagination (paginate, pagerHTML, bindPager, perPagePref), lazy loading (lazyEach, onVisible),
-    │                 motion (staggered .enter, countUp)
-    ├── icons.js      hand-drawn SVG line icons: icon(name) and <i data-icon="name">
-    └── logo.svg      logo and favicon
+    ├── landing.html · dashboard.html   /              the landing page, or the dashboard once logged in
+    ├── projects.html · new-project.html /projects…   projects list and the new-project form
+    ├── studio.html   /p/<uuid>    the studio: chat, preview, code, project, research, versions, stats, team
+    ├── hire.html · hire-profile.html   /hire…       the marketplace and its profiles
+    ├── agents.html · teams.html        /agents… /teams…   agent and team pages
+    ├── profile.html  /profile     account, plan, Claude key and spending, security, data and deletion
+    ├── users.html · analytics.html     /users /analytics   admins: accounts, plans, revenue and monitoring
+    ├── auth.html · legal.html · guide.html   login, sign-up, reset; terms and privacy; the user guide
+    ├── base.css · site.css · theme.css design tokens, shared components, page layout
+    ├── ui.js         api(), toast(), dialogs, planPrompt(), showError(), theme, command palette, pagination, lazy loading
+    ├── market.js     marketplace helpers: Start a job, hiring, "choosing for a project"
+    ├── i18n.js · i18n-fr.js · i18n-ary.js   translation of the pages (French, Darija)
+    └── icons.js · logo.svg   hand-drawn SVG line icons, logo and favicon
 ```
-
 
 **Pagination and lazy loading.** Every list uses the same pager (`pagerHTML` in `ui.js`, styles in `base.css`).
 Projects, versions and "recent agent runs" are paged **on the server** (`page`, `per_page`; the answer carries
@@ -70,62 +90,62 @@ time when you scroll up (`foldHistory` / `showEarlier`).
 
 ## 2. Data
 
-Postgres (`server/db.py`, `database/docker-compose.yaml`) holds `users`, `sessions`, `email_codes`, `agents` and `teams`.
-An agent or team with `owner_id` NULL is shared; otherwise it belongs to that user. Everything is built by the migrations in
-`server/migrations/` (`server/migrate.py`), applied on startup and recorded in `schema_migrations`: the tables, then the
-shared agents and teams. `manage.py make-agents-migration` turns edits to `agents/*.md` and `agents/_presets.json` into a
-new migration; an agent or team an admin edited (`origin = 'app'`) or deleted (`shared_removed`) is left alone. Everything else is a file, including project metadata, whose
-`owner` field holds the owner's user id:
+Postgres (`server/db.py`, `database/docker-compose.yaml`) holds everything except the files. The schema and the shared
+agents and teams are built by the migrations in `server/migrations/` (`server/migrate.py`), applied on startup, once
+each, in order, and recorded in `schema_migrations`. `manage.py make-agents-migration` turns edits to `agents/*.md` and
+`agents/_presets.json` into a new migration; an agent or team an admin edited (`origin = 'app'`) or deleted
+(`shared_removed`) is left alone.
+
+| Table | What |
+|---|---|
+| `users` | email, scrypt password hash, role, profile answers, language, theme; the **encrypted Claude key** (`claude_key`, `claude_key_hint`, `claude_key_at`), `plan`, `plan_request`, `run_limit`, and `deactivated_at` / `delete_after` |
+| `sessions`, `email_codes`, `reset_codes` | logins (token hashes) and the 6-digit codes |
+| `plan_events` | every plan change: user, from, to, by an admin or the member, time (revenue analytics) |
+| `projects` | name, description, owner, pages, brief, brand kit, assets, the project's team (`agents`), showcase, `run`, `extra` (contact details, pending questions, the latest check…) |
+| `project_requests` · `project_events` | every request, and the chat events replayed by the studio |
+| `agent_runs` | one row per agent run: status, time, cost, tokens, model, Critic score |
+| `versions` · `files` | saved versions, and every file in `storage/` with its own uuid, size and SHA-256 |
+| `agents` · `teams` | shared (`owner_id` NULL) and members' agents and teams; instructions live in `storage/agents/` |
+| `listings`, `hires`, `agent_ratings` … | the marketplace |
+
+`storage.Store` loads every project into memory at startup and writes changes through to Postgres, so reads are fast and
+a crash never leaves a half-written project. Files:
 
 ```
-work/
-├── <uuid>/                        the generated site for one project (served at /work/<uuid>/)
-│   ├── index.html, style.css, script.js, plan.md, assets/…
-│   └── uploads/                   reference images attached to prompts (not versioned)
-├── .projects/
-│   ├── <uuid>.json                project metadata (see below)
-│   └── <uuid>.events.jsonl        the chat log: one event per line
-└── .versions/
-    └── <uuid>/
-        ├── index.json             list of versions (oldest first)
-        └── 0001/, 0002/, …        full copies of the site at each version
-agents/
-├── _common.md                     shared rules given to every agent
-├── 01-brief.md … 15-critic.md     one file per agent; the number sets the order
-└── _presets.json                  presets saved by the user (built-in presets live in code)
+storage/
+├── .secrets/key_secret              the Fernet key for members' API keys (when KEY_SECRET is empty), mode 600
+├── claude-home/<user-uuid>/         each member's own Claude Code folder (CLAUDE_CONFIG_DIR and HOME of their runs)
+├── agents/<agent-uuid>/instructions.md
+└── works/<project-uuid>/
+    ├── site/                        the website the agents edit (served at /work/<project-uuid>/)
+    │   └── assets/                  the user's images, their WebP copies (-480/-960/-1600.webp), QR codes (qr-*.svg)
+    ├── versions/<version-uuid>/     a full copy of site/ at one moment
+    ├── uploads/<file-uuid>.png      reference images attached to prompts
+    └── checks/<check-uuid>/         the latest browser-check screenshots
+agents/                              the source of the shared agents (read by migrations), _common.md, _orchestrator.md
 ```
 
-### Project metadata — `work/.projects/<uuid>.json`
+### A project, as the server sees it
 
 ```jsonc
 {
-  "id": "7d49ead2-…",               // UUID v4, also the folder name
+  "id": "7d49ead2-…", "owner": "<user uuid>",
   "name": "Bean There coffee",      // required, ≤ 80 chars
   "description": "A cozy café…",    // required, ≤ 300 chars; sent to every agent
-  "created": 1793721789.07,         // unix seconds
-  "updated": 1793721792.00,         // bumped on every save (sorting, "last activity")
-  "history": ["a landing page…"],   // requests whose run finished (last 6 go into the prompt)
-  "agents": ["ux", "design", …],    // the team switched on for this project
-  "pages": [{"title": "Home", "file": "index.html"}, {"title": "About", "file": "about.html"}],   // first = index.html
-  "run": {                          // the latest run, kept for Continue / Start again
-    "request": "…", "images": ["uploads/x.png"],
-    "agents": ["ux", "html"], "done": ["ux"], "notes": ["- UX agent: …"],
-    "current": "html",
-    "status": "running | stopped | error | interrupted | done",
-    "error": "", "started": 1793…, "updated": 1793…
+  "pages": [{"title": "Home", "file": "index.html"}, {"title": "About", "file": "about.html"}],
+  "brief": {"audience": "…", "goal": "…"}, "brand": {"colors": ["#…"], "heading_font": "…"},
+  "assets": [{"path": "assets/hero.jpg", "kind": "photo", "variants": [{"path": "assets/hero-480.webp", "width": 480}]}],
+  "contact": {"whatsapp": "+212…", "email": "…"}, "contact_skipped": ["telegram"],
+  "agents": ["brief", "ux", "design", …],   // the project's team
+  "history": ["a landing page…"],           // finished requests (the last 6 go into the prompt)
+  "run": {                                  // the latest run, kept for Continue / Start again
+    "request": "…", "images": ["uploads/x.png"], "agents": ["ux", "html"], "done": ["ux"], "notes": ["- UX agent: …"],
+    "plan": {"agents": […], "notes": {…}, "reason": "…"}, "review_round": 0, "send_back": {},
+    "current": "html", "status": "running | stopped | error | interrupted | done", "error": "", "started": 1793…
   },
-  "stats": [ { …one entry per agent run, see §7… } ]   // last 500
+  "pending": null, "last_exchange": null    // an Orchestrator form or confirmation waiting for an answer
 }
 ```
-
-Every write goes through `write_json()`: it writes to `<file>.tmp`, then `os.replace()`. A crash mid-write never
-leaves a half-written file behind.
-
-### Chat log — `work/.projects/<uuid>.events.jsonl`
-
-Each event broadcast to the studio is appended as one JSON line, with a sequence number `seq` and a timestamp `ts`.
-`file_changed` events are not saved; they reuse the last `seq`. Opening a project replays this log to rebuild the chat.
-Damaged lines are skipped.
 
 ---
 
@@ -155,11 +175,13 @@ You are the HTML agent. …     # the role prompt (everything after the frontmat
     treats `unrecognized_model` or an empty `modelUsage` as invalid, and records the resolved model id
   Saving an agent with a model outside the list returns `400`. A file edited by hand with an unknown model is flagged
   (`model_ok: false`), and that agent fails at once instead of mid-run.
-- `load_agents()` re-reads the folder on every call, so edits apply to the next run without a restart. A run takes a
-  snapshot of the team when it starts.
-- Files whose names start with `_` or `.` aren't agents.
-- Edits made through the API rewrite **every** agent file with fresh numbers (`01-`, `02-`, …) in the requested order.
-  Rendering is byte-for-byte stable, so saving an unchanged agent leaves its file identical.
+- Agents live in Postgres (`agents` table, instructions in `storage/agents/<uuid>/instructions.md`). `load_agents(user)`
+  returns the shared agents plus the member's own, in order, so edits apply to the next run without a restart. A run
+  takes a snapshot of the team when it starts.
+- The files in `agents/` (`NN-name.md`, `_presets.json`) are the source of the shared agents and teams: migrations
+  copy them into the database. Files whose names start with `_` or `.` aren't agents.
+- An agent can set `tools: web` (Research): it then gets WebSearch and WebFetch, may only write `research.md` and
+  `plan.md`, and the server undoes any other change it makes.
 
 ### Shared rules — `agents/_common.md`
 
@@ -178,8 +200,8 @@ Every agent gets these rules before its own role. They define the contract betwe
 ### Presets
 
 The four built-in presets are computed from the current agents (`agents.builtin_presets()`): Default, Quick, Polish
-and Full. User presets are stored in `agents/_presets.json` as `{id, name, agents}`, and unknown agent ids are
-dropped when presets are loaded.
+and Full. The 23 shared use-case teams (with a starting prompt and a category) come from `agents/_presets.json` through
+the migrations; members' teams are rows in the `teams` table. Unknown agent ids are dropped when teams are loaded.
 
 ---
 
@@ -192,14 +214,25 @@ dropped when presets are loaded.
 ```
 claude -p "<prompt>"
   --output-format stream-json --verbose
-  --append-system-prompt "<_common.md>\n\n<agent role>"
+  --restricted --strict-mcp-config --disable-slash-commands
+  --tools Read,Write,Edit,Glob,Grep[,WebSearch,WebFetch]
   --allowedTools Read Write Edit Glob Grep
-  --disallowedTools Bash WebFetch WebSearch Task
+  --disallowedTools Bash Task [WebFetch WebSearch] Read(//proc/**) Read(//sys/**) Read(//etc/**) …   (DENY_READS)
   --permission-mode acceptEdits
+  [--add-dir uploads/ --add-dir checks/]
+  --exclude-dynamic-system-prompt-sections
+  --append-system-prompt "<language rule><_common.md>\n\n<agent role>\n\n<SECURITY_RULES>"
   [--model <agent.model or AGENT_MODEL>]
 ```
 
-The working directory is `work/<uuid>/`, so file tools are confined to the project folder.
+The working directory is `storage/works/<uuid>/site/`, so file tools are confined to the project folder.
+
+**Whose Claude account.** With `CLAUDE_KEYS=user`, `claude_env(meta)` builds the process's whole environment from
+scratch (`keys.env_for`): a few safe variables (`PATH`, locale, proxies), the project owner's decrypted key as
+`ANTHROPIC_API_KEY`, and `CLAUDE_CONFIG_DIR` / `HOME` set to `storage/claude-home/<owner>/`. Nothing else from the
+server's environment (database URL, SMTP password, `KEY_SECRET`) reaches an agent. No key → `NoClaudeKey`: the
+WebSocket answers `needs_key` before anything runs. The Orchestrator and `POST /api/models/check` use the same
+environment. With `CLAUDE_KEYS=server`, the process inherits the server's environment and login.
 
 The **prompt** is built from (each in its own tagged block, see §9):
 - the site's pages (`<site_pages>`: one page, or the list of files with the shared header/nav/footer rule)
@@ -208,6 +241,9 @@ The **prompt** is built from (each in its own tagged block, see §9):
 - the current request
 - the notes left by earlier agents in this run ("- CSS agent: …")
 - the reference images, which the agent is told to open with `Read`
+- `<project_brief>`, `<brand_kit>`, the contact details and `<project_assets>` (with the WebP copies)
+- `<run_plan>` (the Orchestrator's reason and a note for this agent) or `<review_feedback>` / `<send_back>` for the Critic's rounds
+- `<browser_check>` for Responsive, Accessibility, QA and the Critic (see below)
 
 The **stdout stream** is parsed line by line in `_stream_agent()`:
 
@@ -225,12 +261,18 @@ timeout or cancellation.
 
 ### A run: `run_chain(pid, request, agent_ids, resume=False, images=())`
 
-1. Snapshot the selected agents, in file order. Save `run` with `status: running`, broadcast `run_start`.
+1. Snapshot the selected agents, in file order. Read the owner's plan (`plans.of`): agents with web tools are dropped
+   on Starter (a `notice` says so), browser checks run only before the Critic on Starter, the plan sets how many
+   versions are kept, and the owner's spending limit is read. Save `run` with `status: running`, broadcast `run_start`.
 2. Save a version labelled **"Before: <request>"**. It's skipped if the code hasn't changed since the last version.
 3. For each agent not already in `done`:
-   1. set `run.current`, broadcast `agent_start`, run the agent
+   1. set `run.current`; for a checked agent, run the browser check and broadcast `browser_check`; broadcast
+      `agent_start`, run the agent; then draw any QR codes it asked for (`qr.json`)
    2. append its note, add it to `done`, save the run state
    3. save a version **"After <Agent>"**, then broadcast `agent_done` with that version's number and the agent's stats
+   4. for the Critic: parse its `REDO:` lines and send that work back (up to `REVIEW_ROUNDS`)
+   5. add the agent's cost to the run's total; at the owner's limit, with agents left, stop as `stopped` and broadcast
+      `limit` then `run_stopped` (Continue goes on)
 4. Finally: add the request to `history`, set `status: done`, broadcast `run_done`.
 
 | Ends with          | Run status    | Event          | Offered in the UI           |
@@ -245,6 +287,17 @@ timeout or cancellation.
 - **Start again** runs the whole saved team from the first agent on the same request.
 - **Retry** (`run_retry()`) runs one agent on the last request, with an optional extra instruction appended. It
   saves versions before and after, and leaves `run` untouched, so a paused run can still be continued.
+
+**Before a run** (`run_prompt`): template `[blanks]` become a form; on a follow-up the Orchestrator
+(`run_orchestrator`, read-only tools) decides `intent` and agents, and may ask a form (`questions`) or wait for a yes
+(`confirm`); `orchestrator.decide()` adds the server's rules (Brief first, dependents, QA and the Critic after code
+changes). If an agent in the plan needs a contact detail that's missing (`contact.missing`), a form asks for it first.
+The pending question is kept in `pending` / `last_exchange` until the `answer` message arrives.
+
+**Browser check** (`browser_check.check_site`): every page at 1280px and 390px in headless Chrome over CDP, collecting
+console errors, failed files, broken images, dead links and anchors, sideways overflow with the element too wide, a
+layout probe (overlaps, header wrapping, blank bands, narrow sections, a lonely last card) and axe-core results on
+desktop. `prompt_block()` turns it into data for the agent; `summary()` into the chat card.
 
 Only one task runs per project at a time (`is_busy()`). While it runs, file edits, downloads, restores and new
 prompts are refused with `409` or an `error` event. Different projects can run at the same time.
@@ -270,7 +323,11 @@ All responses are JSON. Errors are always `{"detail": "<readable message>"}`, pl
 | GET    | `/forgot`     | reset a forgotten password with an emailed code (`auth.html`)       |
 | GET    | `/guide`      | guide (needs a confirmed account)                                   |
 | GET    | `/studio`     | redirect to `/projects` (the studio is only opened from a project)  |
-| GET    | `/work/<uuid>/…` | the generated site (no-store caching), also `/work/.versions/<uuid>/<NNNN>/…` |
+| GET    | `/hire`, `/hire/agents/<n>`, `/hire/teams/<n>` | the marketplace and profiles            |
+| GET    | `/users`, `/analytics` | admins only                                                  |
+| GET    | `/login`, `/register`, `/confirm`, `/terms`, `/privacy` | account and legal pages             |
+| GET    | `/work/<uuid>/…` | the generated site (no-store caching, sandbox CSP), also `/work/.versions/<uuid>/<NNNN>/…` |
+| GET    | `/media/<uuid>/<area>/…` | uploads and check screenshots, to who can open the project       |
 
 ### Projects
 
@@ -285,7 +342,14 @@ All responses are JSON. Errors are always `{"detail": "<readable message>"}`, pl
 | GET    | `/api/projects/<id>/files`             | —                                    | `[{path, size, kind, content?, url?, too_large?}]` |
 | PUT    | `/api/projects/<id>/files`             | `{path, content}`                    | text files only, ≤ 500 KB, `409` while busy |
 | POST   | `/api/projects/<id>/uploads`           | `{name, data: "data:image/png;base64,…"}` | ≤ 5 MB → `{path, url, size}`        |
-| GET    | `/api/projects/<id>/download`          | —                                    | `.zip` of the site, `409` while busy      |
+| GET    | `/api/projects/<id>/download`          | —                                    | `.zip` of the site, `409` while busy; on Starter each page gets a "Made with Agents Atelier" line |
+| POST   | `/api/projects/import`                 | `{name, description, files…}`        | a project from an existing site           |
+| POST   | `/api/projects/<id>/assets`            | `{name, data, kind}`                 | logo or photo; photos get WebP copies     |
+| PUT    | `/api/projects/<id>/contact`           | `{whatsapp?, phone?, email?, telegram?}` | validated; an empty value = "not given" |
+| GET/PUT | `/api/projects/<id>/brand` (+ `/logo`, `/copy`) | the brand kit               |                                           |
+| GET/PUT | `/api/projects/<id>/ratings`          | thumbs up/down and a comment per agent | owner only                             |
+
+`POST /api/projects` and `/import` answer `403 {"detail", "upgrade": "pro"}` past the plan's project limit.
 
 Each project in a list has `id, name, description, created, updated, busy, paused, prompts, agents, files, size, has_preview`.
 
@@ -324,7 +388,35 @@ images get a `url` instead.
 | POST     | `/api/import`           | `{name, data: base64, on_conflict: rename·replace·skip, apply}`; without `apply` it returns the plan only. Accepts `.md`, team `.json`, `.zip` (≤ 300 files, 5 MB unpacked) |
 | GET      | `/api/models`           | the model list: `{default, options: [{id, label, kind: alias·full·custom, source, note}], alias_source}` |
 | POST     | `/api/models/check`     | `{model}`: asks the Claude CLI to answer with that model; on success it's added to `agents/_models.json` |
+| GET      | `/api/market…`          | the catalogue, profiles, `hire`, `publish` (Agency), `withdraw`, `pending` and `review` (admins) |
 | GET      | `/api/stats?project=<id>&page=&per_page=` | `{totals, agents: [per agent], recent: [last 30 runs]}`; omit `project` for all projects. With `page`, `recent` is one page of **all** runs (newest first) and `recent_pager` = `{page, pages, per_page, total}` |
+
+Creating or editing agents and teams (`POST/PUT /api/agents`, `/api/presets`, `/api/import`) needs the Pro plan, and
+publishing the Agency plan: otherwise `403 {"detail", "upgrade"}`, which `ui.js` turns into an "Available on Pro" window.
+
+### Accounts, keys and plans
+
+| Method | Path | Notes |
+|--------|------|-------|
+| POST | `/api/auth/register`, `/login`, `/confirm`, `/resend`, `/forgot`, `/reset`, `/logout` | sign-up, login, codes. A login during the 30 days of a deactivated account cancels its deletion and answers `user.reactivated: true` |
+| GET/PATCH | `/api/auth/me`, PATCH `/api/auth/preferences` | the account (`plan`, `claude_key: {set, hint, checked}`, `run_limit`, `plan_request`, `delete_after`…); details; language and theme |
+| POST | `/api/auth/password`; GET/DELETE `/api/auth/sessions` | change password; other devices |
+| PUT/DELETE | `/api/auth/claude-key` | `{key}`: checked with one tiny call (`keys.check`), stored encrypted; `400` with a safe message otherwise |
+| PUT | `/api/auth/run-limit` | `{limit}`: $0.50 up to the plan's maximum (fixed on Starter) |
+| POST | `/api/auth/plan` · DELETE `/api/auth/plan-request` | `{plan}`: lower applies at once, higher becomes a request (admins are emailed); cancel the request |
+| GET | `/api/plans` | `{plans, keys}`, plus `usage.projects` for a logged-in member |
+| GET | `/api/auth/export` | a .zip of everything about you |
+| POST | `/api/auth/delete` | `{password}`: deactivates the account, ends every session; `{delete_after, days}` |
+
+### Admin
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/api/users` | every account |
+| PATCH | `/api/users/<id>` | `{role}`, `{plan}` (also clears a request, logs a `plan_events` row) or `{decline_request: true}` |
+| GET | `/api/admin/analytics?days=` | sign-ups, activity, runs, cost per day, audience, top accounts |
+| GET | `/api/admin/revenue?days=` | monthly revenue, run rate, paying members, revenue per member, by plan, upgrades/downgrades, waiting requests, revenue per day, latest changes |
+| GET | `/api/admin/monitoring?days=` | health (database, Claude Code, Chrome, disk, uptime, busy projects), runs by status, typical and 90th-percentile agent time, failures per day, agents with the most problems, latest errors, members with a key, accounts being deleted |
 
 ---
 
@@ -341,6 +433,11 @@ One socket per open studio tab. Every connected tab of a project receives every 
 | `{"type":"continue"}`                                        | resume the saved run                                        |
 | `{"type":"restart"}`                                         | run the saved request again from the first agent            |
 | `{"type":"retry","agent":"html","note":"…"}`                 | run one agent again                                         |
+| `{"type":"answer","answers":{…}}` / `{"type":"answer","confirm":true}` / `{"type":"answer","cancel":true}` | answer the open form, or confirm or cancel a planned run |
+
+Before `prompt`, `continue`, `restart`, `retry` or `answer` starts anything, the server checks there's a Claude key to
+run with; if not it answers `needs_key` (`{text, mine}`) and nothing runs. An admin who runs an older project without
+an owner becomes its owner.
 
 ### Server → client
 
@@ -361,6 +458,16 @@ One socket per open studio tab. Every connected tab of a project receives every 
 | `versions`       | a version was saved                                       |
 | `restored`       | `version`, `backup`                                       |
 | `needs_details`  | `text`: the project needs a name and description first    |
+| `needs_key`      | `text`, `mine`: no Claude API key to run with              |
+| `orchestrating`  | the Orchestrator is deciding                              |
+| `plan`           | `intent`, `agents`, `notes`, `reason`, `reply`, `questions?`, `confirm?`, `needs?` |
+| `answer`         | the user's answers to a form                              |
+| `browser_check_start`, `browser_check` | `agent`, `text`, `problems`, `screenshots`   |
+| `send_back`      | the Critic sent work back: `agent`, `round`, `rounds`, `items` |
+| `pages`          | the list of pages changed                                 |
+| `security`       | a blocked action or a page-scan finding                   |
+| `notice`         | `text`, `upgrade?`: e.g. Research skipped on Starter      |
+| `limit`          | `text`, `spent`, `limit`: the run reached the owner's spending limit |
 
 Every broadcast event carries `project`, `seq` and `ts`. The studio ignores events with `seq ≤ lastSeq`. After a
 reconnect, it fetches `/api/projects/<id>` and replays any events it missed, which can't create duplicates.
@@ -373,10 +480,11 @@ The **run summary** is `{status, request, agents, done, current, next, error, re
 
 ### Versions (`server/versions.py`)
 
-- A snapshot copies every file of `work/<uuid>/` except `uploads/` into `work/.versions/<uuid>/<NNNN>/`.
+- A snapshot copies every file of `storage/works/<uuid>/site/` into `versions/<version-uuid>/`.
 - A SHA-1 of all paths and contents is stored with each version. If it matches the previous version, no new version
   is created, so runs that don't change anything don't fill the list.
-- At most **150** versions are kept; the oldest are deleted first.
+- At most `MAX_VERSIONS` (150) are kept, fewer on a plan that keeps fewer (Starter 10, Pro 100); the oldest are
+  deleted first.
 - **Restore** takes a `backup` snapshot first, empties the site folder (keeping `uploads/`), then copies the version back.
 - **Diff** uses `difflib.unified_diff` per file and reports `added`, `removed` or `changed` with line counts.
 
@@ -390,7 +498,7 @@ Each agent run, whether it finished, was stopped or failed, appends an entry to 
   "tokens_in": 120345, "tokens_out": 1799 }
 ```
 
-`cost` is Claude Code's `total_cost_usd` (an API-equivalent estimate). `tokens_in` includes cache reads and writes.
+`cost` is Claude Code's `total_cost_usd`: with `CLAUDE_KEYS=user` it's what the run cost on the owner's Claude account. `tokens_in` includes cache reads and writes.
 `/api/stats` adds these up per agent (runs, finished, time, cost, tokens, models) and overall.
 
 ---
@@ -412,7 +520,8 @@ Each agent run, whether it finished, was stopped or failed, appends an entry to 
 
 Agent failures are turned into actionable messages by `explain_failure()`:
 - Claude Code not found or not executable (`CLAUDE_BIN`)
-- not logged in
+- a refused API key, no credit left, or a key without access (`keys.explain`); any `sk-ant-…` text is scrubbed first
+- not logged in (`CLAUDE_KEYS=server`)
 - rate-limited or overloaded
 - unknown model
 - timed out
@@ -462,7 +571,13 @@ A failed run is saved as `error`, so it can be continued.
 - **`/work/<uuid>/` is reached by its unguessable project id, not by session.** Generated pages run in a sandbox with no
   origin, so browsers don't send the session cookie for their CSS, scripts and images. Anyone given such a link can see that
   site's files, including `plan.md`. `/work/.projects/` is never served.
-- **Runs** always use the project owner's agents, even when an admin starts them.
+- **Runs** always use the project owner's agents and Claude key, even when an admin starts them.
+- **Members' API keys** are encrypted with Fernet (`KEY_SECRET`, or a generated key in `storage/.secrets/`, mode 600),
+  never returned to the browser (only `sk-ant-…` plus the last four characters), never logged, and scrubbed from every
+  error message.
+- **Plans** are enforced on the server (`plans.need`, `check_project_limit`, the run pipeline); the pages only explain them.
+- **Deleting an account** deactivates it and ends its sessions; `purge_loop()` deletes it with its projects, files,
+  brand kit and Claude folder after `ACCOUNT_DELETE_DAYS`, unless a login cancels it first.
 
 ### Prompt injection
 
@@ -475,7 +590,7 @@ to make an agent do something else. The defences are layered.
 ```
 claude -p … --restricted --strict-mcp-config --disable-slash-commands
        --tools Read,Write,Edit,Glob,Grep --allowedTools Read Write Edit Glob Grep
-       --disallowedTools Bash WebFetch WebSearch Task --permission-mode acceptEdits
+       --disallowedTools Bash WebFetch WebSearch Task <DENY_READS> --permission-mode acceptEdits
 ```
 
 | Flag                         | Effect                                                                                  |
@@ -486,6 +601,9 @@ claude -p … --restricted --strict-mcp-config --disable-slash-commands
 | `--disable-slash-commands`   | no skills or slash commands                                                            |
 
 This was checked against the real CLI: a `Read` of `/etc/hostname` is denied, while files in the folder can be read.
+On top of it, `DENY_READS` explicitly denies reading `/proc` (the process environment holds the member's key), `/sys`,
+`/etc`, the server's code and `.env`, `storage/.secrets/`, `storage/claude-home/` and the server account's `~/.claude`,
+`~/.config`, `~/.ssh`, `~/.aws` and `~/.docker`; and each run's environment is rebuilt from scratch (§4).
 The model check (`POST /api/models/check`) runs with `--restricted --tools ""` (no tools at all).
 
 ### 2. Prompt structure (`build_prompt`, `SECURITY_RULES`)
@@ -527,7 +645,12 @@ JavaScript can't read or change the app through the API.
 - **Path checks:** file paths from the browser are resolved and must stay inside the project; uploads are checked
   against an allowed image type list and size.
 
-The server binds to `127.0.0.1` and has no authentication: don't expose it to a network.
+The server binds to `127.0.0.1` by default. To serve it publicly, put a reverse proxy with HTTPS in front and set
+`TRUST_PROXY=true`, `COOKIE_SECURE=true` and `ATELIER_HOSTS=your.domain`.
+
+**Known limit:** the browser check runs the generated pages' JavaScript in headless Chrome inside the app's container
+(with `--no-sandbox` there). Running it, and the agents, in a separate locked-down runner container per job is the next
+step for a public service.
 
 ---
 
@@ -541,16 +664,21 @@ The server binds to `127.0.0.1` and has no authentication: don't expose it to a 
 | Add an icon                   | Add a path to `ICONS` in `server/static/icons.js` (24×24 grid, stroke-based)                |
 | Add an API endpoint           | Add a route in `server/main.py`, **before** the `app.mount("/static"…)` / `app.mount("/work"…)` lines |
 | Add a WebSocket command       | Handle a new `type` in `handle_ws_message()` and a matching event in the studio's `handle()` |
-| Change a limit                | Edit the constants at the top of `server/main.py` (`MAX_BODY`, `MAX_IMAGE`, `MAX_EDIT`, …) |
+| Change a limit                | Use the settings in `.env` (`MAX_BODY_MB`, `MAX_IMAGE_MB`, `MAX_EDIT_KB`, …)               |
+| Change a plan's price or limits | Edit `PLANS` in `server/plans.py` (the pages read them from `/api/plans`)                |
+| Change the shared agents      | Edit `agents/*.md`, then `manage.py make-agents-migration`                                  |
 
 ### Development notes
 
 - **Tests:** `.venv/bin/python -m unittest discover -s tests -v`.
-  - `tests/test_server.py` starts a server with `ATELIER_WORK` / `ATELIER_AGENTS` pointing to a temporary copy and
-    `CLAUDE_BIN=tests/fake-claude`.
+  - `tests/test_server.py` starts a server with a throwaway database, temporary `STORAGE_DIR` and `ATELIER_AGENTS`,
+    `CLAUDE_BIN=tests/fake-claude`, `CLAUDE_KEYS=user` and `ACCOUNT_PURGE_SECONDS=1`. Test accounts save a test key
+    and get the Agency plan unless a test asks otherwise.
   - The fake CLI behaves like the real one. Markers in the prompt pick the behaviour: `[[fail]]`, `[[fail-once]]`,
-    `[[crash]]`, `[[hang]]`, `[[slow]]`, `[[escape]]`, `[[inject-script]]`.
-  - It logs every call to `$FAKE_CLAUDE_LOG`, so tests can check the exact flags and prompt.
-- `ATELIER_WORK` and `ATELIER_AGENTS` move the data folders, for example for tests or a second instance.
+    `[[crash]]`, `[[hang]]`, `[[slow]]`, `[[escape]]`, `[[inject-script]]`, `[[redo]]`, `[[qr]]`, `[[pricey]]`,
+    `[[orch:…]]`, `[[orch-form]]`, `[[orch-confirm]]`… A key containing `bad` or `broke` is refused like Claude does.
+  - It logs every call to `$FAKE_CLAUDE_LOG` (flags, prompt, the last 4 characters of the key, `CLAUDE_CONFIG_DIR` and
+    the names of the environment variables), so tests can check the exact flags, prompt and isolation.
+- `STORAGE_DIR` and `ATELIER_AGENTS` move the data folders, for example for tests or a second instance.
 - Run the server without `run.sh`: `cd server && ../.venv/bin/uvicorn main:app --reload --port 8001`.
 - Logs go to the terminal (logger `agents-atelier`).
