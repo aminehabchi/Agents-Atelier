@@ -50,6 +50,9 @@ server/
 ├── auth.py           accounts, sessions, email codes, profile, plans and plan requests, keys, deactivation
 ├── keys.py           members' Claude API keys: check, encrypt (Fernet), clean environment for each run
 ├── plans.py          the three plans and their limits
+├── collab.py         people on a project: owner, editors, viewers, invitations (in memory, Postgres-backed)
+├── share.py          share links (read-only site for people without an account) and pinned comments
+├── billing.py        PayPal subscriptions: checkout, return, webhooks, cancellation, payments received
 ├── limits.py         per-IP limits and throwaway email domains
 ├── agents.py         agents and teams: parser, validation, ordering, export and import
 ├── orchestrator.py   the Orchestrator's prompt, its decision rules, forms, confirmations and template blanks
@@ -64,7 +67,8 @@ server/
 └── static/
     ├── landing.html · dashboard.html   /              the landing page, or the dashboard once logged in
     ├── projects.html · new-project.html /projects…   projects list and the new-project form
-    ├── studio.html   /p/<uuid>    the studio: chat, preview, code, project, research, versions, stats, team
+    ├── studio.html   /p/<uuid>    the studio: chat, preview, code, project, research, versions, stats, share, team
+    ├── share.html · share-pin.js   /s/<token>   a share link's page; the script that places pins inside the shared site
     ├── hire.html · hire-profile.html   /hire…       the marketplace and its profiles
     ├── agents.html · teams.html        /agents… /teams…   agent and team pages
     ├── profile.html  /profile     account, plan, Claude key and spending, security, data and deletion
@@ -265,11 +269,15 @@ timeout or cancellation.
    on Starter (a `notice` says so), browser checks run only before the Critic on Starter, the plan sets how many
    versions are kept, and the owner's spending limit is read. Save `run` with `status: running`, broadcast `run_start`.
 2. Save a version labelled **"Before: <request>"**. It's skipped if the code hasn't changed since the last version.
-3. For each agent not already in `done`:
-   1. set `run.current`; for a checked agent, run the browser check and broadcast `browser_check`; broadcast
-      `agent_start`, run the agent; then draw any QR codes it asked for (`qr.json`)
-   2. append its note, add it to `done`, save the run state
-   3. save a version **"After <Agent>"**, then broadcast `agent_done` with that version's number and the agent's stats
+3. Step by step until every agent is in `done`. A step is the next agent in team order, plus the agents right after it
+   that the Orchestrator grouped with it in `plan.parallel` (`orchestrator.next_step`):
+   1. set `run.current` and `run.running`; if an agent of the step gets a browser check, run it once and give it to
+      each of them (`browser_check`); broadcast `parallel` for a group, then `agent_start` for each agent (`with`: the
+      others); run them at the same time (`asyncio.gather`); then draw any QR codes they asked for (`qr.json`)
+   2. append each finished agent's note, add it to `done`, save the run state. Every agent of a step reads the notes left
+      before the step. If one failed, the others' work is kept and the run stops with `error` (Continue runs the failed one)
+   3. save one version **"After <Agent> + <Agent>"**, then broadcast `agent_done` for each, with that version's number and
+      the agent's own stats (`last_stat(pid, agent)`)
    4. for the Critic: parse its `REDO:` lines and send that work back (up to `REVIEW_ROUNDS`)
    5. add the agent's cost to the run's total; at the owner's limit, with agents left, stop as `stopped` and broadcast
       `limit` then `run_stopped` (Continue goes on)
@@ -293,6 +301,15 @@ timeout or cancellation.
 (`confirm`); `orchestrator.decide()` adds the server's rules (Brief first, dependents, QA and the Critic after code
 changes). If an agent in the plan needs a contact detail that's missing (`contact.missing`), a form asks for it first.
 The pending question is kept in `pending` / `last_exchange` until the `answer` message arrives.
+
+**Parallel steps** (`orchestrator.py`, "Parallel steps"): the Orchestrator may answer `parallel: [[ids], …]`.
+`clean_parallel()` keeps a group only if its agents are in the run, none is in `SOLO` (Brief, Research, Auditor, Tidy,
+Translator, UX, HTML, QA, Critic), none adapts to another (`DEPENDS`, followed through), and it has 2 to
+`PARALLEL_AGENTS` agents (default 3; 1 turns this off). `next_step()` only joins agents that are next to each other in
+run order. A **first build** doesn't ask the Orchestrator what to run, so `schedule_first_build()` asks it only for the
+groups (`<first_build>` in the prompt) while Brief works, and only when two neighbours could pair (`could_pair`); the
+groups apply from the next step (event `schedule`). Each project keeps a set of `claude` processes (`runs[pid]["procs"]`);
+Stop kills them all.
 
 **Browser check** (`browser_check.check_site`): every page at 1280px and 390px in headless Chrome over CDP, collecting
 console errors, failed files, broken images, dead links and anchors, sideways overflow with the element too wide, a
@@ -403,8 +420,11 @@ publishing the Agency plan: otherwise `403 {"detail", "upgrade"}`, which `ui.js`
 | POST | `/api/auth/password`; GET/DELETE `/api/auth/sessions` | change password; other devices |
 | PUT/DELETE | `/api/auth/claude-key` | `{key}`: checked with one tiny call (`keys.check`), stored encrypted; `400` with a safe message otherwise |
 | PUT | `/api/auth/run-limit` | `{limit}`: $0.50 up to the plan's maximum (fixed on Starter) |
-| POST | `/api/auth/plan` · DELETE `/api/auth/plan-request` | `{plan}`: lower applies at once, higher becomes a request (admins are emailed); cancel the request |
-| GET | `/api/plans` | `{plans, keys}`, plus `usage.projects` for a logged-in member |
+| POST | `/api/auth/plan` · DELETE `/api/auth/plan-request` | `{plan}`: lower applies at once, higher becomes a request (admins are emailed); cancel the request. With PayPal on, a paid plan answers `400` (use the PayPal route) and Starter cancels the subscription first |
+| GET | `/api/plans` | `{plans, keys, payment: "paypal"\|"request"}`, plus `usage.projects` and `subscription` for a logged-in member |
+| POST | `/api/billing/paypal/subscribe` | `{plan}` (pro, agency): creates a PayPal subscription (`custom_id` = the member) → `{approve, id}`; the page sends the member to `approve` |
+| GET | `/billing/paypal/return?subscription_id=` | PayPal sends the member back here: the server reads the subscription, checks it's theirs and active, switches the plan, redirects to `/profile?paid=active\|pending\|cancelled\|error#plan` |
+| POST | `/api/billing/paypal/webhook` | public; the signature is checked with PayPal (`PAYPAL_WEBHOOK_ID`), each event handled once (`billing_events`). `BILLING.SUBSCRIPTION.*` keeps the plan in step (active → the plan, cancelled/suspended/expired → Starter, the old subscription is cancelled after a switch); `PAYMENT.SALE.COMPLETED/REFUNDED/REVERSED` go to `billing_payments` |
 | GET | `/api/auth/export` | a .zip of everything about you |
 | POST | `/api/auth/delete` | `{password}`: deactivates the account, ends every session; `{delete_after, days}` |
 
@@ -415,7 +435,22 @@ publishing the Agency plan: otherwise `403 {"detail", "upgrade"}`, which `ui.js`
 | GET | `/api/users` | every account |
 | PATCH | `/api/users/<id>` | `{role}`, `{plan}` (also clears a request, logs a `plan_events` row) or `{decline_request: true}` |
 | GET | `/api/admin/analytics?days=` | sign-ups, activity, runs, cost per day, audience, top accounts |
-| GET | `/api/admin/revenue?days=` | monthly revenue, run rate, paying members, revenue per member, by plan, upgrades/downgrades, waiting requests, revenue per day, latest changes |
+| GET | `/api/admin/revenue?days=` | monthly revenue, run rate, paying members, revenue per member, by plan, upgrades/downgrades, waiting requests, revenue per day, latest changes, and `received` (money PayPal collected in the period) |
+
+### People, share links and comments
+
+| Method | Path | Who | Notes |
+|--------|------|-----|-------|
+| GET | `/api/projects/<id>/people` | anyone on it | `{owner, members:[{id,email,name,role}], invites:[{email,role}], active, my_role, can_invite}` |
+| POST | `/api/projects/<id>/people` | owner | `{email, role: editor\|viewer}`: an existing account joins at once, any other email waits in `project_invites` until it confirms an account. Needs Agency (`403` + `upgrade`), 20 people at most |
+| PATCH / DELETE | `/api/projects/<id>/people/<user>` | owner | change the role / remove |
+| DELETE | `/api/projects/<id>/membership` · `/api/projects/<id>/invites?email=` | the member · owner | leave the project · cancel an invitation |
+| GET / POST | `/api/projects/<id>/share` | owner, editors | list links (with `views`, `comment_count`, `state`) · `{label, days: 1\|7\|30\|90\|0, comments}` creates one |
+| DELETE | `/api/projects/<id>/share/<link>` | owner, editors | turn a link off |
+| GET | `/api/projects/<id>/comments` | anyone on it | every pinned comment |
+| PATCH / DELETE | `/api/projects/<id>/comments/<comment>` | owner, editors | `{resolved}` · delete |
+| GET | `/s/<token>`, `/s/<token>/info`, `/s/<token>/site/…` | anyone with the link | the share page, `{name, pages, comments, expires, built}`, the site (sandboxed like `/work/`, web pages get `share-pin.js`) |
+| GET / POST | `/s/<token>/comments` | anyone with the link | the link's comments · `{text, author, page, selector, x, y, doc_x, doc_y, viewport, snippet}` (30 an hour per address) |
 | GET | `/api/admin/monitoring?days=` | health (database, Claude Code, Chrome, disk, uptime, busy projects), runs by status, typical and 90th-percentile agent time, failures per day, agents with the most problems, latest errors, members with a key, accounts being deleted |
 
 ---
@@ -435,6 +470,9 @@ One socket per open studio tab. Every connected tab of a project receives every 
 | `{"type":"retry","agent":"html","note":"…"}`                 | run one agent again                                         |
 | `{"type":"answer","answers":{…}}` / `{"type":"answer","confirm":true}` / `{"type":"answer","cancel":true}` | answer the open form, or confirm or cancel a planned run |
 
+A **viewer** may connect and watch, but `prompt`, `stop`, `continue`, `restart`, `retry` and `answer` answer
+`{"type":"error","viewer":true}`.
+
 Before `prompt`, `continue`, `restart`, `retry` or `answer` starts anything, the server checks there's a Claude key to
 run with; if not it answers `needs_key` (`{text, mine}`) and nothing runs. An admin who runs an older project without
 an owner becomes its owner.
@@ -446,7 +484,9 @@ an owner becomes its owner.
 | `hello`          | `busy` (sent on connect)                                  |
 | `user`           | `text`, `images`                                          |
 | `run_start`      | `request`, `name`, `agents`, `done`, `resumed`, `retry?`, `note?` |
-| `agent_start`    | `agent`                                                   |
+| `agent_start`    | `agent`, `fix?`, `with?` (the agents working alongside it) |
+| `parallel`       | `agents`: a step where these agents work at the same time |
+| `schedule`       | `groups`: on a first build, the Orchestrator's groups arrived |
 | `tool`           | `agent`, `tool`, `target`                                 |
 | `agent_text`     | `agent`, `text`                                           |
 | `file_changed`   | `agent`, `file`                                           |
@@ -460,7 +500,7 @@ an owner becomes its owner.
 | `needs_details`  | `text`: the project needs a name and description first    |
 | `needs_key`      | `text`, `mine`: no Claude API key to run with              |
 | `orchestrating`  | the Orchestrator is deciding                              |
-| `plan`           | `intent`, `agents`, `notes`, `reason`, `reply`, `questions?`, `confirm?`, `needs?` |
+| `plan`           | `intent`, `agents`, `notes`, `parallel`, `reason`, `reply`, `questions?`, `confirm?`, `needs?` |
 | `answer`         | the user's answers to a form                              |
 | `browser_check_start`, `browser_check` | `agent`, `text`, `problems`, `screenshots`   |
 | `send_back`      | the Critic sent work back: `agent`, `round`, `rounds`, `items` |
@@ -468,11 +508,13 @@ an owner becomes its owner.
 | `security`       | a blocked action or a page-scan finding                   |
 | `notice`         | `text`, `upgrade?`: e.g. Research skipped on Starter      |
 | `limit`          | `text`, `spent`, `limit`: the run reached the owner's spending limit |
+| `comment`        | not saved in the chat: `comment` (new or resolved), `new?`, or `deleted` (an id) |
+| `people`         | not saved in the chat: someone joined, left or changed role |
 
 Every broadcast event carries `project`, `seq` and `ts`. The studio ignores events with `seq ≤ lastSeq`. After a
 reconnect, it fetches `/api/projects/<id>` and replays any events it missed, which can't create duplicates.
 
-The **run summary** is `{status, request, agents, done, current, next, error, resumable}`.
+The **run summary** is `{status, request, agents, done, current, running, next, error, resumable}`.
 
 ---
 
@@ -571,11 +613,24 @@ A failed run is saved as `error`, so it can be continued.
 - **`/work/<uuid>/` is reached by its unguessable project id, not by session.** Generated pages run in a sandbox with no
   origin, so browsers don't send the session cookie for their CSS, scripts and images. Anyone given such a link can see that
   site's files, including `plan.md`. `/work/.projects/` is never served.
-- **Runs** always use the project owner's agents and Claude key, even when an admin starts them.
+- **Roles** (`collab.role_of`): owner, admin, editor, viewer. The same middleware refuses every change to a project
+  (`POST`, `PUT`, `PATCH`, `DELETE` under `/api/projects/<id>`) by a viewer with `403`; inviting, removing people and
+  deleting the project are the owner's (or an admin's). Memberships count only while the owner's plan includes `members`
+  (Agency): after a move down, the people they invited get 404 until the owner is back on Agency.
+- **Share links:** the token (32 random URL-safe characters) is the only secret; a link stops working when it expires or
+  is turned off (cached 10 seconds). Its site is served sandboxed with `noindex` and `no-referrer`; files outside the site
+  and browser-check screenshots are never served. Visitors get no cookie. Comments are plain text, length-limited, positions
+  clamped, limited per address; they reach the agents only when someone on the team presses **Ask the team** and sends it.
+- **Payments:** the server never sees card data. A subscription id from the return URL is only trusted after PayPal says
+  it belongs to this member (`custom_id`) and is active; webhooks are trusted only after PayPal verifies their signature.
+- **Runs** always use the project owner's agents and Claude key, even when an admin or an editor starts them.
 - **Members' API keys** are encrypted with Fernet (`KEY_SECRET`, or a generated key in `storage/.secrets/`, mode 600),
   never returned to the browser (only `sk-ant-…` plus the last four characters), never logged, and scrubbed from every
   error message.
 - **Plans** are enforced on the server (`plans.need`, `check_project_limit`, the run pipeline); the pages only explain them.
+- **Agents' instructions** (`plans` feature `instructions`, `sees_instructions` in `main.py`): on Starter, `/api/agents?full=1`,
+  `/api/agents/<id>` and the marketplace profiles answer `role: ""` with `instructions_locked: true` (name, description,
+  stats, projects and ratings stay); `/api/agents/common` and the three exports answer `403` with `upgrade: "pro"`.
 - **Deleting an account** deactivates it and ends its sessions; `purge_loop()` deletes it with its projects, files,
   brand kit and Claude folder after `ACCOUNT_DELETE_DAYS`, unless a login cancels it first.
 

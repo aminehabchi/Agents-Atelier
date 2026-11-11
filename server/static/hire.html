@@ -39,7 +39,7 @@
       <p class="m-lead">Specialists and ready teams for your website. Official ones are already in your team. Community ones are made by members and checked by an admin: hire one and it joins your agents.</p>
       <label class="mk-search"><i data-icon="search" data-size="18"></i>
         <input class="input" id="q" type="search" placeholder="Search by name or skill" autocomplete="off" aria-label="Search by name or skill"></label>
-      <div class="mk-quick" aria-label="Popular searches"><span>Popular:</span>
+      <div class="mk-quick" role="group" aria-label="Popular searches"><span aria-hidden="true">Popular:</span>
         <button type="button" data-quick="3D">3D</button><button type="button" data-quick="SEO">SEO</button>
         <button type="button" data-quick="restaurant">Restaurant</button><button type="button" data-quick="form">Forms</button>
         <button type="button" data-quick="translat">Languages</button><button type="button" data-quick="portfolio">Portfolio</button></div>
@@ -56,14 +56,14 @@
   <ul class="mk-cats" id="cats" aria-label="Categories"></ul>
 
   <div class="mk-bar" id="bar">
-    <div class="seg mk-tabs" role="tablist">
-      <button type="button" data-tab="agents" role="tab"><i data-icon="users" data-size="15"></i>Agents <span class="n" id="n-agents" data-no-i18n></span></button>
-      <button type="button" data-tab="teams" role="tab"><i data-icon="layers" data-size="15"></i>Teams <span class="n" id="n-teams" data-no-i18n></span></button>
+    <div class="seg mk-tabs" role="tablist" aria-label="Agents or teams">
+      <button type="button" data-tab="agents" role="tab" id="tab-agents" aria-controls="results"><i data-icon="users" data-size="15"></i>Agents <span class="n" id="n-agents" data-no-i18n></span></button>
+      <button type="button" data-tab="teams" role="tab" id="tab-teams" aria-controls="results"><i data-icon="layers" data-size="15"></i>Teams <span class="n" id="n-teams" data-no-i18n></span></button>
     </div>
     <div class="mk-src" role="group" aria-label="Source">
-      <button class="fchip on" type="button" data-source="all">All</button>
-      <button class="fchip" type="button" data-source="official">Official</button>
-      <button class="fchip" type="button" data-source="community">Community</button>
+      <button class="fchip on" type="button" data-source="all" aria-pressed="true">All</button>
+      <button class="fchip" type="button" data-source="official" aria-pressed="false">Official</button>
+      <button class="fchip" type="button" data-source="community" aria-pressed="false">Community</button>
     </div>
     <span class="spacer"></span>
     <span class="mk-count" id="count" aria-live="polite"></span>
@@ -74,10 +74,12 @@
       <option value="new">Newest</option>
     </select>
   </div>
-  <div class="mk-active" id="active"></div>
+  <div class="mk-active" id="active" role="group" aria-label="Active filters"></div>
 
-  <ul class="m-grid" id="grid" aria-busy="true"></ul>
-  <nav class="pager" id="pager" aria-label="Pages of the marketplace"></nav>
+  <div id="results" role="tabpanel" aria-labelledby="tab-agents">
+    <ul class="m-grid" id="grid" aria-busy="true"></ul>
+    <nav class="pager" id="pager" aria-label="Pages of the marketplace"></nav>
+  </div>
 </main>
 
 <script>
@@ -86,6 +88,7 @@ const state = { tab: new URLSearchParams(location.search).get("tab") === "teams"
 let perPage = perPagePref("market", 12), reviewPage = 1, data = null;
 
 $("grid").innerHTML = Array.from({ length: 6 }, () => `<li class="m-skel" aria-hidden="true"><span></span><span></span><span></span></li>`).join("");
+$("cats").innerHTML = Array.from({ length: 6 }, () => `<li class="mk-cat-skel" aria-hidden="true"></li>`).join("");
 const reset = () => { state.page = 1; render(); };
 document.addEventListener("click", (e) => {
   const tab = e.target.closest("[data-tab]");
@@ -95,10 +98,19 @@ document.addEventListener("click", (e) => {
   const cat = e.target.closest("[data-cat]");
   if (cat) { state.cat = state.cat === cat.dataset.cat ? "" : cat.dataset.cat; reset(); }
   const quick = e.target.closest("[data-quick]");
-  if (quick) { $("q").value = quick.dataset.quick; state.q = quick.dataset.quick.toLowerCase(); reset(); }
+  if (quick) { const on = state.q === quick.dataset.quick.toLowerCase(); $("q").value = on ? "" : quick.dataset.quick; state.q = on ? "" : quick.dataset.quick.toLowerCase(); reset(); }
+  const unset = e.target.closest("[data-unset]");
+  if (unset) { const k = unset.dataset.unset; if (k === "q") $("q").value = ""; state[k] = k === "source" ? "all" : ""; reset(); return; }
   if (e.target.closest("[data-clear]")) { $("q").value = ""; Object.assign(state, { q: "", cat: "", source: "all" }); reset(); }
   const rv = e.target.closest("[data-review]");
   if (rv) review(rv.dataset.kind, rv.dataset.pk, rv.dataset.review);
+});
+document.querySelector(".mk-tabs").addEventListener("keydown", (e) => {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+  e.preventDefault();
+  const next = state.tab === "agents" ? "teams" : "agents";
+  document.querySelector(`[data-tab="${e.key === "Home" ? "agents" : e.key === "End" ? "teams" : next}"]`).click();
+  document.querySelector(`[data-tab="${state.tab}"]`).focus();
 });
 let typing;
 $("q").addEventListener("input", () => { clearTimeout(typing); typing = setTimeout(() => { state.q = $("q").value.trim().toLowerCase(); reset(); }, 120); });
@@ -119,28 +131,28 @@ function price(x, est = false) {
 function agentCard(a) {
   return `<li><article class="m-card">
     <header class="mc-head"><span class="ico">${icon(a.icon || "bot", { size: 22 })}</span>
-      <div class="mc-who"><h3><a href="/hire/agents/${a.pk}">${esc(a.name)}</a></h3>
+      <div class="mc-who"><h3><a href="/hire/agents/${a.pk}" ${userText(a)}>${esc(a.name)}</a></h3>
         <span class="m-by"><span>by</span> <span data-no-i18n>${esc(a.by)}</span> · <span>${esc(CATEGORY[a.category] || "")}</span></span></div>
       ${sourceBadge(a)}</header>
-    <p>${esc(a.description)}</p>
+    <p ${userText(a)}>${esc(a.description)}</p>
     <div class="m-stats">${ratingText(a.rating)}${stat("check", `${a.jobs} job${a.jobs === 1 ? "" : "s"}`, "Jobs done")}
       ${a.official ? "" : stat("users", `${a.hires} hire${a.hires === 1 ? "" : "s"}`, "Hires")}
       ${a.web ? `<span class="tagline">Web research</span>` : ""}</div>
     <footer class="mc-foot">${price(a)}
-      <div class="m-acts"><a class="btn btn-ghost btn-sm" href="/hire/agents/${a.pk}">Profile</a>${hireButtons("agent", a)}</div></footer>
+      <div class="m-acts"><a class="btn btn-ghost btn-sm" href="/hire/agents/${a.pk}" aria-label="${esc(window.t("Profile"))}: ${esc(a.official ? window.t(a.name) : a.name)}">Profile</a>${hireButtons("agent", a)}</div></footer>
   </article></li>`;
 }
 function teamCard(t) {
   return `<li><article class="m-card">
     <header class="mc-head"><span class="ico">${icon(CATEGORY_ICON[t.category] || "layers", { size: 22 })}</span>
-      <div class="mc-who"><h3><a href="/hire/teams/${t.pk}">${esc(t.name)}</a></h3>
+      <div class="mc-who"><h3><a href="/hire/teams/${t.pk}" ${userText(t)}>${esc(t.name)}</a></h3>
         <span class="m-by"><span>by</span> <span data-no-i18n>${esc(t.by)}</span> · <span>${t.agents.length} agents</span></span></div>
       ${sourceBadge(t)}</header>
-    <p>${esc(t.description)}</p>
-    <div class="m-stack">${t.agents.slice(0, 10).map(a => `<span class="mini" title="${esc(a.name)}">${icon(a.icon || "bot", { size: 14 })}</span>`).join("")}${t.agents.length > 10 ? `<span class="mini more" data-no-i18n>+${t.agents.length - 10}</span>` : ""}</div>
+    <p ${userText(t)}>${esc(t.description)}</p>
+    <div class="m-stack" aria-hidden="true">${t.agents.slice(0, 10).map(a => `<span class="mini" title="${esc(a.name)}">${icon(a.icon || "bot", { size: 14 })}</span>`).join("")}${t.agents.length > 10 ? `<span class="mini more" data-no-i18n>+${t.agents.length - 10}</span>` : ""}</div>
     <div class="m-stats">${ratingText(t.rating)}${t.official ? "" : stat("users", `${t.hires} hire${t.hires === 1 ? "" : "s"}`, "Hires")}</div>
     <footer class="mc-foot">${price(t, true)}
-      <div class="m-acts"><a class="btn btn-ghost btn-sm" href="/hire/teams/${t.pk}">Team</a>${hireButtons("team", t)}</div></footer>
+      <div class="m-acts"><a class="btn btn-ghost btn-sm" href="/hire/teams/${t.pk}" aria-label="${esc(window.t("Team"))}: ${esc(t.official ? window.t(t.name) : t.name)}">Team</a>${hireButtons("team", t)}</div></footer>
   </article></li>`;
 }
 
@@ -159,7 +171,10 @@ function filtered() {
 function render() {
   if (!data) return;
   document.querySelectorAll("[data-tab]").forEach(b => { b.classList.toggle("on", b.dataset.tab === state.tab); b.setAttribute("aria-selected", b.dataset.tab === state.tab); });
-  document.querySelectorAll("[data-source]").forEach(b => b.classList.toggle("on", b.dataset.source === state.source));
+  document.querySelectorAll("[data-tab]").forEach(b => b.tabIndex = b.dataset.tab === state.tab ? 0 : -1);
+  $("results").setAttribute("aria-labelledby", `tab-${state.tab}`);
+  document.querySelectorAll("[data-quick]").forEach(b => b.setAttribute("aria-pressed", state.q === b.dataset.quick.toLowerCase()));
+  document.querySelectorAll("[data-source]").forEach(b => { b.classList.toggle("on", b.dataset.source === state.source); b.setAttribute("aria-pressed", b.dataset.source === state.source); });
   const list = data[state.tab];
   const cats = state.tab === "agents" ? data.agent_categories : data.team_categories;
   $("cats").innerHTML = cats.map(c => `<li><button type="button" class="mk-cat ${state.cat === c ? "on" : ""}" data-cat="${c}" aria-pressed="${state.cat === c}">
@@ -168,12 +183,17 @@ function render() {
   const pg = paginate(items, state.page, perPage);
   state.page = pg.page;
   $("count").textContent = `${items.length} ${state.tab === "agents" ? (items.length === 1 ? "agent" : "agents") : (items.length === 1 ? "team" : "teams")}`;
-  const chips = [state.q && `<span class="fchip on" data-no-i18n>“${esc(state.q)}”</span>`, state.cat && `<span class="fchip on">${esc(CATEGORY[state.cat])}</span>`,
-                 state.source !== "all" && `<span class="fchip on">${state.source === "official" ? "Official" : "Community"}</span>`].filter(Boolean);
+  // what's filtering the list right now: each chip takes its own filter off
+  const chip = (key, inner) => `<button class="fchip on" type="button" data-unset="${key}" title="Remove filter">${inner}${icon("x", { size: 13 })}</button>`;
+  const chips = [state.q && chip("q", `<span data-no-i18n>“${esc(state.q)}”</span>`), state.cat && chip("cat", `<span>${esc(CATEGORY[state.cat])}</span>`),
+                 state.source !== "all" && chip("source", `<span>${state.source === "official" ? "Official" : "Community"}</span>`)].filter(Boolean);
   $("active").innerHTML = chips.length ? `${chips.join("")}<button class="btn btn-ghost btn-sm" type="button" data-clear>${icon("x", { size: 14 })}Clear filters</button>` : "";
   $("grid").setAttribute("aria-busy", "false");
   $("grid").innerHTML = items.length ? pg.items.map(state.tab === "agents" ? agentCard : teamCard).join("")
-    : `<li class="m-empty"><p>Nothing matches. Try another category or search.</p><button class="btn btn-ghost btn-sm" type="button" data-clear>${icon("x", { size: 14 })}Clear filters</button></li>`;
+    : `<li class="m-empty"><span class="m-tile">${icon("search", { size: 22 })}</span>
+        <b>${state.tab === "agents" ? "No agents match" : "No teams match"}</b>
+        <p>${state.q ? "Try a shorter search, another category, or both sources." : "Try another category, or show both official and community ones."}</p>
+        <button class="btn btn-ghost btn-sm" type="button" data-clear>${icon("x", { size: 14 })}Clear filters</button></li>`;
   $("pager").innerHTML = pagerHTML(pg, { sizes: [12, 24, 48], noun: state.tab === "agents" ? "agents" : "teams" });
 }
 
@@ -217,7 +237,12 @@ async function load() {
     render();
     const me = await getMe();
     if (me?.role === "admin") await loadReview();
-  } catch (err) { showError($("grid"), err, load, "Couldn't load the marketplace"); }
+  } catch (err) {
+    $("grid").setAttribute("aria-busy", "false");
+    $("cats").innerHTML = ""; $("pager").innerHTML = "";
+    $("grid").innerHTML = `<li class="m-error"></li>`;
+    showError($("grid").firstElementChild, err, load, "Couldn't load the marketplace");
+  }
 }
 load();
 </script>

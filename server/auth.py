@@ -141,6 +141,7 @@ def public(row) -> dict:
                            "checked": row.get("claude_key_at")},
             "run_limit": plans.run_limit(dict(row)),
             "plan_request": row.get("plan_request") or "", "plan_request_at": row.get("plan_request_at"),
+            "paid_online": bool(row.get("billing_subscription")),   # the plan is a PayPal subscription (see billing.py)
             "deactivated_at": row.get("deactivated_at"), "delete_after": row.get("delete_after"),
             **({"reactivated": True} if row.get("reactivated") else {})}   # just logged in during the 30 days
 
@@ -270,6 +271,31 @@ EMAILS = {
                 "السلام،\n\nكلمة السر ديال حسابك ف Agents Atelier يالاه تبدلات.\n\n"
                 "إلا ماشي نتا اللي بدلتيها، دخل دابا لصفحة الدخول وكليكي على \"نسيتي كلمة السر؟\".\n"),
     },
+    "invited": {
+        "en": ("You were added to a project on Agents Atelier",
+               "Hello,\n\nSomeone added you to one of their projects on Agents Atelier.\n\n"
+               "Log in and open Projects: it's listed under \"Shared with me\".\n"),
+        "fr": ("Vous avez été ajouté à un projet sur Agents Atelier",
+               "Bonjour,\n\nQuelqu'un vous a ajouté à l'un de ses projets sur Agents Atelier.\n\n"
+               "Connectez-vous et ouvrez Projets : il apparaît dans « Partagés avec moi ».\n"),
+        "ary": ("تزاديتي لواحد المشروع ف Agents Atelier",
+                "السلام،\n\nشي واحد زادك لواحد من المشاريع ديالو ف Agents Atelier.\n\n"
+                "دخل لحسابك وحل المشاريع: غادي تلقاه ف \"مشاركين معايا\".\n"),
+    },
+    "invited_signup": {
+        "en": ("You're invited to a project on Agents Atelier",
+               "Hello,\n\nSomeone invited you to work with them on a project on Agents Atelier.\n\n"
+               "Create an account with this email address and confirm it: the project will be waiting under "
+               "\"Shared with me\" in Projects.\n\nIf you don't know who sent this, you can ignore this email.\n"),
+        "fr": ("Vous êtes invité à un projet sur Agents Atelier",
+               "Bonjour,\n\nQuelqu'un vous invite à travailler avec lui sur un projet sur Agents Atelier.\n\n"
+               "Créez un compte avec cette adresse e-mail et confirmez-le : le projet vous attendra dans "
+               "« Partagés avec moi », dans Projets.\n\nSi vous ne savez pas qui l'a envoyé, ignorez cet e-mail.\n"),
+        "ary": ("عندك دعوة لواحد المشروع ف Agents Atelier",
+                "السلام،\n\nشي واحد عرض عليك تخدم معاه ف واحد المشروع ف Agents Atelier.\n\n"
+                "دير حساب بهاد الإيميل وأكدو: المشروع غادي يكون كيتسناك ف \"مشاركين معايا\" ف المشاريع.\n\n"
+                "إلا ما عرفتيش شكون صيفط هادشي، ما تدير والو.\n"),
+    },
 }
 
 
@@ -367,6 +393,13 @@ def _send_later(to: str, subject: str, text: str, code: str | None = None):
     task = asyncio.create_task(send())
     _background.add(task)
     task.add_done_callback(_background.discard)
+
+
+send_later = _send_later       # for the other modules (collab.py): an email that never blocks or fails the request
+
+
+def email_text(kind: str, language: str, **values) -> tuple[str, str]:
+    return _email(kind, language, **values)
 
 
 def _password_changed_email(user):

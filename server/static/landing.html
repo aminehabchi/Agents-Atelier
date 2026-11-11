@@ -91,6 +91,7 @@
   .price-card .amount span { color: var(--stone); font-size: 14px; margin-inline-start: 6px; }
   .price-card ul.plain { flex: 1; }
   .price-card .btn { align-self: flex-start; }
+  .price-note { margin: 20px auto 0; max-width: 720px; font-size: 14px; color: var(--stone); text-align: center; }
   @media (max-width: 900px) { .pricing { grid-template-columns: minmax(0, 1fr); } }
   ul.plain { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
   ul.plain li { position: relative; padding-left: 16px; font-size: 15px; line-height: 1.5; color: var(--graphite); }
@@ -123,6 +124,9 @@
   .ticker li.done { color: var(--graphite); }
   .ticker li.done .st { background: var(--graphite); box-shadow: none; }
   .ticker li.now { color: var(--ink); }
+  .ticker li[data-with] { position: relative; margin-top: -2px; }
+  .ticker li[data-with]::before { content: ""; position: absolute; inset-inline-start: 6px; top: -8px; height: 8px; width: 2px; background: var(--line-strong); border-radius: 2px; }
+  .ticker li[data-with].now::before { background: var(--sky); }
   .ticker li.now .st { box-shadow: inset 0 0 0 2px var(--sky); border-top: 0; animation: spin .9s linear infinite; background: conic-gradient(var(--sky) 0 25%, transparent 25%); }
   @keyframes spin { to { transform: rotate(360deg); } }
   .proof { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; max-width: 1120px; margin: 40px auto 0; padding: 0; text-align: start; }
@@ -138,19 +142,6 @@
   .cmp.us { box-shadow: inset 0 0 0 1.5px var(--sky); }
   .cmp.us .cmp-kind { color: var(--ink); }
 
-  /* examples */
-  .examples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 56px; text-align: start; }
-  .ex { overflow: hidden; border-radius: var(--r-card); box-shadow: var(--ring); background: var(--paper); transition: transform .35s cubic-bezier(.2, .7, .2, 1); }
-  .ex:hover { transform: translateY(-4px); }
-  .ex-img { overflow: hidden; aspect-ratio: 16 / 10; border-bottom: 1px solid var(--line); }
-  .ex-img img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; transition: transform .6s cubic-bezier(.2, .7, .2, 1); }
-  .ex:hover .ex-img img { transform: scale(1.03); }
-  .ex-body { padding: 20px 24px 24px; }
-  .ex-body h3 { margin: 0 0 6px; font-size: 20px; font-weight: 400; letter-spacing: -0.027em; }
-  .ex-body p { margin: 0 0 16px; font-size: 15px; line-height: 1.55; color: var(--graphite); }
-  .ex-facts { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
-  .ex-facts li { padding: 4px 10px; border-radius: var(--r-pill); background: var(--bone); font-size: 12px; color: var(--graphite); }
-  .ex-facts b { font-weight: 500; color: var(--ink); }
   .final-sub { margin-bottom: 32px !important; }
 
 
@@ -206,6 +197,14 @@
   .motion ol.timeline li:not(.lit) b, .motion ol.timeline li:not(.lit) span:last-child { color: var(--stone); }
   .motion ol.timeline li { transition: color .3s; }
   ol.timeline li.lit .num { color: var(--sky); }
+  /* two agents that work at the same time */
+  .par-note { display: inline-flex; align-items: center; gap: 10px; margin: 24px auto 0; padding: 8px 16px 8px 8px; border-radius: var(--r-pill); box-shadow: var(--ring); background: var(--paper); font-size: 14px; color: var(--graphite); text-align: start; max-width: 100%; }
+  [dir="rtl"] .par-note { padding: 8px 8px 8px 16px; }
+  .par-ico { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--ice); color: var(--sky); }
+  ol.timeline li.with-next, ol.timeline li.with { background: rgb(var(--sky-rgb) / .06); }
+  ol.timeline li.with { border-top-color: transparent !important; }
+  .pair { display: inline-flex; margin-inline-start: 8px; padding: 1px 8px; border-radius: var(--r-pill); background: var(--ice); color: var(--sky); font-family: var(--mono); font-size: 11px; font-style: normal; letter-spacing: .02em; white-space: nowrap; vertical-align: 1px; }
+  @media (max-width: 480px) { .pair { margin: 6px 0 0; } }
 
   /* entrance */
   .motion .hero-pill, .motion .hero-block h1 .line, .motion .sub, .motion .ctas, .motion .micro { animation: rise .7s cubic-bezier(.2, .7, .2, 1) both; }
@@ -249,12 +248,6 @@
 
   /* examples: the two sites slide in from opposite sides like cards dealt on a table, then their facts pop */
   main { overflow-x: clip; }              /* cards slide in from the side: never a sideways scroll */
-  .motion .ex.reveal { opacity: 0; transition: opacity .8s ease, transform .9s cubic-bezier(.2, .7, .2, 1); }
-  .motion .ex.reveal:nth-child(1) { transform: translateX(-60px) rotate(-3deg); } .motion .ex.reveal:nth-child(2) { transform: translateX(60px) rotate(3deg); }
-  .motion .ex.reveal.in { opacity: 1; transform: none; }
-  .motion .ex .ex-facts li { opacity: 0; transform: scale(.8); transition: opacity .3s, transform .4s cubic-bezier(.3, 1.6, .5, 1); }
-  .motion .ex.in .ex-facts li { opacity: 1; transform: none; }
-  .motion .ex.in .ex-facts li:nth-child(1) { transition-delay: .7s; } .motion .ex.in .ex-facts li:nth-child(2) { transition-delay: .8s; } .motion .ex.in .ex-facts li:nth-child(3) { transition-delay: .9s; }
 
   /* build: a blue line runs down the list as you scroll through it */
   ol.timeline { position: relative; }
@@ -282,8 +275,8 @@
   .motion .files .zipped { opacity: 0; transform: translateY(8px) scale(.9); transition: opacity .4s, transform .5s cubic-bezier(.3, 1.6, .5, 1); }
   .motion .files .zipped.on { opacity: 1; transform: none; }
   .motion .points li { opacity: 0; transform: translateX(24px); transition: opacity .5s, transform .6s cubic-bezier(.2, .7, .2, 1); }
-  .motion #output.in-view .points li { opacity: 1; transform: none; }
-  .motion #output.in-view .points li:nth-child(2) { transition-delay: .12s; } .motion #output.in-view .points li:nth-child(3) { transition-delay: .24s; } .motion #output.in-view .points li:nth-child(4) { transition-delay: .36s; } .motion #output.in-view .points li:nth-child(5) { transition-delay: .48s; }
+  .motion .in-view .points li { opacity: 1; transform: none; }
+  .motion .in-view .points li:nth-child(2) { transition-delay: .12s; } .motion .in-view .points li:nth-child(3) { transition-delay: .24s; } .motion .in-view .points li:nth-child(4) { transition-delay: .36s; } .motion .in-view .points li:nth-child(5) { transition-delay: .48s; }
 
   /* who: the cards lean towards the pointer */
   #who .card { transform-style: preserve-3d; transition: transform .25s ease-out, box-shadow .25s; will-change: transform; }
@@ -298,6 +291,36 @@
   .motion .fence rect { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 2s ease; }
   .motion #limits.in-view .fence rect { stroke-dashoffset: 0; }
   .fence-done .fence rect { stroke-dasharray: 6 6 !important; transition: none !important; }
+
+  /* clients and teammates: a shared page with pinned comments, next to what it does */
+  .together { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 56px; text-align: start; align-items: stretch; }
+  .share-mock { display: flex; flex-direction: column; border-radius: var(--r-card); background: var(--paper); box-shadow: var(--ring); overflow: hidden; font-size: 12px; }
+  .sm-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .sm-bar .m-dots { padding: 0; border: 0; }
+  .sm-url { flex: 1; min-width: 0; padding: 3px 10px; border-radius: var(--r-pill); background: var(--field); font-family: var(--mono); font-size: 11px; color: var(--stone); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sm-ro { flex: none; padding: 2px 8px; border-radius: var(--r-pill); box-shadow: var(--ring); color: var(--graphite); font-size: 11px; }
+  .sm-page { position: relative; flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 240px; padding: 28px; background: var(--mist); }
+  .sm-h, .sm-l, .sm-cards i { display: block; border-radius: 4px; background: var(--steel); }
+  .sm-h { width: 58%; height: 18px; } .sm-l { width: 82%; height: 7px; } .sm-l.short { width: 46%; }
+  .sm-btn { display: block; width: 96px; height: 22px; margin-top: 8px; border-radius: var(--r-pill); background: var(--sky); opacity: .85; }
+  .sm-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: auto; }
+  .sm-cards i { height: 64px; border-radius: 8px; background: var(--bone); }
+  .sm-pin { position: absolute; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50% 50% 50% 4px; background: var(--sky); color: var(--on-sky); font: 500 11px var(--mono); box-shadow: 0 0 0 3px rgb(var(--sky-rgb) / .25); }
+  .sm-pin.p1 { top: 18px; inset-inline-start: calc(58% + 20px); }
+  .sm-pin.p2 { bottom: 52px; inset-inline-start: 58%; background: var(--saffron-fill); color: var(--on-saffron); box-shadow: 0 0 0 3px rgb(var(--saffron-rgb) / .25); }
+  [dir="rtl"] .sm-pin { border-radius: 50% 50% 4px 50%; }
+  .sm-note { position: absolute; top: 48px; inset-inline-start: calc(58% - 40px); inset-inline-end: 16px; max-width: 220px; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; background: var(--paper); box-shadow: var(--ring), 0 8px 24px rgb(0 0 0 / .18); color: var(--ink); }
+  .sm-note b { font-weight: 500; font-size: 11px; color: var(--stone); }
+  .sm-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-top: 1px solid var(--line); color: var(--graphite); }
+  .sm-team { display: inline-flex; align-items: center; gap: 8px; }
+  .sm-ask { padding: 3px 10px; border-radius: var(--r-pill); background: var(--sky); color: var(--on-sky); font-size: 11px; font-weight: 500; }
+  #together .points li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; }
+  .pt-ico { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--r); background: var(--ice); color: var(--sky); }
+  .motion .sm-pin, .motion .sm-note { opacity: 0; transform: translateY(-8px) scale(.8); transition: opacity .4s, transform .5s cubic-bezier(.3, 1.6, .5, 1); }
+  .motion #together.in-view .sm-pin, .motion #together.in-view .sm-note { opacity: 1; transform: none; }
+  .motion #together.in-view .sm-pin.p1 { transition-delay: .5s; } .motion #together.in-view .sm-note { transition-delay: .8s; } .motion #together.in-view .sm-pin.p2 { transition-delay: 1.1s; }
+  @media (max-width: 860px) { .together { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 480px) { .sm-page { padding: 20px; min-height: 220px; } .sm-note { inset-inline-start: 24px; } }
 
   /* faq: answers slide open */
   .faq details > p { overflow: hidden; }
@@ -318,9 +341,8 @@
   [dir="rtl"] .ticker { left: auto; right: -28px; }
   [dir="rtl"] ol.timeline::before, [dir="rtl"] ol.timeline::after { left: auto; right: 12px; }
   [dir="rtl"] .cmp .x { background-position: right 58%; }
-  [dir="rtl"] .motion .ex.reveal:nth-child(1) { transform: translateX(60px) rotate(3deg); } [dir="rtl"] .motion .ex.reveal:nth-child(2) { transform: translateX(-60px) rotate(-3deg); }
   [dir="rtl"] .motion .points li { transform: translateX(-24px); }
-  [dir="rtl"] .motion #output.in-view .points li, [dir="rtl"] .motion .ex.reveal.in { transform: none; }
+  [dir="rtl"] .motion .in-view .points li { transform: none; }
   /* use cases: three groups of ready teams, dealt onto the table one after another */
   .uc-group { margin-top: 48px; text-align: start; }
   .uc-group h3 { margin: 0 0 14px; font-size: 14px; font-weight: 500; font-family: var(--mono); color: var(--stone); letter-spacing: .02em; }
@@ -357,10 +379,10 @@
   @media (max-width: 860px) { .mp-preview { grid-template-columns: minmax(0, 1fr); } }
   .reveal { opacity: 0; transform: translateY(12px); transition: opacity .6s ease, transform .6s ease; }
   .reveal.in { opacity: 1; transform: none; }
-  @media (prefers-reduced-motion: reduce) { .stream-row, .final .btn-dark { animation: none !important; } .type::after, .m-a.now::before { animation: none; } .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } .live-dot, .hero-pill .dot, .ticker li.now .st { animation: none; } .ex, .ex-img img { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .stream-row, .final .btn-dark { animation: none !important; } .type::after, .m-a.now::before { animation: none; } .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } .live-dot, .hero-pill .dot, .ticker li.now .st { animation: none; } }
   @media (max-width: 860px) {
     .hero-block { padding-top: 64px; }
-    .stats, .cards, .cards.two, .features, .split, .compare, .examples { grid-template-columns: minmax(0, 1fr); }
+    .stats, .cards, .cards.two, .features, .split, .compare { grid-template-columns: minmax(0, 1fr); }
     .proof { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ticker { display: none; }
     ol.timeline li { grid-template-columns: 32px minmax(0, 1fr); gap: 2px 8px; padding: 12px 16px; }
@@ -379,7 +401,6 @@
   <div class="wrap">
     <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
     <nav class="links">
-      <a href="#examples" data-show="guest unconfirmed"><i data-icon="eye" data-size="16"></i>Examples</a>
       <a href="#how" data-show="guest unconfirmed"><i data-icon="play" data-size="16"></i>How it works</a>
       <a href="#usecases" data-show="guest unconfirmed"><i data-icon="layers" data-size="16"></i>Use cases</a>
       <a href="#marketplace" data-show="guest unconfirmed"><i data-icon="briefcase" data-size="16"></i>Marketplace</a>
@@ -402,7 +423,7 @@
     <div class="ctas">
       <a class="btn btn-dark btn-lg" data-show="guest" href="/register">Hire your first team<i data-icon="arrow-right" data-size="18"></i></a>
       <a class="btn btn-dark btn-lg" data-show="unconfirmed" href="/confirm">Confirm your email<i data-icon="arrow-right" data-size="18"></i></a>
-      <a class="btn btn-ghost btn-lg" href="#examples"><i data-icon="eye" data-size="18"></i>See real examples</a>
+      <a class="btn btn-ghost btn-lg" href="#how"><i data-icon="play" data-size="18"></i>See how it works</a>
     </div>
     <p class="micro">No templates. No lock-in. Download the code whenever you want.</p>
     <div class="stage">
@@ -412,13 +433,13 @@
       </figure>
       <aside class="ticker" aria-hidden="true">
         <div class="ticker-head"><span class="live-dot"></span><span>Team at work</span><span class="ticker-count" data-no-i18n></span></div>
-        <ol><li><span class="st"></span><span>Brief</span></li><li><span class="st"></span><span>UX</span></li><li><span class="st"></span><span>Design System</span></li><li><span class="st"></span><span>Copywriter</span></li><li><span class="st"></span><span>HTML</span></li><li><span class="st"></span><span>CSS</span></li><li><span class="st"></span><span>JS</span></li><li><span class="st"></span><span>Responsive</span></li><li><span class="st"></span><span>Animation</span></li><li><span class="st"></span><span>Accessibility</span></li><li><span class="st"></span><span>Critic</span></li></ol>
+        <ol><li><span class="st"></span><span>Brief</span></li><li><span class="st"></span><span>UX</span></li><li><span class="st"></span><span>Design System</span></li><li data-with><span class="st"></span><span>Copywriter</span></li><li><span class="st"></span><span>HTML</span></li><li><span class="st"></span><span>CSS</span></li><li><span class="st"></span><span>JS</span></li><li><span class="st"></span><span>Responsive</span></li><li><span class="st"></span><span>Animation</span></li><li><span class="st"></span><span>Accessibility</span></li><li><span class="st"></span><span>Critic</span></li></ol>
       </aside>
     </div>
     <ul class="proof">
       <li><b data-count="35">35</b><span>specialist agents</span></li>
       <li><b data-count="23">23</b><span>ready teams to hire</span></li>
-      <li><b>150</b><span>versions saved per project</span></li>
+      <li><b>Live</b><span>client comments on a share link</span></li>
       <li><b>RTL</b><span>any language, right-to-left included</span></li>
     </ul>
   </div>
@@ -439,29 +460,7 @@
           <ul class="plain"><li>One model does every job in one go</li><li>Hard to see what it decided and why</li><li>Fixing one part can break another</li></ul></article>
         <article class="cmp us reveal"><p class="cmp-kind">Agents Atelier</p>
           <h3>A team of AI specialists, hired in one click</h3>
-          <ul class="plain"><li>Each agent has one job, instructions you can read, and its cost shown</li><li>They start at once and hand the work to each other</li><li>Ask for changes anytime: only the right agents work on them</li></ul></article>
-      </div>
-    </div>
-  </section>
-
-  <section class="block" id="examples">
-    <div class="wrap">
-      <p class="eyebrow reveal">Made with Agents Atelier</p>
-      <h2 class="reveal">Real sites, built from a description.</h2>
-      <p class="lead reveal">Both were built by the agents from a written request, with no template. The drawings are SVG the agents drew themselves.</p>
-      <div class="examples">
-        <article class="ex reveal">
-          <div class="ex-img"><img src="/static/example-coffee.png" loading="lazy" decoding="async" width="1280" height="800" alt="9ahwti, a Casablanca coffee shop site in Moroccan Darija, laid out right to left"></div>
-          <div class="ex-body"><h3 data-no-i18n>9ahwti</h3>
-            <p>A coffee shop in Casablanca, written in Moroccan Darija with a right-to-left layout, a menu and WhatsApp booking.</p>
-            <ul class="ex-facts"><li><b data-count="11">11</b> agents</li><li><b data-count="2">2</b> prompts</li><li>Arabic, right to left</li></ul></div>
-        </article>
-        <article class="ex reveal">
-          <div class="ex-img"><img src="/static/example-riad.png" loading="lazy" decoding="async" width="1280" height="800" alt="Dar Medina, a booking site for riads and homes across Morocco"></div>
-          <div class="ex-body"><h3 data-no-i18n>Dar Medina</h3>
-            <p>A booking site for riads and homes across Morocco, with a stay search form and hand-drawn illustrations.</p>
-            <ul class="ex-facts"><li><b data-count="15">15</b> agents</li><li><b data-count="2">2</b> prompts</li><li>Search form and booking flow</li></ul></div>
-        </article>
+          <ul class="plain"><li>Each agent has one job, a public track record, and its cost shown</li><li>They start at once and hand the work to each other</li><li>Ask for changes anytime: only the right agents work on them</li></ul></article>
       </div>
     </div>
   </section>
@@ -487,11 +486,11 @@
           <div class="step-head"><span class="step-n">2</span><span class="step-time">5 to 10 minutes</span></div>
           <div class="mock mock-run" aria-hidden="true">
             <span class="m-prompt" data-no-i18n><span class="type" data-text="Add the menu with prices and a booking button" data-delay="300"></span></span>
-            <span class="m-agents"><span class="m-a done">UX</span><span class="m-a done">Design System</span><span class="m-a done">Copywriter</span><span class="m-a now">HTML</span><span class="m-a">CSS</span><span class="m-a">Critic</span></span>
+            <span class="m-agents"><span class="m-a done">UX</span><span class="m-a now">Design System</span><span class="m-a now">Copywriter</span><span class="m-a">HTML</span><span class="m-a">CSS</span><span class="m-a">Critic</span></span>
             <span class="m-bar"><span></span></span>
           </div>
           <h3>Hire the team and watch it work</h3>
-          <p>Pick a ready team or choose the agents yourself, then press send. Each specialist works in turn while the preview updates live. Stop or redirect them at any point.</p>
+          <p>Pick a ready team or choose the agents yourself, then press send. Specialists hand the work to each other, and those that don't depend on each other work side by side. The preview updates live, and you can stop or redirect them at any point.</p>
         </li>
         <li class="step reveal">
           <div class="step-head"><span class="step-n">3</span><span class="step-time">As long as you like</span></div>
@@ -515,10 +514,11 @@
       <p class="eyebrow reveal">The specialists</p>
       <h2 class="reveal">Ten specialists take your first job.</h2>
       <p class="lead reveal">This is the default team you hire for a new website. Twenty-five more are available when the job needs them, from a Site auditor and Research to a Translator, Pricing, Gallery, Forms, WhatsApp, Telegram, QR codes, Legal pages and 3D.</p>
+      <p class="par-note reveal"><span class="par-ico"><i data-icon="split" data-size="14"></i></span>Agents that don't depend on each other, like Design System and Copywriter, work side by side, so the build finishes sooner.</p>
       <ol class="timeline">
           <li><span class="num">01</span><b>UX</b><span>Plans the sections, the navigation and where each button goes.</span></li>
-          <li><span class="num">02</span><b>Design System</b><span>Chooses the colours, fonts and spacing as reusable tokens.</span></li>
-          <li><span class="num">03</span><b>Copywriter</b><span>Writes the headlines, body text, buttons and form messages.</span></li>
+          <li class="with-next"><span class="num">02</span><b>Design System</b><span>Chooses the colours, fonts and spacing as reusable tokens.</span></li>
+          <li class="with"><span class="num">03</span><b>Copywriter</b><span>Writes the headlines, body text, buttons and form messages. <em class="pair">Side by side with Design System</em></span></li>
           <li><span class="num">04</span><b>HTML</b><span>Builds every page with semantic, accessible markup.</span></li>
           <li><span class="num">05</span><b>CSS</b><span>Styles every element, starting from the phone layout.</span></li>
           <li><span class="num">06</span><b>JS</b><span>Adds the menu, tabs, forms and other interactions.</span></li>
@@ -645,7 +645,7 @@
           <span class="ico"><i data-icon="history" data-size="22"></i></span>
           <h3>Versions of every step</h3>
           <p>The code is saved before each run and after each agent. Open any version, compare it line by line, download it, or restore it in one click.</p>
-          <span class="tag">Up to 150 versions per project</span>
+          <span class="tag">Every version kept on Agency</span>
         </article>
         <article class="feature reveal">
           <span class="ico"><i data-icon="code" data-size="22"></i></span>
@@ -705,6 +705,32 @@
     </div>
   </section>
 
+  <section class="block" id="together">
+    <div class="wrap">
+      <p class="eyebrow reveal">Clients and teammates</p>
+      <h2 class="reveal">Show the work to clients. Build it with your team.</h2>
+      <p class="lead reveal">Send a link instead of screenshots. Clients point at the exact spot they mean, and their notes reach the team while it works.</p>
+      <div class="together">
+        <div class="share-mock reveal" aria-hidden="true">
+          <div class="sm-bar"><span class="m-dots"><i></i><i></i><i></i></span><span class="sm-url" data-no-i18n>/s/riad-atlas</span><span class="sm-ro">Read only</span></div>
+          <div class="sm-page">
+            <span class="sm-h"></span><span class="sm-l"></span><span class="sm-l short"></span><span class="sm-btn"></span>
+            <span class="sm-cards"><i></i><i></i><i></i></span>
+            <span class="sm-pin p1">1</span><span class="sm-pin p2">2</span>
+            <span class="sm-note"><b data-no-i18n>Youssef</b><span>Can the title be a bit bigger?</span></span>
+          </div>
+          <div class="sm-foot"><span class="sm-team"><span class="live-dot"></span>Seen live in the studio's Share tab</span><span class="sm-ask">Ask the team</span></div>
+        </div>
+        <ul class="points">
+          <li><span class="pt-ico"><i data-icon="link" data-size="18"></i></span><div><b>Share links for clients</b><span>A read-only link to the site that works without an account. Choose when it expires, and turn it off anytime.</span></div></li>
+          <li><span class="pt-ico"><i data-icon="pin" data-size="18"></i></span><div><b>Comments pinned on the page</b><span>Visitors click a spot and leave a note. The team sees each comment live in the studio's Share tab.</span></div></li>
+          <li><span class="pt-ico"><i data-icon="send" data-size="18"></i></span><div><b>From comment to change</b><span>Ask the team turns a comment into a request, so the right agents start on it.</span></div></li>
+          <li><span class="pt-ico"><i data-icon="users" data-size="18"></i></span><div><b>Editors and viewers</b><span>On the Agency plan, invite people to a project by email. They find it under Shared with me.</span></div></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
   <section class="block" id="output">
     <div class="wrap">
       <p class="eyebrow reveal">What you get</p>
@@ -741,7 +767,7 @@
           <p>Hire a team for your shop, restaurant or service: describe it in plain words and get a site with your own text and images.</p></article>
         <article class="card reveal"><span class="ico"><i data-icon="layers" data-size="20"></i></span>
           <h3>Freelancers and studios</h3>
-          <p>Hire agents as your assistants: build a first version for a client quickly, then hand over clean files you can keep editing.</p></article>
+          <p>Hire agents as your assistants: build a first version for a client quickly, collect their comments through a share link, then hand over clean files you can keep editing.</p></article>
         <article class="card reveal"><span class="ico"><i data-icon="code" data-size="20"></i></span>
           <h3>Designers and developers</h3>
           <p>Build your own agents: change any agent's instructions, edit the code in the browser, and save your own teams for different kinds of work.</p></article>
@@ -781,12 +807,13 @@
           <ul class="plain"><li>One project</li><li>Every official agent and ready team</li><li>Browser check before the Critic</li><li>Last 10 versions of each project</li><li>Downloads carry a small “Made with Agents Atelier” line</li><li>Spending limit of $3 per run</li></ul>
           <a class="btn btn-ghost" href="/register">Start free</a></article>
         <article class="price-card featured reveal"><h3>Pro</h3><div class="amount"><b>$9</b><span>/ month</span></div>
-          <ul class="plain"><li>Unlimited projects</li><li>Your own agents and teams</li><li>Web research agent</li><li>Browser checks before Responsive, Accessibility, QA and the Critic</li><li>Last 100 versions, downloads without the credit line</li><li>Your own spending limit, up to $50 per run</li></ul>
+          <ul class="plain"><li>Unlimited projects</li><li>Read every agent's instructions</li><li>Your own agents and teams</li><li>Web research agent</li><li>Browser checks before Responsive, Accessibility, QA and the Critic</li><li>Last 100 versions, downloads without the credit line</li><li>Your own spending limit, up to $50 per run</li></ul>
           <a class="btn btn-dark" href="/register">Choose Pro</a></article>
         <article class="price-card reveal"><h3>Agency</h3><div class="amount"><b>$29</b><span>/ month</span></div>
-          <ul class="plain"><li>Everything in Pro</li><li>Publish your agents and teams to the marketplace</li><li>Every version kept</li><li>Spending limit up to $200 per run</li></ul>
+          <ul class="plain"><li>Everything in Pro</li><li>Work with editors and viewers</li><li>Publish your agents and teams to the marketplace</li><li>Every version kept</li><li>Spending limit up to $200 per run</li></ul>
           <a class="btn btn-ghost" href="/register">Choose Agency</a></article>
       </div>
+      <p class="price-note reveal"><span>Every plan includes share links with client comments.</span> <span class="pay-note" hidden>Pro and Agency are monthly subscriptions, paid with PayPal.</span></p>
     </div>
   </section>
 
@@ -805,7 +832,8 @@
         <details class="reveal"><summary>What does hiring an agent cost?<i data-icon="chevron-down" data-size="18"></i></summary><p>There's no fee per hire. Agents run on your own Claude API key, so a job costs what Claude charges for it. Each agent's profile shows its average time and cost per job, and a team's page estimates the whole team before you start.</p></details>
         <details class="reveal"><summary>Which languages can I use?<i data-icon="chevron-down" data-size="18"></i></summary><p>The app speaks English, French and Moroccan Darija. Your site can be in any language, or in several: the Translator agent adds a language switcher and right-to-left layouts.</p></details>
         <details class="reveal"><summary>Can my site receive messages from visitors?<i data-icon="chevron-down" data-size="18"></i></summary><p>The sites are front end only, so they don't store messages. Contact forms send them where you already read them: WhatsApp, Telegram or the visitor's email app opens with the message written, and they press send.</p></details>
-        <details class="reveal"><summary>Who can see my projects?<i data-icon="chevron-down" data-size="18"></i></summary><p>Your projects are private to your account, though admins can open every project. A site's preview link works for anyone you send it to.</p></details>
+        <details class="reveal"><summary>Who can see my projects?<i data-icon="chevron-down" data-size="18"></i></summary><p>Your projects are private to your account, though admins can open every project. On the Agency plan you can invite editors, who can work on a project, and viewers, who can only watch.</p></details>
+        <details class="reveal"><summary>How do I show a site to a client?<i data-icon="chevron-down" data-size="18"></i></summary><p>Create a share link in the studio's Share tab. Your client opens a read-only copy of the site without an account, until the date you choose. They can pin comments on the page, and you see them live, ready to turn into a request for the team.</p></details>
       </div>
     </div>
   </section>
@@ -833,14 +861,18 @@ if (!calm) document.documentElement.classList.add("motion");
 (() => {
   const rows = [...document.querySelectorAll(".ticker li")], count = document.querySelector(".ticker-count");
   if (!rows.length) return;
-  let at = calm ? rows.length : 0;
+  /* a row marked data-with works at the same time as the one before it (agents side by side) */
+  const step = [];
+  rows.forEach((r, i) => step.push(i && r.hasAttribute("data-with") ? step[i - 1] : (i ? step[i - 1] + 1 : 0)));
+  const steps = step[step.length - 1] + 1;
+  let at = calm ? steps : 0;
   const paint = () => {
-    rows.forEach((r, i) => { r.classList.toggle("done", i < at); r.classList.toggle("now", i === at); });
-    count.textContent = `${Math.min(at, rows.length)}/${rows.length}`;
+    rows.forEach((r, i) => { r.classList.toggle("done", step[i] < at); r.classList.toggle("now", step[i] === at); });
+    count.textContent = `${rows.filter((r, i) => step[i] < at).length}/${rows.length}`;
   };
   paint();
   if (calm) return;
-  setInterval(() => { at = at > rows.length + 1 ? 0 : at + 1; paint(); }, 1100);
+  setInterval(() => { at = at > steps + 1 ? 0 : at + 1; paint(); }, 1100);
 })();
 
 /* How it works: the numbers light up, and the little forms type themselves once they're on screen. */
@@ -972,6 +1004,9 @@ document.querySelectorAll(".faq details").forEach(d => {
   });
 });
 
+/* pricing: say how paid plans are paid, when the server takes PayPal */
+api("/api/plans").then(p => { if (p?.payment === "paypal") document.querySelector(".pay-note").hidden = false; }).catch(() => {});
+
 /* final: the whole team streams past the last question */
 api("/api/agents").then(agents => {
   const row = (list) => `<div class="stream-row">${[...list, ...list].map(a => `<span>${esc(a.name)}</span>`).join("")}</div>`;
@@ -996,7 +1031,7 @@ const io = new IntersectionObserver((entries) => entries.forEach(e => {
   if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
 }), { threshold: .15 });
 /* siblings in a grid reveal one after another */
-document.querySelectorAll(".stats, .cards, .features, .compare, .examples").forEach(g => [...g.children].forEach((c, i) => c.style.transitionDelay = `${i * 70}ms`));
+document.querySelectorAll(".stats, .cards, .features, .compare").forEach(g => [...g.children].forEach((c, i) => c.style.transitionDelay = `${i * 70}ms`));
 document.querySelectorAll(".reveal").forEach(el => io.observe(el));
 </script>
 </body>

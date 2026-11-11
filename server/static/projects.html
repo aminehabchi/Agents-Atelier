@@ -14,103 +14,153 @@
 <script src="/static/icons.js"></script>
 <script src="/static/ui.js"></script>
 <style>
+  /* ---------- page head and counters ---------- */
+  .phead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 16px; }
+  .phead h1 { font-size: 32px; line-height: 1.1; margin: 0; }
+  .phead .hint { font-size: 13px; color: var(--stone); margin: 0; }
+  .phead .hint kbd { font: 11px var(--mono); background: var(--paper); border-radius: var(--r); padding: 2px 6px; box-shadow: var(--ring); color: var(--graphite); }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 0; }
-  .stat { background: var(--paper); border-radius: var(--r); padding: 20px 22px; display: flex; align-items: center; gap: 14px; }
+  .stat { background: var(--paper); border-radius: var(--r); padding: 16px 20px; display: flex; align-items: center; gap: 14px; min-width: 0; }
   .stat .ico { width: 40px; height: 40px; border-radius: var(--r); background: var(--linen); display: grid; place-items: center; color: var(--charcoal); flex: none; }
-  .stat b { display: block; font-weight: 400; font-size: 32px; line-height: 1; letter-spacing: 0; font-feature-settings: "tnum"; }
+  .stat b { display: block; font-weight: 400; font-size: 30px; line-height: 1; letter-spacing: 0; font-feature-settings: "tnum"; }
   .stat span { display: block; font-size: 13px; color: var(--stone); margin-top: 4px; }
 
-  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 32px 0 20px; }
+  /* ---------- search, filters, sort, view ---------- */
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 28px 0 16px; }
   .controls .search { flex: 1 1 260px; max-width: 380px; }
-  .controls .search kbd { position: absolute; right: 10px; font: 11px ui-monospace, monospace; color: var(--stone); background: var(--paper); border-radius: var(--r); padding: 2px 6px; box-shadow: var(--ring); }
+  .controls .search kbd { position: absolute; inset-inline-end: 10px; font: 11px var(--mono); color: var(--stone); background: var(--paper); border-radius: var(--r); padding: 2px 6px; box-shadow: var(--ring); pointer-events: none; }
+  .controls .search .input { padding-inline-end: 34px; }
   .filters { display: flex; gap: 6px; flex-wrap: wrap; }
   .fchip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--r); border: 1px solid var(--line); background: var(--paper);
     font-size: 13px; color: var(--graphite); line-height: 1; }
   .fchip:hover { border-color: var(--graphite); color: var(--ink); }
   .fchip.on { background: var(--espresso); border-color: var(--espresso); color: var(--on-espresso); }
-  .fchip .n { font-size: 11px; font-feature-settings: "tnum"; opacity: .7; }
+  .fchip .n { font-size: 11px; font-feature-settings: "tnum"; opacity: .75; min-width: 1ch; }
+  .fchip .n:empty { display: none; }
   .controls .right { margin-inline-start: auto; display: flex; gap: 8px; align-items: center; }
-  select.input { height: 36px; padding: 0 34px 0 14px; border-radius: var(--r); background: var(--paper) no-repeat right 12px center / 14px;
+  select.input { height: 36px; padding-block: 0; padding-inline: 14px 34px; border-radius: var(--r); background: var(--paper) no-repeat right 12px center / 14px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23898683' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
     appearance: none; font-size: 13px; cursor: pointer; border-color: var(--line); }
+  [dir="rtl"] select.input { background-position: left 12px center; }
   .seg.views button { width: 36px; height: 30px; padding: 0; display: grid; place-items: center; }
 
-  .result-line { font-size: 13px; color: var(--stone); margin: 0 0 14px; min-height: 18px; }
+  .result-line { font-size: 13px; color: var(--stone); margin: 0 0 12px; min-height: 18px; }
+  .result-line:empty { min-height: 0; margin: 0; }
 
-  /* grid view */
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+  /* ---------- grid view ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr)); gap: 16px; }
   .pcard { position: relative; background: var(--paper); border-radius: var(--r); overflow: hidden; display: flex; flex-direction: column;
     box-shadow: var(--ring); transition: transform .2s ease, box-shadow .2s ease; }
   .pcard:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--line-strong); }
-  .pcard > a.cover { position: absolute; inset: 0; z-index: 1; border-radius: var(--r); }
+  .pcard > a.cover { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+  /* the whole card is the link: show its focus on the card itself (the card clips an outline drawn on the link) */
+  .pcard > a.cover:focus-visible, .row > a.cover:focus-visible { outline: none; }
+  .pcard:has(> a.cover:focus-visible) { outline: 2px solid var(--sky); outline-offset: 2px; }
   .thumb { position: relative; aspect-ratio: 16 / 10; background: var(--bone); overflow: hidden; margin: 8px 8px 0; border-radius: var(--r); }
   .thumb iframe { position: absolute; top: 0; left: 0; width: 400%; height: 400%; border: 0; transform: scale(.25); transform-origin: 0 0; pointer-events: none; background: #fff; }
   .thumb .none { position: absolute; inset: 0; display: grid; place-items: center; color: var(--stone); font-size: 13px; text-align: center; }
   .thumb .none .ic { margin: 0 auto 8px; }
-  .thumb .badge { position: absolute; top: 10px; left: 10px; z-index: 2; }
-  .thumb .hover { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgb(0 0 0 / .35);
-    opacity: 0; transition: opacity .2s; z-index: 2; }
+  .thumb .badge { position: absolute; top: 10px; inset-inline-start: 10px; z-index: 2; }
+  .thumb .hover { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; padding: 8px; background: rgb(0 0 0 / .35);
+    opacity: 0; transition: opacity .2s; z-index: 2; pointer-events: none; }
+  .thumb .hover .btn { pointer-events: auto; }
   .pcard:hover .thumb .hover, .pcard:focus-within .thumb .hover { opacity: 1; }
   .thumb .hover .btn { background: var(--paper); color: var(--ink); }
   .thumb .hover .btn-dark { background: var(--espresso); color: var(--on-espresso); }
-  .pbody { padding: 16px 18px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
-  .pname { font-size: 17px; font-weight: 500; letter-spacing: 0; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pbody { padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+  .pname { margin: 0; font-size: 17px; font-weight: 500; letter-spacing: 0; line-height: 1.3; display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .pname .nm { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pdesc { font-size: 14px; line-height: 1.5; color: var(--graphite); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 42px; }
-  .pdesc.missing { color: var(--danger); }
+  .pdesc.missing { color: var(--stone); font-style: italic; }
+  button.pdesc.missing { all: unset; display: block; text-align: start; position: relative; z-index: 2; align-self: flex-start; font-size: 14px; line-height: 1.5; min-height: 42px; color: var(--sky); cursor: pointer;
+    text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgb(var(--sky-rgb) / .4); border-radius: var(--r); }
+  button.pdesc.missing:hover { text-decoration-color: currentColor; }
+  button.pdesc.missing:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; }
   .powner { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--stone); }
   .powner span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .powner .ic { flex: none; }
-  .pmeta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--stone); align-items: center; margin-top: 2px; }
-  .pmeta span { display: inline-flex; align-items: center; gap: 4px; }
-  .pfoot { display: flex; align-items: center; gap: 2px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); position: relative; z-index: 2; }
-  .pfoot .mono { font-size: 12px; color: var(--stone); flex: 1; }
-  .pfoot .icon-btn { width: 32px; height: 32px; }
+  /* your role on a project someone shared with you, or a mark on your own shared projects */
+  .rtag { display: inline-flex; align-items: center; gap: 4px; flex: none; font-size: 11px; font-weight: 500; line-height: 1.6;
+    padding: 1px 8px; border-radius: var(--r-pill); background: rgb(var(--sky-rgb) / .14); color: #3a43b5; white-space: nowrap; }
+  [data-theme="dark"] .rtag { color: #a9b0ff; }
+  .rtag.own { background: var(--linen); color: var(--graphite); }
+  [data-theme="dark"] .rtag.own { background: var(--bone); color: var(--graphite); }
+  .pmeta { display: flex; gap: 4px 12px; flex-wrap: wrap; font-size: 12px; color: var(--stone); align-items: center; margin-top: 2px; }
+  .pmeta span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .pfoot { display: flex; align-items: center; gap: 2px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); position: relative; z-index: 2; }
+  .pfoot .mono { font-size: 12px; color: var(--stone); flex: 1; min-width: 0; }
+  .pfoot .icon-btn, .row .tools .icon-btn { width: 36px; height: 36px; }
 
-  /* list view */
+  /* ---------- list view ---------- */
   .list { display: flex; flex-direction: column; background: var(--paper); border-radius: var(--r); box-shadow: var(--ring); overflow: hidden; }
   .row { position: relative; display: grid; grid-template-columns: 44px minmax(0, 2.2fr) minmax(0, 1fr) 120px auto; gap: 16px; align-items: center;
     padding: 12px 16px; border-bottom: 1px solid var(--line); transition: background .15s; }
   .row:last-child { border-bottom: 0; }
   .row:hover { background: var(--linen); }
+  .row:has(> a.cover:focus-visible) { box-shadow: inset 0 0 0 2px var(--sky); }
   .row > a.cover { position: absolute; inset: 0; z-index: 1; }
   .row .ico { width: 44px; height: 44px; border-radius: var(--r); background: var(--linen); display: grid; place-items: center; color: var(--stone); }
   .row:hover .ico { background: var(--paper); }
   .row .main { min-width: 0; }
-  .row .pname { font-size: 15px; display: flex; align-items: center; gap: 8px; }
-  .row .pdesc { -webkit-line-clamp: 1; min-height: 0; font-size: 13px; }
+  .row .pname { font-size: 15px; }
+  .row .pdesc, .row button.pdesc.missing { -webkit-line-clamp: 1; min-height: 0; font-size: 13px; }
   .row .when { font-size: 13px; color: var(--stone); display: flex; flex-direction: column; gap: 2px; }
-  .row .stat-line { font-size: 12px; color: var(--stone); display: flex; gap: 10px; }
+  .row .stat-line { font-size: 12px; color: var(--stone); display: flex; gap: 10px; flex-wrap: wrap; }
   .row .stat-line span { display: inline-flex; gap: 4px; align-items: center; }
-  .row .tools { display: flex; gap: 2px; position: relative; z-index: 2; }
-  .row .tools .icon-btn { width: 32px; height: 32px; }
+  .row .tools { display: flex; gap: 2px; justify-content: flex-end; position: relative; z-index: 2; width: 150px; }   /* room for all four buttons: the columns line up row to row */
 
-    color: var(--graphite); background: transparent; transition: border-color .2s, background .2s; text-align: center; }
-
-  .empty { background: var(--paper); border-radius: var(--r); padding: 64px 24px; text-align: center; color: var(--graphite); }
-  .empty .tile { width: 56px; height: 56px; border-radius: var(--r); background: var(--linen); display: grid; place-items: center; margin: 0 auto 16px; color: var(--charcoal); }
-  .empty h3 { font-weight: 400; font-size: 28px; letter-spacing: 0; margin: 0 0 8px; color: var(--ink); }
-  .empty p { margin: 0 auto 20px; max-width: 380px; font-size: 15px; }
+  /* ---------- empty and loading states ---------- */
+  .empty { background: var(--paper); border-radius: var(--r); padding: 56px 24px; display: flex; flex-direction: column; align-items: center; text-align: center; color: var(--graphite); }
+  .empty .tile { width: 56px; height: 56px; border-radius: var(--r); background: var(--linen); display: grid; place-items: center; margin: 0 0 16px; color: var(--charcoal); }
+  .empty h2 { font-weight: 400; font-size: 26px; line-height: 1.2; margin: 0 0 8px; color: var(--ink); }
+  .empty p { margin: 0 0 20px; max-width: 460px; font-size: 15px; line-height: 1.55; }
+  .empty .roles { list-style: none; padding: 0; margin: 0 0 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; max-width: 520px; width: 100%; text-align: start; }
+  .empty .roles li { background: var(--linen); border-radius: var(--r); padding: 12px 14px; font-size: 13px; line-height: 1.5; color: var(--graphite); }
+  [data-theme="dark"] .empty .roles li { background: var(--bone); }
+  .empty .roles .rtag { margin-bottom: 6px; }
+  .empty .roles p { margin: 0; max-width: none; font-size: 13px; }
+  .empty .note { font-size: 13px; color: var(--stone); margin-top: -6px; }
+  .empty .acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 
   .skel { background: var(--paper); border-radius: var(--r); height: 340px; box-shadow: var(--ring); position: relative; overflow: hidden; }
-  .skel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(237, 236, 231, .8), transparent); animation: shimmer 1.2s infinite; }
+  .list .skel { height: 69px; border-radius: 0; box-shadow: none; border-bottom: 1px solid var(--line); }
+  .skel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgb(var(--fg-rgb) / .06), transparent); animation: shimmer 1.2s infinite; }
   @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
-
+  @media (prefers-reduced-motion: reduce) {
+    .skel::after { animation: none; }
+    .pcard, .pcard:hover { transform: none; transition: none; }
+    .thumb .hover { transition: none; }
+  }
 
   @media (max-width: 900px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
     .row { grid-template-columns: 44px minmax(0, 1fr) auto; }
     .row .when, .row .stat-line { display: none; }
-    .controls .right { margin-left: 0; }
+    .controls .search { max-width: none; flex-basis: 100%; }
   }
   @media (max-width: 600px), (pointer: coarse) {
-    .controls .search kbd { display: none; }
+    .controls .search kbd, .phead .hint { display: none; }
+    .controls .search .input { padding-inline-end: 14px; }
   }
+  /* touch: a tap opens the project; the buttons over the thumbnail would only get in the way */
+  @media (hover: none) { .thumb .hover { display: none; } }
   @media (max-width: 600px) {
-    .stat { padding: 14px; gap: 10px; }
-    .stat .ico { width: 34px; height: 34px; }
-    .stat b { font-size: 26px; }
-    .stat span { white-space: nowrap; font-size: 12px; }
-    .controls .right { width: 100%; justify-content: space-between; }
+    .phead h1 { font-size: 28px; }
+    .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .stat { padding: 12px 10px; gap: 0; }
+    .stat .ico { display: none; }
+    .stat b { font-size: 22px; }
+    .stat span { font-size: 11px; line-height: 1.3; }
+    .controls { margin-top: 20px; }
+    .controls .right { width: 100%; justify-content: space-between; margin-inline-start: 0; }
+    .row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 12px; }
+    .row .ico { display: none; }
+    .row .pdesc, .row button.pdesc.missing { -webkit-line-clamp: 2; }
+    .row .pname { flex-wrap: wrap; row-gap: 2px; }
+    .row .tools { width: auto; }
+    .empty { padding: 40px 18px; }
+    .empty h2 { font-size: 22px; }
+    .empty .roles { grid-template-columns: minmax(0, 1fr); }
   }
   @media (max-width: 520px) {
     .pages .num:not(.on), .pages .gap { display: none; }
@@ -133,7 +183,10 @@
 </header>
 
 <main class="wrap page">
-  <h1 class="sr-only">Projects</h1>
+  <div class="phead">
+    <h1>Projects</h1>
+    <p class="hint">Press <kbd>/</kbd> to search, <kbd>N</kbd> for a new project</p>
+  </div>
 
   <div class="stats">
     <div class="stat"><span class="ico"><i data-icon="folder" data-size="20"></i></span><div><b id="s-all">–</b><span>projects</span></div></div>
@@ -144,12 +197,13 @@
 
   <div class="controls">
     <label class="search"><i data-icon="search" data-size="16"></i>
-      <input class="input" id="q" placeholder="Search name, description or id" autocomplete="off" aria-label="Search projects"><kbd>/</kbd></label>
+      <input class="input" id="q" placeholder="Search name, description or id" autocomplete="off" aria-label="Search projects" aria-keyshortcuts="/"><kbd aria-hidden="true">/</kbd></label>
     <div class="filters" id="filters" role="group" aria-label="Filter">
-      <button class="fchip on" data-status="all">All <span class="n" data-count="all"></span></button>
-      <button class="fchip" data-status="working"><i data-icon="zap" data-size="14"></i>Building <span class="n" data-count="working"></span></button>
-      <button class="fchip" data-status="built"><i data-icon="monitor" data-size="14"></i>Built <span class="n" data-count="built"></span></button>
-      <button class="fchip" data-status="empty"><i data-icon="file" data-size="14"></i>Empty <span class="n" data-count="empty"></span></button>
+      <button class="fchip on" type="button" data-status="all" aria-pressed="true">All <span class="n" data-count="all"></span></button>
+      <button class="fchip" type="button" data-status="working" aria-pressed="false"><i data-icon="zap" data-size="14"></i>Building <span class="n" data-count="working"></span></button>
+      <button class="fchip" type="button" data-status="built" aria-pressed="false"><i data-icon="monitor" data-size="14"></i>Built <span class="n" data-count="built"></span></button>
+      <button class="fchip" type="button" data-status="empty" aria-pressed="false"><i data-icon="file" data-size="14"></i>Empty <span class="n" data-count="empty"></span></button>
+      <button class="fchip" type="button" data-status="shared" aria-pressed="false" title="Projects other people invited you to"><i data-icon="users" data-size="14"></i>Shared with me <span class="n" data-count="shared"></span></button>
     </div>
     <div class="right">
       <select class="input" id="sort" aria-label="Sort">
@@ -158,14 +212,14 @@
         <option value="name">Name A–Z</option>
       </select>
       <div class="seg views" id="views" role="group" aria-label="View">
-        <button data-view="grid" class="on" title="Grid view"><i data-icon="grid" data-size="16"></i></button>
-        <button data-view="list" title="List view"><i data-icon="menu" data-size="16"></i></button>
+        <button type="button" data-view="grid" class="on" title="Grid view" aria-label="Grid view" aria-pressed="true"><i data-icon="grid" data-size="16"></i></button>
+        <button type="button" data-view="list" title="List view" aria-label="List view" aria-pressed="false"><i data-icon="menu" data-size="16"></i></button>
       </div>
     </div>
   </div>
 
   <p class="result-line" id="resultLine" aria-live="polite"></p>
-  <div id="results"></div>
+  <div id="results" aria-busy="true"></div>
   <nav class="pager" id="pager" aria-label="Pagination"></nav>
 </main>
 
@@ -190,7 +244,7 @@ let data = null, signature = "", loading = false, pending = false, offline = fal
 async function load({ quiet = false } = {}) {
   if (loading) { pending = true; return; }
   loading = true;
-  if (!quiet && !data) $("results").innerHTML = `<div class="grid">${"<div class='skel'></div>".repeat(6)}</div>`;
+  if (!quiet && !data) $("results").innerHTML = `<div class="${state.view === "list" ? "list" : "grid"}" aria-hidden="true">${"<div class='skel'></div>".repeat(6)}</div>`;
   const params = new URLSearchParams({ page: state.page, per_page: state.per_page, q: state.q, sort: state.sort, status: state.status });
   try { data = await api(`/api/projects?${params}`); offline = false; }
   catch (err) {
@@ -199,7 +253,7 @@ async function load({ quiet = false } = {}) {
       offline = true; refreshFailed = true; $("resultLine").textContent = `Can't refresh right now: ${err.message}`; return;
     }
     signature = "";
-    $("pager").innerHTML = "";
+    $("pager").innerHTML = ""; $("results").removeAttribute("aria-busy");
     return showError($("results"), err, () => load(), "Couldn't load your projects");
   }
   if (refreshFailed) { $("resultLine").textContent = ""; refreshFailed = false; }
@@ -235,19 +289,13 @@ function renderStats() {
 function render() {
   const { items, total, counts } = data;
   const filtered = state.q || state.status !== "all";
-  $("resultLine").textContent = filtered ? `${total} result${total === 1 ? "" : "s"}${state.q ? ` for “${state.q}”` : ""}` : "";
+  $("results").removeAttribute("aria-busy");
+  // the empty states say it themselves: no "0 results" line above them
+  $("resultLine").textContent = filtered && total ? `${total} result${total === 1 ? "" : "s"}${state.q ? ` for “${state.q}”` : ""}` : "";
 
   $("topNew").hidden = !counts.all;           // one "new project" button per screen: the empty state has its own
-  if (!counts.all) {
-    $("results").innerHTML = `<div class="empty"><div class="tile">${icon("folder", { size: 24 })}</div>
-      <h3>No projects yet</h3><p>Give your first project a name and a description, then describe the page you want.</p>
-      <button class="btn btn-dark" data-new>${icon("plus", { size: 16 })}Create your first project</button></div>`;
-    $("pager").innerHTML = ""; return;
-  }
   if (!items.length) {
-    $("results").innerHTML = `<div class="empty"><div class="tile">${icon("search", { size: 24 })}</div>
-      <h3>Nothing matches</h3><p>Try another search or filter.</p>
-      <button class="btn btn-ghost" id="clear">${icon("x", { size: 16 })}Clear filters</button></div>`;
+    $("results").innerHTML = emptyHTML(counts);
     $("pager").innerHTML = ""; return;
   }
 
@@ -258,18 +306,55 @@ function render() {
   renderPager();
 }
 
+/* What an empty list means depends on why it's empty: no projects at all, nothing shared yet, or a filter that hides everything. */
+function emptyHTML(counts) {
+  const box = (ic, title, body, acts) => `<div class="empty"><div class="tile">${icon(ic, { size: 24 })}</div><h2>${title}</h2>${body}<div class="acts">${acts}</div></div>`;
+  const showAll = `<button class="btn btn-ghost" type="button" id="clear">${icon("grid", { size: 16 })}Show all projects</button>`;
+  if (state.status === "shared" && !state.q) return box("users", "Nothing shared with you yet",
+    `<p>When someone invites you to one of their projects, it shows up here. Your role decides what you can do:</p>
+     <ul class="roles">
+       <li><span class="rtag">${icon("pencil", { size: 11 })}Editor</span><p>Works on the project like its owner: prompts, code, versions and the brand kit.</p></li>
+       <li><span class="rtag">${icon("eye", { size: 11 })}Viewer</span><p>Watches the build: the chat, preview, code and versions, without changing anything.</p></li>
+     </ul>
+     <p class="note">To invite people to a project of your own, open it and use the Share tab. Inviting needs the Agency plan.</p>`,
+    counts.all ? showAll : "");
+  if (!counts.all) return box("folder", "No projects yet",
+    `<p>Give your first project a name and a description, then describe the page you want.</p>`,
+    `<button class="btn btn-dark" type="button" data-new>${icon("plus", { size: 16 })}Create your first project</button>`);
+  if (!state.q && state.status === "working") return box("zap", "Nothing is building right now",
+    `<p>Open a project and send a prompt to put its team to work. Projects being built show up here.</p>`, showAll);
+  if (!state.q && state.status === "built") return box("monitor", "No pages built yet",
+    `<p>A project shows up here once its agents have written its first page.</p>`, showAll);
+  if (!state.q && state.status === "empty") return box("file", "No empty projects",
+    `<p>Every project already has at least one page.</p>`, showAll);
+  return box("search", "Nothing matches", `<p>Try another search or filter.</p>`,
+    `<button class="btn btn-ghost" type="button" id="clear">${icon("x", { size: 16 })}Clear filters</button>`);
+}
+
+const canManage = (p) => !p.role || p.role === "owner" || p.role === "admin";
+const canEdit = (p) => canManage(p) || p.role === "editor";
 
 const desc = (p) => p.description
-  ? `<div class="pdesc" title="${esc(p.description)}">${esc(p.description)}</div>`
-  : `<div class="pdesc missing">No description yet. Add one</div>`;
+  ? `<div class="pdesc" title="${esc(p.description)}" data-no-i18n>${esc(p.description)}</div>`
+  : canEdit(p) ? `<button class="pdesc missing" type="button" data-act="edit" data-id="${p.id}">No description yet. Add one</button>`
+  : `<div class="pdesc missing">No description yet.</div>`;
 
+/* Each button says which project it acts on, for screen readers: "Download .zip: Riad Atlas". */
 function tools(p) {
+  const btn = (act, ic, label, extra = "") =>
+    `<button class="icon-btn plain${act === "del" ? " danger" : ""}" type="button" data-act="${act}" data-id="${p.id}" title="${label}" aria-label="${label}: ${esc(p.name)}" ${extra}>${icon(ic, { size: 16 })}</button>`;
   return `
-    <button class="icon-btn plain" data-act="edit" data-id="${p.id}" title="Edit name and description">${icon("pencil", { size: 16 })}</button>
-    <button class="icon-btn plain" data-act="copy" data-id="${p.id}" title="Copy id">${icon("copy", { size: 16 })}</button>
-    <button class="icon-btn plain" data-act="dl" data-id="${p.id}" ${p.busy ? 'aria-disabled="true" title="Available when the agents finish"' : 'title="Download .zip"'}>${icon(p.busy ? "lock" : "download", { size: 16 })}</button>
-    <button class="icon-btn plain danger" data-act="del" data-id="${p.id}" title="Delete">${icon("trash", { size: 16 })}</button>`;
+    ${canEdit(p) ? btn("edit", "pencil", "Edit name and description") : ""}
+    ${btn("copy", "copy", "Copy id")}
+    ${p.busy ? btn("dl", "lock", "Available when the agents finish", 'aria-disabled="true"') : btn("dl", "download", "Download .zip")}
+    ${canManage(p) ? btn("del", "trash", "Delete") : ""}`;
 }
+/* who you are on a project you didn't create, or that you share with others */
+const roleBadge = (p) => p.role === "editor" ? `<span class="rtag" title="Someone invited you to work on this project">${icon("pencil", { size: 11 })}Editor</span>`
+  : p.role === "viewer" ? `<span class="rtag" title="Someone invited you to watch this project">${icon("eye", { size: 11 })}Viewer</span>`
+  : p.shared ? `<span class="rtag own" title="You invited other people to this project">${icon("users", { size: 11 })}Shared</span>` : "";
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 function cardHTML(p) {
   return `
@@ -277,25 +362,25 @@ function cardHTML(p) {
     <a class="cover" href="/p/${p.id}" aria-label="Open ${esc(p.name)}"></a>
     <div class="thumb">
       ${p.has_preview ? `<iframe data-src="/work/${p.id}/index.html" tabindex="-1" title="" aria-hidden="true" sandbox=""></iframe>`
-        : `<div class="none"><div>${icon("file", { size: 24 })}No page yet</div></div>`}
+        : `<div class="none" aria-hidden="true"><div>${icon("file", { size: 24 })}No page yet</div></div>`}
       ${p.busy ? `<span class="badge live">Building</span>` : p.paused ? `<span class="badge" title="Stopped before the team finished. Open it to continue">Paused</span>` : ""}
       <div class="hover">
-        <a class="btn btn-dark btn-sm" href="/p/${p.id}">${icon("message", { size: 14 })}Open project</a>
+        <a class="btn btn-dark btn-sm" href="/p/${p.id}" tabindex="-1" aria-hidden="true">${icon("message", { size: 14 })}Open project</a>
         ${p.has_preview ? `<a class="btn btn-sm" href="/work/${p.id}/index.html" target="_blank" rel="noopener">${icon("external", { size: 14 })}View page</a>` : ""}
       </div>
     </div>
     <div class="pbody">
-      <div class="pname" title="${esc(p.name)}">${esc(p.name)}</div>
+      <h2 class="pname"><span class="nm" title="${esc(p.name)}" data-no-i18n>${esc(p.name)}</span>${roleBadge(p)}</h2>
       ${desc(p)}
-      ${p.owner_email !== undefined ? `<div class="powner" title="Owner">${icon("user", { size: 12 })}<span>${esc(p.owner_email || "no owner (older project)")}</span></div>` : ""}
+      ${p.owner_email !== undefined ? `<div class="powner" title="Owner">${icon("user", { size: 12 })}${p.owner_email ? `<span data-no-i18n>${esc(p.owner_email)}</span>` : `<span>no owner (older project)</span>`}</div>` : ""}
       <div class="pmeta">
         <span title="Last activity">${icon("clock", { size: 13 })}${ago(p.updated)}</span>
-        <span>${icon("message", { size: 13 })}${p.prompts} prompt${p.prompts === 1 ? "" : "s"}</span>
-        <span title="${p.files} file${p.files === 1 ? "" : "s"}">${icon("file", { size: 13 })}${p.files} · ${fmtSize(p.size || 0)}</span>
-        <span title="Agents switched on">${icon("users", { size: 13 })}${p.agents}</span>
+        <span>${icon("message", { size: 13 })}${plural(p.prompts, "prompt")}</span>
+        <span title="${fmtSize(p.size || 0)}">${icon("file", { size: 13 })}${plural(p.files, "file")}</span>
+        <span title="Agents switched on">${icon("users", { size: 13 })}${plural(p.agents, "agent")}</span>
         ${(p.pages || []).length > 1 ? `<span title="${esc(p.pages.join(", "))}">${icon("layers", { size: 13 })}${p.pages.length} pages</span>` : ""}
       </div>
-      <div class="pfoot"><span class="mono">#${p.id.slice(0, 8)}</span>${tools(p)}</div>
+      <div class="pfoot"><span class="mono" title="Project id">#${p.id.slice(0, 8)}</span>${tools(p)}</div>
     </div>
   </article>`;
 }
@@ -304,9 +389,9 @@ function rowHTML(p) {
   return `
   <div class="row">
     <a class="cover" href="/p/${p.id}" aria-label="Open ${esc(p.name)}"></a>
-    <span class="ico">${icon(p.busy ? "zap" : p.has_preview ? "monitor" : "file", { size: 18 })}</span>
+    <span class="ico" aria-hidden="true">${icon(p.busy ? "zap" : p.has_preview ? "monitor" : "file", { size: 18 })}</span>
     <div class="main">
-      <div class="pname">${esc(p.name)}${p.busy ? `<span class="badge live">Building</span>` : ""}</div>
+      <h2 class="pname"><span class="nm" title="${esc(p.name)}" data-no-i18n>${esc(p.name)}</span>${roleBadge(p)}${p.busy ? `<span class="badge live">Building</span>` : ""}</h2>
       ${desc(p)}
     </div>
     <div class="stat-line">
@@ -345,11 +430,11 @@ $("views").onclick = (e) => {
   state.view = b.dataset.view; syncControls(); syncUrl(); signature = ""; render();
 };
 bindPager($("pager"),
-  (page) => { state.page = page; load(); document.querySelector(".controls").scrollIntoView({ behavior: "smooth", block: "start" }); },
+  (page) => { state.page = page; load(); document.querySelector(".controls").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); },
   (n) => { state.per_page = n; state.page = 1; load(); });
 function syncControls() {
-  document.querySelectorAll("[data-status]").forEach(b => b.classList.toggle("on", b.dataset.status === state.status));
-  document.querySelectorAll("[data-view]").forEach(b => b.classList.toggle("on", b.dataset.view === state.view));
+  document.querySelectorAll("[data-status]").forEach(b => { const on = b.dataset.status === state.status; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+  document.querySelectorAll("[data-view]").forEach(b => { const on = b.dataset.view === state.view; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
   $("sort").value = state.sort;
 }
 

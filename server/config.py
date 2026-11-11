@@ -82,6 +82,8 @@ AGENTS_DIR = _path("ATELIER_AGENTS", ROOT / "agents")
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "").strip() or "claude"
 AGENT_MODEL = os.environ.get("AGENT_MODEL", "").strip() or None
 AGENT_TIMEOUT = _int("AGENT_TIMEOUT", 900)
+# Agents the Orchestrator lets work at the same time (see orchestrator.py, "Parallel steps"). 1 = one after another.
+PARALLEL_AGENTS = min(_int("PARALLEL_AGENTS", 3), 6)
 
 # ---- limits
 MAX_BODY = _mb("MAX_BODY_MB", 8)
@@ -152,9 +154,20 @@ CHROME_BIN = os.environ.get("CHROME_BIN", "").strip()          # empty = look fo
 CHROME_NO_SANDBOX = _yes("CHROME_NO_SANDBOX", False)        # inside a container, where Chrome's own sandbox can't start
 
 # ---- legal pages (shown on /terms and /privacy)
-LEGAL_NAME = os.environ.get("LEGAL_NAME", "").strip()          # who runs this service, e.g. "Atelier SARL"
+LEGAL_NAME = os.environ.get("LEGAL_NAME", "").strip() or "Agents Atelier"   # who runs this service (a company name once registered)
 LEGAL_EMAIL = os.environ.get("LEGAL_EMAIL", "").strip().lower() or ADMIN_EMAIL
 LEGAL_ADDRESS = os.environ.get("LEGAL_ADDRESS", "").strip()
 
 # ---- project brief & assets (asked when a project is created)
 MAX_ASSETS = _int("MAX_ASSETS", 12)   # logo + photos a project can start with
+
+# ---- Online payment with PayPal (see billing.py). Empty = upgrades are requests an admin approves.
+PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_CLIENT_ID", "").strip()
+PAYPAL_CLIENT_SECRET = os.environ.get("PAYPAL_CLIENT_SECRET", "").strip()
+PAYPAL_MODE = (os.environ.get("PAYPAL_MODE", "").strip() or "sandbox").lower()      # sandbox · live
+PAYPAL_API = (os.environ.get("PAYPAL_API", "").strip()
+              or ("https://api-m.paypal.com" if PAYPAL_MODE == "live" else "https://api-m.sandbox.paypal.com")).rstrip("/")
+PAYPAL_PLAN_PRO = os.environ.get("PAYPAL_PLAN_PRO", "").strip()          # PayPal billing plan ids (P-…), see manage.py paypal-setup
+PAYPAL_PLAN_AGENCY = os.environ.get("PAYPAL_PLAN_AGENCY", "").strip()
+PAYPAL_WEBHOOK_ID = os.environ.get("PAYPAL_WEBHOOK_ID", "").strip()      # checks that webhooks really come from PayPal
+PUBLIC_URL = os.environ.get("PUBLIC_URL", "").strip().rstrip("/")         # e.g. https://atelier.example.com (PayPal sends members back here)

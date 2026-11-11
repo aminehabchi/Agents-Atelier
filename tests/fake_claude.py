@@ -30,6 +30,8 @@ markers inside <user_request>:
   [[orch-form]]     no agent: asks a short form (once answered, picks css)
   [[orch-confirm]]  picks design + css, but waits for the user's yes
   [[orch-garbage]]  replies with text that isn't JSON (the server falls back to the whole team)
+  [[par:design+copy]]  adds "parallel": [["design", "copy"]] to the decision (several groups: [[par:a+b,c+d]]);
+                   on a first build (<first_build> in the prompt) it answers only with those groups
 
 Every call is appended to $FAKE_CLAUDE_LOG as one JSON line: {"argv": [...], "cwd": "...", "key": "<last 4 of
 ANTHROPIC_API_KEY or ''>", "home": "<CLAUDE_CONFIG_DIR>", "env": [names of the variables it got]}.
@@ -97,7 +99,11 @@ if role.startswith("You are the Orchestrator"):
     req = re.search(r"<user_request>(.*?)</user_request>", prompt, re.S)
     req = req.group(1) if req else ""
     pick = re.search(r"\[\[orch:([a-z0-9,-]+)\]\]", req)
-    if "[[orch-garbage]]" in req:
+    par = re.search(r"\[\[par:([a-z0-9+,-]+)\]\]", req)
+    groups = [g.split("+") for g in par.group(1).split(",")] if par else []
+    if "<first_build>" in prompt:
+        answer = json.dumps({"intent": "new_build", "agents": [], "parallel": groups, "reason": "Side by side.", "reply": None})
+    elif "[[orch-garbage]]" in req:
         answer = "I think the CSS agent should do it."
     elif "[[orch-form]]" in req and "My answers to your questions" not in req:
         answer = json.dumps({"intent": "unclear", "agents": [], "reason": "", "reply": "A few details first:",
@@ -112,7 +118,7 @@ if role.startswith("You are the Orchestrator"):
     else:
         ids = pick.group(1).split(",") if pick else ["css"]
         answer = "```json\n" + json.dumps({"intent": "change", "agents": ids, "notes": {i: f"note for {i}" for i in ids},
-                                           "reason": "Only styling is needed."}) + "\n```"
+                                           "parallel": groups, "reason": "Only styling is needed."}) + "\n```"
     out({"type": "result", "subtype": "success", "is_error": False, "result": answer, "total_cost_usd": 0.001, "num_turns": 1})
     sys.exit(0)
 m = re.search(r"You are the (.+?) agent", role)

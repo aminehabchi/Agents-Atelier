@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0f1117">
+<title>Shared preview · Agents Atelier</title>
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<script src="/static/i18n.js"></script>
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  html, body { height: 100%; }
+  body { margin: 0; display: grid; grid-template-rows: auto 1fr; background: var(--linen); color: var(--ink); overflow: hidden; }
+  .sbar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--paper); border-bottom: 1px solid var(--line); min-width: 0; flex-wrap: wrap; }
+  .sbar .mark { width: 32px; height: 32px; border-radius: var(--r); display: grid; place-items: center; background: var(--sky); color: var(--on-sky); flex: none; }
+  .sbar .who { min-width: 0; flex: 1 1 180px; }
+  .sbar .who b { display: block; font-weight: 500; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sbar .who small { display: block; font-size: 12px; color: var(--stone); }
+  .sbar .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .sbar select.input { height: 36px; padding: 0 10px; font-size: 13px; max-width: 180px; }
+  .seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r); background: var(--linen); }
+  .seg button { border: 0; background: none; color: var(--stone); width: 34px; height: 32px; border-radius: var(--r); display: grid; place-items: center; cursor: pointer; }
+  .seg button.on { background: var(--paper); color: var(--ink); box-shadow: var(--ring); }
+  .btn.on { background: var(--sky); color: var(--on-sky); }
+  .count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-grid; place-items: center; font-size: 11px; font-weight: 600; background: var(--sky); color: var(--on-sky); }
+  .btn.on .count { background: var(--on-sky); color: var(--sky); }
+  .count[hidden] { display: none; }
+
+  main { position: relative; display: grid; grid-template-columns: 1fr auto; min-height: 0; }
+  .stage { position: relative; min-width: 0; min-height: 0; display: grid; place-items: stretch; overflow: auto; padding: 0; }
+  .frame { margin: 0 auto; width: 100%; height: 100%; background: #fff; transition: width .25s; }
+  .frame.tablet { width: 768px; max-width: 100%; height: calc(100% - 32px); margin: 16px auto; box-shadow: var(--ring); border-radius: var(--r); }
+  .frame.phone { width: 375px; max-width: 100%; height: calc(100% - 32px); margin: 16px auto; box-shadow: var(--ring); border-radius: var(--r); }
+  iframe { width: 100%; height: 100%; border: 0; display: block; background: #fff; border-radius: inherit; }
+  .hint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+    border-radius: var(--r-pill); background: var(--sky); color: var(--on-sky); font-size: 13px; box-shadow: 0 6px 20px rgb(0 0 0 / .25); max-width: calc(100% - 32px); }
+  .hint[hidden] { display: none; }
+  .hint button { border: 0; background: rgb(255 255 255 / .2); color: inherit; border-radius: var(--r); padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  .empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--stone); }
+  .empty b { display: block; color: var(--ink); font-weight: 500; font-size: 18px; margin-bottom: 6px; }
+
+  aside { width: 340px; border-inline-start: 1px solid var(--line); background: var(--paper); display: flex; flex-direction: column; min-height: 0; }
+  aside[hidden] { display: none; }
+  aside header { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  aside header h2 { margin: 0; font-size: 15px; font-weight: 500; flex: 1; }
+  .clist { flex: 1; overflow: auto; padding: 12px; display: grid; gap: 8px; align-content: start; }
+  .c { display: grid; grid-template-columns: 28px 1fr; gap: 4px 10px; padding: 10px 12px; border-radius: var(--r); background: var(--linen); text-align: start; border: 0; font: inherit; color: inherit; cursor: pointer; }
+  .c:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .c .n { grid-row: span 3; width: 26px; height: 26px; border-radius: 50% 50% 50% 4px; background: var(--sky); color: var(--on-sky); display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+  .c.done .n { background: var(--stone); }
+  .c header { all: unset; display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: var(--stone); }
+  .c header b { color: var(--ink); font-weight: 500; font-size: 13px; }
+  .c q { font-size: 12px; color: var(--graphite); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .c p { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .c .tag { font-size: 11px; padding: 0 6px; border-radius: var(--r-pill); background: var(--add-bg); color: var(--add-fg); }
+  .group { font-size: 12px; color: var(--stone); margin: 8px 4px 0; }
+  aside footer { padding: 12px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--stone); line-height: 1.5; }
+
+  dialog.cform { width: min(420px, calc(100vw - 32px)); padding: 0; }
+  dialog.cform form { display: grid; gap: 12px; padding: 20px; }
+  dialog.cform h3 { margin: 0; font-size: 17px; font-weight: 500; }
+  dialog.cform q { font-size: 13px; color: var(--stone); }
+  dialog.cform label { display: grid; gap: 6px; font-size: 13px; }
+  dialog.cform .input { width: 100%; box-sizing: border-box; }
+  dialog.cform textarea.input { min-height: 110px; resize: vertical; }
+  dialog.cform .row { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
+  dialog.cform .err { color: var(--danger); font-size: 13px; margin-inline-end: auto; }
+
+  @media (max-width: 760px) {
+    aside { position: absolute; inset: auto 0 0 0; width: auto; height: 55%; border: 0; border-top: 1px solid var(--line); box-shadow: 0 -10px 30px rgb(0 0 0 / .25); z-index: 6; }
+    .sbar .tools .seg { display: none; }
+  }
+</style>
+</head>
+<body data-no-cookie-note>
+<header class="sbar">
+  <span class="mark"><i data-icon="logo" data-size="18"></i></span>
+  <div class="who"><b id="name" data-no-i18n>…</b><small>Shared preview · built with Agents Atelier</small></div>
+  <div class="tools">
+    <select class="input" id="pageSel" aria-label="Page"></select>
+    <div class="seg" id="devices" role="group" aria-label="Screen size">
+      <button type="button" data-device="desktop" class="on" title="Desktop"><i data-icon="monitor" data-size="16"></i></button>
+      <button type="button" data-device="tablet" title="Tablet · 768px"><i data-icon="tablet" data-size="16"></i></button>
+      <button type="button" data-device="phone" title="Phone · 375px"><i data-icon="phone" data-size="16"></i></button>
+    </div>
+    <button class="btn btn-ghost btn-sm" type="button" id="commentBtn" hidden><i data-icon="pin" data-size="15"></i>Comment</button>
+    <button class="btn btn-ghost btn-sm" type="button" id="listBtn" hidden aria-expanded="false"><i data-icon="chat" data-size="15"></i>Comments <span class="count" id="count" hidden></span></button>
+    <button class="icon-btn" type="button" data-theme-btn aria-label="Change theme"></button>
+  </div>
+</header>
+<main>
+  <div class="stage">
+    <div class="frame" id="frame"><iframe id="site" title="The shared site"
+      sandbox="allow-scripts allow-forms allow-popups allow-modals allow-popups-to-escape-sandbox"></iframe></div>
+    <div class="hint" id="hint" hidden role="status"><i data-icon="pin" data-size="15"></i><span>Click any spot of the page to comment on it</span>
+      <button type="button" id="stopComment">Done</button></div>
+    <div class="empty" id="empty" hidden><div><b>Nothing to see yet</b>The team hasn't built this site yet. Come back a little later.</div></div>
+  </div>
+  <aside id="panel" hidden aria-label="Comments">
+    <header><h2>Comments</h2><button class="icon-btn plain" type="button" id="closePanel" aria-label="Close"><i data-icon="x" data-size="16"></i></button></header>
+    <div class="clist" id="clist"></div>
+    <footer id="foot"></footer>
+  </aside>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const TOKEN = location.pathname.split("/")[2];
+const BASE = `/s/${TOKEN}`;
+let info = null, comments = [], page = "index.html", commenting = false;
+const NAME_KEY = "atelier-share-name";
+const savedName = () => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } };
+
+/* comments numbered per page, in the order they were left */
+const numbered = () => {
+  const n = {};
+  return comments.map(c => ({ ...c, n: (n[c.page] = (n[c.page] || 0) + 1) }));
+};
+const send = (msg) => $("site").contentWindow?.postMessage({ atelier: 1, ...msg }, "*");
+
+async function start() {
+  document.querySelector("[data-theme-btn]").innerHTML = icon(themeIcon(), { size: 17 });
+  document.querySelector("[data-theme-btn]").onclick = () => { cycleTheme(); document.querySelector("[data-theme-btn]").innerHTML = icon(themeIcon(), { size: 17 }); };
+  try { info = await api(`${BASE}/info`); }
+  catch (err) { document.body.innerHTML = `<div class="empty"><div><b>Link not available</b>${esc(err.message)}</div></div>`; return; }
+  $("name").textContent = info.name;
+  document.title = `${info.name} · Shared preview`;
+  const pages = info.pages.length ? info.pages : [{ file: "index.html", title: "Home" }];
+  $("pageSel").innerHTML = pages.map(p => `<option value="${esc(p.file)}">${esc(p.title)}</option>`).join("");
+  $("pageSel").hidden = pages.length < 2;
+  $("pageSel").setAttribute("data-no-i18n", "");
+  const want = new URLSearchParams(location.search).get("page");
+  if (want && pages.some(p => p.file === want)) page = want;
+  $("pageSel").value = page;
+  $("commentBtn").hidden = !info.comments;
+  $("listBtn").hidden = !info.comments;
+  $("foot").textContent = info.expires
+    ? `This link works until ${new Date(info.expires * 1000).toLocaleDateString(getLocale(), { day: "numeric", month: "long", year: "numeric" })}.`
+    : "This link has no end date.";
+  if (!info.built) { $("empty").hidden = false; $("frame").hidden = true; return; }
+  load();
+  if (info.comments) await loadComments();
+}
+function load() { $("site").src = `${BASE}/site/${page.split("/").map(encodeURIComponent).join("/")}`; }
+async function loadComments() {
+  try { comments = await api(`${BASE}/comments`); } catch { comments = []; }
+  renderComments();
+}
+function renderComments() {
+  const list = numbered(), open = list.filter(c => !c.resolved);
+  $("count").hidden = !open.length; $("count").textContent = open.length;
+  send({ type: "pins", pins: open.filter(c => c.page === page).map(c => ({ id: c.id, n: c.n, selector: c.selector, x: c.x, y: c.y, doc_x: c.doc_x, doc_y: c.doc_y })) });
+  const here = list.filter(c => c.page === page), elsewhere = list.filter(c => c.page !== page);
+  const item = (c) => `<button type="button" class="c ${c.resolved ? "done" : ""}" data-c="${esc(c.id)}" data-page="${esc(c.page)}">
+      <span class="n">${c.n}</span><header><b data-no-i18n>${esc(c.author)}</b><span>${ago(c.created)}</span>${c.resolved ? `<span class="tag">Resolved</span>` : ""}</header>
+      ${c.snippet ? `<q data-no-i18n>${esc(c.snippet)}</q>` : ""}<p data-no-i18n>${esc(c.text)}</p></button>`;
+  $("clist").innerHTML = (here.length ? here.map(item).join("") : `<p class="group">No comments on this page yet. Press <b>Comment</b>, then click the spot you want to talk about.</p>`)
+    + (elsewhere.length ? `<p class="group">On other pages</p>` + elsewhere.map(item).join("") : "");
+}
+function setCommenting(on) {
+  commenting = on;
+  $("commentBtn").classList.toggle("on", on);
+  $("hint").hidden = !on;
+  send({ type: "mode", on });
+}
+function openPanel(on = $("panel").hidden) {
+  $("panel").hidden = !on;
+  $("listBtn").classList.toggle("on", on);
+  $("listBtn").setAttribute("aria-expanded", on ? "true" : "false");
+}
+function commentForm(spot) {
+  const d = document.createElement("dialog");
+  d.className = "modal cform";
+  d.innerHTML = `<form method="dialog"><h3>Leave a comment</h3>
+    ${spot.snippet ? `<q data-no-i18n>${esc(spot.snippet)}</q>` : ""}
+    <label>Your name<input class="input" name="author" maxlength="60" required autocomplete="name" placeholder="So the team knows who wrote it"></label>
+    <label>Comment<textarea class="input" name="text" maxlength="2000" required placeholder="What should change here?"></textarea></label>
+    <div class="row"><span class="err" role="alert"></span><button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn btn-dark" value="send">Send</button></div></form>`;
+  document.body.append(d);
+  d.querySelector("[name=author]").value = savedName();
+  d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
+  d.addEventListener("close", () => d.remove());
+  d.querySelector("form").addEventListener("submit", async (e) => {
+    if (e.submitter?.value !== "send") return;
+    e.preventDefault();
+    const f = e.target, btn = e.submitter;
+    btn.disabled = true;
+    try {
+      const author = f.author.value.trim();
+      try { localStorage.setItem(NAME_KEY, author); } catch {}
+      const c = await api(`${BASE}/comments`, { method: "POST", body: JSON.stringify({ ...spot, page, author, text: f.text.value.trim() }) });
+      comments.push(c);
+      renderComments();
+      d.close();
+      setCommenting(false);
+      openPanel(true);
+      toast("Comment sent to the team");
+    } catch (err) { btn.disabled = false; d.querySelector(".err").textContent = err.message; }
+  });
+  d.showModal();
+  d.querySelector(savedName() ? "[name=text]" : "[name=author]").focus();
+}
+
+addEventListener("message", (e) => {
+  if (e.source !== $("site").contentWindow) return;      // only the shared site's own frame
+  const d = e.data || {};
+  if (!d.atelier) return;
+  if (d.type === "ready") {
+    const at = String(d.page || "").split(`${BASE}/site/`)[1];
+    if (at !== undefined) {
+      page = decodeURIComponent(at || "index.html") || "index.html";
+      if ([...$("pageSel").options].some(o => o.value === page)) $("pageSel").value = page;
+    }
+    send({ type: "mode", on: commenting });
+    renderComments();
+  } else if (d.type === "spot" && commenting) {
+    const spot = {};
+    for (const k of ["selector", "x", "y", "doc_x", "doc_y", "viewport", "snippet"]) spot[k] = d[k];
+    commentForm(spot);
+  } else if (d.type === "open") {
+    openPanel(true);
+    const el = document.querySelector(`[data-c="${CSS.escape(String(d.id))}"]`);
+    el?.scrollIntoView({ block: "nearest", behavior: "smooth" }); el?.focus();
+  } else if (d.type === "escape") setCommenting(false);
+});
+$("pageSel").onchange = () => { page = $("pageSel").value; load(); };
+$("devices").onclick = (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  [...$("devices").children].forEach(x => x.classList.toggle("on", x === b));
+  $("frame").className = "frame " + (b.dataset.device === "desktop" ? "" : b.dataset.device);
+};
+$("commentBtn").onclick = () => setCommenting(!commenting);
+$("stopComment").onclick = () => setCommenting(false);
+$("listBtn").onclick = () => openPanel();
+$("closePanel").onclick = () => openPanel(false);
+$("clist").onclick = (e) => {
+  const c = e.target.closest("[data-c]"); if (!c) return;
+  if (c.dataset.page !== page) { page = c.dataset.page; $("pageSel").value = page; load(); setTimeout(() => send({ type: "focus", id: c.dataset.c }), 900); }
+  else send({ type: "focus", id: c.dataset.c });
+};
+addEventListener("keydown", (e) => { if (e.key === "Escape" && commenting && !document.querySelector("dialog[open]")) setCommenting(false); });
+setInterval(() => { if (info?.comments && !document.hidden) loadComments(); }, 30000);   // the team may resolve some
+start();
+</script>
+</body>
+</html>

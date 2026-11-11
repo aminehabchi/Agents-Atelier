@@ -7,6 +7,9 @@ Flow for every prompt (see run_prompt in main.py):
   3. decide() checks that decision with hard rules the model can't break: only switched-on agents, the Brief
      agent always first, dependent agents added (e.g. HTML changes → CSS), QA and the Critic after code changes.
      A missing or broken answer falls back to the whole team, so a run is never blocked.
+  4. The decision may also group agents that can work at the same time ("parallel"). clean_parallel() keeps only
+     groups the hard rules allow, and next_step() turns them into the run's steps (see "Parallel steps" below).
+     On a first build no decision is needed, so the Orchestrator is asked only for these groups, while Brief works.
 
 Everything here is pure (no I/O besides reading files) so it can be tested without a model.
 """
@@ -39,6 +42,20 @@ DEPENDS = {
     "assets": ["html"],
 }
 STATE_LIMIT = 4000   # characters of plan.md shown to the Orchestrator
+
+# ---- Parallel steps
+# The Orchestrator may say which agents can work at the same time: agents that write different files and don't need
+# each other's work (Design System and Copywriter after UX; SEO and Assets). The server only runs a group together
+# when these rules allow it:
+#   - never with an agent in SOLO: Brief (everything starts from it), Research (its changes are checked and undone
+#     file by file), the Auditor (the others follow its audit), Tidy and the Translator (they rewrite whole files),
+#     UX and HTML (every later agent builds on their structure), QA and the Critic (they check everyone's work)
+#   - never two agents where one adapts to the other (DEPENDS, followed through)
+#   - only agents next to each other in run order, and at most MAX_PARALLEL at once (config PARALLEL_AGENTS; 1 = off)
+# Two agents that do edit the same file stay safe: Claude Code refuses an edit to a file that changed since the agent
+# read it, so the agent reads it again and redoes its edit.
+SOLO = {"brief", "research", "auditor", "tidy", "translator", "ux", "html", "qa", "critic"}
+MAX_PARALLEL = config.PARALLEL_AGENTS
 
 
 def load_prompt() -> tuple[str, str]:
@@ -83,7 +100,16 @@ def project_state(meta: dict, folder: Path, clean) -> str:
             f"What each agent reported in the last run:\n{notes}{asked}")
 
 
-def build_prompt(meta: dict, request: str, team: list[dict], folder: Path, clean, site_pages: str, brief: str = "") -> str:
+FIRST_BUILD = """<first_build>
+This project has never been built: the whole team below builds it now, in the order listed, so the intent is
+"new_build" and every agent works. Brief is already working. Your only decision is which agents may work at the same
+time: reply with {"intent": "new_build", "agents": [], "parallel": [[…], …], "reason": "…", "reply": null}.
+</first_build>
+"""
+
+
+def build_prompt(meta: dict, request: str, team: list[dict], folder: Path, clean, site_pages: str, brief: str = "",
+                 first_build: bool = False) -> str:
     past = "\n".join(f"- {clean(h, 300)}" for h in meta.get("history", [])[-8:]) or "(none)"
     roster = "\n".join(f"- {a['id']}: {a['name']} — {clean(a.get('description') or '', 160)}"
                        + (" (switched off: choose it only when the request clearly asks for what it does)" if a["id"] in ON_REQUEST
@@ -112,7 +138,7 @@ description: {clean(meta.get("description") or "(no description)", 300)}
 <user_request>
 {clean(request, 10000)}
 </user_request>
-
+{FIRST_BUILD if first_build else ""}
 Decide now. Reply with only the JSON object."""
 
 
@@ -216,6 +242,59 @@ def fill_blanks(text: str, found: list[str], qs: list[dict], given: dict) -> tup
     return text, pairs
 
 
+def _depends_on(a: str) -> set[str]:
+    """Every agent that must adapt when `a` changes something (DEPENDS, followed through)."""
+    seen, todo = set(), [a]
+    while todo:
+        for d in DEPENDS.get(todo.pop(), []):
+            if d not in seen:
+                seen.add(d)
+                todo.append(d)
+    return seen
+
+
+def can_pair(a: str, b: str) -> bool:
+    return a != b and a not in SOLO and b not in SOLO and b not in _depends_on(a) and a not in _depends_on(b)
+
+
+def clean_parallel(raw, agents: list[str]) -> list[list[str]]:
+    """The Orchestrator's groups of agents that may work at the same time, cleaned: only agents of this run, each in
+    one group at most, no pair the rules forbid, groups of 2 to MAX_PARALLEL. Order inside a group follows the run."""
+    if MAX_PARALLEL < 2:
+        return []
+    out, used = [], set()
+    for group in raw if isinstance(raw, list) else []:
+        if not isinstance(group, list):
+            continue
+        kept = []
+        for i in [a for a in agents if a in {g for g in group if isinstance(g, str)}]:
+            if i not in used and len(kept) < MAX_PARALLEL and all(can_pair(i, k) for k in kept):
+                kept.append(i)
+        if len(kept) >= 2:
+            out.append(kept)
+            used.update(kept)
+    return out
+
+
+def could_pair(agents: list[str]) -> bool:
+    """Whether any two neighbours in this run could work together (else there's nothing to ask the Orchestrator)."""
+    return MAX_PARALLEL > 1 and any(can_pair(a, b) for a, b in zip(agents, agents[1:]))
+
+
+def next_step(remaining: list[str], groups: list[list[str]]) -> list[str]:
+    """The agents to start now: the next one in run order, plus the agents right after it in the same group."""
+    if not remaining:
+        return []
+    first = remaining[0]
+    group = next((g for g in groups or [] if first in g), None)
+    step = [first]
+    for b in remaining[1:] if group else []:
+        if b not in group or len(step) >= MAX_PARALLEL or not all(can_pair(b, k) for k in step):
+            break
+        step.append(b)
+    return step
+
+
 def decide(raw: dict | None, pool: list[str], order: list[str]) -> dict:
     """Turn the model's answer into a safe plan.
 
@@ -255,9 +334,10 @@ def decide(raw: dict | None, pool: list[str], order: list[str]) -> dict:
     if chosen - READ_ONLY:
         chosen |= {f for f in FINISHERS if f in allowed}
     agents = [i for i in order if i in chosen]
+    parallel = clean_parallel(raw.get("parallel"), agents)
     notes = raw.get("notes") if isinstance(raw.get("notes"), dict) else {}
     notes = {k: _short(v, 400) for k, v in notes.items() if k in chosen and _short(v, 400)}
     confirm = intent == "confirm"
-    return {"intent": "change" if confirm else intent, "agents": agents, "notes": notes,
+    return {"intent": "change" if confirm else intent, "agents": agents, "notes": notes, "parallel": parallel,
             "reason": reason or "These agents cover your request.", "fallback": False, "questions": [], "confirm": confirm,
             "reply": (reply or "Should the team go ahead with this plan?") if confirm else None}

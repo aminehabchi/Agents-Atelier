@@ -32,6 +32,9 @@ Its metadata and chat log live in work/.projects/<uuid>.json and <uuid>.events.j
 - GET    /api/projects/<id>/versions/<n>/download  version n as a .zip
 - GET    /api/stats?project=<id>     cost, time and tokens per agent (one project, or all)
 - GET/POST/DELETE /api/presets       team presets (built-in + saved)
+- GET/POST/PATCH/DELETE /api/projects/<id>/people[/<user>]   the people on a project (see collab.py)
+- GET/POST/DELETE /api/projects/<id>/share[/<link>]          share links · GET/PATCH/DELETE …/comments[/<id>]  pinned comments
+- GET    /s/<token>, /s/<token>/site/…, /s/<token>/info, GET/POST /s/<token>/comments   a share link (no account needed)
 - WS     /ws/<id>                    send {"type":"prompt","text":...,"agents":[...],"images":[...]}, {"type":"stop"},
                                      {"type":"continue"}, {"type":"restart"} or {"type":"retry","agent":id,"note":...};
                                      receive live events
@@ -81,6 +84,9 @@ import keys
 import plans
 import storage
 import legacy
+import collab
+import share
+import billing
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = Path(__file__).resolve().parent / "static"
@@ -113,6 +119,7 @@ MODEL = config.AGENT_MODEL  # e.g. "sonnet" for faster runs; default = your Clau
 async def lifespan(_app):
     await db.init()
     await store.start(db.pool)
+    await collab.load()
     imported = legacy.import_work_folder(config.LEGACY_WORK_DIR, store)     # once per project, from the old work/ folder
     if imported:
         log.info("Imported %d projects from %s into %s", imported, config.LEGACY_WORK_DIR, storage.ROOT)
@@ -182,6 +189,13 @@ async def auth_error(request: Request, exc: auth.AuthError):
     return JSONResponse({"detail": str(exc)}, status_code=exc.status)
 
 
+@app.exception_handler(collab.CollabError)
+@app.exception_handler(share.ShareError)
+@app.exception_handler(billing.BillingError)
+async def collab_error(request: Request, exc: Exception):
+    return JSONResponse({"detail": str(exc)}, status_code=exc.status)
+
+
 @app.exception_handler(plans.PlanError)
 async def plan_error(request: Request, exc: plans.PlanError):
     """A feature the member's plan doesn't include: 403, with the plan that has it (the pages offer to upgrade)."""
@@ -219,7 +233,15 @@ runs: dict[str, dict] = {}
 
 
 def live(pid: str) -> dict:
-    return runs.setdefault(pid, {"task": None, "proc": None, "clients": set()})
+    return runs.setdefault(pid, {"task": None, "procs": set(), "clients": set()})
+
+
+def kill_procs(st: dict):
+    """Stop every `claude` process of a project (several agents may work at the same time)."""
+    for proc in list(st["procs"]):
+        if proc.returncode is None:
+            proc.kill()
+    st["procs"].clear()
 
 
 def is_busy(pid: str) -> bool:
@@ -413,7 +435,7 @@ def run_summary(run: dict) -> dict:
     agents, done = run.get("agents", []), run.get("done", [])
     nxt = next((a for a in agents if a not in done), None)
     return {"status": run.get("status"), "request": run.get("request", ""), "agents": agents, "done": done,
-            "current": run.get("current") or nxt, "next": nxt, "error": run.get("error", ""),
+            "current": run.get("current") or nxt, "running": run.get("running") or [], "next": nxt, "error": run.get("error", ""),
             "resumable": run.get("status") in RESUMABLE and nxt is not None}
 
 
@@ -435,7 +457,8 @@ def _origin_ok(request_host: str, origin: str | None) -> bool:
 
 
 # ---- who may do what. Everything is private unless listed here.
-PUBLIC_PAGES = {"/", "/login", "/register", "/forgot", "/confirm", "/terms", "/privacy", "/favicon.ico"}
+PUBLIC_PAGES = {"/", "/login", "/register", "/forgot", "/confirm", "/terms", "/privacy", "/favicon.ico",
+                "/api/billing/paypal/webhook"}     # PayPal calls it; billing.py checks its signature
 PROJECT_PATH = re.compile(r"^/(?:api/projects|p|media)/([^/]+)")
 
 
@@ -444,12 +467,17 @@ def is_public(path: str, method: str = "GET") -> bool:
         return True
     # /work/<uuid>/… is reached by its unguessable project id: generated pages run in a sandbox with no origin,
     # so browsers don't send the session cookie for their CSS, scripts and images.
-    return path in PUBLIC_PAGES or path.startswith(("/static/", "/work/", "/api/auth/"))
+    return path in PUBLIC_PAGES or path.startswith(("/static/", "/work/", "/api/auth/", "/s/"))
 
 
 def can_access(user: dict | None, meta: dict) -> bool:
-    """A project belongs to its owner; admins can open every project (projects with no owner are admins' only)."""
-    return bool(user) and (user["role"] == "admin" or meta.get("owner") == str(user["id"]))
+    """A project belongs to its owner and the people they invited (collab.py); admins can open every project
+    (projects with no owner are admins' only)."""
+    return collab.role_of(user, meta) is not None
+
+
+# Changes a viewer may still make: leaving the project.
+VIEWER_WRITES = re.compile(r"^/api/projects/[^/]+/membership$")
 
 
 def _project_of_path(path: str) -> dict | None:
@@ -475,8 +503,8 @@ async def _check_access(request):
     request.state.user = None
     if path.startswith(("/work/.projects", "/work/.brand")):     # project data, chat logs and brand kits are never served as files
         return JSONResponse({"detail": "This page or file doesn't exist."}, status_code=404)
-    if path.startswith(("/static/", "/work/")):
-        return None
+    if path.startswith(("/static/", "/work/", "/s/")):
+        return None                              # share links check their token themselves
     user = request.state.user = await auth.user_for_token(request.cookies.get(auth.COOKIE))
     if is_public(path, request.method):
         return None
@@ -490,6 +518,10 @@ async def _check_access(request):
         if path.startswith("/api/"):
             return JSONResponse({"detail": "This project doesn't exist (it may have been deleted)."}, status_code=404)
         return _error_page(404, "Not found", "This project doesn't exist (it may have been deleted).")
+    if (meta is not None and request.method not in ("GET", "HEAD", "OPTIONS") and not collab.can_edit(user, meta)
+            and not VIEWER_WRITES.match(path)):
+        return JSONResponse({"detail": "You can view this project but not change it. Ask its owner to make you an editor."},
+                            status_code=403)
     return None
 
 
@@ -574,7 +606,7 @@ async def no_cache(request, call_next):
     if denied:
         return denied
     response = await call_next(request)
-    if request.url.path.startswith("/work"):
+    if request.url.path.startswith("/work") or re.match(r"^/s/[^/]+/site(?:/|$)", request.url.path):
         response.headers["Cache-Control"] = "no-store"
         # Generated pages always run in an isolated origin: their JavaScript can't call this app's API,
         # whether they're shown in the preview, a thumbnail or their own tab.
@@ -790,6 +822,7 @@ async def revenue(request: Request, days: int = 30):
     gained = sum(price.get(e["to_plan"], 0) - price.get(e["from_plan"], 0) for e in up)
     lost = sum(price.get(e["from_plan"], 0) - price.get(e["to_plan"], 0) for e in down)
     return {
+        "received": await billing.received(since),
         "days": days, "mrr": mrr, "arr": mrr * 12, "members": len(members), "paying": paying,
         "conversion": round(paying / len(members), 4) if members else 0,
         "arpu": round(mrr / len(members), 2) if members else 0,
@@ -914,7 +947,11 @@ async def login(request: Request, body: dict):
 async def confirm_email(request: Request, body: dict):
     if not request.state.user:
         raise HTTPException(401, "Log in first.")
-    return _with_session(await auth.confirm(request.state.user, body.get("code")))
+    user = await auth.confirm(request.state.user, body.get("code"))
+    if user["role"] != "unconfirmed":
+        collab.note_user(user)
+        await collab.claim_invites(user)           # projects someone invited this email to before it had an account
+    return _with_session(user)
 
 
 @app.post("/api/auth/resend")
@@ -985,6 +1022,11 @@ async def delete_account(request: Request, body: dict):
     (your private agents and teams, your projects and their files) unless you log in again before then."""
     user = _confirmed_user(request)
     await auth.check_can_delete(user, body.get("password"))
+    if user.get("billing_subscription"):          # a deactivated account isn't charged any more
+        try:
+            await billing.cancel(user, "Account deleted")
+        except billing.BillingError:
+            log.error("Couldn't cancel the PayPal subscription of %s on deletion", user["email"])
     owned = [m["id"] for m in store.all() if m.get("owner") == str(user["id"])]
     if any(is_busy(pid) for pid in owned):
         raise HTTPException(409, "Agents are working on one of your projects. Stop them first.")
@@ -1002,6 +1044,8 @@ async def erase_account(user: dict):
     await auth.delete_user(user)
     for pid in owned:
         _remove_project_files(pid)
+    for people in collab.members.values():       # their memberships went with the account (ON DELETE CASCADE)
+        people.pop(str(user["id"]), None)
     shutil.rmtree(BRAND_DIR / str(user["id"]), ignore_errors=True)
     shutil.rmtree(Path(config.STORAGE_DIR) / "claude-home" / str(user["id"]), ignore_errors=True)
 
@@ -1103,6 +1147,7 @@ async def users_set_role(request: Request, user_id: str, body: dict):
         out = await auth.set_plan(actor, user_id, str(body.get("plan") or ""))
     if "role" in body or out is None:
         out = await auth.set_role(actor, user_id, str(body.get("role") or ""))
+    await collab.refresh_user(user_id)            # the people this member invited keep or lose access with the plan
     return out
 
 
@@ -1111,17 +1156,51 @@ async def users_set_role(request: Request, user_id: str, body: dict):
 @app.get("/api/plans")
 async def list_plans(request: Request):
     """The plans, and for a logged-in member what they use of theirs."""
-    out = {"plans": plans.public(), "keys": config.CLAUDE_KEYS}
+    out = {"plans": plans.public(), "keys": config.CLAUDE_KEYS, "payment": "paypal" if billing.enabled() else "request"}
     user = request.state.user
     if user:
         out["usage"] = {"projects": sum(m.get("owner") == str(user["id"]) for m in store.all())}
+        out["subscription"] = bool(user.get("billing_subscription"))
     return out
+
+
+@app.post("/api/billing/paypal/subscribe")
+async def paypal_subscribe(request: Request, body: dict):
+    """Start paying for a plan with PayPal: the answer's `approve` is the PayPal page to send the member to."""
+    return await billing.subscribe(_confirmed_user(request), str(body.get("plan") or ""), str(request.base_url))
+
+
+@app.get("/billing/paypal/return")
+async def paypal_return(request: Request, subscription_id: str = ""):
+    """PayPal sends the member back here after they approve (or leave) the payment."""
+    user = _confirmed_user(request)
+    try:
+        state = await billing.confirm_return(user, subscription_id)
+    except billing.BillingError:
+        state = "error"
+    await collab.refresh_user(user["id"])
+    return RedirectResponse(f"/profile?paid={state}#plan", status_code=303)
+
+
+@app.post("/api/billing/paypal/webhook")
+async def paypal_webhook(request: Request):
+    done = await billing.webhook(request.headers, await request.body())
+    if done.get("user"):
+        await collab.refresh_user(done["user"])
+    return {"ok": True}
 
 
 @app.post("/api/auth/plan")
 async def change_my_plan(request: Request, body: dict):
     """Move to another plan: lower at once, higher as a request the admins approve."""
-    return {"user": await auth.change_my_plan(_confirmed_user(request), str(body.get("plan") or ""))}
+    me, plan = _confirmed_user(request), str(body.get("plan") or "")
+    if billing.enabled() and me["role"] != "admin" and plan in plans.PLANS and plans.PLANS[plan]["price"]:
+        raise HTTPException(400, "Paid plans are paid with PayPal: use the plan's button on your profile.")
+    if plan == plans.DEFAULT and me.get("billing_subscription"):
+        await billing.cancel(me)                  # moving to Starter: stop paying at PayPal first
+    user = await auth.change_my_plan(me, plan)
+    await collab.refresh_user(me["id"])
+    return {"user": user}
 
 
 @app.delete("/api/auth/plan-request")
@@ -1171,7 +1250,21 @@ async def list_agents(request: Request, full: bool = False, project: str | None 
             raise HTTPException(404, "This project doesn't exist (it may have been deleted).")
         who = await owner_of(meta)
     keys = ("id", "name", "icon", "color", "default", "description", "model", "tools", "scope", "editable") + (("role", "file") if full else ())
-    return [{**{k: a[k] for k in keys}, "model_ok": model_catalog.allowed(a["model"])} for a in await load_agents(who)]
+    out = [{**{k: a[k] for k in keys}, "model_ok": model_catalog.allowed(a["model"])} for a in await load_agents(who)]
+    return out if not full or sees_instructions(current_user(request)) else [without_instructions(a) for a in out]
+
+
+INSTRUCTIONS_LOCKED = ("Reading the agents' instructions comes with the Pro plan. On Starter you see what each agent does, "
+                       "its results, its projects and its ratings, and every official agent works for you.")
+
+
+def sees_instructions(user: dict | None) -> bool:
+    """Starter members see what an agent does (name, description, stats, projects, ratings), not its instructions."""
+    return bool(user) and user.get("role") != "unconfirmed" and plans.of(user).get("instructions", True)
+
+
+def without_instructions(item: dict) -> dict:
+    return {**item, "role": "", "instructions_locked": True}
 
 
 async def _agent_call(call):
@@ -1207,7 +1300,8 @@ async def check_model(request: Request, body: dict):
 
 
 @app.get("/api/agents/common")
-async def get_common():
+async def get_common(request: Request):
+    plans.need(current_user(request), "instructions", INSTRUCTIONS_LOCKED)
     return {"text": load_common()}
 
 
@@ -1242,7 +1336,8 @@ async def get_agent(request: Request, agent_id: str):
     if i is None:
         raise HTTPException(404, f"There's no agent called “{agent_id}”.")
     stats = next((b for b in (await get_stats(request))["agents"] if b["agent"] == agent_id), None)
-    return {**agents[i], "model_ok": model_catalog.allowed(agents[i]["model"]), "position": i + 1, "total": len(agents),
+    agent = agents[i] if sees_instructions(user) else without_instructions(agents[i])
+    return {**agent, "model_ok": model_catalog.allowed(agents[i]["model"]), "position": i + 1, "total": len(agents),
             "prev": agents[i - 1]["id"] if i > 0 else None, "next": agents[i + 1]["id"] if i + 1 < len(agents) else None,
             "teams": await team_files.teams_with(user, agent_id), "stats": stats,
             "market": await market.listing_of(user, "agent", agent_id)}
@@ -1281,7 +1376,8 @@ async def list_projects(request: Request, page: int | None = None, per_page: int
         return projects
 
     counts = {"all": len(projects), "working": sum(p["busy"] for p in projects),
-              "built": sum(p["has_preview"] for p in projects), "empty": sum(not p["has_preview"] for p in projects)}
+              "built": sum(p["has_preview"] for p in projects), "empty": sum(not p["has_preview"] for p in projects),
+              "shared": sum(p["role"] in collab.ROLES for p in projects)}
     needle = q.strip().lower()
     if needle:
         projects = [p for p in projects if needle in p["name"].lower() or needle in p["description"].lower() or p["id"].startswith(needle)]
@@ -1291,6 +1387,8 @@ async def list_projects(request: Request, page: int | None = None, per_page: int
         projects = [p for p in projects if p["has_preview"]]
     elif status == "empty":
         projects = [p for p in projects if not p["has_preview"]]
+    elif status == "shared":                    # projects other people invited you to
+        projects = [p for p in projects if p["role"] in collab.ROLES]
     if sort == "name":
         projects.sort(key=lambda p: p["name"].lower())
     elif sort == "created":
@@ -1310,7 +1408,8 @@ def all_projects(user: dict, default_count: int) -> list[dict]:
     """The projects `user` can open."""
     projects = []
     for m in store.all():
-        if not can_access(user, m):
+        role = collab.role_of(user, m)
+        if role is None:
             continue
         folder = site_dir(m["id"])
         files = [f for f in folder.rglob("*") if f.is_file()] if folder.exists() else []
@@ -1320,7 +1419,8 @@ def all_projects(user: dict, default_count: int) -> list[dict]:
                          "files": len(files), "size": sum(f.stat().st_size for f in files),
                          "pages": [p["title"] for p in m.get("pages") or DEFAULT_PAGES],
                          "brief": m.get("brief") or {},
-                         "has_preview": (folder / "index.html").exists(),
+                         "has_preview": (folder / "index.html").exists(), "role": role,
+                         "shared": role in collab.ROLES or (role == "owner" and bool(collab.members.get(m["id"]))),
                          "paused": (m.get("run") or {}).get("status") in RESUMABLE and not is_busy(m["id"])})
     return sorted(projects, key=lambda m: m["updated"], reverse=True)
 
@@ -1454,14 +1554,15 @@ async def import_project(request: Request, body: dict):
 
 
 @app.get("/api/projects/{pid}")
-async def get_project(pid: str):
+async def get_project(request: Request, pid: str):
     meta = load_meta(pid)
     events = await store.events(meta["id"])
     if not meta.get("agents"):
         meta["agents"] = await default_ids(await owner_of(meta))
     meta.setdefault("description", "")
     meta.setdefault("pages", list(DEFAULT_PAGES))
-    return {**meta, "busy": is_busy(meta["id"]), "events": events, "run": run_summary(meta.get("run"))}
+    return {**meta, "busy": is_busy(meta["id"]), "events": events, "run": run_summary(meta.get("run")),
+            "my_role": collab.role_of(current_user(request), meta), "people": len(collab.members.get(meta["id"], {}))}
 
 
 @app.patch("/api/projects/{pid}")
@@ -1484,6 +1585,7 @@ def _remove_project_files(pid: str):
     """The project, its chat, versions and files: its rows in Postgres and its folder works/<pid>/."""
     store.delete(pid)
     runs.pop(pid, None)
+    collab.forget_project(pid)
 
 
 # ---------------------------------------------------------------- brand kit (one per project)
@@ -1595,8 +1697,8 @@ def _drop_logo(meta: dict):
 
 def _own_project(request: Request, pid: str) -> dict:
     meta = load_meta(pid)
-    if meta.get("owner") != str(current_user(request)["id"]):
-        raise HTTPException(403, "Only the project's owner can change its brand kit.")
+    if collab.role_of(current_user(request), meta) not in ("owner", "editor"):   # not admins: it's the member's brand
+        raise HTTPException(403, "Only the project's owner and editors can change its brand kit.")
     return meta
 
 
@@ -1685,8 +1787,10 @@ async def copy_project_brand(request: Request, pid: str, body: dict):
 
 
 @app.delete("/api/projects/{pid}")
-async def delete_project(pid: str):
+async def delete_project(request: Request, pid: str):
     meta = load_meta(pid)
+    if not collab.can_manage(current_user(request), meta):
+        raise HTTPException(403, "Only the project's owner can delete it.")
     if is_busy(meta["id"]):
         raise HTTPException(409, "Agents are working on this project. Stop them first.")
     _remove_project_files(meta["id"])
@@ -1771,6 +1875,7 @@ def _download(name: str, content: bytes, media: str):
 
 @app.get("/api/agents/{agent_id}/export")
 async def export_agent(request: Request, agent_id: str):
+    plans.need(current_user(request), "instructions", "Exports contain the agents' instructions, which come with the Pro plan.")
     try:
         name, text = await team_files.export_agent(current_user(request), agent_id)
     except KeyError:
@@ -1780,6 +1885,7 @@ async def export_agent(request: Request, agent_id: str):
 
 @app.get("/api/presets/{preset_id}/export")
 async def export_team(request: Request, preset_id: str):
+    plans.need(current_user(request), "instructions", "Exports contain the agents' instructions, which come with the Pro plan.")
     try:
         name, bundle = await team_files.export_team(current_user(request), preset_id)
     except KeyError:
@@ -1790,6 +1896,7 @@ async def export_team(request: Request, preset_id: str):
 @app.get("/api/export")
 async def export_everything(request: Request):
     """The agents you can see, the shared rules and your saved teams, as a .zip that /api/import understands."""
+    plans.need(current_user(request), "instructions", "Exports contain the agents' instructions, which come with the Pro plan.")
     buf = io.BytesIO()
     user = current_user(request)
     agents = await load_agents(user)
@@ -1955,12 +2062,17 @@ async def market_catalogue(request: Request):
 
 @app.get("/api/market/agents/{pk}")
 async def market_agent(request: Request, pk: int):
-    return await _market_call(market.agent_profile(current_user(request), pk, _all_metas(), _has_preview))
+    profile = await _market_call(market.agent_profile(current_user(request), pk, _all_metas(), _has_preview))
+    return profile if sees_instructions(current_user(request)) else without_instructions(profile)
 
 
 @app.get("/api/market/teams/{pk}")
 async def market_team(request: Request, pk: int):
-    return await _market_call(market.team_profile(current_user(request), pk, _all_metas()))
+    profile = await _market_call(market.team_profile(current_user(request), pk, _all_metas()))
+    if not sees_instructions(current_user(request)) and isinstance(profile, dict):
+        profile = {**profile, "instructions_locked": True,
+                   "agents": [without_instructions(a) if isinstance(a, dict) else a for a in profile.get("agents") or []]}
+    return profile
 
 
 @app.post("/api/market/agents/{pk}/hire")
@@ -2019,6 +2131,184 @@ async def put_rating(request: Request, pid: str, body: dict):
 
 
 # ---------------------------------------------------------------- editing & uploads
+
+# ---------------------------------------------------------------- people on a project (see collab.py)
+
+def _managed(request: Request, pid: str) -> dict:
+    meta = load_meta(pid)
+    if not collab.can_manage(current_user(request), meta):
+        raise HTTPException(403, "Only the project's owner can choose who works on it.")
+    return meta
+
+
+@app.get("/api/projects/{pid}/people")
+async def project_people(request: Request, pid: str):
+    meta = load_meta(pid)
+    return {**await collab.list_people(meta), "my_role": collab.role_of(current_user(request), meta),
+            "can_invite": plans.of(await owner_of(meta)).get("members", False)}
+
+
+@app.post("/api/projects/{pid}/people")
+async def invite_person(request: Request, pid: str, body: dict):
+    meta = _managed(request, pid)
+    out = await collab.invite(meta, current_user(request), body.get("email"), body.get("role") or "editor")
+    await notify(meta["id"], {"type": "people"})
+    return out
+
+
+@app.patch("/api/projects/{pid}/people/{user_id}")
+async def change_person(request: Request, pid: str, user_id: str, body: dict):
+    meta = _managed(request, pid)
+    out = await collab.set_role(meta, user_id, body.get("role"))
+    await notify(meta["id"], {"type": "people"})
+    return out
+
+
+@app.delete("/api/projects/{pid}/people/{user_id}")
+async def remove_person(request: Request, pid: str, user_id: str):
+    meta = _managed(request, pid)
+    await collab.remove(meta, user_id)
+    await notify(meta["id"], {"type": "people"})
+    return {"ok": True}
+
+
+@app.delete("/api/projects/{pid}/membership")
+async def leave_project(request: Request, pid: str):
+    """An editor or viewer takes themselves off a project."""
+    meta, user = load_meta(pid), current_user(request)
+    if collab.role_of(user, meta) not in collab.ROLES:
+        raise HTTPException(400, "You own this project (or you're an admin): there's nothing to leave.")
+    await collab.remove(meta, user["id"])
+    await notify(meta["id"], {"type": "people"})
+    return {"ok": True}
+
+
+@app.delete("/api/projects/{pid}/invites")
+async def cancel_invite(request: Request, pid: str, email: str = ""):
+    meta = _managed(request, pid)
+    await collab.cancel_invite(meta, email)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- share links and pinned comments (see share.py)
+
+def _editable(request: Request, pid: str) -> dict:
+    meta = load_meta(pid)
+    if not collab.can_edit(current_user(request), meta):
+        raise HTTPException(403, "Only the project's owner and editors can do this.")
+    return meta
+
+
+@app.get("/api/projects/{pid}/share")
+async def list_share_links(request: Request, pid: str):
+    return await share.links(_editable(request, pid)["id"])
+
+
+@app.post("/api/projects/{pid}/share")
+async def create_share_link(request: Request, pid: str, body: dict):
+    meta = _editable(request, pid)
+    return await share.create(meta["id"], current_user(request), body)
+
+
+@app.delete("/api/projects/{pid}/share/{link_id}")
+async def revoke_share_link(request: Request, pid: str, link_id: str):
+    await share.revoke(_editable(request, pid)["id"], link_id)
+    return {"ok": True}
+
+
+@app.get("/api/projects/{pid}/comments")
+async def list_comments(pid: str):
+    return await share.comments(load_meta(pid)["id"])
+
+
+@app.patch("/api/projects/{pid}/comments/{comment_id}")
+async def resolve_comment(request: Request, pid: str, comment_id: str, body: dict):
+    meta = _editable(request, pid)
+    out = await share.resolve(meta["id"], comment_id, current_user(request), bool(body.get("resolved", True)))
+    await notify(meta["id"], {"type": "comment", "comment": out})
+    return out
+
+
+@app.delete("/api/projects/{pid}/comments/{comment_id}")
+async def delete_comment(request: Request, pid: str, comment_id: str):
+    meta = _editable(request, pid)
+    await share.delete_comment(meta["id"], comment_id)
+    await notify(meta["id"], {"type": "comment", "deleted": comment_id})
+    return {"ok": True}
+
+
+SHARE_GONE = ("This link has expired or was turned off. Ask the person who sent it for a new one.")
+COMMENT_LIMIT = limits.Limit(30, 3600)        # comments per visitor address per hour
+
+
+async def _share_link(token: str) -> tuple[dict, dict]:
+    link = await share.open_link(token)
+    meta = store.get(link["project"]) if link else None
+    if not link or not meta:
+        raise HTTPException(404, SHARE_GONE)
+    return link, meta
+
+
+@app.get("/s/{token}")
+async def share_page(token: str):
+    try:
+        link, _meta = await _share_link(token)
+    except HTTPException:
+        return _error_page(404, "Link not available", SHARE_GONE)
+    await share.viewed(link)
+    return FileResponse(STATIC / "share.html", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
+                                                        "X-Robots-Tag": "noindex"})
+
+
+@app.get("/s/{token}/info")
+async def share_info(token: str):
+    link, meta = await _share_link(token)
+    pages = [p for p in meta.get("pages") or DEFAULT_PAGES if (site_dir(meta["id"]) / p["file"]).is_file()]
+    return {"name": meta["name"], "pages": pages, "comments": link["comments"], "expires": link["expires"],
+            "busy": is_busy(meta["id"]), "built": (site_dir(meta["id"]) / "index.html").is_file()}
+
+
+@app.get("/s/{token}/comments")
+async def share_comments(token: str):
+    link, _meta = await _share_link(token)
+    return await share.link_comments(link)
+
+
+@app.post("/s/{token}/comments")
+async def share_add_comment(request: Request, token: str, body: dict):
+    link, meta = await _share_link(token)
+    _limited(COMMENT_LIMIT, request, "comments")
+    pages = [p["file"] for p in meta.get("pages") or DEFAULT_PAGES]
+    comment = await share.add_comment(link, body, pages)
+    await notify(meta["id"], {"type": "comment", "comment": comment, "new": True})
+    return comment
+
+
+PIN_SCRIPT = b'<script src="/static/share-pin.js"></script>'
+
+
+@app.api_route("/s/{token}/site", methods=["GET", "HEAD"])
+@app.api_route("/s/{token}/site/{path:path}", methods=["GET", "HEAD"])
+async def share_site(request: Request, token: str, path: str = ""):
+    """The project's site through a share link: sandboxed like /work/<pid>/ (see no_cache), web pages with the pin script."""
+    link, meta = await _share_link(token)
+    root = site_dir(meta["id"]).resolve()
+    target = (root / path).resolve()
+    if (target != root and root not in target.parents) or (path.split("/")[0] == browser_check.CHECK_DIR):
+        raise HTTPException(404, "This page or file doesn't exist.")
+    if target.is_dir():
+        if not request.url.path.endswith("/"):
+            return RedirectResponse(f"/s/{token}/site/{path}/" if path else f"/s/{token}/site/")
+        target = target / "index.html"
+    if not target.is_file():
+        raise HTTPException(404, "This page or file doesn't exist.")
+    if target.suffix.lower() in (".html", ".htm"):
+        html = target.read_bytes()
+        i = html.lower().rfind(b"</body>")
+        html = html[:i] + PIN_SCRIPT + html[i:] if i >= 0 else html + PIN_SCRIPT
+        return HTMLResponse(html, headers={"Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex"})
+    return FileResponse(target, headers={"Referrer-Policy": "no-referrer"})
+
 
 def safe_path(pid: str, rel: str) -> Path:
     folder = site_dir(pid).resolve()
@@ -2325,6 +2615,16 @@ async def project_media(pid: str, area: str, path: str):
 
 # ---------------------------------------------------------------- agents
 
+async def notify(pid: str, event: dict):
+    """Tell the studios open on this project about something that isn't part of the chat (comments, people)."""
+    event["project"] = pid
+    for ws in list(live(pid)["clients"]):
+        try:
+            await ws.send_json(event)
+        except Exception:
+            live(pid)["clients"].discard(ws)
+
+
 async def broadcast(pid: str, event: dict):
     event["project"] = pid
     log_event(pid, event)
@@ -2582,7 +2882,7 @@ async def run_agent(pid: str, agent: dict, common: str, request: str, notes: lis
         raise RuntimeError(f"Claude Code wasn't found (tried “{CLAUDE}”). Install it, or set CLAUDE_BIN to its path, then restart the server.")
     except PermissionError:
         raise RuntimeError(f"Claude Code at “{CLAUDE}” isn't executable. Check its permissions or set CLAUDE_BIN.")
-    st["proc"] = proc
+    st["procs"].add(proc)
     final_text = ""
     pending_edits = {}  # tool_use_id -> file
     started = time.time()
@@ -2604,6 +2904,7 @@ async def run_agent(pid: str, agent: dict, common: str, request: str, notes: lis
     finally:
         if proc.returncode is None:
             proc.kill()
+        st["procs"].discard(proc)
         stderr_task.cancel()
         if guard is not None:
             undone = safely("Undoing a web agent's changes", _undo_site_changes, folder, guard) or []
@@ -2697,7 +2998,6 @@ async def _stream_agent(pid: str, agent: dict, proc, folder: Path, pending_edits
                 raise RuntimeError(explain_failure(final_text or "The agent reported an error."))
 
     await proc.wait()
-    st["proc"] = None
     if proc.returncode != 0:
         err = (await stderr_task).decode(errors="replace")
         raise RuntimeError(explain_failure(err or f"Claude Code exited with code {proc.returncode}."))
@@ -2768,9 +3068,11 @@ async def safe_browser_check(pid: str) -> dict | None:
 
 
 async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool = False, images: list[str] = (),
-                    plan: dict | None = None):
-    """Run the team in order. With resume=True, skip the agents that already finished in the saved run
-    and give the rest the notes those agents left. `plan` is the Orchestrator's decision (reason and notes per agent)."""
+                    plan: dict | None = None, schedule: asyncio.Task | None = None):
+    """Run the team in order, one step at a time: one agent, or a group the Orchestrator lets work at the same time
+    (plan["parallel"], see orchestrator.next_step). With resume=True, skip the agents that already finished in the saved
+    run and give the rest the notes those agents left. `plan` is the Orchestrator's decision (reason and notes per agent).
+    `schedule` (a first build) is the Orchestrator still choosing those groups: they apply from the step after it answers."""
     st = live(pid)
     meta = load_meta(pid)
     if await asyncio.to_thread(photo_copies.ensure, meta, site_dir(pid)):      # photos added before the WebP copies existed
@@ -2794,7 +3096,7 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
     plan = plan if plan is not None else (prev.get("plan") or {}) if resume else {}
     meta["run"] = {"request": request, "images": images, "agents": [a["id"] for a in team], "done": done, "notes": notes,
                    "review_round": review_round, "send_back": send_back, "plan": plan,
-                   "current": None, "status": "running", "error": "",
+                   "current": None, "running": [], "status": "running", "error": "",
                    "started": prev.get("started", time.time()) if resume else time.time(), "updated": time.time()}
     save_meta(meta)
 
@@ -2808,52 +3110,86 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
         await broadcast(pid, {"type": "versions"})
     try:
         while True:
-            agent = next((a for a in team if a["id"] not in done), None)
-            if agent is None:
+            if schedule is not None and schedule.done() and not plan.get("parallel"):
+                groups = schedule.result() if not schedule.cancelled() and schedule.exception() is None else []
+                schedule = None
+                if groups:                          # the Orchestrator's groups for a first build arrived while Brief worked
+                    plan = {**plan, "parallel": groups}
+                    update_run(pid, plan=plan)
+                    await broadcast(pid, {"type": "schedule", "groups": groups})
+            remaining = [a["id"] for a in team if a["id"] not in done]
+            step = [a for i in orch.next_step(remaining, plan.get("parallel") or []) for a in team if a["id"] == i]
+            if not step:
                 break
-            fix = send_back.get(agent["id"])
-            if agent["id"] == REVIEWER:
-                extra = send_back_brief(team, done, review_round)
-            else:
-                extra = review_feedback(fix, review_round) if fix else run_plan_brief(plan, agent["id"])
-            update_run(pid, current=agent["id"])
-            agent_images = images
-            if agent["id"] in checked and browser_check.available():
-                await broadcast(pid, {"type": "browser_check_start", "agent": agent["id"]})
+            extras, fixes = {}, {}
+            for agent in step:
+                fix = fixes[agent["id"]] = send_back.get(agent["id"])
+                if agent["id"] == REVIEWER:
+                    extras[agent["id"]] = send_back_brief(team, done, review_round)
+                else:
+                    extras[agent["id"]] = review_feedback(fix, review_round) if fix else run_plan_brief(plan, agent["id"])
+            update_run(pid, current=step[0]["id"], running=[a["id"] for a in step])
+            agent_images = {a["id"]: images for a in step}
+            looked = [a for a in step if a["id"] in checked]
+            if looked and browser_check.available():  # one check serves every agent of the step that gets one
+                await broadcast(pid, {"type": "browser_check_start", "agent": looked[0]["id"]})
                 report = await safe_browser_check(pid)
                 if report is not None:
-                    extra += browser_check.prompt_block(report)
-                    agent_images = [*images, *report["screenshots"]]
-                    await broadcast(pid, {"type": "browser_check", "agent": agent["id"], "text": browser_check.summary(report),
+                    for a in looked:
+                        extras[a["id"]] += browser_check.prompt_block(report)
+                        agent_images[a["id"]] = [*images, *report["screenshots"]]
+                    await broadcast(pid, {"type": "browser_check", "agent": looked[0]["id"], "text": browser_check.summary(report),
                                           "problems": browser_check.problems(report), "screenshots": report["screenshots"]})
-            await broadcast(pid, {"type": "agent_start", "agent": agent["id"], **({"fix": True} if fix else {})})
-            summary = await run_agent(pid, agent, common, request, notes, load_meta(pid), agent_images, extra)
-            summary += await build_qr_codes(pid)
-            items = []
-            if agent["id"] == REVIEWER:
-                allowed = [] if review_round >= REVIEW_ROUNDS else [a["id"] for a in team if a["id"] in done and a["id"] != REVIEWER]
-                items, summary = parse_send_back(summary, allowed)
-                summary = summary or "Review done."
-            notes.append(f"- {agent['name']} agent{' (fix)' if fix else ''}: {summary}")
-            done.append(agent["id"])
-            send_back.pop(agent["id"], None)
-            v = safely("Snapshot", VERS.snapshot, pid, f"After {agent['name']}{' (fix)' if fix else ''}",
-                       kind="agent", agent=agent["id"], request=request)
-            await broadcast(pid, {"type": "agent_done", "agent": agent["id"], "text": summary,
-                                  "stat": last_stat(pid), "version": v["n"] if v else None})
-            await report_scan(pid, agent, seen_findings)
-            new_pages = safely("Pages", sync_pages, pid)
-            if new_pages:
-                await broadcast(pid, {"type": "pages", "pages": new_pages})
+            if len(step) > 1:
+                await broadcast(pid, {"type": "parallel", "agents": [a["id"] for a in step]})
+            for agent in step:
+                await broadcast(pid, {"type": "agent_start", "agent": agent["id"], **({"fix": True} if fixes[agent["id"]] else {}),
+                                      **({"with": [a["id"] for a in step if a is not agent]} if len(step) > 1 else {})})
+            # every agent of the step reads the notes left before it, then they work at the same time
+            meta_now = load_meta(pid)
+            results = await asyncio.gather(*(run_agent(pid, a, common, request, notes, meta_now, agent_images[a["id"]], extras[a["id"]])
+                                             for a in step), return_exceptions=True)
+            failure = next((r for r in results if isinstance(r, BaseException)), None)
+            finished, items = [], []
+            for agent, summary in zip(step, results):
+                if isinstance(summary, BaseException):
+                    continue
+                fix = fixes[agent["id"]]
+                summary += await build_qr_codes(pid)
+                if agent["id"] == REVIEWER:
+                    allowed = [] if review_round >= REVIEW_ROUNDS else [a["id"] for a in team if a["id"] in done and a["id"] != REVIEWER]
+                    items, summary = parse_send_back(summary, allowed)
+                    summary = summary or "Review done."
+                notes.append(f"- {agent['name']} agent{' (fix)' if fix else ''}: {summary}")
+                done.append(agent["id"])
+                send_back.pop(agent["id"], None)
+                finished.append((agent, summary, fix))
+            v = None
+            if finished:
+                names = " + ".join(f"{a['name']}{' (fix)' if f else ''}" for a, _, f in finished)
+                v = safely("Snapshot", VERS.snapshot, pid, f"After {names}", kind="agent", agent=finished[0][0]["id"], request=request)
+            for agent, summary, _fix in finished:
+                await broadcast(pid, {"type": "agent_done", "agent": agent["id"], "text": summary,
+                                      "stat": last_stat(pid, agent["id"]), "version": v["n"] if v else None})
+            if finished:
+                await report_scan(pid, {"id": finished[0][0]["id"], "name": " + ".join(a["name"] for a, _, _ in finished)}, seen_findings)
+                new_pages = safely("Pages", sync_pages, pid)
+                if new_pages:
+                    await broadcast(pid, {"type": "pages", "pages": new_pages})
             if items:
                 # Send the work back: those agents (and the Critic after them) run again, in team order.
                 review_round += 1
                 send_back = {i["agent"]: i for i in items}
                 done = [d for d in done if d not in send_back and d != REVIEWER]
-                await broadcast(pid, {"type": "send_back", "agent": agent["id"], "round": review_round,
+                await broadcast(pid, {"type": "send_back", "agent": REVIEWER, "round": review_round,
                                       "rounds": REVIEW_ROUNDS, "items": items})
-            update_run(pid, done=done, notes=notes, current=None, review_round=review_round, send_back=send_back)
-            spent += float(last_stat(pid).get("cost") or 0)
+            update_run(pid, done=done, notes=notes, current=None, running=[], review_round=review_round, send_back=send_back)
+            if failure is not None:
+                if isinstance(failure, asyncio.CancelledError):
+                    raise failure
+                update_run(pid, current=next(a["id"] for a, r in zip(step, results) if r is failure))
+                raise failure
+            spent += sum(float(last_stat(pid, a["id"]).get("cost") or 0) for a, _, _ in finished)
             if limit and spent >= limit and any(a["id"] not in done for a in team):
                 # the member's own money: stop at their limit, keep what's done, and let them Continue on purpose
                 run = update_run(pid, status="stopped", error="")
@@ -2864,31 +3200,33 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
                 return
         meta = load_meta(pid)
         meta["history"].append(request)
-        meta["run"].update(status="done", current=None, updated=time.time())
+        meta["run"].update(status="done", current=None, running=[], updated=time.time())
         save_meta(meta)
         await broadcast(pid, {"type": "run_done"})
     except asyncio.CancelledError:
-        if st["proc"] and st["proc"].returncode is None:
-            st["proc"].kill()
-        run = update_run(pid, status="stopped")
+        kill_procs(st)
+        run = update_run(pid, status="stopped", running=[])
         await broadcast(pid, {"type": "run_stopped", "run": run_summary(run)})
     except Exception as e:
-        run = update_run(pid, status="error", error=str(e)[-500:])
+        run = update_run(pid, status="error", running=[], error=str(e)[-500:])
         await broadcast(pid, {"type": "error", "text": str(e), "run": run_summary(run)})
     finally:
-        st["proc"] = None
+        kill_procs(st)
+        if schedule is not None and not schedule.done():
+            schedule.cancel()
 
 
 class OrchestratorUnavailable(RuntimeError):
     """Claude Code itself can't run (not installed, not logged in, rate-limited): no point running the team either."""
 
 
-async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict) -> dict | None:
-    """Ask the Orchestrator (read-only `claude -p`) which agents to run. Returns its parsed JSON, or None."""
+async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict, first_build: bool = False) -> dict | None:
+    """Ask the Orchestrator (read-only `claude -p`) which agents to run. Returns its parsed JSON, or None.
+    With first_build, it only chooses which of the team's agents may work at the same time."""
     folder = site_dir(pid)
     role, model = orch.load_prompt()
     model = model if model and model_catalog.allowed(model) else MODEL
-    prompt = orch.build_prompt(meta, request, team, folder, clean_text, site_pages(meta), brief_block(meta))
+    prompt = orch.build_prompt(meta, request, team, folder, clean_text, site_pages(meta), brief_block(meta), first_build=first_build)
     cmd = [CLAUDE, "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--restricted", "--strict-mcp-config", "--disable-slash-commands",
            "--tools", "Read,Glob,Grep", "--allowedTools", "Read", "Glob", "Grep",
@@ -2909,7 +3247,7 @@ async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict)
         raise OrchestratorUnavailable(f"Claude Code wasn't found or isn't executable (tried “{CLAUDE}”). "
                                       "Install it, or set CLAUDE_BIN to its path, then restart the server.")
     st = live(pid)
-    st["proc"] = proc
+    st["procs"].add(proc)
     started, info, text, outcome = time.time(), {"model": model or ""}, "", "error"
 
     async def read():
@@ -2948,7 +3286,7 @@ async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict)
     finally:
         if proc.returncode is None:
             proc.kill()
-        st["proc"] = None
+        st["procs"].discard(proc)
         safely("Recording stats", record_stat, pid, {"agent": "orchestrator", "status": outcome, "ts": started,
                                                      "request": request[:100], "seconds": round(time.time() - started, 1), **info})
     decision = orch.parse(text)
@@ -3002,7 +3340,10 @@ async def start_plan(pid: str, request: str, plan: dict, images: list[str]):
     meta = load_meta(pid)
     keys = contact.missing(plan["agents"], meta)
     if not keys:
-        await run_chain(pid, request, plan["agents"], images=images, plan=plan)
+        schedule = None
+        if plan.get("first") and not plan.get("parallel") and orch.could_pair(plan["agents"]):
+            schedule = asyncio.create_task(schedule_first_build(pid, request, plan["agents"]))
+        await run_chain(pid, request, plan["agents"], images=images, plan=plan, schedule=schedule)
         return
     qs = contact.questions(keys)
     reply = ("Before the team starts, a few contact details. Skip any you don't have yet: "
@@ -3012,6 +3353,23 @@ async def start_plan(pid: str, request: str, plan: dict, images: list[str]):
     meta["pending"] = {"request": request, "plan": {**plan, "confirm": False}, "images": images}
     meta["last_exchange"] = {"request": request[:PROMPT_LIMIT], "reply": reply, "questions": qs, "images": images, "needs": keys}
     save_meta(meta)
+
+
+async def schedule_first_build(pid: str, request: str, agent_ids: list[str]) -> list[list[str]]:
+    """A first build runs the whole team without asking the Orchestrator; meanwhile (Brief works first, alone) it is
+    asked which agents may work at the same time. Any failure just means one agent after another."""
+    meta = load_meta(pid)
+    team = [a for a in await project_agents(meta) if a["id"] in agent_ids]
+    if len(team) < 3:
+        return []
+    try:
+        raw = await run_orchestrator(pid, request, team, meta, first_build=True)
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        log.warning("Couldn't plan parallel steps for %s: %s", pid, e)
+        return []
+    return orch.clean_parallel((raw or {}).get("parallel"), [a["id"] for a in team])
 
 
 async def build_qr_codes(pid: str) -> str:
@@ -3034,12 +3392,13 @@ async def report_scan(pid: str, agent: dict, seen: set):
                                       "Check them: they can be a sign of a prompt injection.", "items": new[:8]})
 
 
-def last_stat(pid: str) -> dict:
+def last_stat(pid: str, agent_id: str | None = None) -> dict:
+    """The latest agent run recorded on this project (of one agent: several may finish close together)."""
     try:
         stats = load_meta(pid).get("stats") or []
     except HTTPException:
         return {}
-    return stats[-1] if stats else {}
+    return next((e for e in reversed(stats) if agent_id is None or e.get("agent") == agent_id), {})
 
 
 async def run_retry(pid: str, agent: dict, request: str, note: str):
@@ -3064,17 +3423,16 @@ async def run_retry(pid: str, agent: dict, request: str, note: str):
             summary = parse_send_back(summary, [])[1] or "Review done."
         v = safely("Snapshot", VERS.snapshot, pid, f"After {agent['name']} (retry)", kind="agent", agent=agent["id"], request=request)
         await report_scan(pid, agent, set(found_before))
-        await broadcast(pid, {"type": "agent_done", "agent": agent["id"], "text": summary, "stat": last_stat(pid),
+        await broadcast(pid, {"type": "agent_done", "agent": agent["id"], "text": summary, "stat": last_stat(pid, agent["id"]),
                               "version": v["n"] if v else None})
         await broadcast(pid, {"type": "run_done", "retry": True})
     except asyncio.CancelledError:
-        if st["proc"] and st["proc"].returncode is None:
-            st["proc"].kill()
+        kill_procs(st)
         await broadcast(pid, {"type": "run_stopped", "retry": True, "run": run_summary(load_meta(pid).get("run"))})
     except Exception as e:
         await broadcast(pid, {"type": "error", "text": str(e), "retry": True})
     finally:
-        st["proc"] = None
+        kill_procs(st)
 
 
 @app.websocket("/ws/{pid}")
@@ -3123,6 +3481,11 @@ async def ws_endpoint(ws: WebSocket, pid: str):
                 st["clients"].discard(ws)
                 await ws.close(code=4401)
                 return
+            if msg.get("type") in ("prompt", "continue", "restart", "retry", "answer", "stop") \
+                    and not collab.can_edit(await auth.user_for_token(token), load_meta(pid)):
+                await ws.send_json({"type": "error", "viewer": True,
+                                    "text": "You can watch this project but not run its agents. Ask its owner to make you an editor."})
+                continue
             if msg.get("type") in ("prompt", "continue", "restart", "retry", "answer") and not is_busy(pid):
                 me_now, meta_now = await auth.user_for_token(token), load_meta(pid)
                 if keys.USER_MODE and not meta_now.get("owner") and me_now["role"] == "admin":

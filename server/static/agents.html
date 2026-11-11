@@ -172,7 +172,7 @@ async function listView() {
     <div class="bar-top"><h1>My agents</h1>
       <a class="btn btn-ghost" href="/hire">${icon("briefcase", { size: 16 })}Browse the marketplace</a>
       <button class="btn btn-ghost" id="importBtn" title="Import an agent (.md), a team (.json) or an export (.zip)">${icon("file-plus", { size: 16 })}Import</button>
-      <a class="btn btn-ghost" href="/api/export" title="All agents, shared rules and your teams as a .zip">${icon("download", { size: 16 })}Export all</a>
+      ${seesInstructions(me) ? `<a class="btn btn-ghost" href="/api/export" title="All agents, shared rules and your teams as a .zip">${icon("download", { size: 16 })}Export all</a>` : ""}
       <a class="btn btn-dark" href="/agents/new">${icon("plus", { size: 16 })}New agent</a></div>
     <a class="rules-row" href="/agents/rules"><span class="tile" style="--c:#766a7c">${icon("layers", { size: 17 })}</span>
       <span><b>Shared rules</b><small>Instructions every agent receives before its own role</small></span><span class="go">${icon("arrow-right", { size: 16 })}</span></a>
@@ -283,7 +283,7 @@ async function detailView(id) {
             <span class="badge">${a.teams.length} team${a.teams.length === 1 ? "" : "s"}</span>
           </div></div>
         <div class="acts">
-          <a class="btn btn-ghost btn-sm" href="/api/agents/${encodeURIComponent(a.id)}/export" title="Download this agent as a .md file">${icon("download", { size: 14 })}Export</a>
+          ${a.instructions_locked ? "" : `<a class="btn btn-ghost btn-sm" href="/api/agents/${encodeURIComponent(a.id)}/export" title="Download this agent as a .md file">${icon("download", { size: 14 })}Export</a>`}
           <a class="btn btn-ghost btn-sm" href="/agents/new?from=${encodeURIComponent(a.id)}">${icon("copy", { size: 14 })}Duplicate</a>
           ${a.editable ? `<button class="btn btn-ghost btn-sm" id="del">${icon("trash", { size: 14 })}Delete</button>
           <a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">${icon("pencil", { size: 14 })}Edit</a>` : ""}
@@ -299,9 +299,9 @@ async function detailView(id) {
     ${marketCard("agent", a.market)}
     <div class="grid2">
       <section class="card">
-        <h2>${icon("file", { size: 16 })}Instructions<span class="spacer"></span>
-          <button class="btn btn-ghost btn-sm" id="copyRole">${icon("copy", { size: 14 })}Copy</button></h2>
-        <pre class="role">${esc(a.role)}</pre>
+        <h2>${icon(a.instructions_locked ? "lock" : "file", { size: 16 })}Instructions<span class="spacer"></span>
+          ${a.instructions_locked ? "" : `<button class="btn btn-ghost btn-sm" id="copyRole">${icon("copy", { size: 14 })}Copy</button>`}</h2>
+        ${a.instructions_locked ? instructionsLockedHTML() : `<pre class="role">${esc(a.role)}</pre>`}
       </section>
       <div style="display:flex;flex-direction:column;gap:16px">
         <section class="card">
@@ -327,7 +327,7 @@ async function detailView(id) {
     </nav>`;
   const mk = app.querySelector(".market-card");
   if (mk) bindMarketCard(mk, "agent", a.id, () => detailView(id));
-  $("copyRole").onclick = async () => { try { await navigator.clipboard.writeText(a.role); toast("Instructions copied"); } catch { toast("Copy failed", "err"); } };
+  if ($("copyRole")) $("copyRole").onclick = async () => { try { await navigator.clipboard.writeText(a.role); toast("Instructions copied"); } catch { toast("Copy failed", "err"); } };
   if ($("del")) $("del").onclick = async () => {
     if (!await confirmDialog({ title: `Delete “${a.name}”?`, ok: "Delete", danger: true,
       text: `This deletes the agent${a.scope === "shared" ? " for everyone" : ""}. Projects and teams that use it will simply skip it.` })) return;
@@ -480,7 +480,14 @@ async function rulesView() {
   setTitle("Shared rules");
   app.innerHTML = `<p class="note">Loading…</p>`;
   let rules, me;
-  try { [rules, me] = await Promise.all([api("/api/agents/common").then(r => r.text), getMe()]); }
+  me = await getMe().catch(() => null);
+  if (!seesInstructions(me)) {
+    app.innerHTML = `<a class="crumb" href="/agents">${icon("arrow-right", { size: 14, cls: "flip" })}All agents</a>
+      <section class="card"><div class="vhead" style="margin-bottom:18px"><span class="tile" style="--c:#766a7c">${icon("layers", { size: 30 })}</span>
+        <div><h1>Shared rules</h1><div class="sub">Given to every agent before its own instructions</div></div></div>${instructionsLockedHTML()}</section>`;
+    return;
+  }
+  try { rules = await api("/api/agents/common").then(r => r.text); }
   catch (err) { return showError(app, err, rulesView, "Couldn't load the shared rules"); }
   app.innerHTML = `
     <a class="crumb" href="/agents">${icon("arrow-right", { size: 14, cls: "flip" })}All agents</a>

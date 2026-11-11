@@ -104,6 +104,67 @@
   .start .txt b { font-weight: 500; font-size: 14px; }
   .start .txt small { font-size: 13px; color: var(--stone); line-height: 1.45; }
   .count-row.hot b { color: var(--danger); }
+
+  /* page lead under the title */
+  .head-lead { margin: 6px 0 0; font-size: 15px; color: var(--graphite); }
+  .head-main { min-width: 0; }
+
+  /* the main column (projects) and the side column (shared, comments, agents) */
+  .main-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  #commentsSlot:empty { display: none; }
+  .panel-head .sub { font-size: 12px; color: var(--stone); font-weight: 400; }
+  .tile-link { text-decoration: none; color: inherit; transition: border-color .15s; }
+  .tile-link:hover { border-color: var(--sky); }
+
+  /* small tags on a project row */
+  .tags { display: flex; gap: 6px; flex: none; align-items: center; }
+  .rtag { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: var(--r-pill); font-size: 11px; font-weight: 500; background: var(--linen); color: var(--graphite); white-space: nowrap; }
+  .rtag.hot { background: rgb(var(--sky-rgb) / .14); color: var(--sky); }
+
+  /* client comments left through share links */
+  .cmt-list { display: flex; flex-direction: column; }
+  .cmt { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; padding: 10px 8px; margin: 0 -8px; text-decoration: none; color: inherit; }
+  .cmt + .cmt { border-top: 1px solid var(--line); }
+  .cmt:hover { background: var(--ice); }
+  .cmt .pin { grid-row: span 2; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50% 50% 50% 4px; background: var(--sky); color: var(--on-sky); }
+  [dir="rtl"] .cmt .pin { border-radius: 50% 50% 4px 50%; }
+  .cmt p { margin: 0; font-size: 14px; line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+  .cmt small { font-size: 12px; color: var(--stone); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* a friendlier empty state */
+  .empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 28px 12px 12px; }
+  .empty .ring { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--ice); color: var(--sky); }
+  .empty h3 { margin: 4px 0 0; font-size: 16px; font-weight: 500; }
+  .empty p { margin: 0; max-width: 400px; font-size: 14px; line-height: 1.5; color: var(--stone); }
+  .empty .acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+
+  /* what's new: three short tips, dismissed once */
+  .news { grid-column: 1 / -1; background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 16px 20px 20px; }
+  .news .panel-head { margin-bottom: 12px; align-items: center; }
+  .news h2 { margin: 0; font-size: 14px; font-weight: 500; letter-spacing: .02em; }
+  .news ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .news li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; align-content: start; padding: 14px; border-radius: var(--r); background: var(--mist); box-shadow: var(--ring); }
+  .news .ni { grid-row: span 3; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r); background: var(--ice); color: var(--sky); }
+  .news b { font-size: 14px; font-weight: 500; }
+  .news small { font-size: 13px; line-height: 1.45; color: var(--stone); }
+  .news li a { justify-self: start; font-size: 13px; color: var(--sky); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; }
+  .news li a:hover { text-decoration: underline; }
+  .news .close { background: none; border: 0; padding: 4px; color: var(--stone); cursor: pointer; border-radius: var(--r); display: grid; place-items: center; }
+  .news .close:hover { background: var(--ice); color: var(--ink); }
+
+  @media (max-width: 960px) {
+    .main-grid { grid-template-columns: minmax(0, 1fr); }
+    .main-grid > .col { display: contents; }          /* one column: the panels line up by importance */
+    .news { order: 4; }
+    .o-1 { order: 1; } .o-2 { order: 2; } .o-3 { order: 3; } .o-4 { order: 4; } .o-5 { order: 5; } .o-6 { order: 6; }
+    .news ul { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .tags .rtag.role { display: none; }
+    .news { padding: 14px 16px 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .tile-link { transition: none; } }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 </head>
@@ -171,21 +232,85 @@ function timeChart(agents) {
     <div class="hbar-track"><i style="width:${(a.seconds / max) * 100}%"></i></div></div>`).join("")}</div>`;
 }
 
+/* A project row: name, what it is, its state, who it's shared with and how many client comments wait. */
+function projectRow(p) {
+  const tags = [
+    p.busy ? `<span class="badge live">Working</span>` : p.paused ? `<span class="badge">Paused</span>` : "",
+    p.role === "editor" ? `<span class="rtag role" title="Someone invited you to work on this project">Editor</span>`
+      : p.role === "viewer" ? `<span class="rtag role" title="Someone invited you to watch this project">Viewer</span>`
+      : p.shared ? `<span class="rtag role" title="You invited people to this project">${icon("users", { size: 12 })}Shared</span>` : "",
+    `<span class="cmt-tag" data-pid="${esc(p.id)}"></span>`,
+  ].join("");
+  return `<a class="prow" href="/p/${esc(p.id)}">
+    <span class="nm" data-no-i18n><b>${esc(p.name)}</b><small>${esc(p.description || "")}</small></span>
+    <span class="tags">${tags}</span>
+    <span class="when">${ago(p.updated)}</span>${icon("arrow-right", { size: 15 })}</a>`;
+}
+
+/* Comments clients pinned through share links, for the projects on this screen. Loaded after the page shows. */
+async function loadComments(list) {
+  const built = list.filter(p => p.has_preview);
+  if (!built.length) return;
+  const results = await Promise.all(built.map(p => api(`/api/projects/${p.id}/comments`).then(c => ({ p, c })).catch(() => null)));
+  const open = [];
+  for (const r of results) {
+    if (!r || !Array.isArray(r.c)) continue;
+    const mine = r.c.filter(c => !c.resolved);
+    open.push(...mine.map(c => ({ ...c, project: r.p })));
+    const tag = document.querySelector(`.cmt-tag[data-pid="${CSS.escape(r.p.id)}"]`);
+    if (tag && mine.length) tag.outerHTML = `<span class="rtag hot" title="Open client comments">${icon("message", { size: 12 })}<span data-no-i18n>${mine.length}</span></span>`;
+  }
+  const slot = document.getElementById("commentsSlot");
+  if (!open.length || !slot) return;
+  open.sort((a, b) => b.created - a.created);
+  slot.innerHTML = `<section class="panel">
+    <div class="panel-head"><h2>Client comments</h2><span class="sub"><span data-no-i18n>${open.length}</span> <span>open</span></span></div>
+    <div class="cmt-list">${open.slice(0, 4).map(c => `
+      <a class="cmt" href="/p/${esc(c.project.id)}?tab=share">
+        <span class="pin">${icon("message", { size: 13 })}</span>
+        <p data-no-i18n>${esc(c.text)}</p>
+        <small><span data-no-i18n>${esc(c.author || "")}${c.author ? " · " : ""}${esc(c.project.name)}</span> · ${ago(c.created)}</small></a>`).join("")}</div>
+  </section>`;
+}
+
+/* What's new in the studio: shown until the member closes it. */
+const NEWS_KEY = "atelier-dash-news-1";
+const newsSeen = () => { try { return localStorage.getItem(NEWS_KEY) === "1"; } catch { return false; } };
+function newsCard(me, builtProject) {
+  if (newsSeen()) return "";
+  const agency = me.role === "admin" || me.plan === "agency";
+  const items = [
+    { ic: "split", title: "Agents work side by side", text: "Agents that don't depend on each other, like Design System and Copywriter, now work at the same time, so builds finish sooner." },
+    { ic: "link", title: "Share links for clients", text: "Send a read-only link with an end date. Clients pin comments on the page, and you see them live in the studio's Share tab.",
+      href: builtProject ? `/p/${builtProject.id}?tab=share` : null, cta: "Create a share link" },
+    { ic: "users", title: "Invite your team", text: "Add editors and viewers to a project by email. Projects they share with you appear under Shared with me.",
+      href: agency ? null : "/profile#plan", cta: agency ? "" : "On the Agency plan" },
+  ];
+  return `<section class="news" id="news" aria-label="New in the studio">
+    <div class="panel-head"><h2>New in the studio</h2><button type="button" class="close" id="newsClose" aria-label="Hide" title="Hide">${icon("x", { size: 16 })}</button></div>
+    <ul>${items.map(i => `<li><span class="ni">${icon(i.ic, { size: 16 })}</span><b>${esc(i.title)}</b><small>${esc(i.text)}</small>
+      ${i.href ? `<a href="${i.href}">${esc(i.cta)}${icon("arrow-right", { size: 13 })}</a>` : ""}</li>`).join("")}</ul>
+  </section>`;
+}
+
 async function load() {
-  let me, projects, stats, agents, teams, users = null, planInfo;
+  let me, projects, shared = null, stats, agents, teams, users = null, planInfo;
   try {
     me = (await api("/api/auth/me")).user;
-    [projects, stats, agents, teams, users, planInfo] = await Promise.all([
-      api("/api/projects?page=1&per_page=5&mine=true"), api("/api/stats?mine=true"), api("/api/agents"), api("/api/presets"),
+    [projects, shared, stats, agents, teams, users, planInfo] = await Promise.all([
+      api("/api/projects?page=1&per_page=5&mine=true"), api("/api/projects?page=1&per_page=3&status=shared").catch(() => null),
+      api("/api/stats?mine=true"), api("/api/agents"), api("/api/presets"),
       me?.role === "admin" ? api("/api/users") : null, api("/api/plans")]);
   } catch (err) { return showError(app, err, load, "Couldn't load your dashboard"); }
   const { totals } = stats, counts = projects.counts;
+  const sharedItems = shared?.items || [], sharedCount = shared?.counts?.shared || 0;
   document.getElementById("topNew").hidden = !counts.all;           // one "new project" button per screen: the empty state has its own
   const own = (list) => list.filter(x => x.scope === "mine").length;
   const first = (me.name || "").split(" ")[0];
   const waiting = users ? users.filter(u => u.role === "unconfirmed").length : 0;
   const asks = users ? users.filter(u => u.plan_request).length : 0;
   const byKey = planInfo.keys === "user", plan = planInfo.plans.find(p => p.id === me.plan);
+  const builtProject = projects.items.find(p => p.has_preview) || sharedItems.find(p => p.has_preview && p.role === "editor");
   // the first steps, until they're all done
   const steps = [
     ...(byKey ? [{ done: !!me.claude_key?.set, title: "Add your Claude API key", text: "The agents run on your own Claude account.", href: "/profile#claude-key", cta: "Add my key" }] : []),
@@ -193,9 +318,11 @@ async function load() {
     { done: projects.prompts > 0 || totals.runs > 0, title: "Send your first request", text: "Pick a ready team or describe the page you want.", href: projects.items[0] ? `/p/${projects.items[0].id}` : "/projects/new", cta: "Open the studio" },
   ];
   const next = steps.find(s => !s.done);
+  const lead = counts.working ? `${counts.working} ${counts.working === 1 ? "project is" : "projects are"} being built right now.`
+    : counts.all ? "Pick up where you left off, or start something new." : "Describe a website and hire a team of agents to build it.";
   document.title = "Dashboard · Agents Atelier";
   app.innerHTML = `
-    <div class="head"><h1 class="page-title">${first ? `Welcome back, ${esc(first)}` : "Welcome back"}</h1>
+    <div class="head"><div class="head-main"><h1 class="page-title">${first ? `Welcome back, ${esc(first)}` : "Welcome back"}</h1><p class="head-lead">${lead}</p></div>
       <div class="head-acts">${me.role === "admin" ? "" : `<a class="plan-chip" href="/profile#plan">${icon("sparkles", { size: 14 })}<span>${esc(plan?.name || "Starter")} plan</span>${me.plan !== "agency" ? `<b>Upgrade</b>` : ""}</a>`}
         <a class="btn btn-ghost" href="/hire">${icon("users", { size: 16 })}Browse agents</a></div></div>
 
@@ -208,38 +335,49 @@ async function load() {
     </section>` : ""}
 
     <section class="tiles" aria-label="Your numbers">
-      <div class="tile"><h2>Projects</h2><b>${counts.all}</b><small>${counts.working ? `${counts.working} building now` : `${counts.built} built`}</small></div>
+      <a class="tile tile-link" href="/projects"><h2>Projects</h2><b>${counts.all}</b><small><span>${counts.working ? `${counts.working} building now` : `${counts.built} built`}</span>${sharedCount ? `<span aria-hidden="true"> · </span><span>${sharedCount} shared with you</span>` : ""}</small></a>
       <div class="tile"><h2>Agent runs</h2><b>${totals.runs}</b><small>${totals.failed ? `${totals.failed} stopped or failed` : `${projects.prompts} ${projects.prompts === 1 ? "prompt" : "prompts"} sent`}</small></div>
       <div class="tile"><h2>AI cost</h2><b>${money(totals.cost)}</b><small>${byKey ? "on your Claude account" : "API equivalent, not a bill"}</small></div>
       <div class="tile"><h2>Agent time</h2><b data-no-i18n>${duration(totals.seconds)}</b><small>Total across all your runs</small></div>
     </section>
 
-    <div class="grid">
-      <section class="panel"><div class="panel-head"><h2>Agent runs, last 14 days</h2></div>${runsChart(stats.run_times || [])}</section>
-      <section class="panel"><div class="panel-head"><h2>Time per agent</h2></div>${timeChart(stats.agents)}</section>
-    </div>
-
-    <div class="grid">
-      <section class="panel">
+    <div class="main-grid">
+      ${counts.all ? newsCard(me, builtProject) : ""}
+      <div class="col">
+      <section class="panel o-1">
         <div class="panel-head"><h2>Recent projects</h2>${counts.all ? `<a href="/projects">All projects</a>` : ""}</div>
-        ${projects.items.length ? `<div class="rows">${projects.items.map(p => `
-          <a class="prow" href="/p/${esc(p.id)}">
-            <span class="nm" data-no-i18n><b>${esc(p.name)}</b><small>${esc(p.description || "")}</small></span>
-            ${p.busy ? `<span class="badge live">Working</span>` : p.paused ? `<span class="badge">Paused</span>` : ""}
-            <span class="when">${ago(p.updated)}</span>${icon("arrow-right", { size: 15 })}</a>`).join("")}</div>`
-        : `<p class="empty-note">No projects yet.</p><div style="text-align:center"><button class="btn btn-dark" data-new>${icon("plus", { size: 16 })}Create your first project</button></div>`}
+        ${projects.items.length ? `<div class="rows">${projects.items.map(projectRow).join("")}</div>`
+        : `<div class="empty"><span class="ring">${icon("sparkles", { size: 22 })}</span><h3>No projects yet</h3>
+            <p>Describe the website you need, like a job post. A team of agents plans, writes, designs and codes it while you watch.</p>
+            <div class="acts"><button class="btn btn-dark" data-new>${icon("plus", { size: 16 })}Create your first project</button>
+              <a class="btn btn-ghost" href="/hire">${icon("layers", { size: 16 })}See ready teams</a></div></div>`}
       </section>
-      <section class="panel">
-        <div class="panel-head"><h2>Your agents and teams</h2></div>
-        <a class="count-row" href="/agents?show=mine"><span>Your agents</span><b>${own(agents)}</b></a>
-        <a class="count-row" href="/teams?show=mine"><span>Your teams</span><b>${own(teams)}</b></a>
-        <a class="count-row" href="/agents?show=shared"><span>Shared agents</span><b>${agents.length - own(agents)}</b></a>
-        ${users ? `<div class="panel-head side-gap"><h2>Accounts</h2></div>
+      <section class="panel o-5"><div class="panel-head"><h2>Agent runs, last 14 days</h2></div>${runsChart(stats.run_times || [])}</section>
+      </div>
+      <div class="col side">
+        <div id="commentsSlot" class="o-2"></div>
+        ${sharedItems.length ? `<section class="panel o-3">
+          <div class="panel-head"><h2>Shared with me</h2>${sharedCount > sharedItems.length ? `<a href="/projects?status=shared">See all <span data-no-i18n>${sharedCount}</span></a>` : ""}</div>
+          <div class="rows">${sharedItems.map(projectRow).join("")}</div></section>` : ""}
+        <section class="panel o-4">
+          <div class="panel-head"><h2>Your agents and teams</h2></div>
+          <a class="count-row" href="/agents?show=mine"><span>Your agents</span><b>${own(agents)}</b></a>
+          <a class="count-row" href="/teams?show=mine"><span>Your teams</span><b>${own(teams)}</b></a>
+          <a class="count-row" href="/agents?show=shared"><span>Shared agents</span><b>${agents.length - own(agents)}</b></a>
+        </section>
+        ${users ? `<section class="panel o-4"><div class="panel-head"><h2>Accounts</h2></div>
           <a class="count-row" href="/users"><span>Users</span><b>${users.length}</b></a>
           <a class="count-row" href="/users"><span>Not confirmed</span><b>${waiting}</b></a>
-          <a class="count-row ${asks ? "hot" : ""}" href="/users"><span>Plan requests waiting</span><b>${asks}</b></a>` : ""}
-      </section>
-    </div>`;
+          <a class="count-row ${asks ? "hot" : ""}" href="/users"><span>Plan requests waiting</span><b>${asks}</b></a></section>` : ""}
+        <section class="panel o-6"><div class="panel-head"><h2>Time per agent</h2></div>${timeChart(stats.agents)}</section>
+      </div>
+    </div>
+`;
+  document.getElementById("newsClose")?.addEventListener("click", () => {
+    try { localStorage.setItem(NEWS_KEY, "1"); } catch {}
+    document.getElementById("news")?.remove();
+  });
+  loadComments([...projects.items, ...sharedItems]).catch(() => {});
 }
 load();
 </script>

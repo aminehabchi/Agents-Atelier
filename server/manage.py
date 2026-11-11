@@ -5,6 +5,8 @@
   .venv/bin/python server/manage.py migrations                   list migrations and whether each one is applied
   .venv/bin/python server/manage.py make-agents-migration [name] after editing agents/*.md or agents/_presets.json:
                                                                  write the next migration with what changed
+  .venv/bin/python server/manage.py paypal-setup                 create the PayPal product and the Pro and Agency plans
+                                                                 (needs PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in .env)
 """
 import asyncio
 import sys
@@ -56,6 +58,16 @@ def make_agents_migration(name: str):
         print("Nothing changed in agents/*.md or agents/_presets.json since the last agents migration.")
 
 
+async def paypal_setup():
+    import billing
+    if not (config.PAYPAL_CLIENT_ID and config.PAYPAL_CLIENT_SECRET):
+        raise SystemExit("Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in .env first (developer.paypal.com → Apps & Credentials).")
+    ids = await billing.setup_plans()
+    print(f"Created on PayPal ({config.PAYPAL_MODE}). Add these lines to .env, then restart the server:\n")
+    for k, v in ids.items():
+        print(f"{k}={v}")
+
+
 def main():
     args = sys.argv[1:]
     if len(args) == 2 and args[0] == "make-admin":
@@ -66,6 +78,8 @@ def main():
         asyncio.run(list_migrations())
     elif args[:1] == ["make-agents-migration"] and len(args) <= 2:
         make_agents_migration(args[1] if len(args) == 2 else "shared_agents")
+    elif args == ["paypal-setup"]:
+        asyncio.run(paypal_setup())
     elif args == ["sync-agents"]:
         raise SystemExit("sync-agents was replaced by migrations: run `manage.py make-agents-migration`, "
                          "then restart the server (or run `manage.py migrate`).")

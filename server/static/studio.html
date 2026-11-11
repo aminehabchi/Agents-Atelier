@@ -431,6 +431,43 @@
   .seg .badge.ok { background: var(--ok); }
   .seg .badge[hidden] { display: none; }
 
+
+  /* ---------- several agents at once, roles, Share tab ---------- */
+  .msg.system.par { display: inline-flex; align-items: center; gap: 6px; }
+  .note.par { margin: 8px 0 0; align-items: center; }
+  .role-tag { align-self: center; font-size: 11px; font-weight: 500; padding: 1px 8px; border-radius: var(--r-pill); background: var(--ice); color: var(--sky); white-space: nowrap; }
+  .bar .title { display: flex; flex-wrap: wrap; column-gap: 8px; }
+  .bar .title .sub { flex-basis: 100%; }
+  .bar .title .name { min-width: 0; flex: 0 1 auto; }
+  body.viewer #send, body.viewer #attach, body.viewer .retry, body.viewer #saveVersion, body.viewer [data-vrestore],
+  body.viewer .t-remove, body.viewer .sw, body.viewer #saveFile, body.viewer .autosave, body.viewer .rate { display: none !important; }
+  .sh-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .sh-list > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 12px; border-radius: var(--r); background: var(--linen); }
+  .sh-list > li.off { opacity: .6; }
+  .sh-list b { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sh-list small { display: block; font-size: 12px; color: var(--stone); margin-top: 2px; }
+  .sh-list code { display: block; font-size: 11px; color: var(--graphite); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 4px; }
+  .sh-list .acts { display: flex; gap: 2px; align-items: center; }
+  .sh-list select.input { height: 32px; padding: 0 8px; font-size: 13px; }
+  .sh-tag { font-size: 11px; padding: 1px 8px; border-radius: var(--r-pill); background: var(--paper); color: var(--graphite); margin-inline-start: 6px; }
+  .sh-tag.ok { background: var(--add-bg); color: var(--add-fg); }
+  .sh-form { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; }
+  .sh-form .input { min-width: 0; height: 38px; padding: 0 12px; font-size: 14px; }
+  #shNew { grid-template-columns: minmax(0, 1fr) auto; }
+  #shNew [name="label"] { grid-column: 1 / -1; }
+  .sh-form label.chk { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--graphite); }
+  @container (max-width: 520px) { .sh-form { grid-template-columns: 1fr; } }
+  .sh-filter { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r); background: var(--linen); }
+  .sh-filter button { border: 0; background: none; font: inherit; font-size: 12px; padding: 4px 10px; border-radius: var(--r); color: var(--stone); cursor: pointer; }
+  .sh-filter button.on { background: var(--paper); color: var(--ink); box-shadow: var(--ring); }
+  .sh-c { display: grid; gap: 6px; padding: 12px 14px; border-radius: var(--r); background: var(--linen); }
+  .sh-c.done { opacity: .65; }
+  .sh-c header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12px; color: var(--stone); }
+  .sh-c header b { color: var(--ink); font-weight: 500; font-size: 13px; }
+  .sh-c q { display: block; font-size: 12px; color: var(--graphite); quotes: "“" "”"; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sh-c p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .sh-c .acts { display: flex; flex-wrap: wrap; gap: 6px; }
+
   /* ---------- Project tab ---------- */
   .pane { position: absolute; inset: 0; display: none; overflow: auto; background: var(--linen); }
   .pane.on { display: block; }
@@ -594,6 +631,7 @@
       <button role="tab" data-tab="research" title="The Research agent's report"><i data-icon="search" data-size="16"></i><span class="lbl">Research</span></button>
       <button role="tab" data-tab="versions" title="Every saved version of the code: open, compare, restore"><i data-icon="history" data-size="16"></i><span class="lbl">Versions</span></button>
       <button role="tab" data-tab="stats" title="Cost and time per agent in this project"><i data-icon="chart" data-size="16"></i><span class="lbl">Stats</span></button>
+      <button role="tab" data-tab="share" title="Share links, comments from the people you shared with, and who works on this project"><i data-icon="share" data-size="16"></i><span class="lbl">Share</span><span class="badge" id="shareBadge" hidden></span></button>
     </div>
     <span class="spacer"></span>
     <a class="btn btn-ghost btn-sm" id="download" title="Download the code as .zip"><i data-icon="download" data-size="16"></i>.zip</a>
@@ -642,6 +680,7 @@
       <div class="pane-head"><h2>Cost &amp; time</h2><span class="meta">Every agent run in this project</span></div>
       <div id="statsBody"></div></div></div>
     <div class="pane" id="proj" role="region" aria-label="Project"></div>
+    <div class="pane" id="sharePane" role="region" aria-label="Share"></div>
   </div>
 
   <section class="team" id="team" aria-label="Agent team">
@@ -662,6 +701,7 @@ const MAX_ACTIONS = 4;
 
 let AGENTS = [], BY_ID = {}, PID = null, project = null, selected = new Set();
 let canRate = false, myRatings = {};   // the project's owner rates each agent that worked on it
+let myRole = "owner", canEdit = true;  // owner · admin · editor · viewer (see collab.py); viewers only watch
 let busy = false, ws, lastSeq = 0, replaying = false;
 let currentFile = "index.html", changed = new Set(), cards = {};
 let run = null;   // { agents: [...ids], index, started }
@@ -695,6 +735,13 @@ async function boot() {
   await loadPresets();
   const me = await getMe().catch(() => null);
   canRate = !!me && project.owner === me.id;
+  myRole = project.my_role || "owner";
+  canEdit = ["owner", "admin", "editor"].includes(myRole);
+  if (!canEdit) document.body.classList.add("viewer");
+  if (myRole === "editor" || myRole === "viewer") $("pname").insertAdjacentHTML("afterend", `<span class="role-tag" title="${myRole === "editor"
+    ? "You work on this project with its owner. The agents run on the owner's Claude account."
+    : "You can watch this project: the chat, the preview, the code and the comments. You can't change it."}">${myRole === "editor" ? "Editor" : "Viewer"}</span>`);
+  refreshShareBadge();
   if (canRate) myRatings = await api(`/api/projects/${PID}/ratings`).catch(() => ({}));
 
   selected = new Set(project.agents.filter(id => BY_ID[id]));
@@ -908,10 +955,22 @@ function handle(ev) {
       break;
     case "agent_start":
       if (!a) break;
-      if (run) run.index = run.agents.indexOf(a.id);
+      if (run) run.index = ev.with?.length ? Math.min(...[a.id, ...ev.with].map(id => run.agents.indexOf(id)).filter(n => n >= 0)) : run.agents.indexOf(a.id);
       status[a.id] = { state: "working", started: now, last: "" };
-      cards[a.id] = addAgentCard(a, now, run ? run.index + 1 : 0, run ? run.agents.length : 0, !!ev.fix);
+      cards[a.id] = addAgentCard(a, now, run ? run.index + 1 : 0, run ? run.agents.length : 0, !!ev.fix, ev.with || []);
       renderTeam();
+      break;
+    case "parallel":                      // agents the Orchestrator lets work at the same time
+      addMsg(`<div class="msg system par">${icon("split", { size: 14 })}<span>${esc(agentNames(ev.agents))} work at the same time</span></div>`);
+      break;
+    case "schedule":                      // a first build: the Orchestrator's groups arrived while Brief worked
+      addMsg(`<div class="msg system par">${icon("split", { size: 14 })}<span>Side by side in this build: ${(ev.groups || []).map(g => esc(agentNames(g))).join(" · ")}</span></div>`);
+      break;
+    case "comment":                       // a pinned comment from a share link, or one resolved / deleted by the team
+      shareChanged(ev);
+      break;
+    case "people":
+      if (tabOn("share")) loadShare();
       break;
     case "tool":
       addAction(ev.agent, ev.tool, ev.target);
@@ -946,6 +1005,7 @@ function handle(ev) {
       setBusy(false); run = null; renderTeam();
       addMsg(`<div class="msg done-card">
         <span class="lbl"><span class="tile">${icon("check", { size: 16 })}</span>Team finished${took}</span>
+        ${canEdit ? `<button class="btn btn-ghost btn-sm" type="button" data-goto-share title="Send a preview link and collect comments on the page">${icon("share", { size: 14 })}Share for feedback</button>` : ""}
         ${canRate ? `<label class="showcase"><input type="checkbox" data-showcase ${project.showcase ? "checked" : ""}>
           <span>Show this site in the portfolios of the agents that built it</span></label>` : ""}</div>`);
       if (!replaying) toast("The team finished the page");
@@ -1072,10 +1132,14 @@ const scrollDown = () => {
 };
 const addSystem = (t) => addMsg(`<div class="msg system">${esc(t)}</div>`);
 
-function addAgentCard(a, started, step, total, fix = false) {
+const agentNames = (ids) => {
+  const names = (ids || []).map(id => BY_ID[id]?.name || id);
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] || "";
+};
+function addAgentCard(a, started, step, total, fix = false, alongside = []) {
   const el = addMsg(`<div class="msg agent working" data-agent="${esc(a.id)}" style="--c:${a.color}">
     <div class="who"><span class="tile">${icon(a.icon, { size: 18 })}</span>
-      <span class="nm" title="${esc(a.description || "")}">${esc(a.name)} agent${fix ? `<small>Fixing the Critic's feedback</small>` : step ? `<small>Step ${step} of ${total}</small>` : ""}</span>
+      <span class="nm" title="${esc(a.description || "")}">${esc(a.name)} agent${fix ? `<small>Fixing the Critic's feedback</small>` : step ? `<small>Step ${step} of ${total}${alongside.length ? ` · alongside ${esc(agentNames(alongside))}` : ""}</small>` : ""}</span>
       <span class="state"><span class="timer">0s</span><span class="typing"><span></span><span></span><span></span></span></span>
       <button class="icon-btn plain retry" data-retry="${esc(a.id)}" title="Retry ${esc(a.name)}: run only this agent again">${icon("refresh", { size: 15 })}</button></div>
     <div class="actions"></div><div class="text"></div></div>`);
@@ -1115,6 +1179,7 @@ function finishCard(id, text, ended, stat) {
   addRateRow(card, id);
 }
 
+$("messages").addEventListener("click", (e) => { if (e.target.closest("[data-goto-share]")) showTab("share"); });
 $("messages").addEventListener("change", async (e) => {
   const box = e.target.closest("[data-showcase]"); if (!box) return;
   try {
@@ -1194,7 +1259,7 @@ function showPlan(ev) {
     : `<b>Orchestrator:</b> ${ev.intent === "question" ? "answer" : ev.intent === "off_topic" ? "outside what the team builds" : "a question for you"}`;
   const why = card.querySelector(".why");
   if (why) why.textContent = agents.length ? (ev.first ? "" : ev.reason || "") : (ev.reply || ev.reason || "");
-  card.querySelector(".picks, .note")?.remove();
+  card.querySelectorAll(".picks, .note").forEach(x => x.remove());
   if (agents.length && !ev.first) {
     card.insertAdjacentHTML("beforeend", `<div class="picks">${agents.map(a =>
       `<span title="${esc((ev.notes || {})[a.id] || a.description || "")}"><span style="color:${esc(a.color)}">${icon(a.icon, { size: 14 })}</span>${esc(a.name)}</span>`).join("")}</div>`);
@@ -1207,6 +1272,8 @@ function showPlan(ev) {
     card.insertAdjacentHTML("beforeend", `<div class="picks">${agents.map(a =>
       `<span title="${esc((ev.notes || {})[a.id] || a.description || "")}"><span style="color:${esc(a.color)}">${icon(a.icon, { size: 14 })}</span>${esc(a.name)}</span>`).join("")}</div>`);
   }
+  if ((ev.parallel || []).length && agents.length) card.insertAdjacentHTML("beforeend",
+    `<p class="note par">${icon("split", { size: 14 })}<span>Side by side: ${ev.parallel.map(g => esc(agentNames(g))).join(" · ")}</span></p>`);
   if (ev.fallback) card.insertAdjacentHTML("beforeend", `<p class="note">The Orchestrator couldn't decide, so every agent that's switched on runs.</p>`);
   else if (ev.confirm) addConfirm(card);
   else if (asks) addQuestions(card, ev.questions);
@@ -1310,7 +1377,9 @@ function setBusy(b) {
   $("send").innerHTML = icon(b ? "stop" : "arrow-up", { size: 18, stroke: 2 });
   $("send").classList.toggle("stop", b);
   $("send").title = b ? "Stop the agents" : "Send";
-  $("input").placeholder = b ? "Agents are working… (■ to stop)" : "Describe what to build…";
+  $("input").placeholder = !canEdit ? "You're a viewer on this project: you can watch, but not send requests"
+    : b ? "Agents are working… (■ to stop)" : "Describe what to build…";
+  $("input").disabled = !canEdit;
   const dl = $("download");
   dl.setAttribute("aria-disabled", b ? "true" : "false");
   dl.title = b ? "Available when the agents finish" : "Download the code as .zip";
@@ -1319,7 +1388,7 @@ function setBusy(b) {
   updateEditorLock();
   updateSend();
 }
-function updateSend() { $("send").disabled = !busy && !$("input").value.trim(); }
+function updateSend() { $("send").disabled = !canEdit || (!busy && !$("input").value.trim()); }
 
 $("composer").onsubmit = async (e) => {
   e.preventDefault();
@@ -1368,7 +1437,7 @@ $("pid").onclick = async () => {
 function restoreStatuses(r) {
   Object.keys(status).forEach(k => delete status[k]);
   r.agents.forEach(id => {
-    status[id] = { state: r.done.includes(id) ? "done" : id === r.current ? "stopped" : "pending" };
+    status[id] = { state: r.done.includes(id) ? "done" : (r.running?.length ? r.running.includes(id) : id === r.current) ? "stopped" : "pending" };
   });
 }
 /* ---------- long chats: keep only the latest messages in the page, load earlier ones on scroll up ----------
@@ -1510,10 +1579,11 @@ function renderTeamHead() {
   if (run && busy) {
     const total = run.agents.length, i = Math.max(run.index, 0), cur = BY_ID[run.agents[i]];
     const done = Object.values(status).filter(s => s.state === "done").length;
+    const together = run.agents.filter(id => status[id]?.state === "working");
     $("progress").style.width = `${((done + (run.index >= 0 ? .5 : 0)) / total) * 100}%`;
     $("teamHead").innerHTML = `<h3>${icon("users", { size: 16 })}Team</h3>
       <span class="now"><span class="typing"><span></span><span></span><span></span></span>
-        Step <b>${i + 1}</b> of ${total} · <b>${esc(cur?.name || "…")}</b> is working</span>
+        Step <b>${i + 1}</b> of ${total} · ${together.length > 1 ? `<b>${esc(agentNames(together))}</b> are working side by side` : `<b>${esc(cur?.name || "…")}</b> is working`}</span>
       <span class="spacer"></span>
       <span class="clock">${icon("clock", { size: 13 })}${duration((Date.now() - run.started) / 1000)}</span>${chevron}`;
   } else if (busy && !run) {
@@ -1670,7 +1740,7 @@ function saveState() {
   const url = location.pathname + (q.size ? `?${q}` : "");
   if (url !== location.pathname + location.search + location.hash) history.replaceState(history.state, "", url);
 }
-const PANES = { code: "code", research: "research", versions: "versions", stats: "stats", project: "proj" };
+const PANES = { code: "code", research: "research", versions: "versions", stats: "stats", project: "proj", share: "sharePane" };
 const tabOn = (tab) => !!$(PANES[tab])?.classList.contains("on");
 const showTab = (tab) => document.querySelector(`#tabs [data-tab="${tab}"]`)?.click();
 $("tabs").onclick = (e) => {
@@ -1683,6 +1753,7 @@ $("tabs").onclick = (e) => {
   if (b.dataset.tab === "versions") loadVersions();
   if (b.dataset.tab === "stats") loadStats();
   if (b.dataset.tab === "project") renderProject();
+  if (b.dataset.tab === "share") loadShare();
   saveState();
 };
 
@@ -1921,7 +1992,7 @@ try { autosaveOn = localStorage.getItem("autosave") !== "0"; } catch {}
 $("autosave").checked = autosaveOn;
 
 function updateEditorLock() {
-  $("source").readOnly = busy || !editor.path || !EDITABLE.test(editor.path);
+  $("source").readOnly = !canEdit || busy || !editor.path || !EDITABLE.test(editor.path);
   updateEditorState();
 }
 function updateEditorState(msg, isErr = false) {
@@ -2147,6 +2218,174 @@ async function openBrand() {
   d.showModal();
 }
 
+/* ---------- Share tab: share links, the comments people pin on the shared site, and who works on the project ----------
+   Links and comments live in share.py, people in collab.py. Comments arrive live ("comment" events). */
+let shareFilter = "open", shareData = null;
+const EXPIRY = [[7, "In 7 days"], [1, "In 1 day"], [30, "In 30 days"], [90, "In 90 days"], [0, "Never"]];
+const shareUrl = (l) => `${location.origin}/s/${l.token}`;
+function setShareBadge(comments) {
+  const n = comments.filter(c => !c.resolved).length, b = $("shareBadge");
+  b.hidden = !n; b.textContent = n; b.title = `${n} open comment${n === 1 ? "" : "s"}`;
+}
+async function refreshShareBadge() {
+  try { setShareBadge(await api(`/api/projects/${PID}/comments`)); } catch { /* the badge is a hint only */ }
+}
+function shareChanged(ev) {
+  if (ev.new && ev.comment && !replaying) toast(`New comment from ${ev.comment.author} on ${ev.comment.page}`);
+  if (tabOn("share")) loadShare(); else refreshShareBadge();
+}
+function expiresText(l) {
+  if (l.state === "revoked") return "Turned off";
+  if (!l.expires) return "Never expires";
+  const left = l.expires - Date.now() / 1000;
+  if (left <= 0) return "Expired";
+  return left < 86400 ? `Expires in ${Math.max(1, Math.round(left / 3600))} h` : `Expires in ${Math.round(left / 86400)} d`;
+}
+async function loadShare() {
+  const box = $("sharePane");
+  if (!shareData) box.innerHTML = `<div class="pane-in"><p class="note">Loading…</p></div>`;
+  try {
+    const [comments, people, links] = await Promise.all([
+      api(`/api/projects/${PID}/comments`), api(`/api/projects/${PID}/people`),
+      canEdit ? api(`/api/projects/${PID}/share`) : Promise.resolve(null)]);
+    shareData = { comments, people, links };
+  } catch (err) { return showError(box, err, loadShare, "Couldn't load the sharing settings"); }
+  setShareBadge(shareData.comments);
+  renderShare();
+}
+function renderShare() {
+  const { comments, people, links } = shareData;
+  const manage = ["owner", "admin"].includes(people.my_role);
+  const active = (links || []).filter(l => l.state === "active");
+  const linksCard = `<section class="pcard2"><header><span class="tile">${icon("link", { size: 18 })}</span><h3>Share links</h3>
+      ${links ? `<span class="pj-count">${active.length} active</span>` : ""}</header>
+    <p class="lead">Anyone with a link sees the site as it is now, without an account, until the link expires. They can pin comments on the page; they appear here.</p>
+    ${links ? `<form class="sh-form" id="shNew">
+        <input class="input" name="label" maxlength="80" placeholder="Who it's for, e.g. Client review" aria-label="Link name">
+        <select class="input" name="days" aria-label="Expires">${EXPIRY.map(([d, t]) => `<option value="${d}">${t}</option>`).join("")}</select>
+        <button class="btn btn-dark btn-sm" type="submit">${icon("plus", { size: 14 })}Create link</button>
+        <label class="chk"><input type="checkbox" name="comments" checked>Let visitors pin comments</label></form>
+      ${links.length ? `<ul class="sh-list">${links.map(l => `<li class="${l.state === "active" ? "" : "off"}">
+        <div><b data-no-i18n>${esc(l.label || "Share link")}</b>
+          <small>${expiresText(l)} · ${l.views} view${l.views === 1 ? "" : "s"} · ${l.comment_count} comment${l.comment_count === 1 ? "" : "s"}${l.comments ? "" : " · comments off"}</small>
+          ${l.state === "active" ? `<code data-no-i18n>${esc(shareUrl(l))}</code>` : ""}</div>
+        <div class="acts">${l.state === "active" ? `
+          <button class="icon-btn plain" type="button" data-copy-link="${esc(l.token)}" title="Copy link" aria-label="Copy link">${icon("copy", { size: 15 })}</button>
+          <a class="icon-btn plain" href="${esc(shareUrl(l))}" target="_blank" rel="noopener" title="Open as a visitor" aria-label="Open as a visitor">${icon("external", { size: 15 })}</a>
+          <button class="icon-btn plain" type="button" data-revoke="${esc(l.id)}" title="Turn this link off" aria-label="Turn this link off">${icon("trash", { size: 15 })}</button>` : ""}</div></li>`).join("")}</ul>`
+        : `<div class="pj-empty">${icon("link", { size: 18 })}<p>No links yet. Create one for a client or a colleague: they won't need an account.</p></div>`}`
+      : `<div class="pj-empty">${icon("lock", { size: 18 })}<p>The project's owner and editors create share links.</p></div>`}</section>`;
+
+  const roleSel = (m) => `<select class="input" data-role="${esc(m.id)}" aria-label="Role of ${esc(m.email)}">
+      <option value="editor" ${m.role === "editor" ? "selected" : ""}>Editor</option><option value="viewer" ${m.role === "viewer" ? "selected" : ""}>Viewer</option></select>`;
+  const roleName = (r) => r === "editor" ? "Editor" : "Viewer";
+  const peopleCard = `<section class="pcard2"><header><span class="tile">${icon("users", { size: 18 })}</span><h3>People</h3>
+      <span class="pj-count">${1 + people.members.length}</span></header>
+    <p class="lead">Editors work on this project like its owner: requests, code, versions and links. The agents run on the owner's Claude account. Viewers watch and read.</p>
+    ${!people.active && people.members.length ? `<p class="note">${icon("alert", { size: 14 })}<span>The owner's plan no longer includes working with other people, so they can't open this project until it's back on Agency.</span></p>` : ""}
+    <ul class="sh-list">
+      ${people.owner ? `<li><div><b data-no-i18n>${esc(people.owner.name || people.owner.email)}</b><small data-no-i18n>${esc(people.owner.email)}</small></div><div class="acts"><span class="sh-tag ok">Owner</span></div></li>` : ""}
+      ${people.members.map(m => `<li><div><b data-no-i18n>${esc(m.name || m.email)}</b><small data-no-i18n>${esc(m.email)}</small></div>
+        <div class="acts">${manage ? `${roleSel(m)}<button class="icon-btn plain" type="button" data-remove-person="${esc(m.id)}" title="Remove from the project" aria-label="Remove ${esc(m.email)}">${icon("x", { size: 15 })}</button>`
+          : `<span class="sh-tag">${roleName(m.role)}</span>`}</div></li>`).join("")}
+      ${people.invites.map(i => `<li class="off"><div><b data-no-i18n>${esc(i.email)}</b><small>Invited as ${roleName(i.role).toLowerCase()} · joins when they create their account</small></div>
+        <div class="acts">${manage ? `<button class="icon-btn plain" type="button" data-cancel-invite="${esc(i.email)}" title="Cancel the invitation" aria-label="Cancel the invitation">${icon("x", { size: 15 })}</button>` : ""}</div></li>`).join("")}
+    </ul>
+    ${manage && people.can_invite ? `<form class="sh-form" id="shInvite">
+        <input class="input" type="email" name="email" required maxlength="254" placeholder="Email address" aria-label="Email address">
+        <select class="input" name="role" aria-label="Role"><option value="editor">Editor</option><option value="viewer">Viewer</option></select>
+        <button class="btn btn-dark btn-sm" type="submit">${icon("mail", { size: 14 })}Invite</button></form>`
+      : manage ? `<div class="pj-empty">${icon("users", { size: 18 })}<p>Working on a project with other people comes with the Agency plan.</p>
+        <a class="btn btn-ghost btn-sm" href="/profile?upgrade=agency#plan">See the plans</a></div>` : ""}
+    ${["editor", "viewer"].includes(people.my_role) ? `<div class="pj-bar"><button class="btn btn-ghost btn-sm" type="button" data-leave>${icon("log-out", { size: 14 })}Leave this project</button></div>` : ""}
+  </section>`;
+
+  const open = comments.filter(c => !c.resolved), shown = (shareFilter === "open" ? open : comments.filter(c => c.resolved)).slice().reverse();
+  const commentsCard = `<section class="pcard2"><header><span class="tile">${icon("chat", { size: 18 })}</span><h3>Comments</h3>
+      <span class="pj-count">${open.length} open</span>
+      <span class="acts"><span class="sh-filter" role="group" aria-label="Show">
+        <button type="button" data-cfilter="open" class="${shareFilter === "open" ? "on" : ""}">Open</button>
+        <button type="button" data-cfilter="resolved" class="${shareFilter === "resolved" ? "on" : ""}">Resolved</button></span></span></header>
+    ${shown.length ? shown.map(c => `<article class="sh-c ${c.resolved ? "done" : ""}">
+        <header>${icon("pin", { size: 14 })}<b data-no-i18n>${esc(c.author)}</b><span>${ago(c.created)}</span>
+          <button type="button" class="pj-page" data-show-page="${esc(c.page)}" title="Preview this page">${icon("file", { size: 13 })}<code data-no-i18n>${esc(c.page)}</code></button></header>
+        ${c.snippet ? `<q data-no-i18n>${esc(c.snippet)}</q>` : ""}
+        <p data-no-i18n>${esc(c.text)}</p>
+        ${canEdit ? `<div class="acts">
+          ${c.resolved ? "" : `<button class="btn btn-dark btn-sm" type="button" data-ask-comment="${esc(c.id)}">${icon("send", { size: 14 })}Ask the team</button>`}
+          <button class="btn btn-ghost btn-sm" type="button" data-resolve="${esc(c.id)}" data-done="${c.resolved ? "0" : "1"}">${icon(c.resolved ? "refresh" : "check", { size: 14 })}${c.resolved ? "Reopen" : "Resolve"}</button>
+          <button class="icon-btn plain" type="button" data-del-comment="${esc(c.id)}" title="Delete this comment" aria-label="Delete this comment">${icon("trash", { size: 15 })}</button></div>` : ""}
+      </article>`).join("")
+      : `<div class="pj-empty">${icon("chat", { size: 18 })}<p>${shareFilter === "open" ? "No open comments. People you share a link with can click any spot of the page to leave one." : "No resolved comments yet."}</p></div>`}
+  </section>`;
+
+  $("sharePane").innerHTML = `<div class="pane-in pj">
+    <div class="pane-head"><h2>Share</h2><span class="meta">Show the site to people without an account, collect their comments, and choose who works on it</span></div>
+    <div class="pj-cols"><div class="pj-col">${commentsCard}</div><div class="pj-col">${linksCard}${peopleCard}</div></div></div>`;
+}
+$("sharePane").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = f.querySelector("button[type=submit]");
+  btn.disabled = true;
+  try {
+    if (f.id === "shNew") {
+      const l = await api(`/api/projects/${PID}/share`, { method: "POST", body: JSON.stringify({
+        label: f.label.value.trim(), days: +f.days.value, comments: f.comments.checked }) });
+      await navigator.clipboard?.writeText(shareUrl(l)).then(() => toast("Link created and copied"), () => toast("Link created"));
+    } else if (f.id === "shInvite") {
+      const r = await api(`/api/projects/${PID}/people`, { method: "POST", body: JSON.stringify({ email: f.email.value.trim(), role: f.role.value }) });
+      toast(r.joined ? `${r.email} can open this project now` : `Invitation sent to ${r.email}: they join when they create their account`);
+    }
+    await loadShare();
+  } catch (err) { btn.disabled = false; toast(err.message, "err"); }
+});
+$("sharePane").addEventListener("change", async (e) => {
+  const sel = e.target.closest("[data-role]"); if (!sel) return;
+  try { await api(`/api/projects/${PID}/people/${sel.dataset.role}`, { method: "PATCH", body: JSON.stringify({ role: sel.value }) }); toast("Role changed"); }
+  catch (err) { toast(err.message, "err"); loadShare(); }
+});
+$("sharePane").addEventListener("click", async (e) => {
+  const t = (sel) => e.target.closest(sel);
+  const call = async (path, opts, done) => { try { await api(path, opts); if (done) toast(done); await loadShare(); } catch (err) { toast(err.message, "err"); } };
+  if (t("[data-cfilter]")) { shareFilter = t("[data-cfilter]").dataset.cfilter; return renderShare(); }
+  if (t("[data-copy-link]")) {
+    const url = `${location.origin}/s/${t("[data-copy-link]").dataset.copyLink}`;
+    return navigator.clipboard?.writeText(url).then(() => toast("Link copied"), () => toast(url));
+  }
+  if (t("[data-show-page]")) {
+    const sel = $("pageSel"), pg = t("[data-show-page]").dataset.showPage;
+    if ([...sel.options].some(o => o.value === pg)) { sel.value = pg; sel.dispatchEvent(new Event("change")); }
+    return showTab("preview");
+  }
+  if (t("[data-revoke]")) {
+    if (!await confirmDialog({ title: "Turn this link off?", text: "Whoever has it won't be able to open the site any more. Its comments stay here.", ok: "Turn off", danger: true })) return;
+    return call(`/api/projects/${PID}/share/${t("[data-revoke]").dataset.revoke}`, { method: "DELETE" }, "Link turned off");
+  }
+  if (t("[data-resolve]")) {
+    const b = t("[data-resolve]");
+    return call(`/api/projects/${PID}/comments/${b.dataset.resolve}`, { method: "PATCH", body: JSON.stringify({ resolved: b.dataset.done === "1" }) });
+  }
+  if (t("[data-del-comment]")) {
+    if (!await confirmDialog({ title: "Delete this comment?", text: "It's removed for everyone, including the person who wrote it.", ok: "Delete", danger: true })) return;
+    return call(`/api/projects/${PID}/comments/${t("[data-del-comment]").dataset.delComment}`, { method: "DELETE" });
+  }
+  if (t("[data-ask-comment]")) {
+    const c = shareData.comments.find(x => x.id === t("[data-ask-comment]").dataset.askComment); if (!c) return;
+    return fillComposer(`Someone reviewing the site left this comment on ${c.page}${c.snippet ? `, on the part that reads “${c.snippet}”` : ""}`
+      + `${c.selector ? ` (element: ${c.selector})` : ""}:\n“${c.text}”\nMake the change it asks for and keep everything else as it is.`);
+  }
+  if (t("[data-remove-person]")) {
+    if (!await confirmDialog({ title: "Remove this person?", text: "They won't be able to open this project any more.", ok: "Remove", danger: true })) return;
+    return call(`/api/projects/${PID}/people/${t("[data-remove-person]").dataset.removePerson}`, { method: "DELETE" }, "Removed from the project");
+  }
+  if (t("[data-cancel-invite]")) return call(`/api/projects/${PID}/invites?email=${encodeURIComponent(t("[data-cancel-invite]").dataset.cancelInvite)}`, { method: "DELETE" }, "Invitation cancelled");
+  if (t("[data-leave]")) {
+    if (!await confirmDialog({ title: "Leave this project?", text: "You won't see it any more unless its owner invites you again.", ok: "Leave", danger: true })) return;
+    try { await api(`/api/projects/${PID}/membership`, { method: "DELETE" }); location.replace("/projects"); }
+    catch (err) { toast(err.message, "err"); }
+  }
+});
+
 // ---------- stats (cost & time)
 let agentsPg, sPage = 1, sPer = perPagePref("statsAgents", 10), rPage = 1, rPer = perPagePref("statsRuns", 10);
 async function loadStats() {
@@ -2222,6 +2461,8 @@ registerCommands([
   { group: "This project", icon: "history", title: "Versions", hint: "open, compare, restore", run: () => showTab("versions") },
   { group: "This project", icon: "save", title: "Save a version now", when: () => !busy, run: () => { showTab("versions"); $("saveVersion").click(); } },
   { group: "This project", icon: "chart", title: "Cost & time", run: () => showTab("stats") },
+  { group: "This project", icon: "share", title: "Share links and comments", run: () => showTab("share") },
+  { group: "This project", icon: "users", title: "People on this project", run: () => { showTab("share"); } },
   { group: "This project", icon: "download", title: "Download the code (.zip)", when: () => !busy, run: () => location.href = `/api/projects/${PID}/download` },
   { group: "This project", icon: "pencil", title: "Edit name, description and pages", run: () => editDetails() },
   { group: "This project", icon: "paperclip", title: "Attach reference images", run: () => $("attach").click() },

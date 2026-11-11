@@ -13,6 +13,9 @@ window.ratingText = (r) => r && r.count
   ? `<span class="good" title="${r.up} up · ${r.down} down">${icon("thumbs-up", { size: 13 })}${r.percent}%</span><span>${r.count} rating${r.count === 1 ? "" : "s"}</span>`
   : `<span>${icon("thumbs-up", { size: 13 })}No ratings yet</span>`;
 
+/* Official agents and teams are written by us and translated; a member's own name and description stay as written. */
+window.userText = (item) => item && !item.official ? "data-no-i18n" : "";
+
 window.timeText = (sec) => sec == null ? "–" : sec < 60 ? `${Math.max(1, Math.round(sec))}s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${(sec / 3600).toFixed(1)} h`;
 window.costText = (usd) => usd == null ? "–" : usd >= 0.1 ? `$${usd.toFixed(2)}` : money(usd);
 

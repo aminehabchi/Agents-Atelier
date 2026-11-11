@@ -142,6 +142,15 @@ window.duration = (sec) => {
    instead of a bare error. The page's own error toast for the same message is skipped. */
 const PLAN_NAMES = { pro: "Pro", agency: "Agency" };
 let planPromptShown = { text: "", at: 0 };
+/* Agents' instructions (and the exports that carry them) come with Pro: Starter sees what each agent does, its stats,
+   projects and ratings. The server enforces it (main.py, sees_instructions); this only shapes the pages. */
+window.seesInstructions = (user) => !!user && (user.role === "admin" || ["pro", "agency"].includes(user.plan));
+window.instructionsLockedHTML = () => `<div class="instr-locked">
+    <span class="tile">${icon("lock", { size: 18 })}</span>
+    <div><b>Instructions are visible on the Pro plan</b>
+      <p>On Starter you see what each agent does, its results, its projects and its ratings, and every official agent works for you. Pro shows the instructions each agent follows, so you can learn from them, duplicate and adapt them.</p>
+      <a class="btn btn-dark btn-sm" href="/profile?upgrade=pro#plan">${icon("sparkles", { size: 14 })}See the plans</a></div></div>`;
+
 window.planPrompt = (text, needs) => {
   planPromptShown = { text, at: Date.now() };
   if (document.querySelector("dialog.plan-prompt")) return;
@@ -738,7 +747,10 @@ window.importFlow = () => new Promise((resolve) => {
     { group: "Create", icon: "plus", title: "New project", run: () => newProject() },
     { group: "Create", icon: "plus", title: "New agent", run: () => location.href = "/agents/new" },
     { group: "Create", icon: "plus", title: "New team", run: () => location.href = "/teams/new" },
-    { group: "Agents & teams", icon: "download", title: "Export all agents and teams (.zip)", run: () => location.href = "/api/export" },
+    { group: "Agents & teams", icon: "download", title: "Export all agents and teams (.zip)", run: async () => {
+      if (seesInstructions(await getMe())) location.href = "/api/export";
+      else planPrompt("Exports contain the agents' instructions, which come with the Pro plan.", "pro");
+    } },
     { group: "Agents & teams", icon: "file-plus", title: "Import agents or teams…", run: async () => { if (await importFlow()) location.reload(); } },
     { open: true, group: "Appearance", icon: "sun", title: "Theme: light", run: () => setTheme("light") },
     { open: true, group: "Appearance", icon: "moon", title: "Theme: dark", run: () => setTheme("dark") },
@@ -923,6 +935,7 @@ window.languageButton = () => {
 
 /* ---------- the cookie notice: shown once, until dismissed ---------- */
 function cookieNotice() {
+  if (document.body.hasAttribute("data-no-cookie-note")) return;    // pages that set no cookie (a share link)
   try { if (localStorage.getItem("atelier-cookies-ok")) return; } catch { return; }
   const box = document.createElement("div");
   box.className = "cookie-note";

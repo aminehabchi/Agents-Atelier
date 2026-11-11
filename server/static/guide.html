@@ -140,6 +140,7 @@
       <a href="#keys"><i data-icon="keyboard" data-size="16"></i>Shortcuts</a>
       <a href="#market"><i data-icon="briefcase" data-size="16"></i>The marketplace</a>
       <a href="#plans"><i data-icon="sparkles" data-size="16"></i>Plans &amp; your Claude key</a>
+      <a href="#sharing"><i data-icon="share" data-size="16"></i>Sharing &amp; teamwork</a>
       <a href="#faq"><i data-icon="help" data-size="16"></i>FAQ</a>
     </nav>
 
@@ -154,13 +155,13 @@
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="users" data-size="20"></i></span><span class="n">STEP 2</span></div>
             <h3>Hire a team</h3><p>In the studio, <b>Add agents</b> and <b>Choose a team</b> open the marketplace for this project: pick a specialist or a ready team and it joins the project. Duplicate any agent on the <a href="/agents">Agents page</a> to make your own version, or save a team for a kind of job.</p></div>
           <div class="stepc"><div class="top"><span class="ico"><i data-icon="eye" data-size="20"></i></span><span class="n">STEP 3</span></div>
-            <h3>Watch &amp; refine</h3><p>Agents build it one after another. If something is missing, they ask in a short form first. Ask for changes anytime, then download the .zip.</p></div>
+            <h3>Watch &amp; refine</h3><p>Agents build it step by step, and independent ones work side by side. If something is missing, they ask in a short form first. Ask for changes anytime, share a preview link for feedback, then download the .zip.</p></div>
         </div>
       </section>
 
       <section id="studio">
         <h2><span class="num">02</span>The studio</h2>
-        <p>Each project opens in the studio: the chat on the left, the project's tabs on the right (Preview, Code, Project, Research, Versions, Stats), and the team at the bottom. The address keeps the tab, page and device you're on, so a reload or a shared link opens the same view.</p>
+        <p>Each project opens in the studio: the chat on the left, the project's tabs on the right (Preview, Code, Project, Research, Versions, Stats, Share), and the team at the bottom. The address keeps the tab, page and device you're on, so a reload or a shared link opens the same view.</p>
         <div class="anatomy">
           <div class="part"><span class="ico"><i data-icon="message" data-size="20"></i></span><h3>Chat</h3>
             <ul>
@@ -168,6 +169,7 @@
               <li><i data-icon="check" data-size="16"></i><span>While agents work, the send button turns into a stop button. After a stop you can <b>Continue</b> or <b>Start again</b>.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>Follow-up prompts build on the files that are already there.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>When your request is unclear, the Orchestrator asks a short form; for a big change, it shows its plan and waits for <b>Yes, start</b>.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Agents that don't need each other's work run <b>side by side</b> (for example Design System and Copywriter): the chat says so and their cards say who they work alongside.</span></li>
             </ul></div>
           <div class="part"><span class="ico"><i data-icon="monitor" data-size="20"></i></span><h3>Preview</h3>
             <ul>
@@ -182,7 +184,7 @@
             </ul></div>
           <div class="part"><span class="ico"><i data-icon="users" data-size="20"></i></span><h3>Team strip</h3>
             <ul>
-              <li><i data-icon="check" data-size="16"></i><span>One tile per agent in the project's team: ready, waiting, working (with a live timer and current action) or done.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>One tile per agent in the project's team: ready, waiting, working (with a live timer and current action) or done. Several tiles can be working at once.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>The team strip shows this project's agents only. Use × on a tile to remove an agent; add more from the marketplace.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>Click a tile that already worked to jump to its card in the chat.</span></li>
             </ul></div>
@@ -201,6 +203,11 @@
               <li><i data-icon="check" data-size="16"></i><span>The <b>Code</b> tab is an editor. Turn <b>Auto-save</b> on, or save with the button or Ctrl+S.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>The retry button on an agent's card runs just that agent again, with an optional extra instruction.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>Attach, paste or drop reference images on the prompt; agents look at them before they work.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="share" data-size="20"></i></span><h3>Share tab</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>Create preview links for people without an account, read the comments they pin on the page, and invite people to work with you.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>A red number on the tab counts the open comments. See <a href="#sharing">Sharing &amp; teamwork</a>.</span></li>
             </ul></div>
           <div class="part"><span class="ico"><i data-icon="folder" data-size="20"></i></span><h3>Header</h3>
             <ul>
@@ -357,9 +364,9 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
             </ul></div>
           <div class="part"><span class="ico"><i data-icon="sparkles" data-size="20"></i></span><h3>Plans</h3>
             <ul>
-              <li><i data-icon="check" data-size="16"></i><span><b>Starter</b> (free): one project, the official agents and ready teams.</span></li>
-              <li><i data-icon="check" data-size="16"></i><span><b>Pro</b>: unlimited projects, your own agents and teams, web research, more checks and versions.</span></li>
-              <li><i data-icon="check" data-size="16"></i><span><b>Agency</b>: everything in Pro, every version kept, and publishing to the marketplace.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span><b>Starter</b> (free): one project, the official agents and ready teams. You see what each agent does, its stats, projects and ratings; its instructions are shown from Pro.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span><b>Pro</b>: unlimited projects, every agent's instructions, your own agents and teams, exports, web research, more checks and versions.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span><b>Agency</b>: everything in Pro, every version kept, publishing to the marketplace, and editors and viewers on your projects.</span></li>
             </ul></div>
           <div class="part"><span class="ico"><i data-icon="pause" data-size="20"></i></span><h3>Spending limit</h3>
             <ul>
@@ -368,16 +375,43 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
             </ul></div>
           <div class="part"><span class="ico"><i data-icon="refresh" data-size="20"></i></span><h3>Changing plan</h3>
             <ul>
-              <li><i data-icon="check" data-size="16"></i><span>On <b>Profile → Plan</b>, <b>Upgrade</b> sends a request that an admin confirms with you.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>On <b>Profile → Plan</b>, a paid plan is a monthly <b>PayPal</b> subscription (card or PayPal balance): you pay on PayPal's page and the features turn on when you come back. Where online payment isn't set up, <b>Upgrade</b> sends a request that an admin confirms with you.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Moving to Starter cancels your PayPal subscription at once. Switching between Pro and Agency starts the new subscription and cancels the old one.</span></li>
               <li><i data-icon="check" data-size="16"></i><span>Moving to a lower plan applies at once. Hit a limit? A window shows which plan has the feature.</span></li>
             </ul></div>
         </div>
       </section>
 
+      <section id="sharing">
+        <h2><span class="num">11</span>Sharing &amp; teamwork</h2>
+        <p>Show the site to a client before it's finished, collect their feedback right on the page, and build it with your colleagues. Everything is in the studio's <b>Share</b> tab.</p>
+        <div class="anatomy">
+          <div class="part"><span class="ico"><i data-icon="link" data-size="20"></i></span><h3>Share links</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span><b>Create link</b> makes a read-only address for the site, valid for 1, 7, 30 or 90 days, or with no end date. It's copied for you.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Whoever has it sees the current site, page by page and at desktop, tablet or phone size, without an account.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Each link shows how often it was opened. Turn it off at any time: it stops working at once.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="pin" data-size="20"></i></span><h3>Pinned comments</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>Visitors press <b>Comment</b>, click any spot of the page and write what should change. A numbered pin marks the spot.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Comments appear live in the Share tab. <b>Ask the team</b> turns one into a request in the chat; check it, then press Enter.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span><b>Resolve</b> a comment once it's done: its pin disappears for the visitor. You can turn comments off for a link.</span></li>
+            </ul></div>
+          <div class="part"><span class="ico"><i data-icon="users" data-size="20"></i></span><h3>Editors and viewers</h3>
+            <ul>
+              <li><i data-icon="check" data-size="16"></i><span>On the Agency plan, invite people by email. Someone without an account joins as soon as they sign up with that email.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span><b>Editors</b> work like you: requests, code, versions, brand kit and links. The agents run on <b>your</b> Claude key and spending limit.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span><b>Viewers</b> watch the chat, the preview and the code, and read the comments. They can't change anything.</span></li>
+              <li><i data-icon="check" data-size="16"></i><span>Only you can invite, change roles, remove people or delete the project. Invited projects appear under <b>Shared with me</b> on the Projects page.</span></li>
+            </ul></div>
+        </div>
+      </section>
+
       <section id="faq">
-        <h2><span class="num">11</span>FAQ</h2>
+        <h2><span class="num">12</span>FAQ</h2>
         <details><summary>How long does a run take?<i data-icon="chevron-down" data-size="18"></i></summary>
-          <div>Each agent takes about 20–60 seconds, so the default team of 10 needs roughly 5–8 minutes. Remove agents you don't need from the team, and later prompts only run the agents they need.</div></details>
+          <div>Each agent takes about 20–60 seconds. The Orchestrator lets agents that don't depend on each other work side by side, so the default team usually needs about 4–6 minutes. Remove agents you don't need from the team, and later prompts only run the agents they need.</div></details>
         <details><summary>Does it cost anything?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>Two parts: your plan (Starter is free), and the AI itself, billed by Anthropic on your own Claude API key. A full site costs about $1.50–2, a small change about $0.20–0.50, and every agent card shows its cost.</div></details>
         <details><summary>Can agents touch other files on my computer?<i data-icon="chevron-down" data-size="18"></i></summary>
@@ -391,7 +425,11 @@ prefers-color-scheme, reusing the CSS variables in :root.</pre>
         <details><summary>Why is the download button locked?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>While agents are working, files change every few seconds, so a download could catch a half-finished page. The button unlocks as soon as the run finishes or you stop it.</div></details>
         <details><summary>Who can see my projects, agents and teams?<i data-icon="chevron-down" data-size="18"></i></summary>
-          <div>Your projects and the agents and teams you make are private to you, though admins can open every project. A site's preview link works for anyone you send it to.</div></details>
+          <div>Your projects and the agents and teams you make are private to you, though admins can open every project. People you invite to a project see that project only, and a share link shows only the site, until it expires or you turn it off.</div></details>
+        <details><summary>Do agents running side by side get in each other's way?<i data-icon="chevron-down" data-size="18"></i></summary>
+          <div>No. Only agents that write different things and don't need each other's result are grouped, and the server refuses risky pairs (for example HTML with CSS). If two of them do touch the same file, the second one sees the change and redoes its edit on top of it.</div></details>
+        <details><summary>How do I stop paying?<i data-icon="chevron-down" data-size="18"></i></summary>
+          <div>Move to Starter on <b>Profile → Plan</b>. Your PayPal subscription is cancelled at once and nothing more is charged. Your projects stay; only the features of the paid plan stop.</div></details>
         <details><summary>Why can't I edit a shared agent?<i data-icon="chevron-down" data-size="18"></i></summary>
           <div>Shared agents and teams are the same for everyone, so only an admin can change them. Duplicate one to get your own copy, then change anything you like.</div></details>
         <details><summary>Can I edit the generated code myself?<i data-icon="chevron-down" data-size="18"></i></summary>

@@ -80,7 +80,7 @@
   .plan.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
   .plan.want { box-shadow: 0 0 0 3px var(--sky); border-color: var(--sky); }
   .plan header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .plan header b { font-size: 15px; font-weight: 500; margin-inline-end: auto; }
+  .plan header h3 { margin: 0; font-size: 15px; font-weight: 500; margin-inline-end: auto; }
   .plan .badge.pop { background: var(--ice); color: var(--sky); }
   .plan .badge.req { background: var(--linen, var(--mist)); color: var(--graphite); }
   .plan .price b { font-size: 26px; font-weight: 500; }
@@ -91,8 +91,27 @@
   .plan li.no { color: var(--stone); }
   .plan li.no svg { color: var(--stone); }
   .plan .btn { justify-content: center; }
-  .plan-note { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.5; color: var(--stone); margin: 0 0 16px; }
+  .plan-act { display: grid; gap: 8px; }
+  .plan-how { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0; font-size: 12px; line-height: 1.4; color: var(--stone); text-align: center; }
+  .plan-how svg { flex: none; }
+  .plan-how.paid { color: var(--ok); }
+  .pn-paid { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 3px 10px; border-radius: var(--r-pill, 999px); font-size: 12px; width: fit-content;
+    background: rgb(var(--zellige-rgb) / .14); color: var(--ok); }
+  .plan-ai { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: var(--r); background: var(--ice); margin-bottom: 16px; font-size: 13px; line-height: 1.55; color: var(--graphite); }
+  .plan-ai > svg { flex: none; margin-top: 2px; color: var(--sky); }
+  .plan-ai b { display: block; color: var(--ink); font-weight: 500; font-size: 14px; margin-bottom: 2px; }
+  .plan-ai a { white-space: nowrap; }
+  .plan-note { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.5; color: var(--stone); margin: 4px 0 0; }
   .plan-note svg { flex: none; margin-top: 3px; }
+  .plan .btn[disabled] { opacity: 1; color: var(--stone); }
+  .plan-act .btn.busy { opacity: .7; cursor: progress; }
+
+  /* while the profile loads */
+  .sk { display: block; border-radius: var(--r); background: linear-gradient(90deg, var(--bone), var(--steel), var(--bone)); background-size: 200% 100%; animation: sk 1.2s linear infinite; }
+  @keyframes sk { to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) { .sk { animation: none; } .plan { transition: none; } }
+  .sk-hero { display: flex; gap: 20px; align-items: center; background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 24px; margin: 8px 0 32px; }
+  .sk-lines { flex: 1; display: grid; gap: 10px; }
   .limit { margin: 0; }
   .limit-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .limit-row .input { width: 120px; }
@@ -134,8 +153,15 @@
   }
   @media (max-width: 560px) {
     .two, .prefs { grid-template-columns: minmax(0, 1fr); }
-    .hero { padding: 20px 16px; box-shadow: var(--hard-sm); }
+    .hero { padding: 20px 16px; box-shadow: var(--hard-sm); gap: 14px; }
+    .hero-avatar { width: 56px; height: 56px; font-size: 20px; }
+    .hero-who { flex-basis: 0; }
+    .hero-who h1 { font-size: 21px; }
     .sect { padding: 20px 16px; }
+    .plan-now { padding: 16px; }
+    .pn-stats { margin-inline-start: 0; width: 100%; }
+    .pn-stat { flex: 1 1 120px; }
+    .plan-ai { padding: 12px 14px; }
   }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
@@ -153,7 +179,10 @@
   </div>
 </header>
 <main class="wrap page">
-  <div id="app"><p>Loading…</p></div>
+  <div id="app" aria-busy="true"><p class="sr-only" role="status">Loading…</p>
+    <div class="sk-hero" aria-hidden="true"><span class="sk" style="width:72px;height:72px"></span>
+      <span class="sk-lines"><span class="sk" style="width:220px;max-width:70%;height:22px"></span><span class="sk" style="width:160px;max-width:50%;height:14px"></span></span></div>
+    <div class="layout" aria-hidden="true"><span class="sk" style="height:160px"></span><span class="sk" style="height:320px"></span></div></div>
 </main>
 <script>
 document.addEventListener("click", (e) => { if (e.target.closest("[data-new]")) newProject(); });
@@ -254,11 +283,14 @@ function paintChips() {
 const PLAN_FEATURES = (p) => [
   [p.projects == null ? "Unlimited projects" : p.projects === 1 ? "One project" : `Up to ${p.projects} projects`, true],
   ["Official agents and ready teams", true],
+  ["Read every agent's instructions, export agents and teams", p.instructions],
   ["Your own agents and teams", p.custom_agents],
   ["Web research agent", p.research],
   [p.browser_checks === "all" ? "Browser checks before Responsive, Accessibility, QA and the Critic" : "Browser check before the Critic", true],
   [p.versions == null ? "Every version kept" : `Last ${p.versions} versions kept`, true],
   ["Publish to the marketplace", p.publish],
+  ["Invite editors and viewers to your projects", p.members],
+  ...(planInfo?.keys === "user" ? [[p.run_limit === p.run_limit_max ? `Spending limit fixed at $${p.run_limit} per run` : `Your own spending limit, up to $${p.run_limit_max} per run`, true]] : []),
   [p.credit ? "Downloads carry a small “Made with Agents Atelier” line" : "Downloads without the credit line", !p.credit],
 ];
 const RANK = { starter: 0, pro: 1, agency: 2 };
@@ -271,18 +303,30 @@ function paintPlan() {
   const want = new URLSearchParams(location.search).get("upgrade");          // from an "Available on Pro" prompt
   const max = isAdmin ? 1000 : cur.run_limit_max, fixed = !isAdmin && cur.run_limit === cur.run_limit_max;
   const meter = cur.projects == null || isAdmin ? "" : `<span class="meter" aria-hidden="true"><i style="width:${Math.min(100, used / cur.projects * 100)}%" class="${used >= cur.projects ? "full" : ""}"></i></span>`;
+  const paypal = planInfo.payment === "paypal";
+  /* the button of each plan card, and one line under it saying how the move happens */
+  const how = (p, text, ic, cls = "") => `<p class="plan-how ${cls}" id="plan-how-${p.id}">${icon(ic, { size: 13 })}<span>${text}</span></p>`;
   const action = (p) => {
     if (isAdmin) return "";
-    if (p.id === me.plan) return `<button class="btn btn-ghost" type="button" disabled>${icon("check", { size: 15 })}Current plan</button>`;
-    if (p.id === me.plan_request) return `<button class="btn btn-ghost" type="button" data-cancel-request>${icon("x", { size: 15 })}Cancel request</button>`;
-    return RANK[p.id] > RANK[me.plan]
-      ? `<button class="btn btn-dark" type="button" data-plan="${p.id}">${icon("sparkles", { size: 15 })}Upgrade to ${esc(p.name)}</button>`
-      : `<button class="btn btn-ghost" type="button" data-plan="${p.id}">Switch to ${esc(p.name)}</button>`;
+    if (p.id === me.plan) return `<div class="plan-act"><button class="btn btn-ghost" type="button" disabled>${icon("check", { size: 15 })}Current plan</button>
+      ${me.paid_online && p.price ? how(p, "Paid with PayPal · monthly", "check", "paid") : ""}</div>`;
+    if (p.id === me.plan_request) return `<div class="plan-act"><button class="btn btn-ghost" type="button" data-cancel-request aria-describedby="plan-how-${p.id}">${icon("x", { size: 15 })}Cancel request</button>
+      ${how(p, "Waiting for an admin", "clock")}</div>`;
+    const up = RANK[p.id] > RANK[me.plan];
+    const line = !p.price ? how(p, me.paid_online ? "Cancels your PayPal subscription" : "Applies at once", me.paid_online ? "x" : "check")
+      : paypal ? how(p, "Pay with PayPal · monthly", "lock")
+      : how(p, up ? "Sent as a request: an admin confirms it" : "Applies at once", up ? "clock" : "check");
+    const label = up ? `${icon(paypal && p.price ? "external" : "sparkles", { size: 15 })}Upgrade to ${esc(p.name)}` : `Switch to ${esc(p.name)}`;
+    return `<div class="plan-act"><button class="btn ${up ? "btn-dark" : "btn-ghost"}" type="button" data-plan="${p.id}" aria-describedby="plan-how-${p.id}">${label}</button>${line}</div>`;
   };
+  const payNote = isAdmin ? "Admins have every feature. Members' plans are set on the Users page."
+    : paypal ? `Pro and Agency are monthly PayPal subscriptions: pay with a card or your PayPal balance. The features change as soon as PayPal confirms. ${me.paid_online ? "Moving to Starter applies at once and cancels your subscription." : "Moving to Starter applies at once."}`
+    : "Online payment isn't available yet: when you upgrade, an admin confirms it with you. Moving to a lower plan applies at once.";
   box.innerHTML = `
     <div class="plan-now">
       <div class="pn-name"><span class="pn-label">${isAdmin ? "Admin" : "Your plan"}</span><b>${isAdmin ? "Every feature" : esc(cur.name)}</b>
-        <span class="pn-price">${isAdmin ? "No limits" : cur.price ? `$${cur.price} / month` : "Free"}</span></div>
+        <span class="pn-price">${isAdmin ? "No limits" : cur.price ? `$${cur.price} / month` : "Free"}</span>
+        ${!isAdmin && me.paid_online && cur.price ? `<span class="pn-paid">${icon("check", { size: 13 })}<span>Paid with PayPal · monthly</span></span>` : ""}</div>
       <div class="pn-stats">
         <div class="pn-stat"><b>${isAdmin || cur.projects == null ? used : `${used} / ${cur.projects}`}</b><span>${cur.projects == null || isAdmin ? "projects" : "projects used"}</span>${meter}</div>
         ${byKey ? `<div class="pn-stat"><b>${me.claude_key?.set ? "Added" : "Missing"}</b><span>Claude API key</span>${me.claude_key?.set ? "" : `<a href="#claude-key">Add it</a>`}</div>
@@ -293,14 +337,16 @@ function paintPlan() {
       <div><b>You asked for ${esc(asked.name)}${me.plan_request_at ? ` · ${esc(ago(me.plan_request_at))}` : ""}</b>
         <span>An admin confirms the upgrade with you, then the new features turn on. You'll see it here.</span></div>
       <button class="btn btn-ghost btn-sm" type="button" data-cancel-request>Cancel request</button></div>` : ""}
-    <div class="plans">${planInfo.plans.map(p => `<article class="plan ${p.id === me.plan && !isAdmin ? "on" : ""} ${p.id === want && p.id !== me.plan ? "want" : ""}" id="plan-${p.id}">
-      <header><b>${esc(p.name)}</b>${p.id === "pro" ? `<span class="badge pop">Most popular</span>` : ""}${p.id === me.plan && !isAdmin ? `<span class="badge">Your plan</span>` : ""}${p.id === me.plan_request ? `<span class="badge req">Requested</span>` : ""}</header>
+    ${byKey && !isAdmin ? `<div class="plan-ai">${icon("zap", { size: 18 })}<div><b>The AI is billed on your own Claude key</b>
+      <span>A plan pays for the studio and its features. What the agents use is paid to Anthropic on your own Claude account, at their prices: about $1.50–2 for a full site.</span>
+      <a href="#claude-key">${me.claude_key?.set ? "Your Claude key" : "Add your Claude key"}</a></div></div>` : ""}
+    <div class="plans">${planInfo.plans.map(p => `<article class="plan ${p.id === me.plan && !isAdmin ? "on" : ""} ${p.id === want && p.id !== me.plan ? "want" : ""}" id="plan-${p.id}" aria-labelledby="plan-name-${p.id}">
+      <header><h3 id="plan-name-${p.id}">${esc(p.name)}</h3>${p.id === "pro" ? `<span class="badge pop">Most popular</span>` : ""}${p.id === me.plan && !isAdmin ? `<span class="badge">Your plan</span>` : ""}${p.id === me.plan_request ? `<span class="badge req">Requested</span>` : ""}</header>
       <div class="price"><b>${p.price ? `$${p.price}` : "Free"}</b>${p.price ? "<span>/ month</span>" : "<span>forever</span>"}</div>
-      <ul>${PLAN_FEATURES(p).map(([text, ok]) => `<li class="${ok ? "" : "no"}">${icon(ok ? "check" : "x", { size: 14 })}<span>${esc(text)}</span></li>`).join("")}</ul>
+      <ul>${PLAN_FEATURES(p).map(([text, ok]) => `<li class="${ok ? "" : "no"}">${icon(ok ? "check" : "x", { size: 14 })}<span>${ok ? "" : `<span class="sr-only">Not included: </span>`}${esc(text)}</span></li>`).join("")}</ul>
       ${action(p)}
     </article>`).join("")}</div>
-    <p class="plan-note">${icon("alert", { size: 14 })}<span>${isAdmin ? "Admins have every feature. Members' plans are set on the Users page." :
-      "Online payment isn't available yet: when you upgrade, an admin confirms it with you. Moving to a lower plan applies at once."}${byKey ? " The AI itself is always billed on your own Claude account." : ""}</span></p>
+    <p class="plan-note">${icon(paypal && !isAdmin ? "lock" : "alert", { size: 14 })}<span>${payNote}</span></p>
 `;
   if (want && $(`plan-${want}`) && want !== me.plan) setTimeout(() => $(`plan-${want}`).scrollIntoView({ block: "center", behavior: "smooth" }), 300);
   paintLimit(); paintChips();
@@ -335,12 +381,25 @@ document.addEventListener("click", async (e) => {
     const from = planInfo.plans.find(p => p.id === me.plan), to = planInfo.plans.find(p => p.id === b.dataset.plan);
     const up = RANK[to.id] > RANK[from.id], { gain, lose } = planChange(from, to);
     const used = planInfo.usage?.projects ?? 0;
+    if (planInfo.payment === "paypal" && to.price && me.role !== "admin") {   // paid plans: a PayPal subscription
+      const ok = await confirmDialog({
+        title: `${up ? "Upgrade" : "Switch"} to ${to.name}?`, ok: "Continue to PayPal",
+        text: `${to.name} is $${to.price} a month, paid with PayPal. ${up ? `You get: ${gain.join(" · ") || "every feature of " + to.name}.` : `You lose: ${lose.join(" · ")}.`}`
+          + `${me.paid_online ? " Your current subscription is cancelled once the new one is active." : ""} The features change as soon as PayPal confirms.`,
+      });
+      if (!ok) return;
+      const label = b.innerHTML;
+      b.disabled = true; b.classList.add("busy"); b.innerHTML = `${icon("external", { size: 15 })}<span>Opening PayPal…</span>`;
+      try { location.href = (await send("/api/billing/paypal/subscribe", "POST", { plan: to.id })).approve; }
+      catch (err) { b.disabled = false; b.classList.remove("busy"); b.innerHTML = label; toast(err.message, "err"); }
+      return;
+    }
     const ok = await confirmDialog(up ? {
       title: `Upgrade to ${to.name}?`, ok: "Send my request",
       text: `${to.name} is $${to.price} a month. You get: ${gain.join(" · ") || "every feature of " + to.name}. An admin confirms the upgrade and how you pay, then the features turn on.`,
     } : {
       title: `Switch to ${to.name}?`, ok: `Switch to ${to.name}`, danger: true,
-      text: `It applies at once. You lose: ${lose.join(" · ")}.${to.projects != null && used > to.projects ? ` You keep your ${used} projects, but can't start a new one while you have ${to.projects} or more.` : ""}`,
+      text: `It applies at once. You lose: ${lose.join(" · ")}.${me.paid_online && !to.price ? " Your PayPal subscription is cancelled at once, so you won't be charged again." : ""}${to.projects != null && used > to.projects ? ` You keep your ${used} projects, but can't start a new one while you have ${to.projects} or more.` : ""}`,
     });
     if (!ok) return;
     try {
@@ -362,7 +421,17 @@ async function load() {
   try {
     [me, opts, sessions, planInfo] = await Promise.all([api("/api/auth/me").then(r => r.user), api("/api/auth/options"), api("/api/auth/sessions"),
                                                        api("/api/plans")]);
-  } catch (err) { return showError(app, err, load, "Couldn't load your profile"); }
+  } catch (err) { app.removeAttribute("aria-busy"); return showError(app, err, load, "Couldn't load your profile"); }
+  app.removeAttribute("aria-busy");
+  {
+    // back from PayPal (see billing.py): say what happened, then drop ?paid= from the address
+    const q = new URLSearchParams(location.search), paid = q.get("paid");
+    const plan = planInfo.plans.find(p => p.id === me.plan);
+    const said = { active: [`Payment confirmed: you're on ${plan?.name || me.plan} now`, ""],
+      pending: ["PayPal is confirming your payment. Your plan changes within a minute: reload this page then", ""],
+      cancelled: ["Payment cancelled: your plan didn't change", ""], error: ["PayPal couldn't be reached. If you paid, your plan changes within a few minutes", "err"] }[paid];
+    if (said) { toast(...said); q.delete("paid"); history.replaceState(null, "", location.pathname + (q.size ? `?${q}` : "") + location.hash); }
+  }
   app.innerHTML = `
     <section class="hero">
       <span class="hero-avatar" id="hero-avatar" aria-hidden="true">${esc(initialsOf(me))}</span>
@@ -413,9 +482,9 @@ async function load() {
         </div>
 
         <div class="grp" data-grp="plan" hidden>
-        <section class="sect" id="plan">
-          <h2>Plan</h2>
-          <p>Your plan unlocks features.${planInfo.keys === "user" ? " The AI itself is always paid on your own Claude account." : ""}</p>
+        <header class="grp-head"><h2>Plan</h2><p>What your plan includes, and how to change it.</p></header>
+        <section class="sect" id="plan" aria-labelledby="plan-title">
+          <h2 class="sr-only" id="plan-title">Your plan</h2>
           <div id="plan-box"></div>
         </section>
         </div>

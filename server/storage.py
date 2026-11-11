@@ -215,7 +215,8 @@ class Store:
 
         async def job(con):
             async with con.transaction():
-                for table in ("projects", "project_requests", "agent_runs", "project_events", "versions", "files"):
+                for table in ("projects", "project_requests", "agent_runs", "project_events", "versions", "files",
+                              "share_comments", "share_links", "project_members", "project_invites"):
                     await con.execute(f"DELETE FROM {table} WHERE {'id' if table == 'projects' else 'project_id'} = $1", key)
         self._write(job)
         shutil.rmtree(work_dir(pid), ignore_errors=True)

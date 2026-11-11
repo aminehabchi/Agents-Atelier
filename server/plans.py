@@ -8,6 +8,8 @@ PLANS = {
         "name": "Starter", "price": 0,
         "projects": 1,              # at most this many projects (None = no limit)
         "custom_agents": False,     # create, duplicate and edit your own agents and teams
+        "instructions": False,      # read the agents' instructions and the shared rules (Starter sees name, description,
+                                    # stats, projects and ratings); exports carry instructions, so they need it too
         "publish": False,           # publish agents and teams to the marketplace
         "research": False,          # agents with web search (Research)
         "browser_checks": "critic", # "critic": only before the Critic · "all": before Responsive, Accessibility, QA and the Critic
@@ -15,16 +17,19 @@ PLANS = {
         "credit": True,             # the downloaded .zip carries a small "Made with Agents Atelier" line
         "run_limit": 3.0,           # most a single run may spend on the member's Claude account, in USD
         "run_limit_max": 3.0,       # …and the most the member may set it to
+        "members": False,           # invite editors and viewers to a project (see collab.py)
     },
     "pro": {
         "name": "Pro", "price": 9,
-        "projects": None, "custom_agents": True, "publish": False, "research": True, "browser_checks": "all",
+        "projects": None, "custom_agents": True, "instructions": True, "publish": False, "research": True, "browser_checks": "all",
         "versions": 100, "credit": False, "run_limit": 5.0, "run_limit_max": 50.0,
+        "members": False,
     },
     "agency": {
         "name": "Agency", "price": 29,
-        "projects": None, "custom_agents": True, "publish": True, "research": True, "browser_checks": "all",
+        "projects": None, "custom_agents": True, "instructions": True, "publish": True, "research": True, "browser_checks": "all",
         "versions": None, "credit": False, "run_limit": 10.0, "run_limit_max": 200.0,
+        "members": True,
     },
 }
 DEFAULT = "starter"
@@ -62,5 +67,5 @@ class PlanError(Exception):
 
 
 def need(user: dict | None, feature: str, text: str):
-    if not of(user)[feature]:
-        raise PlanError(text, "agency" if feature == "publish" else "pro")
+    if not of(user).get(feature, True):
+        raise PlanError(text, "agency" if feature in ("publish", "members") else "pro")

@@ -2794,3 +2794,394 @@ class T30KeysAndPlans(unittest.TestCase):
         self.assertEqual((s, r["user"]["plan"]), (200, "pro"), "moving down applies at once")
         self.assertEqual(call("POST", "/api/auth/plan", {"plan": "pro"})[0], 400, "admins have every feature")
 
+
+
+class T40Parallel(unittest.TestCase):
+    """The Orchestrator's groups of agents that work at the same time (orchestrator.clean_parallel / next_step)."""
+
+    def prompt(self, pid, text, pool, until=("run_done", "error", "run_stopped")):
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": text, "agents": pool}))
+            return await recv(until, timeout=60)
+        return ws(pid, script)
+
+    def test_a_group_works_at_the_same_time_on_a_follow_up(self):
+        pid = new_project()
+        pool = ["ux", "design", "copy", "html", "css"]
+        self.assertEqual(self.prompt(pid, "first build", pool)[-1]["type"], "run_done")
+        events = self.prompt(pid, "new look and new words [[orch:design,copy]] [[par:design+copy]] [[slow]]", pool)
+        self.assertEqual(events[-1]["type"], "run_done", events[-1])
+        plan = next(e for e in events if e["type"] == "plan")
+        self.assertEqual(plan["agents"], ["brief", "design", "copy", "css"])
+        self.assertEqual(plan["parallel"], [["design", "copy"]])
+        par = next(e for e in events if e["type"] == "parallel")
+        self.assertEqual(par["agents"], ["design", "copy"])
+        kinds = [(e["type"], e.get("agent")) for e in events if e["type"] in ("agent_start", "agent_done")]
+        first_done = kinds.index(("agent_done", "design")) if ("agent_done", "design") in kinds else 99
+        self.assertLess(kinds.index(("agent_start", "copy")), first_done, "Copywriter started before Design System finished")
+        starts = {e["agent"]: e for e in events if e["type"] == "agent_start"}
+        self.assertEqual(starts["design"].get("with"), ["copy"])
+        done = [e for e in events if e["type"] == "agent_done"]
+        self.assertEqual({e["agent"] for e in done}, {"brief", "design", "copy", "css"})
+        self.assertEqual({e["stat"]["agent"] for e in done}, {"brief", "design", "copy", "css"}, "each card gets its own stats")
+        labels = [v["label"] for v in call("GET", f"/api/projects/{pid}/versions")[1]]
+        self.assertTrue(any(l.startswith("After Design System + Copywriter") for l in labels), labels)
+        meta = call("GET", f"/api/projects/{pid}")[1]
+        self.assertEqual((meta["run"]["status"], meta["run"]["running"]), ("done", []))
+
+    def test_the_server_drops_groups_its_rules_forbid(self):
+        pid = new_project()
+        pool = ["ux", "design", "copy", "html", "css"]
+        self.prompt(pid, "first build", pool)
+        events = self.prompt(pid, "everything [[orch:design,copy,html,css]] [[par:html+css,brief+design,design+css,copy+html]]", pool)
+        plan = next(e for e in events if e["type"] == "plan")
+        self.assertEqual(plan["parallel"], [], "HTML and Brief work alone; CSS adapts to Design System")
+        self.assertNotIn("parallel", types(events))
+
+    def test_a_first_build_gets_its_groups_while_brief_works(self):
+        pid = new_project()
+        LOG.write_text("")
+        events = self.prompt(pid, "a bakery [[par:design+copy]] [[slow]]", ["ux", "design", "copy", "html"])
+        self.assertEqual(events[-1]["type"], "run_done", events[-1])
+        self.assertEqual(next(e for e in events if e["type"] == "schedule")["groups"], [["design", "copy"]])
+        self.assertEqual(next(e for e in events if e["type"] == "parallel")["agents"], ["design", "copy"])
+        prompts = [c["argv"][c["argv"].index("-p") + 1] for c in log_calls() if "-p" in c["argv"]]
+        self.assertEqual(sum("<first_build>" in p for p in prompts), 1)
+
+    def test_no_orchestrator_call_when_nothing_could_pair(self):
+        pid = new_project()
+        LOG.write_text("")
+        self.prompt(pid, "a page", ["ux", "html"])
+        prompts = [c["argv"][c["argv"].index("-p") + 1] for c in log_calls() if "-p" in c["argv"]]
+        self.assertFalse(any("<first_build>" in p for p in prompts))
+
+
+class T41People(unittest.TestCase):
+    """Editors and viewers on a project (collab.py)."""
+
+    def email(self):
+        return f"team-{time.time_ns()}@example.com"
+
+    def me(self, cookie):
+        return call("GET", "/api/auth/me", cookie=cookie)[1]["user"]
+
+    def test_viewers_watch_editors_work_and_only_the_owner_manages(self):
+        owner, bob_mail = register(self.email()), self.email()
+        bob = register(bob_mail)
+        pid = new_project(cookie=owner)
+        self.assertEqual(call("GET", f"/api/projects/{pid}", cookie=bob)[0], 404, "not invited yet")
+        s, r, _ = call("POST", f"/api/projects/{pid}/people", {"email": bob_mail, "role": "viewer"}, cookie=owner)
+        self.assertEqual((s, r["joined"]), (200, True), r)
+        self.assertTrue(any(json.loads(l)["to"] == bob_mail and "added you" in json.loads(l)["text"] for l in OUTBOX.read_text().splitlines()))
+        meta = call("GET", f"/api/projects/{pid}", cookie=bob)[1]
+        self.assertEqual(meta["my_role"], "viewer")
+        listed = call("GET", "/api/projects?page=1&status=shared", cookie=bob)[1]
+        self.assertEqual([p["id"] for p in listed["items"]], [pid])
+        self.assertEqual(listed["items"][0]["role"], "viewer")
+        self.assertEqual(call("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": "<h1>x</h1>"}, cookie=bob)[0], 403)
+        self.assertEqual(call("GET", f"/api/projects/{pid}/files", cookie=bob)[0], 200)
+
+        async def prompt(sock, recv):
+            await sock.send(send({"type": "prompt", "text": "change it", "agents": ["html"]}))
+            return await recv(("error", "plan", "run_done"))
+        err = ws(pid, prompt, cookie=bob)[-1]
+        self.assertEqual((err["type"], err.get("viewer")), ("error", True))
+
+        bob_id = self.me(bob)["id"]
+        self.assertEqual(call("PATCH", f"/api/projects/{pid}/people/{bob_id}", {"role": "editor"}, cookie=owner)[0], 200)
+        self.assertEqual(call("PUT", f"/api/projects/{pid}/files", {"path": "index.html", "content": "<h1>x</h1>"}, cookie=bob)[0], 200)
+        self.assertEqual(call("PUT", f"/api/projects/{pid}/brand", {"colors": ["#112233"]}, cookie=bob)[0], 200)
+        self.assertEqual(call("POST", f"/api/projects/{pid}/people", {"email": self.email(), "role": "viewer"}, cookie=bob)[0], 403)
+        self.assertEqual(call("DELETE", f"/api/projects/{pid}", cookie=bob)[0], 403)
+        people = call("GET", f"/api/projects/{pid}/people", cookie=bob)[1]
+        self.assertEqual([(m["email"], m["role"]) for m in people["members"]], [(bob_mail, "editor")])
+
+        # the owner moves down from Agency: the people they invited can't open the project any more
+        call("POST", "/api/auth/plan", {"plan": "pro"}, cookie=owner)
+        self.assertEqual(call("GET", f"/api/projects/{pid}", cookie=bob)[0], 404)
+        call("PATCH", f"/api/users/{self.me(owner)['id']}", {"plan": "agency"})
+        self.assertEqual(call("GET", f"/api/projects/{pid}", cookie=bob)[0], 200)
+        self.assertEqual(call("DELETE", f"/api/projects/{pid}/membership", cookie=bob)[0], 200)
+        self.assertEqual(call("GET", f"/api/projects/{pid}", cookie=bob)[0], 404)
+
+    def test_an_invitation_waits_for_the_account(self):
+        owner, mail = register(self.email()), self.email()
+        pid = new_project(cookie=owner)
+        s, r, _ = call("POST", f"/api/projects/{pid}/people", {"email": mail, "role": "editor"}, cookie=owner)
+        self.assertEqual((s, r["joined"]), (200, False))
+        self.assertEqual(call("GET", f"/api/projects/{pid}/people", cookie=owner)[1]["invites"][0]["email"], mail)
+        newcomer = register(mail)
+        self.assertEqual(call("GET", f"/api/projects/{pid}", cookie=newcomer)[1]["my_role"], "editor")
+        self.assertEqual(call("GET", f"/api/projects/{pid}/people", cookie=owner)[1]["invites"], [])
+
+    def test_inviting_needs_agency_and_a_real_email(self):
+        starter = register(self.email(), plan="starter")
+        pid = new_project(cookie=starter)
+        s, r, _ = call("POST", f"/api/projects/{pid}/people", {"email": self.email(), "role": "viewer"}, cookie=starter)
+        self.assertEqual((s, r.get("upgrade")), (403, "agency"))
+        owner = register(self.email())
+        pid = new_project(cookie=owner)
+        for bad in ({"email": "nope", "role": "viewer"}, {"email": self.email(), "role": "boss"}):
+            self.assertEqual(call("POST", f"/api/projects/{pid}/people", bad, cookie=owner)[0], 400, bad)
+
+
+class T42Share(unittest.TestCase):
+    """Share links and pinned comments (share.py)."""
+
+    def setUp(self):
+        self.owner = register(f"share-{time.time_ns()}@example.com")
+        self.pid = new_project(cookie=self.owner)
+        call("PUT", f"/api/projects/{self.pid}/files", {"path": "index.html", "content": "<!doctype html><body><h1>Hi</h1></body>"}, cookie=self.owner)
+
+    def link(self, **body):
+        s, r, _ = call("POST", f"/api/projects/{self.pid}/share", {"label": "Client", "days": 7, **body}, cookie=self.owner)
+        self.assertEqual(s, 200, r)
+        return r
+
+    def test_a_link_shows_the_site_sandboxed_and_collects_comments(self):
+        link = self.link()
+        t = link["token"]
+        s, page, h = call("GET", f"/s/{t}", cookie=None)
+        self.assertEqual(s, 200)
+        self.assertIn("Shared preview", page)
+        info = call("GET", f"/s/{t}/info", cookie=None)[1]
+        self.assertEqual((info["name"], info["comments"], info["built"]), ("Test project", True, True))
+        s, html, h = call("GET", f"/s/{t}/site/", cookie=None)
+        self.assertEqual(s, 200)
+        self.assertIn('<script src="/static/share-pin.js"></script></body>', html)
+        self.assertIn("sandbox", h["Content-Security-Policy"])
+        self.assertEqual(call("GET", f"/s/{t}/site/../../../server/main.py", cookie=None)[0], 404)
+        s, c, _ = call("POST", f"/s/{t}/comments", {"text": "Bigger title please", "author": "Sara", "page": "evil.html",
+                                                     "selector": "body > h1", "x": 5, "y": 0.5, "snippet": "Hi"}, cookie=None)
+        self.assertEqual(s, 200, c)
+        self.assertEqual((c["page"], c["x"], c["author"]), ("index.html", 1, "Sara"), "unknown pages and positions are clamped")
+        self.assertEqual(call("POST", f"/s/{t}/comments", {"text": "  "}, cookie=None)[0], 400)
+        mine = call("GET", f"/api/projects/{self.pid}/comments", cookie=self.owner)[1]
+        self.assertEqual([x["text"] for x in mine], ["Bigger title please"])
+        r = call("PATCH", f"/api/projects/{self.pid}/comments/{c['id']}", {"resolved": True}, cookie=self.owner)[1]
+        self.assertTrue(r["resolved"])
+        links = call("GET", f"/api/projects/{self.pid}/share", cookie=self.owner)[1]
+        self.assertEqual((links[0]["views"], links[0]["comment_count"], links[0]["state"]), (1, 1, "active"))
+        self.assertEqual(call("DELETE", f"/api/projects/{self.pid}/share/{link['id']}", cookie=self.owner)[0], 200)
+        self.assertEqual(call("GET", f"/s/{t}/info", cookie=None)[0], 404)
+        self.assertEqual(call("GET", f"/s/{t}/site/", cookie=None)[0], 404)
+        self.assertEqual(call("GET", f"/s/{t}", cookie=None)[0], 404)
+
+    def test_expired_links_and_links_without_comments(self):
+        link = self.link(comments=False)
+        self.assertEqual(call("POST", f"/s/{link['token']}/comments", {"text": "hi", "author": "A"}, cookie=None)[0], 403)
+        db_exec("UPDATE share_links SET expires_at = 1 WHERE id = $1", uuid.UUID(link["id"]))
+        time.sleep(11)                                   # past the server's short link cache
+        self.assertEqual(call("GET", f"/s/{link['token']}/info", cookie=None)[0], 404)
+        self.assertEqual(call("GET", f"/s/not-a-real-token-at-all-000000", cookie=None)[0], 404)
+
+    def test_who_may_manage_links(self):
+        self.assertEqual(call("POST", f"/api/projects/{self.pid}/share", {"days": 3}, cookie=self.owner)[0], 400)
+        stranger = register(f"stranger-{time.time_ns()}@example.com")
+        self.assertEqual(call("GET", f"/api/projects/{self.pid}/share", cookie=stranger)[0], 404)
+        viewer_mail = f"viewer-{time.time_ns()}@example.com"
+        viewer = register(viewer_mail)
+        call("POST", f"/api/projects/{self.pid}/people", {"email": viewer_mail, "role": "viewer"}, cookie=self.owner)
+        self.assertEqual(call("GET", f"/api/projects/{self.pid}/share", cookie=viewer)[0], 403)
+        self.assertEqual(call("POST", f"/api/projects/{self.pid}/share", {"days": 7}, cookie=viewer)[0], 403)
+        self.assertEqual(call("GET", f"/api/projects/{self.pid}/comments", cookie=viewer)[0], 200)
+
+
+class FakePayPal:
+    """A stand-in for PayPal's REST API (billing.py): subscriptions, cancel, webhook signature checks. No money moves."""
+
+    def __init__(self):
+        import http.server
+        import threading
+        self.subs, self.calls = {}, []
+        fake = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def reply(self, status, data=None):
+                body = json.dumps(data).encode() if data is not None else b""
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_GET(self):
+                fake.calls.append(("GET", self.path))
+                sid = self.path.rsplit("/", 1)[-1]
+                self.reply(200, fake.subs[sid]) if sid in fake.subs else self.reply(404, {"name": "RESOURCE_NOT_FOUND"})
+
+            def do_POST(self):
+                raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+                body = json.loads(raw) if raw and self.path != "/v1/oauth2/token" else {}
+                fake.calls.append(("POST", self.path))
+                if self.path == "/v1/oauth2/token":
+                    return self.reply(200, {"access_token": "fake-token", "expires_in": 3600})
+                if self.headers.get("Authorization") != "Bearer fake-token":
+                    return self.reply(401, {"name": "AUTHENTICATION_FAILURE"})
+                if self.path == "/v1/billing/subscriptions":
+                    sid = f"I-{len(fake.subs) + 1:04d}{uuid.uuid4().hex[:6].upper()}"
+                    fake.subs[sid] = {"id": sid, "plan_id": body["plan_id"], "custom_id": body["custom_id"], "status": "APPROVAL_PENDING",
+                                      "links": [{"rel": "approve", "href": f"https://paypal.test/approve/{sid}"}]}
+                    return self.reply(201, fake.subs[sid])
+                if self.path.endswith("/cancel"):
+                    sid = self.path.split("/")[-2]
+                    fake.subs[sid]["status"] = "CANCELLED"
+                    return self.reply(204)
+                if self.path == "/v1/notifications/verify-webhook-signature":
+                    return self.reply(200, {"verification_status": "SUCCESS" if body["transmission_sig"] == "good" else "FAILURE"})
+                self.reply(404, {})
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.port = self.server.server_address[1]
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+
+class T43PayPal(unittest.TestCase):
+    """Paying for Pro and Agency with a PayPal subscription (billing.py), on a second server with PayPal turned on."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.paypal = FakePayPal()
+        cls.port = free_port()
+        cls.base = f"http://127.0.0.1:{cls.port}"
+        env = {**os.environ, "STORAGE_DIR": str(TMP / "storage-paypal"), "ATELIER_WORK": str(TMP / "none"), "ATELIER_AGENTS": str(TMP / "agents"),
+               "CLAUDE_BIN": str(ROOT / "tests" / "fake-claude"), "ATELIER_ENV_FILE": str(TMP / "no.env"), "DATABASE_URL": TEST_DB_URL,
+               "ADMIN_EMAIL": ADMIN_EMAIL, "EMAIL_OUTBOX": str(OUTBOX), "SMTP_HOST": "", "TRUST_PROXY": "1", "SIGNUPS_PER_HOUR": "100000",
+               "LOGINS_PER_15_MIN": "100000", "CLAUDE_KEYS": "user", "KEY_SECRET": "",
+               "PAYPAL_CLIENT_ID": "id", "PAYPAL_CLIENT_SECRET": "secret", "PAYPAL_API": f"http://127.0.0.1:{cls.paypal.port}",
+               "PAYPAL_PLAN_PRO": "P-PRO", "PAYPAL_PLAN_AGENCY": "P-AGENCY", "PAYPAL_WEBHOOK_ID": "WH-1"}
+        cls.log = open(TMP / "server-paypal.log", "w")
+        cls.proc = subprocess.Popen([str(PYTHON), "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(cls.port)],
+                                    cwd=ROOT / "server", env=env, stdout=cls.log, stderr=subprocess.STDOUT)
+        for _ in range(100):
+            try:
+                urllib.request.urlopen(cls.base + "/api/agents", timeout=1)
+                return
+            except urllib.error.URLError:
+                time.sleep(0.1)
+        raise RuntimeError("The PayPal test server didn't start:\n" + (TMP / "server-paypal.log").read_text())
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.proc.terminate()
+        cls.proc.wait(5)
+        cls.log.close()
+        cls.paypal.server.shutdown()
+
+    def call(self, method, path, body=None, cookie=None, headers=None):
+        global BASE
+        saved, BASE = BASE, self.base
+        try:
+            return call(method, path, body, headers=headers, cookie=cookie)
+        finally:
+            BASE = saved
+
+    def member(self):
+        email = f"payer-{time.time_ns()}@example.com"
+        cookie = register(email, plan="starter")          # on the main server: same database, same sessions
+        return cookie, call("GET", "/api/auth/me", cookie=cookie)[1]["user"]["id"]
+
+    def hook(self, kind, resource, sig="good", event_id=None):
+        return self.call("POST", "/api/billing/paypal/webhook",
+                         {"id": event_id or f"WH-{uuid.uuid4().hex}", "event_type": kind, "resource": resource},
+                         headers={"PayPal-Auth-Algo": "SHA256withRSA", "PayPal-Cert-Url": "https://paypal.test/cert",
+                                  "PayPal-Transmission-Id": "t1", "PayPal-Transmission-Sig": sig, "PayPal-Transmission-Time": "now"})
+
+    def plan_of(self, cookie):
+        return self.call("GET", "/api/auth/me", cookie=cookie)[1]["user"]
+
+    def test_subscribe_return_renew_and_cancel(self):
+        cookie, uid = self.member()
+        self.assertEqual(self.call("GET", "/api/plans", cookie=cookie)[1]["payment"], "paypal")
+        s, r, _ = self.call("POST", "/api/auth/plan", {"plan": "pro"}, cookie=cookie)
+        self.assertEqual(s, 400, "paid plans go through PayPal")
+        s, r, _ = self.call("POST", "/api/billing/paypal/subscribe", {"plan": "pro"}, cookie=cookie)
+        self.assertEqual(s, 200, r)
+        sid = r["id"]
+        self.assertTrue(r["approve"].startswith("https://paypal.test/approve/"))
+        self.assertEqual(self.paypal.subs[sid]["custom_id"], uid)
+        # back from PayPal before approving: nothing changes
+        s, _, h = self.call("GET", f"/billing/paypal/return?subscription_id={sid}", cookie=cookie)
+        self.assertEqual(self.plan_of(cookie)["plan"], "starter")
+        # approved: the return switches the plan
+        self.paypal.subs[sid]["status"] = "ACTIVE"
+        req = urllib.request.Request(f"{self.base}/billing/paypal/return?subscription_id={sid}", headers={"Cookie": cookie})
+        try:
+            urllib.request.build_opener(NoRedirect).open(req, timeout=10)
+        except urllib.error.HTTPError as e:
+            with e:
+                self.assertEqual((e.code, e.headers["location"]), (303, "/profile?paid=active#plan"))
+        me = self.plan_of(cookie)
+        self.assertEqual((me["plan"], me["paid_online"]), ("pro", True))
+        # someone else's subscription id changes nothing
+        other, _ = self.member()
+        self.call("GET", f"/billing/paypal/return?subscription_id={sid}", cookie=other)
+        self.assertEqual(self.plan_of(other)["plan"], "starter")
+        # a renewal is recorded as money received; the same event twice counts once
+        sale = {"id": "SALE-1", "billing_agreement_id": sid, "amount": {"total": "9.00", "currency": "USD"}, "create_time": "2026-11-11T10:00:00Z"}
+        self.assertEqual(self.hook("PAYMENT.SALE.COMPLETED", sale, event_id="WH-SALE-1")[0], 200)
+        self.assertEqual(self.hook("PAYMENT.SALE.COMPLETED", sale, event_id="WH-SALE-1")[0], 200)
+        rev = self.call("GET", "/api/admin/revenue?days=365", cookie=ADMIN)[1]["received"]
+        self.assertEqual(rev["count"], 1)
+        self.assertAlmostEqual(rev["total"], 9.0)
+        # upgrade to Agency: a new subscription; once active, the Pro one is cancelled
+        sid2 = self.call("POST", "/api/billing/paypal/subscribe", {"plan": "agency"}, cookie=cookie)[1]["id"]
+        self.paypal.subs[sid2]["status"] = "ACTIVE"
+        self.assertEqual(self.hook("BILLING.SUBSCRIPTION.ACTIVATED", self.paypal.subs[sid2])[0], 200)
+        self.assertEqual(self.plan_of(cookie)["plan"], "agency")
+        self.assertEqual(self.paypal.subs[sid]["status"], "CANCELLED")
+        # the old subscription's cancellation doesn't touch the new plan
+        self.hook("BILLING.SUBSCRIPTION.CANCELLED", self.paypal.subs[sid])
+        self.assertEqual(self.plan_of(cookie)["plan"], "agency")
+        # moving to Starter cancels at PayPal
+        s, r, _ = self.call("POST", "/api/auth/plan", {"plan": "starter"}, cookie=cookie)
+        self.assertEqual((s, r["user"]["plan"], r["user"]["paid_online"]), (200, "starter", False))
+        self.assertEqual(self.paypal.subs[sid2]["status"], "CANCELLED")
+
+    def test_a_suspended_subscription_moves_the_member_back_to_starter(self):
+        cookie, uid = self.member()
+        sid = self.call("POST", "/api/billing/paypal/subscribe", {"plan": "agency"}, cookie=cookie)[1]["id"]
+        self.paypal.subs[sid]["status"] = "ACTIVE"
+        self.hook("BILLING.SUBSCRIPTION.ACTIVATED", self.paypal.subs[sid])
+        self.assertEqual(self.plan_of(cookie)["plan"], "agency")
+        self.hook("BILLING.SUBSCRIPTION.SUSPENDED", {**self.paypal.subs[sid], "status": "SUSPENDED"})
+        self.assertEqual(self.plan_of(cookie)["plan"], "starter")
+
+    def test_unsigned_webhooks_are_refused(self):
+        cookie, uid = self.member()
+        sid = self.call("POST", "/api/billing/paypal/subscribe", {"plan": "pro"}, cookie=cookie)[1]["id"]
+        s, _, _ = self.hook("BILLING.SUBSCRIPTION.ACTIVATED", {**self.paypal.subs[sid], "status": "ACTIVE"}, sig="forged")
+        self.assertEqual(s, 401)
+        self.assertEqual(self.plan_of(cookie)["plan"], "starter")
+        self.assertEqual(self.call("POST", "/api/billing/paypal/subscribe", {"plan": "gold"}, cookie=cookie)[0], 400)
+        self.assertEqual(self.call("POST", "/api/billing/paypal/subscribe", {"plan": "pro"})[0], 401, "logged out")
+
+
+class T44StarterInstructions(unittest.TestCase):
+    """Starter members see what each agent does (name, description, stats, projects, ratings), not its instructions."""
+
+    def test_starter_sees_no_instructions_pro_does(self):
+        starter = register(f"starter-instr-{time.time_ns()}@example.com", plan="starter")
+        pro = register(f"pro-instr-{time.time_ns()}@example.com", plan="pro")
+        agents = call("GET", "/api/agents?full=1", cookie=starter)[1]
+        self.assertTrue(agents and all(a["role"] == "" and a["instructions_locked"] for a in agents))
+        self.assertTrue(all(a["name"] and "description" in a for a in agents))
+        css = call("GET", "/api/agents/css", cookie=starter)[1]
+        self.assertEqual((css["role"], css["instructions_locked"], css["name"]), ("", True, "CSS"))
+        self.assertTrue(css["description"])
+        self.assertIn("stats", css)
+        for path in ("/api/agents/common", "/api/agents/css/export", "/api/export", "/api/presets/default/export"):
+            s, r, _ = call("GET", path, cookie=starter)
+            self.assertEqual((s, r.get("upgrade") if isinstance(r, dict) else None), (403, "pro"), path)
+        market = call("GET", "/api/market", cookie=starter)[1]
+        pk = (market.get("agents") or [{}])[0].get("pk")
+        if pk:
+            profile = call("GET", f"/api/market/agents/{pk}", cookie=starter)[1]
+            self.assertEqual((profile["role"], profile["instructions_locked"]), ("", True))
+            self.assertTrue(call("GET", f"/api/market/agents/{pk}", cookie=pro)[1]["role"])
+        self.assertTrue(call("GET", "/api/agents/css", cookie=pro)[1]["role"])
+        self.assertEqual(call("GET", "/api/agents/common", cookie=pro)[0], 200)
+        self.assertEqual(call("GET", "/api/agents/css/export", cookie=pro)[0], 200)

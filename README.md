@@ -1,7 +1,7 @@
 # Agents Atelier
 
 **Hire AI agents, not freelancers. Describe the website you need, and a team of specialist AI agents builds it in
-front of you, one after another.**
+front of you, step by step, with independent specialists working side by side.**
 
 Agents Atelier works like a freelance platform where every specialist is an AI agent. Instead of writing a job post,
 comparing offers and waiting days for a delivery, you describe the job and hire a team that starts at once: a UX agent
@@ -15,7 +15,7 @@ result in a real browser, sending bigger problems back to the agent that owns th
 | Hire an agency for a whole job          | Hire one of **23 ready teams** (restaurant site, portfolio, 3D site, contact options…), each with a starting prompt |
 | Offers, then days of waiting             | **Start a job**: pick one of your projects and the team starts at once  |
 | Each round of changes means new messages | Ask for a change anytime: **only the agents it needs** work on it      |
-| You trust a profile                     | Every agent's **instructions are readable**, and its **time and cost** are shown |
+| You trust a profile                     | Every agent's **results, ratings, time and cost** are shown, and on Pro its **instructions** too |
 | Build your own agency                   | **Duplicate any agent**, change its instructions, save **your own teams** |
 
 The work itself is **front end only**: the team builds a finished static website (one page or several) in plain HTML,
@@ -73,6 +73,7 @@ team strip below. (Light theme: [docs/screenshots/studio-light.png](docs/screens
 - [Plans and your Claude key](#plans-and-your-claude-key)
 - [Customising the agents](#customising-the-agents)
 - [Sharing agents and teams](#sharing-agents-and-teams)
+- [Share links, comments and teamwork](#share-links-comments-and-teamwork)
 - [Languages, theme and colours](#languages-theme-and-colours)
 - [Accounts, privacy and protection](#accounts-privacy-and-protection)
 - [Analytics for admins](#analytics-for-admins)
@@ -309,6 +310,12 @@ command line wins over the file: `AGENT_MODEL=sonnet PORT=9000 ./run.sh`. Restar
 | `CLAUDE_BIN` | `claude` | Path to the Claude Code executable |
 | `AGENT_MODEL` | your Claude Code model | Model for agents that don't set their own (e.g. `sonnet`) |
 | `AGENT_TIMEOUT` | `900` | Seconds before a stuck agent is stopped (you can then press **Continue**) |
+| `PARALLEL_AGENTS` | `3` | Most agents the Orchestrator may let work at the same time; `1` runs them one after another |
+| `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | *(empty)* | Turn on online payment with PayPal subscriptions; empty keeps upgrades as requests an admin approves |
+| `PAYPAL_MODE` | `sandbox` | `sandbox` (test money) or `live` |
+| `PAYPAL_PLAN_PRO` / `PAYPAL_PLAN_AGENCY` | *(empty)* | PayPal plan ids, printed by `manage.py paypal-setup` |
+| `PAYPAL_WEBHOOK_ID` | *(empty)* | The id of your PayPal webhook, used to check that webhooks really come from PayPal |
+| `PUBLIC_URL` | *(empty)* | The app's public address (e.g. `https://atelier.example.com`), where PayPal sends members back |
 | `CLAUDE_KEYS` | `user` | `user`: each member runs on their own Claude API key · `server`: everyone uses the server's Claude Code login |
 | `KEY_SECRET` | *(generated)* | Fernet key that encrypts members' API keys; empty = one is made and kept in `storage/.secrets/` |
 | `REVIEW_ROUNDS` | `2` | Times the Critic may send work back in one run |
@@ -334,7 +341,7 @@ command line wins over the file: `AGENT_MODEL=sonnet PORT=9000 ./run.sh`. Restar
 | **Browser checks** | | |
 | `BROWSER_CHECKS` / `CHROME_BIN` | `true` / *(found automatically)* | Real browser checks before Responsive, Accessibility, QA and the Critic |
 | **Legal pages** | | |
-| `LEGAL_NAME` / `LEGAL_EMAIL` / `LEGAL_ADDRESS` | *(empty)* | Who runs the service, shown on /terms and /privacy. Fill in before going public |
+| `LEGAL_NAME` / `LEGAL_EMAIL` / `LEGAL_ADDRESS` | `Agents Atelier` / *(admin email)* / *(empty)* | Who runs the service, shown on /terms and /privacy. Put the registered company name and address before going public |
 | **Email** | | |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_SECURITY` | no email sent | Without `SMTP_HOST`, codes are printed in the server log |
 | `EMAIL_OUTBOX` | *(empty)* | Also write every email to this file, one JSON object per line |
@@ -371,7 +378,7 @@ tips for good results.
 | Landing    | `/`              | For visitors: hire AI agents, not freelancers; examples, use cases, features, FAQ |
 | Dashboard  | `/`              | Once logged in: your numbers, runs over 14 days, time per agent, recent work  |
 | Hire       | `/hire`          | The marketplace: agents and teams by category, search, sort, Start a job       |
-| Profiles   | `/hire/agents/<n>`, `/hire/teams/<n>` | Jobs, time, cost, Critic score, ratings, portfolio, instructions |
+| Profiles   | `/hire/agents/<n>`, `/hire/teams/<n>` | Jobs, time, cost, Critic score, ratings, portfolio, instructions (Pro and Agency) |
 | Projects   | `/projects`      | Your projects: stats, search, filters, sort, grid or list view, pagination    |
 | New project| `/projects/new`  | Every project field on one screen                                             |
 | Studio     | `/p/<id>`        | One project: chat, live preview, code, project details, research, versions, stats, team, ratings |
@@ -534,11 +541,14 @@ or login. A full site costs about $1.50–2 on the member's account, a small cha
 |---|---|---|---|
 | Projects | 1 | Unlimited | Unlimited |
 | Official agents and ready teams | ✅ | ✅ | ✅ |
+| Read the agents' instructions and the shared rules, export agents and teams | ❌ name, description, stats, projects and ratings only | ✅ | ✅ |
 | Your own agents and teams, imports | ❌ | ✅ | ✅ |
 | Web research agent | skipped, with a note | ✅ | ✅ |
 | Browser checks | before the Critic | before Responsive, Accessibility, QA and the Critic | same |
 | Versions kept per project | 10 | 100 | all |
 | Publish to the marketplace | ❌ | ❌ | ✅ |
+| Editors and viewers on your projects | ❌ | ❌ | ✅ |
+| Share links with pinned comments | ✅ | ✅ | ✅ |
 | Downloaded .zip | adds a small "Made with Agents Atelier" line | clean | clean |
 | Spending limit per run | fixed at $3 | your choice, up to $50 | your choice, up to $200 |
 
@@ -547,8 +557,16 @@ or login. A full site costs about $1.50–2 on the member's account, a small cha
 - **Spending limit:** after each agent, the run's cost is added up; when it reaches the member's limit, the agents stop
   and a card explains it. **Continue** goes on. Set it on **/profile → Claude and spending**.
 - **Changing plan:** on **/profile → Plan**, a member sees their plan, their usage (projects used, key, limit) and the
-  three plans. **Upgrade** sends a request (online payment isn't connected yet): the admins get an email and approve
-  or decline it on **/users**. **Moving down** applies at once, after a warning listing what's lost.
+  three plans. With PayPal set up, a paid plan is a **monthly PayPal subscription**: the member pays on PayPal's page and
+  the plan turns on when they come back (PayPal's webhooks then keep it in step: renewals are recorded, a cancelled or
+  suspended subscription moves them back to Starter). Without PayPal, **Upgrade** sends a request: the admins get an
+  email and approve or decline it on **/users**. **Moving down** applies at once, after a warning listing what's lost;
+  moving to Starter cancels the PayPal subscription.
+- **Setting up PayPal:** create an app on [developer.paypal.com](https://developer.paypal.com), put its client id and
+  secret in `.env`, run `.venv/bin/python server/manage.py paypal-setup` (it creates the product and the Pro and Agency
+  plans and prints their ids), then add a webhook to `<PUBLIC_URL>/api/billing/paypal/webhook` with the
+  `BILLING.SUBSCRIPTION.*` and `PAYMENT.SALE.*` events and put its id in `PAYPAL_WEBHOOK_ID`. Start with
+  `PAYPAL_MODE=sandbox` and PayPal's test accounts.
 - The plans live in `server/plans.py`; prices and limits are plain values there.
 
 ## Customising the agents
@@ -572,6 +590,8 @@ migrations** in `server/migrations/`, which the server applies on startup, once 
 | `0012_plan_requests.sql` | upgrade requests |
 | `0013_account_deactivation.sql` | the 30 days before a deleted account goes |
 | `0014_plan_events.sql` | every plan change, for the revenue analytics |
+| `0015_members_and_share_links.sql` | editors and viewers on projects, waiting invitations, share links and pinned comments |
+| `0016_paypal_billing.sql` | PayPal subscriptions, payments received and the webhook events already handled |
 
 To change the shared agents or teams, edit `agents/*.md` or `agents/_presets.json`, then run
 `.venv/bin/python server/manage.py make-agents-migration`. It writes the next migration with what changed, applied on
@@ -615,6 +635,22 @@ using the existing styles. Don't change other sections.
 **Import** (Agents or Teams page, or the command palette) accepts any of these files. You always see a preview first:
 what will be added, replaced, kept, or can't be imported, and why. When something with the same id already exists,
 choose **Keep both** (imported as a copy), **Replace mine** or **Keep mine**.
+
+## Share links, comments and teamwork
+
+Everything is in the studio's **Share** tab.
+
+- **Share links:** **Create link** makes a read-only address (`/s/<token>`) for people without an account, valid for 1,
+  7, 30 or 90 days or with no end date. Visitors see the current site, page by page, at desktop, tablet or phone size.
+  Each link shows its views and comments, and can be turned off at once.
+- **Pinned comments:** a visitor presses **Comment**, clicks a spot of the page and writes what should change; a
+  numbered pin marks it. Comments arrive live in the Share tab (a badge counts the open ones). **Ask the team** turns one
+  into a request in the chat, which you check and send; **Resolve** removes its pin for the visitor.
+- **Editors and viewers (Agency):** invite people by email; someone without an account joins when they sign up with that
+  email. Editors work like the owner (requests, code, versions, brand kit, links) and the agents run on the **owner's**
+  Claude key and spending limit. Viewers watch the chat, preview, code and comments, and can't change anything. Only the
+  owner invites, changes roles, removes people or deletes the project. Invited projects are under **Shared with me** on
+  /projects.
 
 ## Languages, theme and colours
 
@@ -664,8 +700,8 @@ choose **Keep both** (imported as a copy), **Replace mine** or **Keep mine**.
 
 **/analytics** has two tabs, with a 7, 30 or 90-day period (the address keeps the tab: `/analytics?view=monitoring`):
 
-- **Revenue:** monthly revenue (what the members' plans are worth; payments aren't collected online yet, so it's not
-  money received), yearly run rate, paying members, revenue per member, monthly revenue per day, members by plan,
+- **Revenue:** monthly revenue (what the members' plans are worth), the money PayPal actually collected in the period
+  (when PayPal is set up), yearly run rate, paying members, revenue per member, monthly revenue per day, members by plan,
   upgrades, downgrades and net change, waiting upgrade requests, and the latest plan changes.
 - **Monitoring:** is everything working (database and its response time, Claude Code, Chrome for browser checks, disk,
   uptime, projects building now), runs that failed or stopped, typical agent time, members ready to build (with a Claude
@@ -712,7 +748,8 @@ you've checked your projects. Back up two things: the Postgres database and the 
 ## Good to know
 
 - **Time and cost:**
-  - Each agent takes about 20–60 seconds, so the default team needs roughly 5–8 minutes.
+  - Each agent takes about 20–60 seconds. Agents that don't depend on each other work side by side (the Orchestrator
+    groups them, the server checks the groups), so the default team needs roughly 4–6 minutes.
   - Every agent run is one Claude Code session, billed to the project owner's Claude account (`CLAUDE_KEYS=user`).
   - The Stats tab shows each run's cost; a spending limit per run stops a run that gets too expensive.
 - **Nothing is lost.** A version is saved before each run and after every agent, and restoring one saves the current
@@ -779,7 +816,7 @@ Yes, in the Code tab or in any editor. The agents read the current files on the 
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-The suite (`tests/test_server.py`, about 170 tests in roughly 2½ minutes) needs Postgres running
+The suite (`tests/test_server.py`, about 190 tests in roughly 3 minutes) needs Postgres running
 (`docker compose -f database/docker-compose.yaml up -d`, or set `TEST_DATABASE_URL`). It starts its own server on a free
 port, with a throwaway database, a temporary copy of `agents/` and a temporary storage folder, so your data is never
 touched. It uses a **fake Claude CLI** (`tests/fake-claude`), so no model is called and nothing is spent. Test accounts
@@ -839,7 +876,7 @@ Set `KEEP_TEST_FILES=1` to keep the temporary folder for inspection.
 ├── server/              the Python server (FastAPI)
 │   ├── migrations/      numbered database migrations (schema, shared agents and teams)
 │   ├── static/          the web pages, styles, icons and translations (i18n-fr.js, i18n-ary.js)
-│   └── manage.py        make-admin, migrate, migrations, make-agents-migration
+│   └── manage.py        make-admin, migrate, migrations, make-agents-migration, paypal-setup
 ├── tests/               automated tests and a fake Claude CLI
 ├── storage/             every file: agents' instructions and projects (created at first run, not in git)
 └── work/                the projects folder of earlier versions, imported into storage/ once (safe to delete after)

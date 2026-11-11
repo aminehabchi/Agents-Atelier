@@ -160,6 +160,7 @@ const stack = (ids, byId, max = 10) => `<div class="stack">${ids.slice(0, max).m
 let owner = ["mine", "shared"].includes(new URLSearchParams(location.search).get("show")) ? new URLSearchParams(location.search).get("show") : "all";
 async function listView() {
   setTitle("My teams");
+  const me = await getMe().catch(() => null);   // Starter: no exports (they carry instructions)
   app.innerHTML = `<p class="note">Loading…</p>`;
   let teams, base;
   try { [teams, base] = await Promise.all([api("/api/presets"), loadBase()]); }
@@ -180,7 +181,7 @@ async function listView() {
     <div class="bar-top"><h1>My teams</h1>
       <a class="btn btn-ghost" href="/hire?tab=teams">${icon("briefcase", { size: 16 })}Browse ready teams</a>
       <button class="btn btn-ghost" id="importBtn" title="Import a team (.json), an agent (.md) or an export (.zip)">${icon("file-plus", { size: 16 })}Import</button>
-      <a class="btn btn-ghost" href="/api/export" title="All agents, shared rules and your teams as a .zip">${icon("download", { size: 16 })}Export all</a>
+      ${seesInstructions(me) ? `<a class="btn btn-ghost" href="/api/export" title="All agents, shared rules and your teams as a .zip">${icon("download", { size: 16 })}Export all</a>` : ""}
       <a class="btn btn-dark" href="/teams/new">${icon("plus", { size: 16 })}New team</a></div>
     <p class="note">${icon("alert", { size: 14 })}<span>A team is a set of agents that run together, always in the agents' order. Use one for a project with <b>Choose a team</b> in the studio. Times and costs are estimates from past runs (about ${DEFAULT_SECONDS}s for agents that haven't run yet).</span></p>
     <div class="fgroup team-filter" role="group" aria-label="Whose teams">
@@ -219,6 +220,7 @@ let teamsPage = 1, teamsPer = perPagePref("teams", 6);
 // ================================================================ view: /teams/<id>
 async function detailView(id) {
   app.innerHTML = `<p class="note">Loading…</p>`;
+  const me = await getMe().catch(() => null);   // Starter: no exports (they carry instructions)
   let t, base;
   try { [t, base] = await Promise.all([api(`/api/presets/${encodeURIComponent(id)}`), loadBase()]); }
   catch (err) { return showError(app, err, err.status === 404 ? null : () => detailView(id), err.status === 404 ? "Team not found" : "Couldn't load this team"); }
@@ -232,7 +234,7 @@ async function detailView(id) {
         <div><h1>${esc(t.name)}</h1>
           <div class="sub">${t.builtin ? "Built-in team. Duplicate it to make your own version" : t.scope === "shared" ? `Shared team${t.editable ? "" : ". Duplicate it to make your own version"}` : `Your team${t.updated ? ` · updated ${ago(t.updated)}` : ""}`} · id <span class="mono">${esc(t.id)}</span></div></div>
         <div class="acts">
-          <a class="btn btn-ghost btn-sm" href="/api/presets/${encodeURIComponent(t.id)}/export" title="Download this team and its agents as a .json file">${icon("download", { size: 14 })}Export</a>
+          ${seesInstructions(me) ? `<a class="btn btn-ghost btn-sm" href="/api/presets/${encodeURIComponent(t.id)}/export" title="Download this team and its agents as a .json file">${icon("download", { size: 14 })}Export</a>` : ""}
           <a class="btn btn-ghost btn-sm" href="/teams/new?from=${encodeURIComponent(t.id)}">${icon("copy", { size: 14 })}Duplicate</a>
           <a class="btn btn-dark btn-sm" href="/projects/new" data-start-team="${esc(t.id)}">${icon("plus", { size: 14 })}New project with this team</a>
           ${!t.editable ? "" : `<button class="btn btn-ghost btn-sm" id="del">${icon("trash", { size: 14 })}Delete</button>

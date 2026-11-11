@@ -167,12 +167,15 @@ async function loadRevenue() {
   const first = r.series[0]?.value || 0, change = r.mrr - first;
   const total = r.by_plan.reduce((n, p) => n + p.members, 0) || 1;
   app.innerHTML = `
-    <p class="note-line">${icon("alert", { size: 14 })}<span>What the members' plans are worth each month. Online payment isn't connected yet, so this is the plans' value, not money received. Admins and deactivated accounts aren't counted.</span></p>
+    <p class="note-line">${icon("alert", { size: 14 })}<span>${r.received?.enabled
+      ? "What the members' plans are worth each month, and the money PayPal actually collected in the period. Plans an admin set by hand count in the value but bring no payments."
+      : "What the members' plans are worth each month. Online payment isn't connected yet (set up PayPal in .env), so this is the plans' value, not money received."} Admins and deactivated accounts aren't counted.</span></p>
     <section class="tiles" aria-label="Revenue">
       ${tile("Monthly revenue", usd(r.mrr), `${change === 0 ? "no change" : `${change > 0 ? "+" : "−"}${usd(Math.abs(change))}`} in ${r.days} days`, change > 0 ? "up" : change < 0 ? "down" : "")}
       ${tile("Yearly run rate", usd(r.arr), "monthly revenue × 12")}
       ${tile("Paying members", `${r.paying}`, `${pct(r.paying, r.members)} of ${r.members} members`)}
       ${tile("Revenue per member", `$${r.arpu.toFixed(2)}`, "monthly, across every member")}
+      ${r.received?.enabled ? tile("Received with PayPal", `$${r.received.total.toFixed(2)}`, `${r.received.count} payment${r.received.count === 1 ? "" : "s"} in ${r.days} days`) : ""}
     </section>
     <div class="grid rev">
       <section class="panel wide"><h2>Monthly revenue</h2><p class="total">Each day, what the plans were worth</p>${barChart(r.series, usd)}</section>
