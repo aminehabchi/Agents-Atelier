@@ -18,7 +18,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-import config
+from core import config
 
 log = logging.getLogger("agents-atelier.browser")
 
@@ -164,7 +164,7 @@ LAYOUT = r"""(() => {
 
 # axe-core (server/vendor/axe.min.js, MPL-2.0) checks each page against WCAG 2.2 A and AA, inside the headless browser only:
 # it is never part of the site the agents build.
-AXE_FILE = Path(__file__).resolve().parent / "vendor" / "axe.min.js"
+AXE_FILE = Path(__file__).resolve().parent.parent / "vendor" / "axe.min.js"   # server/vendor/
 AXE_RUN = r"""axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },
   resultTypes: ["violations"] }).then((r) => r.violations.map((v) => ({ id: v.id, impact: v.impact || "minor", help: v.help,
   count: v.nodes.length, targets: v.nodes.slice(0, 3).map((n) => [].concat(n.target).join(" ")) })))"""

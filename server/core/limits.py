@@ -9,9 +9,9 @@ import time
 from collections import defaultdict, deque
 from pathlib import Path
 
-import config
+from core import config
 
-DISPOSABLE_FILE = Path(__file__).resolve().parent / "disposable_domains.txt"
+DISPOSABLE_FILE = Path(__file__).resolve().parent.parent / "disposable_domains.txt"   # server/disposable_domains.txt
 
 
 class Limit:

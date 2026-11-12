@@ -27,10 +27,10 @@ import urllib.parse
 import urllib.request
 import uuid
 
-import auth
-import config
-import db
-import limits
+from accounts import auth
+from core import config
+from core import db
+from core import limits
 
 log = logging.getLogger("agents-atelier.oauth")
 

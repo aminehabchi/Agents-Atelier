@@ -13,8 +13,8 @@ import sys
 
 import asyncpg
 
-import config
-import migrate
+from core import config
+from core import migrate
 
 
 async def make_admin(email: str):
@@ -59,7 +59,7 @@ def make_agents_migration(name: str):
 
 
 async def paypal_setup():
-    import billing
+    from accounts import billing
     if not (config.PAYPAL_CLIENT_ID and config.PAYPAL_CLIENT_SECRET):
         raise SystemExit("Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in .env first (developer.paypal.com → Apps & Credentials).")
     ids = await billing.setup_plans()

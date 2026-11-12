@@ -19,10 +19,10 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-import auth
-import config
-import db
-import plans
+from accounts import auth
+from core import config
+from core import db
+from accounts import plans
 
 log = logging.getLogger("agents-atelier.notify")
 

@@ -26,7 +26,7 @@ import time
 import uuid
 from pathlib import Path
 
-import config
+from core import config
 
 log = logging.getLogger("agents-atelier.storage")
 
@@ -141,7 +141,7 @@ class Store:
     async def _writer(self):
         """Run the queued jobs in order, for ever. A job that fails because Postgres is down or restarting is tried again
         (for about a minute, keeping the order); any other failure is logged and the next job runs."""
-        import db
+        from core import db
         while True:
             job = await self.queue.get()
             try:

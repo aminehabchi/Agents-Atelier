@@ -16,7 +16,7 @@ import tempfile
 import time
 from pathlib import Path
 
-import config
+from core import config
 
 AGENTS_DIR = config.AGENTS_DIR
 VERIFIED_FILE = AGENTS_DIR / "_models.json"

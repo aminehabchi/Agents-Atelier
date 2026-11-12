@@ -16,7 +16,7 @@ from pathlib import Path
 
 log = logging.getLogger("agents-atelier.migrate")
 
-DIR = Path(__file__).resolve().parent / "migrations"
+DIR = Path(__file__).resolve().parent.parent / "migrations"   # server/migrations/
 NAME = re.compile(r"^(\d{4})_([a-z0-9_]+)\.(sql|json)$")
 LOCK = 4242          # one server at a time migrates
 
@@ -119,19 +119,14 @@ async def _place_new_agents(con, order: list[str], had: set[str]):
 
 
 def _agents_module():
-    """server/agents.py, loaded by path: from the project root, `import agents` would find the agents/ folder instead."""
+    """server/crew/team_files.py (agents and teams), with server/ on the path so it imports from anywhere
+    (manage.py and the tests run from the project root)."""
     import sys
-    import importlib.util
-    mod = sys.modules.get("agents")
-    if mod is not None and hasattr(mod, "read_agent_files"):
-        return mod
-    here = str(Path(__file__).resolve().parent)
+    here = str(Path(__file__).resolve().parent.parent)
     if here not in sys.path:
         sys.path.insert(0, here)
-    spec = importlib.util.spec_from_file_location("atelier_agents_store", Path(here) / "agents.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    from crew import team_files
+    return team_files
 
 
 def snapshot_from_files() -> dict:

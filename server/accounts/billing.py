@@ -25,11 +25,11 @@ import urllib.error
 import urllib.request
 import uuid
 
-import auth
-import config
-import notify
-import db
-import plans
+from accounts import auth
+from core import config
+from accounts import notify
+from core import db
+from accounts import plans
 
 log = logging.getLogger("agents-atelier.billing")
 

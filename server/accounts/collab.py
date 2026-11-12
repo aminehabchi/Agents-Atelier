@@ -20,9 +20,9 @@ run on every request and are synchronous; Postgres is the source of truth.
 import time
 import uuid
 
-import auth
-import db
-import plans
+from accounts import auth
+from core import db
+from accounts import plans
 
 ROLES = ("editor", "viewer")
 EDIT = {"owner", "admin", "editor"}
@@ -183,7 +183,7 @@ async def claim_invites(user: dict) -> int:
                 await con.execute("""INSERT INTO project_members (project_id, user_id, role, invited_by, created_at)
                                      VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING""",
                                   r["project_id"], user["id"], r["role"], r["invited_by"], time.time())
-    import notify                              # (not at the top: notify imports auth, like this module)
+    from accounts import notify                # (not at the top: notify imports auth, like this module)
     for r in rows:
         members.setdefault(str(r["project_id"]), {}).setdefault(str(user["id"]), r["role"])
         if r["invited_by"]:

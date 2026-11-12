@@ -24,10 +24,10 @@ import time
 import uuid
 from email.message import EmailMessage
 
-import config
-import db
-import limits
-import plans
+from core import config
+from core import db
+from core import limits
+from accounts import plans
 
 log = logging.getLogger("agents-atelier.auth")
 

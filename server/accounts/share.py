@@ -22,7 +22,7 @@ import secrets
 import time
 import uuid
 
-import db
+from core import db
 
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{20,64}$")
 MAX_LINKS = 20                 # active links per project

@@ -17,7 +17,7 @@ import shutil
 import uuid
 from pathlib import Path
 
-import storage
+from core import storage
 
 log = logging.getLogger("agents-atelier.legacy")
 NOT_SITE = {"uploads", ".checks"}

@@ -12,7 +12,7 @@ import os
 import re
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent     # the app folder (this file is server/core/config.py)
 ENV_FILE = Path(os.environ.get("ATELIER_ENV_FILE") or ROOT / ".env")
 _LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$")
 

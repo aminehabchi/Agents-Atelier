@@ -23,8 +23,8 @@ import logging
 
 import asyncpg
 
-import config
-import migrate
+from core import config
+from core import migrate
 
 log = logging.getLogger("agents-atelier.db")
 pool: asyncpg.Pool | None = None
@@ -45,7 +45,7 @@ async def init():
                          "or set DATABASE_URL in .env.")
     async with pool.acquire() as con:
         applied = await migrate.apply_all(con)
-        import storage                    # agents' instructions live in files: move any a migration just wrote
+        from core import storage          # agents' instructions live in files: move any a migration just wrote
         storage.check_writable()
         moved = await storage.export_instructions(con)
         await storage.forget_deleted_agents(con)

@@ -14,9 +14,9 @@
 import re
 import uuid
 
-import agents as store
-import db
-import storage
+from crew import team_files as store
+from core import db
+from core import storage
 
 AGENT_CATEGORIES = ("planning", "writing", "design", "code", "growth", "quality")
 TEAM_CATEGORIES = ("build", "improve", "add")

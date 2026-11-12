@@ -15,7 +15,7 @@ from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
 
-import config
+from core import config
 
 KEY_RE = re.compile(r"^sk-ant-[A-Za-z0-9_\-]{20,250}$")
 USER_MODE = config.CLAUDE_KEYS == "user"

@@ -18,8 +18,8 @@ import json
 import re
 from pathlib import Path
 
-import config
-from agents import _parse_text
+from core import config
+from crew.team_files import _parse_text
 
 PROMPT_FILE = config.AGENTS_DIR / "_orchestrator.md"
 BRIEF = "brief"                         # always runs whenever any agent runs

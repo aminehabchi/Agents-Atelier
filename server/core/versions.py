@@ -17,8 +17,8 @@ import time
 import uuid
 from pathlib import Path
 
-import config
-import storage
+from core import config
+from core import storage
 
 MAX_VERSIONS = config.MAX_VERSIONS
 SKIP = {"uploads", ".checks"}          # never part of the code (only sites from older versions still have them)

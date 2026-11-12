@@ -37,9 +37,9 @@ import unicodedata
 import time
 from pathlib import Path
 
-import config
-import db
-import storage
+from core import config
+from core import db
+from core import storage
 
 AGENTS_DIR = config.AGENTS_DIR
 COMMON_FILE = AGENTS_DIR / "_common.md"
@@ -218,13 +218,13 @@ def validate(data: dict, *, new: bool) -> dict:
     model = str(data.get("model") or "").strip()
     if not MODEL_RE.match(model):
         raise ValueError("Model must be an alias like sonnet or opus, or a full model id.")
-    import models   # local import: models.py reads the CLI and agents/_models.json
+    from crew import models   # local import: models.py reads the CLI and agents/_models.json
     if not models.allowed(model):
         raise ValueError(f"“{model}” isn't in the model list. Pick one, or check it with the Claude CLI first.")
     tools = str(data.get("tools") or "").strip().lower()
     if tools not in TOOL_SETS:
         raise ValueError("Tools must be empty, or “web” for web search and page fetching.")
-    import injection   # local import, like models above
+    from site_tools import injection   # local import, like models above
     found = injection.suspicious(f"{name}\n{description}\n{role}", "a")
     if found:
         raise ValueError(f"These instructions can't be saved: they look like a prompt injection ({injection.describe(found)}). "
@@ -453,7 +453,7 @@ async def plan_import(user: dict, items: list[dict], on_conflict: str = "rename"
     """items: [{"kind": "agent"|"team"|"rules", ...}]. Returns the plan without changing anything.
     on_conflict for agents and teams that already exist (and differ): rename · replace · skip.
     A shared agent can only be replaced by an admin; for others it is imported as a renamed copy."""
-    import models
+    from crew import models
     if on_conflict not in ("rename", "replace", "skip"):
         raise ValueError("on_conflict must be rename, replace or skip.")
     existing = {a["id"]: a for a in await load_agents(user)}
