@@ -224,6 +224,12 @@ def validate(data: dict, *, new: bool) -> dict:
     tools = str(data.get("tools") or "").strip().lower()
     if tools not in TOOL_SETS:
         raise ValueError("Tools must be empty, or “web” for web search and page fetching.")
+    import injection   # local import, like models above
+    found = injection.suspicious(f"{name}\n{description}\n{role}", "a")
+    if found:
+        raise ValueError(f"These instructions can't be saved: they look like a prompt injection ({injection.describe(found)}). "
+                         "Remove that part and try again.")
+    role = injection.strip_invisible(role)
     out.update(name=name, role=role, icon=icon, color=color.lower(), default=bool(data.get("default", True)),
                description=description, model=model, tools=tools)
     return out

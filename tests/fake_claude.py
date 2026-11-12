@@ -13,6 +13,9 @@ Markers inside the prompt choose what happens during an agent run:
   [[hang]]          sleeps 60 s (to test AGENT_TIMEOUT)
   [[slow]]          sleeps 2.5 s before finishing (to test stop / busy)
   [[escape]]        reports a blocked read of /etc/passwd (a permission denial)
+  [[ssrf]]          the Research agent fetches the cloud metadata address, then keeps going for 5 s (must be stopped)
+  [[peek]]          the HTML agent reads another project's index.html (../../<other>/site/), then keeps going for 5 s:
+                    the server must stop it at once
   [[inject-script]] writes an external <script> into index.html (to test the safety scan)
   [[redo]]          the Critic sends work back (REDO lines) whenever <send_back> lists agents
   [[research-escape]]  the Research agent also edits index.html and creates evil.html (the server must undo both)
@@ -149,6 +152,13 @@ if "[[fail]]" in prompt:
     result("Simulated failure for the test.", is_error=True)
     sys.exit(0)
 
+if agent == "Research" and "[[ssrf]]" in prompt:
+    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "toolu_f", "name": "WebFetch",
+                                                       "input": {"url": "http://169.254.169.254/latest/meta-data/", "prompt": "x"}}]}})
+    time.sleep(5)
+    Path("research.md").write_text("fetched")
+    result("Research agent: fetched it.")
+    sys.exit(0)
 if agent == "Research":
     out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "toolu_s", "name": "WebSearch",
                                                        "input": {"query": "coffee shop websites"}}]}})
@@ -161,6 +171,17 @@ if agent == "Research":
         Path("index.html").write_text("hacked")
         Path("evil.html").write_text("<script>bad()</script>")
     result("Research agent: improved idea, 1 source.")
+    sys.exit(0)
+
+if "[[peek]]" in prompt and agent == "HTML":
+    other = Path.cwd().parent.parent / "11111111-1111-4111-8111-111111111111" / "site" / "index.html"
+    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "toolu_peek", "name": "Read",
+                                                       "input": {"file_path": str(other)}}]}})
+    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "toolu_glob", "name": "Glob",
+                                                       "input": {"pattern": "../../*/site/*.html"}}]}})
+    time.sleep(5)                     # the server kills the process long before this ends
+    Path("peeked.txt").write_text("the agent kept going")
+    result("HTML agent: copied another project.")
     sys.exit(0)
 
 # a normal step: append a line to index.html with a Write tool use

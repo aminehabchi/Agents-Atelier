@@ -2901,3 +2901,42 @@ window.I18N_PATTERNS.ary.push(
   [/^About \$([\d.]+) · about a minute for these agents$/, "تقريبا $1 دولار · تقريبا دقيقة لهاد الوكلاء"],
   [/^About \$([\d.]+) · about (\d+) min for these agents$/, "تقريبا $1 دولار · تقريبا $2 دقيقة لهاد الوكلاء"],
 );
+/* prompt-injection defences: the chat's security cards and the errors that stop a step */
+(() => {
+  const tr = (s) => (Object.prototype.hasOwnProperty.call(window.I18N.ary, s) ? window.I18N.ary[s] : s);
+  const REASON = {
+    "tries to override the agents' rules": "كيحاول يدوز على القواعد ديال الوكلاء",
+    "asks for the agents' hidden instructions": "كيطلب التعليمات المخبية ديال الوكلاء",
+    "asks for keys, passwords or server files": "كيطلب مفاتيح، كلمات السر ولا ملفات ديال السيرفر",
+    "asks to read or write outside the project": "كيطلب يقرا ولا يكتب برا المشروع",
+    "asks to send data to another site": "كيطلب يصيفط معطيات لسيت آخر",
+    "asks to add a harmful or tracking script": "كيطلب يزيد سكريبت مضر ولا ديال التتبع",
+    "fakes the server's own instruction tags": "كيقلد الوسوم ديال التعليمات ديال السيرفر",
+    "contains hidden characters": "فيه حروف مخبية",
+    "a private or local address": "عنوان خاص ولا محلي",
+    "an address that isn't a web page": "عنوان ماشي صفحة ويب",
+    "an address that can't be read": "عنوان ما كيتقراش",
+    "an address with a login in it": "عنوان فيه معلومات الدخول",
+    "an address that carries encoded data": "عنوان هاز معطيات مشفرة",
+    "an address that carries the project's private details": "عنوان هاز المعلومات الخاصة ديال المشروع",
+  };
+  const reasons = (s) => s.split("; ").map(r => REASON[r] || r).join("؛ ");
+  Object.assign(window.I18N.ary, REASON, {
+    "This request has text that looks like a prompt injection. The agents keep to their security rules and won't follow it.": "هاد الطلب فيه نص كيشبه لحقن البرومپت. الوكلاء كيبقاو على القواعد ديال الأمان وما غاديش يتبعوه.",
+    "Some project files have text that looks like instructions aimed at the agents. They treat it as data and won't follow it.": "شي ملفات ف المشروع فيهم نص كيشبه لتعليمات موجهة للوكلاء. كيتعاملو معاه بحال معطيات وما غاديش يتبعوه.",
+  });
+  window.I18N_PATTERNS.ary.push(
+    [/^The (.+) agent's instructions look like a prompt injection, so it didn't run\.$/, (_, a) => `التعليمات ديال الوكيل ${tr(a)} كتشبه لحقن البرومپت، داكشي علاش ما خدمش.`],
+    [/^The (.+) agent didn't run: its instructions look like a prompt injection\. Fix them on its page \((\S+)\), or take it out of the team, then press Continue\.$/,
+      (_, a, url) => `الوكيل ${tr(a)} ما خدمش: التعليمات ديالو كتشبه لحقن البرومپت. صلحهم ف الصفحة ديالو (${url})، ولا حيدو من الفريق، ومن بعد ضغط على كمل.`],
+    [/^The (.+) agent tried to open a file outside this project, so it was stopped\.$/, (_, a) => `الوكيل ${tr(a)} حاول يحل ملف برا هاد المشروع، داكشي علاش توقف.`],
+    [/^The (.+) agent was stopped: it tried to open a file outside this project\. Check your request and the project files for instructions that ask for other files, then press Continue\.$/,
+      (_, a) => `الوكيل ${tr(a)} توقف: حاول يحل ملف برا هاد المشروع. شوف الطلب ديالك والملفات ديال المشروع واش فيهم تعليمات كتطلب ملفات أخرى، ومن بعد ضغط على كمل.`],
+    [/^The (.+) agent tried to fetch (.+), so it was stopped\.$/, (_, a, w) => `الوكيل ${tr(a)} حاول يجيب ${REASON[w] || w}، داكشي علاش توقف.`],
+    [/^The (.+) agent was stopped: it tried to fetch (.+)\. Check your request and the project files for instructions that ask for it, then press Continue\.$/,
+      (_, a, w) => `الوكيل ${tr(a)} توقف: حاول يجيب ${REASON[w] || w}. شوف الطلب ديالك والملفات ديال المشروع واش فيهم تعليمات كتطلبو، ومن بعد ضغط على كمل.`],
+    [/^These instructions can't be saved: they look like a prompt injection \((.+)\)\. Remove that part and try again\.$/,
+      (_, r) => `هاد التعليمات ما يمكنش تتسجل: كتشبه لحقن البرومپت (${reasons(r)}). حيد داك الجزء وعاود.`],
+    [/^([\w./ -]+\.\w+): ((?:tries to|asks |fakes |contains ).+)$/, (_, f, r) => `${f}: ${reasons(r)}`],
+  );
+})();

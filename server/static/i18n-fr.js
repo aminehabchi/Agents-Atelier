@@ -2182,3 +2182,42 @@ window.I18N_PATTERNS.fr.push(
   [/^About \$([\d.]+) · about (\d+) min for these agents$/, "Environ $1 $ · environ $2 min pour ces agents"],
   [/^Next$/, "Suivant"],
 );
+/* prompt-injection defences: the chat's security cards and the errors that stop a step */
+(() => {
+  const tr = (s) => (Object.prototype.hasOwnProperty.call(window.I18N.fr, s) ? window.I18N.fr[s] : s);
+  const REASON = {
+    "tries to override the agents' rules": "tente de contourner les règles des agents",
+    "asks for the agents' hidden instructions": "demande les instructions cachées des agents",
+    "asks for keys, passwords or server files": "demande des clés, des mots de passe ou des fichiers du serveur",
+    "asks to read or write outside the project": "demande de lire ou d'écrire hors du projet",
+    "asks to send data to another site": "demande d'envoyer des données vers un autre site",
+    "asks to add a harmful or tracking script": "demande d'ajouter un script nuisible ou de pistage",
+    "fakes the server's own instruction tags": "imite les balises d'instructions du serveur",
+    "contains hidden characters": "contient des caractères cachés",
+    "a private or local address": "une adresse privée ou locale",
+    "an address that isn't a web page": "une adresse qui n'est pas une page web",
+    "an address that can't be read": "une adresse illisible",
+    "an address with a login in it": "une adresse qui contient un identifiant",
+    "an address that carries encoded data": "une adresse qui transporte des données encodées",
+    "an address that carries the project's private details": "une adresse qui transporte les coordonnées privées du projet",
+  };
+  const reasons = (s) => s.split("; ").map(r => REASON[r] || r).join(" ; ");
+  Object.assign(window.I18N.fr, REASON, {
+    "This request has text that looks like a prompt injection. The agents keep to their security rules and won't follow it.": "Cette demande contient un texte qui ressemble à une injection de prompt. Les agents s'en tiennent à leurs règles de sécurité et ne le suivront pas.",
+    "Some project files have text that looks like instructions aimed at the agents. They treat it as data and won't follow it.": "Certains fichiers du projet contiennent un texte qui ressemble à des instructions destinées aux agents. Ils le traitent comme des données et ne le suivront pas.",
+  });
+  window.I18N_PATTERNS.fr.push(
+    [/^The (.+) agent's instructions look like a prompt injection, so it didn't run\.$/, (_, a) => `Les instructions de l'agent ${tr(a)} ressemblent à une injection de prompt : il n'a pas été lancé.`],
+    [/^The (.+) agent didn't run: its instructions look like a prompt injection\. Fix them on its page \((\S+)\), or take it out of the team, then press Continue\.$/,
+      (_, a, url) => `L'agent ${tr(a)} n'a pas été lancé : ses instructions ressemblent à une injection de prompt. Corrigez-les sur sa page (${url}) ou retirez-le de l'équipe, puis appuyez sur Continuer.`],
+    [/^The (.+) agent tried to open a file outside this project, so it was stopped\.$/, (_, a) => `L'agent ${tr(a)} a tenté d'ouvrir un fichier hors de ce projet : il a été arrêté.`],
+    [/^The (.+) agent was stopped: it tried to open a file outside this project\. Check your request and the project files for instructions that ask for other files, then press Continue\.$/,
+      (_, a) => `L'agent ${tr(a)} a été arrêté : il a tenté d'ouvrir un fichier hors de ce projet. Vérifiez votre demande et les fichiers du projet (des instructions y demandent peut-être d'autres fichiers), puis appuyez sur Continuer.`],
+    [/^The (.+) agent tried to fetch (.+), so it was stopped\.$/, (_, a, w) => `L'agent ${tr(a)} a tenté de récupérer ${REASON[w] || w} : il a été arrêté.`],
+    [/^The (.+) agent was stopped: it tried to fetch (.+)\. Check your request and the project files for instructions that ask for it, then press Continue\.$/,
+      (_, a, w) => `L'agent ${tr(a)} a été arrêté : il a tenté de récupérer ${REASON[w] || w}. Vérifiez votre demande et les fichiers du projet (des instructions le demandent peut-être), puis appuyez sur Continuer.`],
+    [/^These instructions can't be saved: they look like a prompt injection \((.+)\)\. Remove that part and try again\.$/,
+      (_, r) => `Ces instructions ne peuvent pas être enregistrées : elles ressemblent à une injection de prompt (${reasons(r)}). Retirez ce passage et réessayez.`],
+    [/^([\w./ -]+\.\w+): ((?:tries to|asks |fakes |contains ).+)$/, (_, f, r) => `${f} : ${reasons(r)}`],
+  );
+})();
