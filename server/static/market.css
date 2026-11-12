@@ -34,6 +34,9 @@
 
 .badge.official { background: rgb(var(--sky-rgb) / .16); color: #3a43b5; }
 [data-theme="dark"] .badge.official { color: #a9b0ff; }
+/* a paid community agent or team: its one-time price */
+.badge.paid { background: rgb(var(--sky-rgb) / .1); color: #3a43b5; border-color: rgb(var(--sky-rgb) / .35); font-weight: 600; letter-spacing: 0; }
+[data-theme="dark"] .badge.paid { color: #a9b0ff; }
 .badge.community { background: rgb(var(--saffron-rgb) / .18); color: var(--saffron); }
 .badge.pending { background: rgb(var(--saffron-rgb) / .18); color: var(--saffron); }
 .badge.listed { background: rgb(var(--zellige-rgb) / .16); color: var(--zellige); }

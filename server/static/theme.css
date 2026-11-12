@@ -200,3 +200,15 @@ dialog.plan-prompt .row { justify-content: center; }
   header.top .links a { flex: none; width: 34px; }
   header.top .btn:not(.keep) { flex: none; width: 36px; height: 36px; }
 }
+
+/* ---------- the header never wraps ----------
+   Labels stay on one line. When they don't fit (French labels are longer, members and admins get more links),
+   ui.js adds .tight and the links become their icons, with their names as tooltips; .tighter also hides the logo's
+   name. Measured, not guessed from the width, so it works in every language. */
+header.top .logo, .links a, header.top .btn, .hdr-actions, .hdr-tools { white-space: nowrap; }
+header.top .logo, .hdr-actions, .hdr-tools { flex: none; }
+header.top.tight .links a { font-size: 0; gap: 0; padding: 0; width: 36px; justify-content: center; }
+header.top.tight .links a.on { background: var(--steel); border-radius: var(--r-pill); }
+header.top.tight .wrap { gap: 12px; }
+header.top.tight .hdr-tools { margin-right: 0; margin-left: auto; }   /* keeps the same space before the account buttons */
+header.top.tighter .logo { font-size: 0; gap: 0; }

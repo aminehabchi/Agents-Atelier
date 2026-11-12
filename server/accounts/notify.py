@@ -46,43 +46,30 @@ EMAILS = {
                "Trois conseils pour commencer :\n- Choisissez une équipe prête pour votre type de site : elle vient avec une demande à compléter.\n"
                "- Ajoutez votre clé API Claude dans votre profil : les agents travaillent sur votre propre compte Claude.\n"
                "- Partagez un lien avec votre client : il peut épingler des commentaires directement sur la page.\n{link}"),
-        "ary": ("مرحبا بيك ف Agents Atelier",
-                "السلام،\n\nالحساب ديالك واجد. وصف السيت اللي محتاج وخدم فريق ديال الوكلاء ديال الذكاء الاصطناعي يبنيوه قدام عينيك.\n\n"
-                "تلاتة ديال النصائح باش تبدا:\n- ختار فريق واجد للنوع ديال السيت ديالك: كيجي معاه طلب تكملو.\n"
-                "- زيد المفتاح ديال Claude API ف البروفيل ديالك: الوكلاء كيخدمو على الحساب ديالك ف Claude.\n"
-                "- بارطاجي رابط مع الكليان ديالك: يقدر يحط تعليقات نيشان على الصفحة.\n{link}"),
     },
     "run_done": {
         "en": ("Your agents finished their work",
                "Hello,\n\nThe agents finished the request you sent ({minutes}). Open the studio to see the result, ask for changes or share a link.\n{link}"),
         "fr": ("Vos agents ont terminé leur travail",
                "Bonjour,\n\nLes agents ont terminé la demande que vous avez envoyée ({minutes}). Ouvrez le studio pour voir le résultat, demander des changements ou partager un lien.\n{link}"),
-        "ary": ("الوكلاء ديالك ساليو الخدمة",
-                "السلام،\n\nالوكلاء ساليو الطلب اللي صيفطتي ({minutes}). حل الستوديو باش تشوف النتيجة، تطلب تبديلات ولا تبارطاجي رابط.\n{link}"),
     },
     "run_stopped": {
         "en": ("Your agents stopped before the end",
                "Hello,\n\nThe agents stopped before finishing your request ({minutes}): {why}\nWhat's done is kept. Open the studio and press Continue to go on.\n{link}"),
         "fr": ("Vos agents se sont arrêtés avant la fin",
                "Bonjour,\n\nLes agents se sont arrêtés avant de terminer votre demande ({minutes}) : {why}\nCe qui est fait est conservé. Ouvrez le studio et appuyez sur Continuer pour reprendre.\n{link}"),
-        "ary": ("الوكلاء ديالك وقفو قبل ما يساليو",
-                "السلام،\n\nالوكلاء وقفو قبل ما يساليو الطلب ديالك ({minutes}): {why}\nداكشي اللي تدار محفوظ. حل الستوديو وضغط على كمل باش يكملو.\n{link}"),
     },
     "joined": {
         "en": ("Someone you invited joined your project",
                "Hello,\n\n{email} created their account and joined one of your projects as {role}.\n\nYou can change their role or remove them in the project's Share tab.\n{link}"),
         "fr": ("Une personne invitée a rejoint votre projet",
                "Bonjour,\n\n{email} a créé son compte et a rejoint l'un de vos projets en tant que {role}.\n\nVous pouvez changer son rôle ou la retirer dans l'onglet Partager du projet.\n{link}"),
-        "ary": ("شي واحد عرضتي عليه دخل للمشروع ديالك",
-                "السلام،\n\n{email} دار الحساب ديالو ودخل لواحد من المشاريع ديالك ك{role}.\n\nتقدر تبدل الدور ديالو ولا تحيدو من خانة البارطاج ف المشروع.\n{link}"),
     },
     "plan_active": {
         "en": ("Your {plan} plan is active",
                "Hello,\n\nYour {plan} plan is active ({period}). Its features are on now: {features}.\n\nThank you for your trust.\n{link}"),
         "fr": ("Votre offre {plan} est active",
                "Bonjour,\n\nVotre offre {plan} est active ({period}). Ses fonctionnalités sont disponibles dès maintenant : {features}.\n\nMerci de votre confiance.\n{link}"),
-        "ary": ("الباقة {plan} ديالك خدامة",
-                "السلام،\n\nالباقة {plan} ديالك خدامة ({period}). المميزات ديالها متاحة دابا: {features}.\n\nشكرا على الثقة ديالك.\n{link}"),
     },
     "plan_declined": {
         "en": ("About your plan request",
@@ -91,9 +78,6 @@ EMAILS = {
         "fr": ("À propos de votre demande d'offre",
                "Bonjour,\n\nUn admin a examiné votre demande de changement d'offre et ne l'a pas approuvée cette fois. Votre offre reste la même.\n\n"
                "Pour toute question, contactez l'administrateur de ce service.\n{link}"),
-        "ary": ("على الطلب ديال الباقة ديالك",
-                "السلام،\n\nأدمين شاف الطلب ديالك باش تبدل الباقة وما وافقش عليه هاد المرة. الباقة ديالك بقات كيف كانت.\n\n"
-                "إلا عندك شي سؤال، تواصل مع الأدمين ديال هاد الخدمة.\n{link}"),
     },
     "plan_ended": {
         "en": ("Your {plan} subscription has ended",
@@ -102,9 +86,6 @@ EMAILS = {
         "fr": ("Votre abonnement {plan} est terminé",
                "Bonjour,\n\nVotre abonnement {plan} a été {how} chez PayPal : votre compte est revenu à l'offre gratuite Starter. Vos projets sont conservés.\n\n"
                "Vous pouvez vous réabonner depuis votre profil à tout moment.\n{link}"),
-        "ary": ("الاشتراك {plan} ديالك سالا",
-                "السلام،\n\nالاشتراك {plan} ديالك {how} ف PayPal، داكشي علاش الحساب ديالك رجع للباقة الفابور Starter. المشاريع ديالك محفوظين.\n\n"
-                "تقدر تعاود تشترك من البروفيل ديالك فاش ما بغيتي.\n{link}"),
     },
     "payment_failed": {
         "en": ("We couldn't take your payment",
@@ -113,9 +94,6 @@ EMAILS = {
         "fr": ("Nous n'avons pas pu encaisser votre paiement",
                "Bonjour,\n\nPayPal n'a pas pu encaisser le paiement de votre offre {plan}. Vérifiez votre moyen de paiement dans votre compte PayPal : "
                "PayPal réessaie dans quelques jours, et l'abonnement s'arrête si cela échoue encore.\n{link}"),
-        "ary": ("ما قدرناش ناخدو الخلاص ديالك",
-                "السلام،\n\nPayPal ما قدرش ياخد الخلاص ديال الباقة {plan} ديالك. شوف وسيلة الخلاص ف الحساب ديالك ف PayPal: "
-                "PayPal غادي يعاود من بعد شي أيام، والاشتراك كيوقف إلا بقا ما خدمش.\n{link}"),
     },
     "renewal": {
         "en": ("Your {plan} plan renews on {date}",
@@ -124,9 +102,6 @@ EMAILS = {
         "fr": ("Votre offre {plan} se renouvelle le {date}",
                "Bonjour,\n\nVotre offre annuelle {plan} se renouvelle le {date} : PayPal prélèvera {price} $ pour l'année suivante.\n\n"
                "Rien à faire si vous la gardez. Pour l'arrêter, passez à Starter dans votre profil avant cette date.\n{link}"),
-        "ary": ("الباقة {plan} ديالك كتجدد نهار {date}",
-                "السلام،\n\nالباقة السنوية {plan} ديالك كتجدد نهار {date}: PayPal غادي ياخد {price} دولار على العام الجاي.\n\n"
-                "ما تدير والو إلا بغيتي تخليها. باش توقفها، رجع لـ Starter ف البروفيل ديالك قبل هاد التاريخ.\n{link}"),
     },
 }
 WORDS = {
@@ -136,19 +111,14 @@ WORDS = {
     "fr": {"monthly": "payée au mois", "yearly": "payée à l'année", "editor": "éditeur", "viewer": "lecteur",
            "CANCELLED": "annulé", "SUSPENDED": "suspendu", "EXPIRED": "arrivé à son terme", "open": "Ouvrir Agents Atelier : {url}",
            "min": "{n} min", "sec": "moins d'une minute"},
-    "ary": {"monthly": "بالشهر", "yearly": "بالعام", "editor": "محرر", "viewer": "متفرج",
-            "CANCELLED": "تلغى", "SUSPENDED": "توقف", "EXPIRED": "سالا", "open": "حل Agents Atelier: {url}",
-            "min": "{n} دقيقة", "sec": "أقل من دقيقة"},
 }
 FEATURES = {
     "pro": {"en": "unlimited projects, your own agents and teams, web research, more checks and versions",
-            "fr": "projets illimités, vos propres agents et équipes, recherche web, plus de vérifications et de versions",
-            "ary": "مشاريع بلا حدود، الوكلاء والفرق ديالك، البحث فالويب، فحوصات ونسخ كثر"},
+            "fr": "projets illimités, vos propres agents et équipes, recherche web, plus de vérifications et de versions"},
     "agency": {"en": "everything in Pro, editors and viewers on your projects, publishing to the marketplace, every version kept",
-               "fr": "tout Pro, des éditeurs et lecteurs sur vos projets, la publication sur la place de marché, toutes les versions gardées",
-               "ary": "كلشي ديال Pro، محررين ومتفرجين ف المشاريع ديالك، النشر ف السوق، كاع النسخ محفوظين"},
+               "fr": "tout Pro, des éditeurs et lecteurs sur vos projets, la publication sur la place de marché, toutes les versions gardées"},
 }
-PLAN_NAMES = {"ary": {"agency": "الوكالة"}, "fr": {"agency": "Agence"}}
+PLAN_NAMES = {"fr": {"agency": "Agence"}}
 
 
 def _lang(user) -> str:

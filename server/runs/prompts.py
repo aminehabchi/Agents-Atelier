@@ -34,7 +34,7 @@ def brief_block(meta: dict) -> str:
 async def language_rule(meta: dict) -> str:
     """Agents talk to the project owner in the owner's language. It goes first: the security rules stay last."""
     owner = await owner_of(meta)
-    language = {"fr": "French", "ary": "Moroccan Darija, written in Arabic script"}.get((owner or {}).get("language"))
+    language = {"fr": "French"}.get((owner or {}).get("language"))
     if not language:
         return ""
     return (f"Write every message to the user in {language}. The website's own text keeps following the brief and the "

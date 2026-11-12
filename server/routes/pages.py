@@ -117,6 +117,12 @@ async def project_page(pid: str):
     return FileResponse(STATIC / "studio.html")
 
 
+@router.get("/earnings")
+async def earnings_page():
+    """A creator's sales and profit from paid agents and teams, their payouts, and what they bought."""
+    return FileResponse(STATIC / "earnings.html")
+
+
 @router.get("/hire")
 async def hire_page():
     return FileResponse(STATIC / "hire.html")

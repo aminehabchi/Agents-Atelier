@@ -10,6 +10,7 @@ The flow
      for that subscription, checks it's this member's and active, and switches the plan.
   3. PayPal's webhooks (/api/billing/paypal/webhook, signature checked with PayPal) keep it right afterwards: renewals
      are recorded as payments; a cancelled, suspended or expired subscription moves the member back to Starter.
+     The same webhook carries the marketplace's one-time payments (CHECKOUT.ORDER.*, PAYMENT.CAPTURE.*): sales.py.
   4. Moving to Starter on /profile cancels the subscription at PayPal. Moving between Pro and Agency starts a new
      subscription; when it's active, the old one is cancelled.
 
@@ -140,7 +141,7 @@ async def subscribe(user: dict, plan: str, base_url: str, period: str = "monthly
     sub = await paypal("POST", "/v1/billing/subscriptions", {
         "plan_id": (YEARLY_IDS if period == "yearly" else PLAN_IDS)[plan], "custom_id": str(user["id"]),
         "application_context": {"brand_name": "Agents Atelier", "user_action": "SUBSCRIBE_NOW", "shipping_preference": "NO_SHIPPING",
-                                "locale": {"fr": "fr-FR", "ary": "fr-MA"}.get(user.get("language") or "", "en-US"),
+                                "locale": {"fr": "fr-FR"}.get(user.get("language") or "", "en-US"),
                                 "return_url": f"{base}/billing/paypal/return", "cancel_url": f"{base}/profile?paid=cancelled#plan"}})
     approve = next((l["href"] for l in sub.get("links") or [] if l.get("rel") == "approve"), None)
     if not sub.get("id") or not approve:
@@ -275,7 +276,8 @@ async def webhook(headers, raw: bytes) -> dict:
         raise BillingError("Not JSON.")
     if not isinstance(event, dict):
         raise BillingError("A webhook event is a JSON object.")
-    if not enabled() or not await verify_webhook(headers, event):
+    from accounts import sales          # here: sales.py imports this module
+    if not (enabled() or sales.enabled()) or not await verify_webhook(headers, event):
         raise BillingError("This webhook couldn't be verified.", 401)
     event_id, kind, res = str(event.get("id") or ""), str(event.get("event_type") or ""), event.get("resource") or {}
     res = res if isinstance(res, dict) else {}
@@ -293,6 +295,8 @@ async def webhook(headers, raw: bytes) -> dict:
             changed = await apply(res)
         elif kind in ("PAYMENT.SALE.COMPLETED", "PAYMENT.SALE.REFUNDED", "PAYMENT.SALE.REVERSED"):
             await record_payment(kind, res)
+        elif kind == "CHECKOUT.ORDER.APPROVED" or kind.startswith("PAYMENT.CAPTURE."):     # marketplace sales
+            await sales.webhook(kind, res)
     except Exception:
         # not handled after all: forget it, so PayPal's next delivery of this event is handled instead of skipped
         log.exception("PayPal webhook %s (%s) failed; PayPal will send it again", event_id, kind)

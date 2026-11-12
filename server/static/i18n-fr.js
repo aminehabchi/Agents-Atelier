@@ -623,11 +623,11 @@ window.I18N_FR = {
   "Checked in a real browser": "Vérifié dans un vrai navigateur",
   "Before the QA agent and the Critic work, the page opens in a real browser at desktop and phone width. Errors, broken links and images, and sideways scrolling are caught and fixed.": "Avant le travail de l'agent QA et du Critique, la page s'ouvre dans un vrai navigateur, en largeur ordinateur et téléphone. Erreurs, liens et images cassés et défilement horizontal sont repérés et corrigés.",
   "Desktop and phone": "Ordinateur et téléphone",
-  "In English, French or Darija": "En anglais, français ou darija",
-  "Use the app in English, French or Moroccan Darija, written right to left. The agents talk to you in your language, whatever language your site is in.": "Utilisez l'application en anglais, en français ou en darija marocaine, écrite de droite à gauche. Les agents vous parlent dans votre langue, quelle que soit celle de votre site.",
+  "In English or French": "En anglais ou en français",
+  "Use the app in English or French. The agents talk to you in your language, whatever language your site is in, Arabic and other right-to-left languages included.": "Utilisez l'application en anglais ou en français. Les agents vous parlent dans votre langue, quelle que soit celle de votre site, arabe et autres langues de droite à gauche compris.",
   "Right to left included": "Droite à gauche inclus",
   "Which languages can I use?": "Quelles langues puis-je utiliser ?",
-  "The app speaks English, French and Moroccan Darija. Your site can be in any language, or in several: the Translator agent adds a language switcher and right-to-left layouts.": "L'application parle anglais, français et darija marocaine. Votre site peut être dans n'importe quelle langue, ou en plusieurs : l'agent Traducteur ajoute un sélecteur de langue et les mises en page de droite à gauche.",
+  "The app speaks English and French. Your site can be in any language, or in several: the Translator agent adds a language switcher and right-to-left layouts.": "L'application parle anglais et français. Votre site peut être dans n'importe quelle langue, ou en plusieurs : l'agent Traducteur ajoute un sélecteur de langue et les mises en page de droite à gauche.",
   "Agents Atelier: hire AI agents, not freelancers": "Agents Atelier : engagez des agents IA, pas des freelances",
   "Hire AI agents, not freelancers": "Engagez des agents IA, pas des freelances",
   "Describe the job.": "Décrivez la mission.",
@@ -665,7 +665,7 @@ window.I18N_FR = {
   "Agents Atelier works like a freelance platform where every specialist is an AI agent: you describe the job, hire a team, and watch it build the <b>front end</b> of your website in plain HTML, CSS and JavaScript. Every agent runs on Claude Code, so there's no API key to set up.": "Agents Atelier fonctionne comme une plateforme de freelances où chaque spécialiste est un agent IA : vous décrivez la mission, engagez une équipe et la regardez construire le <b>front end</b> de votre site en HTML, CSS et JavaScript simples. Chaque agent fonctionne avec Claude Code : aucune clé API à configurer.",
   "Click <b>New project</b> and give it a name and a short description, like a job post. To improve a site you already have, use <b>Existing site</b> and pick its folder or a .zip (HTML, CSS, JS, Markdown and assets only).": "Cliquez sur <b>Nouveau projet</b> et donnez-lui un nom et une courte description, comme une annonce. Pour améliorer un site existant, utilisez <b>Site existant</b> et choisissez son dossier ou un .zip (HTML, CSS, JS, Markdown et visuels uniquement).",
   "Hire a team": "Engagez une équipe",
-  "In the studio, pick one of the ready teams or switch agents on yourself. Duplicate any agent on the <a href=\"/agents\">Agents page</a> to make your own version, or save a team for a kind of job.": "Dans le studio, choisissez l'une des équipes prêtes ou activez les agents vous-même. Dupliquez un agent sur la <a href=\"/agents\">page Agents</a> pour créer votre version, ou enregistrez une équipe pour un type de travail.",
+  "In the studio, pick one of the ready teams or switch agents on yourself. On Pro, duplicate any agent on the <a href=\"/agents\">Agents page</a> to make your own version, or save a team for a kind of job.": "Dans le studio, choisissez l'une des équipes prêtes ou activez les agents vous-même. Avec Pro, dupliquez un agent sur la <a href=\"/agents\">page Agents</a> pour créer votre version, ou enregistrez une équipe pour un type de travail.",
   "These are the specialists you can hire. Agents run in order, and each one does a single job. Faded agents are off by default; switch them on per project in the Team panel, or hire them with a ready team.": "Voici les spécialistes que vous pouvez engager. Les agents s'exécutent dans l'ordre et chacun fait un seul travail. Les agents grisés sont désactivés par défaut ; activez-les par projet dans le panneau Équipe, ou engagez-les avec une équipe prête.",
   "Ready to hire your first team?": "Prêt à engager votre première équipe ?",
   "Marketplace": "Place de marché",
@@ -1158,7 +1158,7 @@ Object.assign(window.I18N.fr, {
   "Required: always runs": "Obligatoire : s'exécute toujours",
 });
 Object.assign(window.I18N.fr, {
-  "In the studio, <b>Add agents</b> and <b>Choose a team</b> open the marketplace for this project: pick a specialist or a ready team and it joins the project. Duplicate any agent on the <a href=\"/agents\">Agents page</a> to make your own version, or save a team for a kind of job.": "Dans le studio, <b>Ajouter des agents</b> et <b>Choisir une équipe</b> ouvrent la place de marché pour ce projet : choisissez un spécialiste ou une équipe prête et il rejoint le projet. Dupliquez n'importe quel agent sur la <a href=\"/agents\">page Agents</a> pour créer votre version, ou enregistrez une équipe pour un type de travail.",
+  "In the studio, <b>Add agents</b> and <b>Choose a team</b> open the marketplace for this project: pick a specialist or a ready team and it joins the project. On Pro, duplicate any agent on the <a href=\"/agents\">Agents page</a> to make your own version, or save a team for a kind of job.": "Dans le studio, <b>Ajouter des agents</b> et <b>Choisir une équipe</b> ouvrent la place de marché pour ce projet : choisissez un spécialiste ou une équipe prête et il rejoint le projet. Avec Pro, dupliquez n'importe quel agent sur la <a href=\"/agents\">page Agents</a> pour créer votre version, ou enregistrez une équipe pour un type de travail.",
   "The team strip shows this project's agents only. Use × on a tile to remove an agent; add more from the marketplace.": "La bande de l'équipe ne montre que les agents de ce projet. Utilisez × sur une tuile pour retirer un agent ; ajoutez-en depuis la place de marché.",
 });
 Object.assign(window.I18N.fr, {
@@ -1393,7 +1393,7 @@ Object.assign(window.I18N.fr, {
 Object.assign(window.I18N.fr, {
   "One project": "Un projet",
   "The Starter plan includes one project. Delete it, or move to Pro for unlimited projects.": "L'offre Starter comprend un projet. Supprimez-le, ou passez à Pro pour des projets illimités.",
-  "<b>Starter</b> (free): one project, the official agents and ready teams.": "<b>Starter</b> (gratuit) : un projet, les agents officiels et les équipes prêtes.",
+  "<b>Starter</b> (free): one project, the official agents (except web Research) and ready teams.": "<b>Starter</b> (gratuit) : un projet, les agents officiels (sauf la Recherche web) et les équipes prêtes.",
 });
 Object.assign(window.I18N.fr, {
   "A name and a short description, like a job post.": "Un nom et une courte description, comme une offre de mission.",
@@ -1784,11 +1784,11 @@ Object.assign(window.I18N.fr, {
 window.I18N_PATTERNS.fr.push([/^\$(\d+) \/ month$/, "$1 $ / mois"]);
 Object.assign(window.I18N.fr, {
   "Instructions are visible on the Pro plan": "Les instructions sont visibles avec l'offre Pro",
-  "On Starter you see what each agent does, its results, its projects and its ratings, and every official agent works for you. Pro shows the instructions each agent follows, so you can learn from them, duplicate and adapt them.": "Avec Starter, vous voyez ce que fait chaque agent, ses résultats, ses projets et ses notes, et chaque agent officiel travaille pour vous. Pro affiche les instructions que suit chaque agent, pour que vous puissiez vous en inspirer, les dupliquer et les adapter.",
+  "On Starter you see what each agent does, its results, its projects and its ratings, and every official agent except web Research works for you. Pro shows the instructions each agent follows, and lets you duplicate and adapt them into your own agents.": "Avec Starter, vous voyez ce que fait chaque agent, ses résultats, ses projets et ses notes, et chaque agent officiel, sauf la Recherche web, travaille pour vous. Pro affiche les instructions que suit chaque agent et vous permet de les dupliquer et de les adapter en vos propres agents.",
   "Read every agent's instructions, export agents and teams": "Lire les instructions de chaque agent, exporter agents et équipes",
   "Read every agent's instructions": "Lire les instructions de chaque agent",
   "Each agent has one job, a public track record, and its cost shown": "Chaque agent a une seule tâche, un historique public et un coût affiché",
-  "<b>Starter</b> (free): one project, the official agents and ready teams. You see what each agent does, its stats, projects and ratings; its instructions are shown from Pro.": "<b>Starter</b> (gratuit) : un projet, les agents officiels et les équipes prêtes. Vous voyez ce que fait chaque agent, ses statistiques, ses projets et ses notes ; ses instructions sont visibles à partir de Pro.",
+  "<b>Starter</b> (free): one project, the official agents (except web Research) and ready teams. You see what each agent does, its stats, projects and ratings; its instructions, and making your own agents, come with Pro.": "<b>Starter</b> (gratuit) : un projet, les agents officiels (sauf la Recherche web) et les équipes prêtes. Vous voyez ce que fait chaque agent, ses statistiques, ses projets et ses notes ; ses instructions et la création de vos propres agents viennent avec Pro.",
   "<b>Pro</b>: unlimited projects, every agent's instructions, your own agents and teams, exports, web research, more checks and versions.": "<b>Pro</b> : projets illimités, les instructions de chaque agent, vos propres agents et équipes, les exports, la recherche web, plus de vérifications et de versions.",
 });
 /* log in with Google or GitHub, rate limits */
@@ -2221,3 +2221,118 @@ window.I18N_PATTERNS.fr.push(
     [/^([\w./ -]+\.\w+): ((?:tries to|asks |fakes |contains ).+)$/, (_, f, r) => `${f} : ${reasons(r)}`],
   );
 })();
+
+/* ---------- plan wording ---------- */
+Object.assign(window.I18N.fr, {
+  "<li>Every official agent and ready team, except web Research</li><li>Browser check before the Critic</li>": null,
+  "Every official agent and ready team, except web Research": "Tous les agents officiels et équipes prêtes, sauf la Recherche web",
+});
+
+/* ---------- plan list ---------- */
+Object.assign(window.I18N.fr, {
+  "Official agents and ready teams, except web Research": "Agents officiels et équipes prêtes, sauf la Recherche web",
+  "Buy paid agents and teams in the marketplace": "Acheter des agents et équipes payants sur la place de marché",
+  "Duplicate agents, make your own agents and teams": "Dupliquer des agents, créer vos propres agents et équipes",
+  "Sell your agents and teams in the marketplace, keep 70% of each sale": "Vendre vos agents et équipes sur la place de marché, garder 70 % de chaque vente",
+});
+
+/* ---------- landing: paid agents ---------- */
+Object.assign(window.I18N.fr, {
+  "Profiles, ratings and a catalogue that pays its creators.": "Des profils, des notes et un catalogue qui rémunère ses créateurs.",
+  "A community agent: writes restaurant menus that sell, with dish names, short descriptions and prices laid out for phones.": "Un agent de la communauté : rédige des menus de restaurant qui donnent envie, avec noms des plats, descriptions courtes et prix pensés pour le téléphone.",
+  "Menu writer": "Rédacteur de menus",
+  "Buy $4.99": "Acheter 4,99 $",
+  "Costs are estimates for one run, before an agent has a history. After that, its profile shows its real averages. Official agents are free to hire; a community agent may have a one-time price set by its creator.": "Les coûts sont des estimations pour une exécution, avant qu'un agent ait un historique. Ensuite, son profil affiche ses vraies moyennes. Les agents officiels sont gratuits ; un agent de la communauté peut avoir un prix unique fixé par son créateur.",
+  "Members publish their own agents and teams, free or at a price. An admin checks each one before anyone can hire it.": "Les membres publient leurs propres agents et équipes, gratuitement ou à un prix. Un admin vérifie chacun avant que quiconque puisse l'engager.",
+  "Sell your agents, keep 70%": "Vendez vos agents, gardez 70 %",
+  "On the Agency plan, set a price from $1 to $100. Buyers pay once with PayPal, you earn 70% of every sale, and your Earnings dashboard shows sales, profit and payouts.": "Avec le forfait Agency, fixez un prix de 1 $ à 100 $. Les acheteurs paient une fois avec PayPal, vous gagnez 70 % de chaque vente, et votre tableau de bord Revenus affiche ventes, bénéfices et versements.",
+  "Your instructions stay yours": "Vos instructions restent les vôtres",
+  "A paid agent works in its buyers' projects, but nobody reads, edits, exports or copies its instructions, buyers included.": "Un agent payant travaille dans les projets de ses acheteurs, mais personne ne lit, ne modifie, n'exporte ni ne copie ses instructions, acheteurs compris.",
+  "Read the instructions of every free agent": "Lire les instructions de chaque agent gratuit",
+  "An Earnings dashboard with your sales, profit and payouts": "Un tableau de bord Revenus avec vos ventes, bénéfices et versements",
+  "Paid agents and teams are bought once; 70% goes to their creator.": "Les agents et équipes payants s'achètent une fois ; 70 % vont à leur créateur.",
+  "Official agents have no fee: they run on your own Claude API key, so a job costs what Claude charges for it. Some community agents and teams have a one-time price set by their creator; you pay it once with PayPal and keep them. Each profile shows the average time and cost per job, and a team's page estimates the whole team before you start.": "Les agents officiels sont sans frais : ils fonctionnent avec votre propre clé API Claude, donc un travail coûte ce que Claude facture. Certains agents et équipes de la communauté ont un prix unique fixé par leur créateur ; vous le payez une fois avec PayPal et vous les gardez. Chaque profil affiche le temps et le coût moyens par travail, et la page d'une équipe estime toute l'équipe avant de commencer.",
+  "Yes, on the Pro plan. Duplicate a shared agent and edit its instructions, or write a new one in plain Markdown. Your agents and teams are private to you. Paid agents you buy work as they are: their instructions stay their creator's.": "Oui, avec le forfait Pro. Dupliquez un agent partagé et modifiez ses instructions, ou écrivez-en un nouveau en Markdown. Vos agents et équipes sont privés. Les agents payants que vous achetez fonctionnent tels quels : leurs instructions restent celles de leur créateur.",
+  "Can I earn money with my agents?": "Puis-je gagner de l'argent avec mes agents ?",
+  "Yes, on the Agency plan. Publish an agent or a team with a price from $1 to $100. After an admin approves it, members buy it once with PayPal and you earn 70% of each sale. Your Earnings dashboard shows sales and profit per agent, and you ask for a payout to your PayPal from $10.": "Oui, avec le forfait Agency. Publiez un agent ou une équipe avec un prix de 1 $ à 100 $. Une fois approuvé par un admin, les membres l'achètent une fois avec PayPal et vous gagnez 70 % de chaque vente. Votre tableau de bord Revenus affiche ventes et bénéfices par agent, et vous demandez un versement sur votre PayPal à partir de 10 $.",
+});
+
+/* ---------- paid agents, earnings ---------- */
+Object.assign(window.I18N.fr, {
+  "Pay once, keep it. Its instructions stay its creator's.": "Payez une fois, gardez-le. Ses instructions restent celles de son créateur.",
+  "Buy": "Acheter",
+  "Paid. It's yours: it's in your agents and teams.": "Payé. Il est à vous : il est dans vos agents et équipes.",
+  "PayPal is still confirming your payment. It shows here in a minute.": "PayPal confirme encore votre paiement. Il apparaîtra ici dans une minute.",
+  "Payment cancelled. Nothing was charged.": "Paiement annulé. Rien n'a été prélevé.",
+  "PayPal couldn't be reached. If you paid, it shows here in a minute.": "PayPal est injoignable. Si vous avez payé, cela apparaîtra ici dans une minute.",
+  "Price (USD)": "Prix (USD)",
+  "Leave 0 to share it for free, or set a price from $1 to $100. Buyers pay once and you earn 70% of each sale. A paid agent keeps its instructions hidden, buyers included. See your sales on the <a href=\"/earnings\">Earnings</a> page.": "Laissez 0 pour le partager gratuitement, ou fixez un prix de 1 $ à 100 $. Les acheteurs paient une fois et vous gagnez 70 % de chaque vente. Un agent payant garde ses instructions cachées, acheteurs compris. Suivez vos ventes sur la page <a href=\"/earnings\">Revenus</a>.",
+  "Leave 0 to share it for free, or set a price from $1 to $100. Buyers pay once and you earn 70% of each sale. A paid team's agents keep its instructions hidden, buyers included. See your sales on the <a href=\"/earnings\">Earnings</a> page.": "Laissez 0 pour la partager gratuitement, ou fixez un prix de 1 $ à 100 $. Les acheteurs paient une fois et vous gagnez 70 % de chaque vente. Les agents d'une équipe payante gardent leurs instructions cachées, acheteurs compris. Suivez vos ventes sur la page <a href=\"/earnings\">Revenus</a>.",
+  "Members can buy it, hire it and rate its work. If you edit it, an admin reviews it again.": "Les membres peuvent l'acheter, l'engager et noter son travail. Si vous le modifiez, un admin le vérifie à nouveau.",
+  "You bought this agent. It works in your projects; its instructions stay its creator's, so it can't be edited, exported or duplicated.": "Vous avez acheté cet agent. Il travaille dans vos projets ; ses instructions restent celles de son créateur, il ne peut donc pas être modifié, exporté ni dupliqué.",
+  "A paid agent keeps its instructions private": "Un agent payant garde ses instructions privées",
+  "You bought it: it works in your projects like any of your agents, but its instructions stay its creator's.": "Vous l'avez acheté : il travaille dans vos projets comme vos autres agents, mais ses instructions restent celles de son créateur.",
+  "Its creator sells it: buy it once and it works in your projects like any of your agents. Its instructions stay its creator's, buyers included.": "Son créateur le vend : achetez-le une fois et il travaille dans vos projets comme vos autres agents. Ses instructions restent celles de son créateur, acheteurs compris.",
+  "A paid team: buy it once and its agents work in your projects. Their instructions stay its creator's.": "Une équipe payante : achetez-la une fois et ses agents travaillent dans vos projets. Leurs instructions restent celles de son créateur.",
+  "This team includes paid agents. Buy them first, then hire the team.": "Cette équipe comprend des agents payants. Achetez-les d'abord, puis engagez l'équipe.",
+  "This agent is locked": "Cet agent est verrouillé",
+  "Earnings": "Revenus",
+  "Earnings and purchases": "Revenus et achats",
+  "What your paid agents and teams sold, what you earned, and your payouts.": "Ce que vos agents et équipes payants ont vendu, ce que vous avez gagné, et vos versements.",
+  "What you bought in the marketplace. Selling agents and teams comes with the Agency plan.": "Ce que vous avez acheté sur la place de marché. Vendre des agents et des équipes est inclus dans le forfait Agency.",
+  "days": "jours",
+  "Your profit": "Votre bénéfice",
+  "Balance": "Solde",
+  "Ready to be paid out": "Prêt à être versé",
+  "All-time profit": "Bénéfice total",
+  "Buyers paid": "Les acheteurs ont payé",
+  "Sales": "Ventes",
+  "sale": "vente",
+  "sales": "ventes",
+  "sales in this period": "ventes sur la période",
+  "sale in this period": "vente sur la période",
+  "buyer": "acheteur",
+  "buyers": "acheteurs",
+  "refunded": "remboursées",
+  "On the Agency plan you can sell your own agents and teams and keep 70% of every sale.": "Avec le forfait Agency, vous pouvez vendre vos propres agents et équipes et garder 70 % de chaque vente.",
+  "Your profit per day": "Votre bénéfice par jour",
+  "Your share of each sale": "Votre part de chaque vente",
+  "No sales in this period yet.": "Aucune vente sur cette période pour l'instant.",
+  "By agent and team": "Par agent et équipe",
+  "Agent or team": "Agent ou équipe",
+  "Price": "Prix",
+  "Refunds": "Remboursements",
+  "Deleted": "Supprimé",
+  "You don't sell anything yet. Open one of your agents or teams, set a price and publish it to the marketplace.": "Vous ne vendez encore rien. Ouvrez l'un de vos agents ou équipes, fixez un prix et publiez-le sur la place de marché.",
+  "Selling agents and teams comes with the Agency plan.": "Vendre des agents et des équipes est inclus dans le forfait Agency.",
+  "Recent sales": "Ventes récentes",
+  "Your sales show here.": "Vos ventes apparaissent ici.",
+  "Bought by": "Acheté par",
+  "Payout": "Versement",
+  "Sent to your PayPal": "Envoyé sur votre PayPal",
+  "Waiting to be sent": "En attente d'envoi",
+  "Paid to you so far": "Déjà versé",
+  "Your PayPal email": "Votre e-mail PayPal",
+  "Ask for a payout": "Demander un versement",
+  "You can ask for your whole balance from": "Vous pouvez demander tout votre solde à partir de",
+  ". An admin sends it with PayPal within a few days.": ". Un admin l'envoie avec PayPal sous quelques jours.",
+  "Asked for": "Demandé",
+  "Paid": "Payé",
+  "Not sent": "Non envoyé",
+  "How a sale is split": "Comment une vente est partagée",
+  "You": "Vous",
+  "Buyers pay once with PayPal. Your agent's instructions stay hidden from everyone, buyers included. A refunded sale comes off your balance.": "Les acheteurs paient une fois avec PayPal. Les instructions de votre agent restent cachées à tous, acheteurs compris. Une vente remboursée est retirée de votre solde.",
+  "What you bought": "Vos achats",
+  "Paid agents and teams you buy in the marketplace show here.": "Les agents et équipes payants que vous achetez sur la place de marché apparaissent ici.",
+  "Payouts to send": "Versements à envoyer",
+  "Admins only": "Admins uniquement",
+  "Mark paid": "Marquer payé",
+  "No payout is waiting.": "Aucun versement en attente.",
+  "Mark this payout paid?": "Marquer ce versement comme payé ?",
+  "The PayPal transaction id you sent it with": "L'identifiant de la transaction PayPal utilisée",
+  "Reject this payout?": "Refuser ce versement ?",
+  "Payout asked for:": "Versement demandé :",
+  "Marked paid": "Marqué payé",
+  "PayPal email saved": "E-mail PayPal enregistré",
+  "Couldn't load your earnings": "Impossible de charger vos revenus",
+});

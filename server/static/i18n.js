@@ -1,25 +1,24 @@
-/* The interface language. Pages are written in English; in French or Darija this translates the page as it renders.
+/* The interface language. Pages are written in English; in French this translates the page as it renders.
 
-   The server only ever stores the choice. Translations live in i18n-<lang>.js (fr, ary), keyed by the exact English text:
+   The server only ever stores the choice. Translations live in i18n-<lang>.js (fr), keyed by the exact English text:
    - a piece of text, an attribute (title, placeholder, aria-label, alt), or an element with simple inline markup
      such as <p>Click <b>New</b></p> (its normalised innerHTML is the key)
    - I18N_PATTERNS[lang] for text with numbers or names in it
 
    What people wrote is never translated: put data-no-i18n on it, or add its container to SKIP below. */
 (function () {
-  const SUPPORTED = ["en", "fr", "ary"];          // ary: Moroccan Darija, in Arabic script, right to left
-  const RTL = ["ary"];
-  window.LANGS = [["en", "English", "EN"], ["fr", "Français", "FR"], ["ary", "الدارجة", "دا"]];
+  const SUPPORTED = ["en", "fr"];
+  const RTL = [];                                  // a right-to-left language would be listed here (dir="rtl")
+  window.LANGS = [["en", "English", "EN"], ["fr", "Français", "FR"]];
   const stored = () => { try { return localStorage.getItem("atelier-lang"); } catch { return null; } };
   const browser = () => {
     const l = (navigator.language || "en").toLowerCase();
-    return l.startsWith("fr") ? "fr" : l.startsWith("ar") ? "ary" : "en";
+    return l.startsWith("fr") ? "fr" : "en";
   };
   const lang = SUPPORTED.includes(stored()) ? stored() : browser();
 
   window.getLang = () => lang;
-  /* For dates and numbers: Darija has no locale data of its own, so Moroccan Arabic with Western digits. */
-  window.getLocale = () => (lang === "ary" ? "ar-MA-u-nu-latn" : lang);
+  window.getLocale = () => lang;       /* for dates and numbers */
   /* Remember a language and show it. `reload` is off when the page is about to move anyway. */
   window.setLang = (next, reload = true) => {
     if (!SUPPORTED.includes(next)) return;
@@ -96,7 +95,7 @@
     }
     if (el.nodeType !== Node.ELEMENT_NODE) return;
     if (el.closest(SKIP)) {
-      // what people wrote reads in its own direction (an English name inside a Darija page)
+      // what people wrote reads in its own direction (an English name inside a right-to-left page)
       if (rtl) for (const w of [el, ...el.querySelectorAll(WRITTEN)]) if (w.matches?.(WRITTEN) && !w.hasAttribute("dir")) w.dir = "auto";
       return;
     }

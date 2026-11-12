@@ -9,6 +9,7 @@ from core import config
 from core import db
 from accounts import auth
 from accounts import billing
+from accounts import sales
 from accounts import collab
 from accounts import notify as notices
 from accounts import plans
@@ -135,6 +136,7 @@ async def revenue(request: Request, days: int = 30):
     lost = sum(price.get(e["from_plan"], 0) - price.get(e["to_plan"], 0) for e in down)
     return {
         "received": await billing.received(since),
+        "marketplace": await sales.summary(since),
         "days": days, "mrr": mrr, "arr": mrr * 12, "members": len(members), "paying": paying,
         "conversion": round(paying / len(members), 4) if members else 0,
         "arpu": round(mrr / len(members), 2) if members else 0,

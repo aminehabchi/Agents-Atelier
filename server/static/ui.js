@@ -271,7 +271,7 @@ window.seesInstructions = (user) => !!user && (user.role === "admin" || ["pro", 
 window.instructionsLockedHTML = () => `<div class="instr-locked">
     <span class="tile">${icon("lock", { size: 18 })}</span>
     <div><b>Instructions are visible on the Pro plan</b>
-      <p>On Starter you see what each agent does, its results, its projects and its ratings, and every official agent works for you. Pro shows the instructions each agent follows, so you can learn from them, duplicate and adapt them.</p>
+      <p>On Starter you see what each agent does, its results, its projects and its ratings, and every official agent except web Research works for you. Pro shows the instructions each agent follows, and lets you duplicate and adapt them into your own agents.</p>
       <a class="btn btn-dark btn-sm" href="/profile?upgrade=pro#plan">${icon("sparkles", { size: 14 })}See the plans</a></div></div>`;
 
 window.planPrompt = (text, needs) => {
@@ -323,7 +323,7 @@ window.accountButton = (user, { compact = false } = {}) => {
     <div class="acct-menu" role="menu" hidden>
       <div class="acct-head"><b data-no-i18n>${esc(user.name || user.email)}</b>${user.name ? `<small data-no-i18n>${esc(user.email)}</small>` : ""}<span class="badge">${esc(ROLE[user.role] || user.role)}</span>${user.role === "user" && user.plan ? ` <span class="badge plan-badge">${esc({ starter: "Starter", pro: "Pro", agency: "Agency" }[user.plan] || user.plan)}</span>` : ""}</div>
       <div class="acct-links">
-        ${user.confirmed ? item("/profile", "user", "Profile") + item("/profile#plan", "sparkles", user.role === "user" && user.plan !== "agency" ? "Plan and upgrade" : "Plan") + item("/guide", "book", "Guide") : item("/confirm", "check", "Confirm your email")}
+        ${user.confirmed ? item("/profile", "user", "Profile") + item("/profile#plan", "sparkles", user.role === "user" && user.plan !== "agency" ? "Plan and upgrade" : "Plan") + item("/earnings", "chart", "Earnings") + item("/guide", "book", "Guide") : item("/confirm", "check", "Confirm your email")}
         ${user.role === "admin" ? item("/users", "users", "Users") : ""}
       </div>
       <div class="acct-links"><button type="button" role="menuitem" data-out>${icon("log-out", { size: 15 })}<span>Log out</span></button></div>
@@ -872,6 +872,7 @@ window.importFlow = () => new Promise((resolve) => {
     { open: true, group: "Go to", icon: "briefcase", title: "Hire agents", run: () => location.href = "/hire" },
     { group: "Go to", icon: "grid", title: "Projects", run: () => location.href = "/projects" },
     { group: "Go to", icon: "user", title: "Profile and password", run: () => location.href = "/profile" },
+    { group: "Go to", icon: "chart", title: "Earnings and purchases", run: () => location.href = "/earnings" },
     ...(document.documentElement.dataset.ownAgents === "no" ? [] : [
     { group: "Go to", icon: "users", title: "My agents", run: () => location.href = "/agents" },
     { group: "Go to", icon: "layers", title: "My teams", run: () => location.href = "/teams" }]),
@@ -1193,3 +1194,34 @@ function onVisible(el, fn, root = null) {
   io.observe(el);
   return io;
 }
+
+/* ---------- the header fits on one line, whatever the language ----------
+   Try the full labels first; if the header overflows, links become icons (.tight), then the logo loses its name
+   (.tighter). Runs again when the window, the language's text or the links change. */
+(() => {
+  let frame = 0;
+  function fit() {
+    frame = 0;
+    const head = document.querySelector("header.top"), wrap = head?.querySelector(".wrap");
+    if (!wrap) return;
+    for (const a of head.querySelectorAll(".links a")) {
+      const name = a.textContent.trim();
+      if (name && a.dataset.autoTitle !== name) { a.title = name; a.dataset.autoTitle = name; }
+    }
+    const over = () => wrap.scrollWidth > wrap.clientWidth + 1;
+    head.classList.remove("tight", "tighter");
+    if (!over()) return;
+    head.classList.add("tight");
+    if (over()) head.classList.add("tighter");
+  }
+  const soon = () => { if (!frame) frame = requestAnimationFrame(fit); };
+  function watch() {
+    const head = document.querySelector("header.top");
+    if (!head) return;
+    soon();
+    new ResizeObserver(soon).observe(document.documentElement);
+    new MutationObserver(soon).observe(head, { childList: true, subtree: true, characterData: true });
+    document.fonts?.ready.then(soon);
+  }
+  document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", watch) : watch();
+})();

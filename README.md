@@ -16,7 +16,8 @@ result in a real browser, sending bigger problems back to the agent that owns th
 | Offers, then days of waiting             | **Start a job**: pick one of your projects and the team starts at once  |
 | Each round of changes means new messages | Ask for a change anytime: **only the agents it needs** work on it      |
 | You trust a profile                     | Every agent's **results, ratings, time and cost** are shown, and on Pro its **instructions** too |
-| Build your own agency                   | **Duplicate any agent**, change its instructions, save **your own teams** |
+| Build your own agency                   | On Pro, **duplicate any agent**, change its instructions, save **your own teams** |
+| Freelancers earn from their work        | On Agency, **sell your agents and teams**: buyers pay once, you keep **70%** |
 
 The work itself is **front end only**: the team builds a finished static website (one page or several) in plain HTML,
 CSS and JavaScript that you download and host anywhere.
@@ -38,7 +39,7 @@ reloads after every edit, a code editor and a version saved after every agent, a
 Orchestrator runs only the agents each follow-up needs. You can stop, continue, retry a single agent, or duplicate any
 agent and edit its Markdown instructions to build your own teams. The result is plain HTML, CSS and JavaScript you
 download as a .zip and host anywhere, inside a platform with real accounts, plans, revenue and monitoring analytics
-for admins, privacy tools and an interface in English, French or Moroccan Darija. The agents run on each member's own
+for admins, privacy tools and an interface in English or French. The agents run on each member's own
 Claude API key, so members pay Anthropic directly for the AI and the plans only unlock features.
 
 You watch every step live. You can stop, steer, retry or roll back any of them, and at the end you download plain
@@ -52,7 +53,7 @@ HTML, CSS and JavaScript files that are yours.
 Every agent is **Claude Code** running with a different role. On a public install each member adds **their own Claude
 API key** in their profile and the agents run on it (`CLAUDE_KEYS=user`, the default); on a private install everyone can
 use the server's own Claude Code login (`CLAUDE_KEYS=server`). People sign up with an email and a password; accounts,
-agents and teams live in Postgres. The app speaks **English, French and Moroccan Darija** (right to left), in light or
+agents and teams live in Postgres. The app speaks **English and French**, in light or
 dark.
 
 ![The Agents Atelier studio: chat with the agents on the left, live preview of the page being built on the right, and the agent team below](docs/screenshots/studio.png)
@@ -188,7 +189,7 @@ Each agent receives:
   copies** of your photos to use in `srcset`
 - for Responsive, Accessibility, QA and the Critic: a **browser check** (see below)
 - the **shared rules** (`agents/_common.md`) followed by **its own role**, then security rules the server adds last
-- an instruction to write its chat messages in **your interface language** (French or Darija); the site itself keeps
+- an instruction to write its chat messages in **your interface language** (French); the site itself keeps
   following the brief
 
 Agents can only use file tools (read, write, edit, search) inside the project folder. They can't run commands or start
@@ -534,6 +535,16 @@ The app works like a freelance platform where the freelancers are agents (**Hire
 - **Community agents and teams:** on your own agent or team page, **Publish to the marketplace** with a category. An admin
   approves or rejects it (with a note) in the review queue at the top of `/hire`; editing a listed one sends it back for
   review. **Hire** copies it into your agents (a team brings its private agents along); hires are counted on the original.
+- **Paid agents and teams:** an Agency member may set a price ($1–$100) when publishing. Everyone, Starter included,
+  can buy: **Buy** opens PayPal for a one-time payment, and on return the agent (or team) is copied into the buyer's
+  own. The creator earns **70%** of each sale, the platform keeps **30%**. A paid agent's instructions are shown to
+  nobody but its creator and the admins, buyers included: a bought copy is **locked** (it runs, but can't be read,
+  edited, exported, duplicated or published). A free team can't include a paid agent; a paid team locks its creator's
+  agents too. When a seller leaves the Agency plan, their paid listings can't be bought until they come back.
+- **Earnings** (`/earnings`): sales and profit for the period and all time, profit per day, sales and refunds per agent
+  and team, recent sales, what you bought, and payouts. Add your PayPal email and ask for your balance from $10; an
+  admin sends it from PayPal and marks it paid with the transaction id (admins see the payout queue on the same page).
+  A refund (PayPal webhook) comes off the creator's balance.
 
 ## Plans and your Claude key
 
@@ -546,13 +557,14 @@ or login. A full site costs about $1.50–2 on the member's account, a small cha
 | | **Starter** (free) | **Pro** ($9/month, or $90/year) | **Agency** ($29/month, or $290/year) |
 |---|---|---|---|
 | Projects | 1 | Unlimited | Unlimited |
-| Official agents and ready teams | ✅ | ✅ | ✅ |
-| Read the agents' instructions and the shared rules, export agents and teams | ❌ name, description, stats, projects and ratings only | ✅ | ✅ |
-| Your own agents and teams, imports | ❌ | ✅ | ✅ |
+| Official agents and ready teams | ✅ except the web Research agent | ✅ | ✅ |
+| Buy paid agents and teams from the marketplace | ✅ | ✅ | ✅ |
+| Read the agents' instructions and the shared rules, export agents and teams | ❌ name, description, stats, projects and ratings only | ✅ (not paid agents') | ✅ (not paid agents') |
+| Duplicate agents, your own agents and teams, imports | ❌ | ✅ | ✅ |
 | Web research agent | skipped, with a note | ✅ | ✅ |
 | Browser checks | before the Critic | before Responsive, Accessibility, QA and the Critic | same |
 | Versions kept per project | 10 | 100 | all |
-| Publish to the marketplace | ❌ | ❌ | ✅ |
+| Publish to the marketplace, free or for a price (you keep 70%) | ❌ | ❌ | ✅ |
 | Editors and viewers on your projects | ❌ | ❌ | ✅ |
 | Share links with pinned comments | ✅ | ✅ | ✅ |
 | Downloaded .zip | adds a small "Made with Agents Atelier" line | clean | clean |
@@ -680,16 +692,18 @@ language. Nothing a person typed (project names, comments) goes in an email; lin
 
 ## Languages, theme and colours
 
-- **Interface languages:** English, French and **Moroccan Darija** (Arabic script, right to left). Pick one on the
-  login page, in the footer or on **/profile**; it's saved on the account. In French or Darija, the interface and the
+- **Interface languages:** English and French. Pick one on the login page, in the footer or on **/profile**; it's
+  saved on the account (a browser in another language starts in English). In French, the interface and the
   account emails are translated, and the agents write their chat messages in that language. The generated site keeps
   following the brief, so a French interface can build an English site.
 - **How translation works:** pages are written in English; `server/static/i18n.js` translates them as they render,
-  from `i18n-fr.js` and `i18n-ary.js` (keyed by the exact English text, with patterns for text containing numbers or
+  from `i18n-fr.js` (keyed by the exact English text, with patterns for text containing numbers or
   names). What people wrote (project names, prompts, chat) is never translated. To add a language: add its code to
   `SUPPORTED` (and `RTL` if needed) and `LANGS` in `i18n.js`, write `i18n-<code>.js`, add it to `LANGUAGES` and
   `EMAILS` in `server/auth.py`, and to `language_rule` in `server/main.py`.
-- **Darija** was translated by the AI. Have a native speaker review `server/static/i18n-ary.js` before launch.
+- **Generated sites** can still be in any language, Arabic and other right-to-left languages included (the Translator
+  agent); only the app's own interface is limited to English and French. Moroccan Darija was removed from the
+  interface: accounts that had picked it read the app in English (migration `0024_no_darija.sql`).
 - **Theme:** dark (default), light or follow the system, from **/profile** or the theme button; saved on the account.
 - **Colours:** three colours on neutral backgrounds: **Majorelle blue** for actions, **saffron** for highlights and
   **zellige green** for success. Icon tiles, list cards and chart bars take turns between the three. The tokens are at
@@ -861,7 +875,7 @@ run with `CLAUDE_KEYS=user`, each saving a test key the fake CLI accepts. It cov
 - files, uploads, imports and versions
 - agents, models, teams, use cases and the migrations
 - WebSocket messages and full runs: stop / continue / start again / retry, timeouts, CLI errors
-- the agents' language rule (French and Darija) and the emails in each language
+- the agents' language rule (French) and the emails in each language
 - browser checks (layout and axe-core) and the prompt-injection defences
 - Orchestrator forms, confirmations and template blanks; the contact and QR agents; WebP copies
 - Claude keys (checked, encrypted, never echoed, per-owner runs in a clean environment), plans and their limits,
@@ -907,7 +921,7 @@ Set `KEEP_TEST_FILES=1` to keep the temporary folder for inspection.
 ├── database/            docker-compose.yaml for Postgres
 ├── server/              the Python server (FastAPI)
 │   ├── migrations/      numbered database migrations (schema, shared agents and teams)
-│   ├── static/          the web pages, styles, icons and translations (i18n-fr.js, i18n-ary.js)
+│   ├── static/          the web pages, styles, icons and translations (i18n-fr.js)
 │   └── manage.py        make-admin, migrate, migrations, make-agents-migration, paypal-setup
 ├── tests/               automated tests and a fake Claude CLI
 ├── storage/             every file: agents' instructions and projects (created at first run, not in git)

@@ -133,7 +133,7 @@ function agentCard(a) {
     <header class="mc-head"><span class="ico">${icon(a.icon || "bot", { size: 22 })}</span>
       <div class="mc-who"><h3><a href="/hire/agents/${a.pk}" ${userText(a)}>${esc(a.name)}</a></h3>
         <span class="m-by"><span>by</span> <span data-no-i18n>${esc(a.by)}</span> · <span>${esc(CATEGORY[a.category] || "")}</span></span></div>
-      ${sourceBadge(a)}</header>
+      ${priceBadge(a)}${sourceBadge(a)}</header>
     <p ${userText(a)}>${esc(a.description)}</p>
     <div class="m-stats">${ratingText(a.rating)}${stat("check", `${a.jobs} job${a.jobs === 1 ? "" : "s"}`, "Jobs done")}
       ${a.official ? "" : stat("users", `${a.hires} hire${a.hires === 1 ? "" : "s"}`, "Hires")}
@@ -147,7 +147,7 @@ function teamCard(t) {
     <header class="mc-head"><span class="ico">${icon(CATEGORY_ICON[t.category] || "layers", { size: 22 })}</span>
       <div class="mc-who"><h3><a href="/hire/teams/${t.pk}" ${userText(t)}>${esc(t.name)}</a></h3>
         <span class="m-by"><span>by</span> <span data-no-i18n>${esc(t.by)}</span> · <span>${t.agents.length} agents</span></span></div>
-      ${sourceBadge(t)}</header>
+      ${priceBadge(t)}${sourceBadge(t)}</header>
     <p ${userText(t)}>${esc(t.description)}</p>
     <div class="m-stack" aria-hidden="true">${t.agents.slice(0, 10).map(a => `<span class="mini" title="${esc(a.name)}">${icon(a.icon || "bot", { size: 14 })}</span>`).join("")}${t.agents.length > 10 ? `<span class="mini more" data-no-i18n>+${t.agents.length - 10}</span>` : ""}</div>
     <div class="m-stats">${ratingText(t.rating)}${t.official ? "" : stat("users", `${t.hires} hire${t.hires === 1 ? "" : "s"}`, "Hires")}</div>

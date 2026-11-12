@@ -78,7 +78,7 @@ server/
     ├── base.css · site.css · theme.css design tokens, shared components, page layout
     ├── ui.js         api(), toast(), dialogs, planPrompt(), showError(), theme, command palette, pagination, lazy loading
     ├── market.js     marketplace helpers: Start a job, hiring, "choosing for a project"
-    ├── i18n.js · i18n-fr.js · i18n-ary.js   translation of the pages (French, Darija)
+    ├── i18n.js · i18n-fr.js       translation of the pages (French)
     └── icons.js · logo.svg   hand-drawn SVG line icons, logo and favicon
 ```
 
@@ -406,7 +406,11 @@ images get a `url` instead.
 | POST     | `/api/import`           | `{name, data: base64, on_conflict: rename·replace·skip, apply}`; without `apply` it returns the plan only. Accepts `.md`, team `.json`, `.zip` (≤ 300 files, 5 MB unpacked) |
 | GET      | `/api/models`           | the model list: `{default, options: [{id, label, kind: alias·full·custom, source, note}], alias_source}` |
 | POST     | `/api/models/check`     | `{model}`: asks the Claude CLI to answer with that model; on success it's added to `agents/_models.json` |
-| GET      | `/api/market…`          | the catalogue, profiles, `hire`, `publish` (Agency), `withdraw`, `pending` and `review` (admins) |
+| GET      | `/api/market…`          | the catalogue, profiles, `hire`, `publish` (Agency, `{kind, id, category, price}`: 0 or $1–$100), `withdraw`, `pending` and `review` (admins). Items carry `price` and `bought`; hiring a paid one not bought yet answers `402` |
+| POST     | `/api/market/{agents,teams}/<pk>/buy` | one-time PayPal order (`accounts/sales.py`): `{approve}` (PayPal's page) or `{owned: true}`. PayPal returns the buyer to `/market/paypal/return?token=<order>`, which captures it and copies the agent (locked) or team |
+| GET      | `/api/earnings?days=`   | the Earnings dashboard: `totals` (sales, gross, earned 70%, platform 30%, refunds, balance, paid out), `items` per agent and team, `series` per day, `recent` sales, `payouts`, `purchases` |
+| PUT, POST | `/api/earnings/payout-email`, `/api/earnings/payout` | `{email}`; ask for the whole balance (from $10, one request at a time) |
+| GET, POST | `/api/admin/payouts`, `/api/admin/payouts/<id>` | admins: the payout queue; `{decision: paid·rejected, reference, note}` (paid needs the PayPal transaction id) |
 | GET      | `/api/stats?project=<id>&page=&per_page=` | `{totals, agents: [per agent], recent: [last 30 runs]}`; omit `project` for all projects. With `page`, `recent` is one page of **all** runs (newest first) and `recent_pager` = `{page, pages, per_page, total}` |
 
 Creating or editing agents and teams (`POST/PUT /api/agents`, `/api/presets`, `/api/import`) needs the Pro plan, and

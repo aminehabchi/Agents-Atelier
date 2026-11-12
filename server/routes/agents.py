@@ -41,9 +41,12 @@ async def list_agents(request: Request, full: bool = False, project: str | None 
         if not can_access(who, meta):
             raise HTTPException(404, "This project doesn't exist (it may have been deleted).")
         who = await owner_of(meta)
-    keys = ("id", "name", "icon", "color", "default", "description", "model", "tools", "scope", "editable") + (("role", "file") if full else ())
+    keys = ("id", "name", "icon", "color", "default", "description", "model", "tools", "scope", "editable", "locked") + (("role", "file") if full else ())
     out = [{**{k: a[k] for k in keys}, "model_ok": model_catalog.allowed(a["model"])} for a in await load_agents(who)]
-    return out if not full or sees_instructions(current_user(request)) else [without_instructions(a) for a in out]
+    if not full:
+        return out
+    see = sees_instructions(current_user(request))
+    return [a if see and not a["locked"] else without_instructions(a) for a in out]
 
 
 INSTRUCTIONS_LOCKED = ("Reading the agents' instructions comes with the Pro plan. On Starter you see what each agent does, "
@@ -56,6 +59,7 @@ def sees_instructions(user: dict | None) -> bool:
 
 
 def without_instructions(item: dict) -> dict:
+    """No instructions: a Starter member's view, or a bought (locked) copy of a paid agent."""
     return {**item, "role": "", "instructions_locked": True}
 
 
@@ -128,7 +132,7 @@ async def get_agent(request: Request, agent_id: str):
     if i is None:
         raise HTTPException(404, f"There's no agent called “{agent_id}”.")
     stats = next((b for b in (await get_stats(request))["agents"] if b["agent"] == agent_id), None)
-    agent = agents[i] if sees_instructions(user) else without_instructions(agents[i])
+    agent = agents[i] if sees_instructions(user) and not agents[i]["locked"] else without_instructions(agents[i])
     return {**agent, "model_ok": model_catalog.allowed(agents[i]["model"]), "position": i + 1, "total": len(agents),
             "prev": agents[i - 1]["id"] if i > 0 else None, "next": agents[i + 1]["id"] if i + 1 < len(agents) else None,
             "teams": await team_files.teams_with(user, agent_id), "stats": stats,
@@ -175,6 +179,8 @@ async def export_agent(request: Request, agent_id: str):
         name, text = await team_files.export_agent(current_user(request), agent_id)
     except KeyError:
         raise HTTPException(404, f"There's no agent called “{agent_id}”.")
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
     return _download(name, text.encode(), "text/markdown; charset=utf-8")
 
 
@@ -194,7 +200,7 @@ async def export_everything(request: Request):
     plans.need(current_user(request), "instructions", "Exports contain the agents' instructions, which come with the Pro plan.")
     buf = io.BytesIO()
     user = current_user(request)
-    agents = await load_agents(user)
+    agents = [a for a in await load_agents(user) if not a["locked"]]     # bought copies aren't theirs to share
     teams = await team_files.load_presets(user)
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for a in agents:

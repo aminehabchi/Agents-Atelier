@@ -149,7 +149,7 @@ def _agent(row, user: dict | None) -> dict:
             "default": row["is_default"], "description": row["description"], "model": row["model"],
             "tools": row["tools"] if row["tools"] in TOOL_SETS else "", "role": storage.read_instructions(row["uuid"], row["role"]),
             "scope": "shared" if shared else "mine", "editable": is_admin(user) if shared else True,
-            "updated": row["updated_at"].timestamp()}
+            "locked": bool(row["locked"]), "updated": row["updated_at"].timestamp()}
 
 
 async def load_agents(user: dict | None) -> list[dict]:
@@ -269,6 +269,8 @@ async def update_agent(user: dict, agent_id: str, data: dict) -> dict:
     target = await _find(user, agent_id)
     if not target["editable"]:
         raise PermissionError("Only an admin can change a shared agent. Duplicate it to make your own version.")
+    if target["locked"]:
+        raise PermissionError("You bought this agent: it works in your projects, but its instructions stay its creator's.")
     clean = validate({"tools": target.get("tools", ""), **data}, new=False)   # a form without `tools` keeps it
     await db.pool.execute(
         """UPDATE agents SET name = $3, icon = $4, color = $5, is_default = $6, description = $7, model = $8, tools = $9,
@@ -431,13 +433,15 @@ AGENT_KEYS = ("id", "name", "icon", "color", "default", "description", "model", 
 
 async def export_agent(user: dict, agent_id: str) -> tuple[str, str]:
     a = await _find(user, agent_id)
+    if a["locked"]:
+        raise PermissionError("You bought this agent: its instructions stay its creator's, so it can't be exported.")
     return f"{a['id']}.md", _render(a)
 
 
 async def export_team(user: dict, preset_id: str) -> tuple[str, dict]:
     t = await get_preset(user, preset_id)
     by_id = {a["id"]: a for a in await load_agents(user)}
-    agents = [{k: by_id[i][k] for k in AGENT_KEYS} for i in t["agents"] if i in by_id]
+    agents = [{k: by_id[i][k] for k in AGENT_KEYS} for i in t["agents"] if i in by_id and not by_id[i]["locked"]]   # bought: not theirs to share
     return f"team-{t['id']}.json", {"format": TEAM_FORMAT, "version": 1, "exported": time.time(),
                                     "team": {"name": t["name"], "description": t.get("description", ""), "agents": t["agents"],
                                              "prompt": t.get("prompt", "")},

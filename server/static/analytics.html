@@ -145,7 +145,7 @@ function hbars(rows) {
   return `<div class="hbars">${rows.slice(0, 8).map(r => `<div><div class="hbar-top"><span>${esc(r.label)}</span><span>${r.value}</span></div>
     <div class="hbar-track"><i style="width:${(r.value / max) * 100}%"></i></div></div>`).join("")}</div>`;
 }
-const LANG = { en: "English", fr: "Français", ary: "الدارجة", "": "Not set" };
+const LANG = { en: "English", fr: "Français", "": "Not set" };
 const sum = (s) => s.reduce((n, d) => n + d.value, 0);
 
 /* Two views: Revenue (what the plans are worth) and Monitoring (is everything working, and how it's used).

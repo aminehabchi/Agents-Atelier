@@ -599,16 +599,6 @@ class T06Runs(unittest.TestCase):
                 self.assertLess(system.index("in French"), system.index("SECURITY") if "SECURITY" in system else len(system))
         finally:
             call("PATCH", "/api/auth/preferences", {"language": "en"})
-        call("PATCH", "/api/auth/preferences", {"language": "ary"})
-        try:
-            before = len(log_calls())
-            self.run_prompt(make_project_for_language(), "Make a page")
-            prompts = [c["argv"][c["argv"].index("--append-system-prompt") + 1] for c in log_calls()[before:] if "--append-system-prompt" in c["argv"]]
-            self.assertTrue(prompts)
-            for system in prompts:
-                self.assertIn("Moroccan Darija", system.split("\n")[0])
-        finally:
-            call("PATCH", "/api/auth/preferences", {"language": "en"})
         before = len(log_calls())
         self.run_prompt(make_project_for_language(), "Make a page")
         for c in log_calls()[before:]:
@@ -1978,19 +1968,18 @@ class T14Preferences(unittest.TestCase):
         call("POST", "/api/auth/register", {"name": "Ann Lee", "email": other, "password": "correct horse", "language": "klingon"}, cookie=None)
         self.assertIn("Hello", [m for m in map(json.loads, OUTBOX.read_text().splitlines()) if m["to"] == other][-1]["text"])
 
-    def test_darija_is_a_language(self):
+    def test_the_interface_is_in_english_or_french_only(self):
+        """Moroccan Darija was removed: it's refused as a choice, and a sign-up asking for it gets English."""
         cookie = register(self.email())
-        self.assertEqual(call("PATCH", "/api/auth/preferences", {"language": "ary"}, cookie=cookie)[0], 200)
-        self.assertEqual(call("GET", "/api/auth/me", cookie=cookie)[1]["user"]["language"], "ary")
+        self.assertEqual(call("PATCH", "/api/auth/preferences", {"language": "ary"}, cookie=cookie)[0], 400)
+        self.assertEqual(call("PATCH", "/api/auth/preferences", {"language": "fr"}, cookie=cookie)[0], 200)
         email = self.email()
         s, r, _ = call("POST", "/api/auth/register", {"name": "Ann Lee", "email": email, "password": "correct horse", "language": "ary"}, cookie=None)
         self.assertEqual(s, 200, r)
         mail = [m for m in map(json.loads, OUTBOX.read_text().splitlines()) if m["to"] == email][-1]
-        self.assertIn("السلام", mail["text"])
-        self.assertIn(mail["code"], mail["subject"])
-        s, js, _ = call("GET", "/static/i18n-ary.js", cookie=None)
-        self.assertEqual(s, 200)
-        self.assertIn("window.I18N.ary", js)
+        self.assertIn("Hello", mail["text"])
+        self.assertEqual(call("GET", "/static/i18n-ary.js", cookie=None)[0], 404)
+        self.assertNotIn('"ary"', call("GET", "/static/i18n.js", cookie=None)[1])
 
     def test_home_is_a_dashboard_only_for_confirmed_accounts(self):
         page = lambda cookie: call("GET", "/", cookie=cookie)[1]
@@ -3037,12 +3026,13 @@ class T42Share(unittest.TestCase):
 
 
 class FakePayPal:
-    """A stand-in for PayPal's REST API (billing.py): subscriptions, cancel, webhook signature checks. No money moves."""
+    """A stand-in for PayPal's REST API (billing.py, sales.py): subscriptions, cancel, one-time orders and their capture,
+    webhook signature checks. No money moves. An order is captured only once a test marks it APPROVED (the buyer paid)."""
 
     def __init__(self):
         import http.server
         import threading
-        self.subs, self.calls = {}, []
+        self.subs, self.calls, self.orders = {}, [], {}
         fake = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
@@ -3060,6 +3050,8 @@ class FakePayPal:
             def do_GET(self):
                 fake.calls.append(("GET", self.path))
                 sid = self.path.rsplit("/", 1)[-1]
+                if self.path.startswith("/v2/checkout/orders/") and sid in fake.orders:
+                    return self.reply(200, fake.orders[sid])
                 self.reply(200, fake.subs[sid]) if sid in fake.subs else self.reply(404, {"name": "RESOURCE_NOT_FOUND"})
 
             def do_POST(self):
@@ -3075,6 +3067,25 @@ class FakePayPal:
                     fake.subs[sid] = {"id": sid, "plan_id": body["plan_id"], "custom_id": body["custom_id"], "status": "APPROVAL_PENDING",
                                       "links": [{"rel": "approve", "href": f"https://paypal.test/approve/{sid}"}]}
                     return self.reply(201, fake.subs[sid])
+                if self.path == "/v2/checkout/orders":
+                    oid = f"O-{len(fake.orders) + 1:04d}{uuid.uuid4().hex[:6].upper()}"
+                    unit = body["purchase_units"][0]
+                    fake.orders[oid] = {"id": oid, "status": "CREATED", "custom_id": unit["custom_id"], "amount": unit["amount"],
+                                        "links": [{"rel": "approve", "href": f"https://paypal.test/checkout/{oid}"}]}
+                    return self.reply(201, fake.orders[oid])
+                if self.path.startswith("/v2/checkout/orders/") and self.path.endswith("/capture"):
+                    oid = self.path.split("/")[-2]
+                    o = fake.orders.get(oid)
+                    if not o:
+                        return self.reply(404, {"name": "RESOURCE_NOT_FOUND"})
+                    if o["status"] == "COMPLETED":
+                        return self.reply(422, {"name": "UNPROCESSABLE_ENTITY", "details": [{"issue": "ORDER_ALREADY_CAPTURED"}]})
+                    if o["status"] != "APPROVED":
+                        return self.reply(422, {"name": "UNPROCESSABLE_ENTITY", "details": [{"issue": "ORDER_NOT_APPROVED"}]})
+                    o["status"] = "COMPLETED"
+                    o["purchase_units"] = [{"payments": {"captures": [{"id": f"CAP-{oid}", "status": "COMPLETED",
+                                                                      "amount": {"currency_code": o["amount"]["currency_code"], "value": o["amount"]["value"]}}]}}]
+                    return self.reply(201, o)
                 if self.path.endswith("/cancel"):
                     sid = self.path.split("/")[-2]
                     fake.subs[sid]["status"] = "CANCELLED"
@@ -3231,6 +3242,153 @@ class T43PayPal(unittest.TestCase):
         self.assertEqual(self.call("POST", "/api/billing/paypal/subscribe", {"plan": "pro"})[0], 401, "logged out")
 
 
+    # ------------------------------------------------------------ paid agents and teams (sales.py)
+
+    def seller_agent(self, cookie, price, name="Paid FAQ"):
+        slug = f"paid-{time.time_ns() % 10**9}"
+        s, r, _ = call("POST", "/api/agents", {"id": slug, "name": name, "icon": "message", "color": "#334455", "default": False,
+                                               "description": "Writes a FAQ section.", "role": "SECRET-RECIPE: you are the paid FAQ agent."},
+                       cookie=cookie)
+        self.assertEqual(s, 200, r)
+        s, r, _ = call("POST", "/api/market/publish", {"kind": "agent", "id": slug, "category": "writing", "price": price}, cookie=cookie)
+        self.assertEqual((s, r["listing"], r["price"]), (200, "pending", price), r)
+        pk = r["pk"]
+        self.assertEqual(call("POST", "/api/market/review", {"kind": "agent", "pk": pk, "decision": "approve"})[0], 200)
+        return slug, pk
+
+    def pay(self, cookie, kind, pk):
+        """Buy through the fake PayPal: start, 'pay', come back. Returns where the browser lands."""
+        s, r, _ = self.call("POST", f"/api/market/{kind}s/{pk}/buy", cookie=cookie)
+        self.assertEqual(s, 200, r)
+        self.assertTrue(r["approve"].startswith("https://paypal.test/checkout/"))
+        self.paypal.orders[r["id"]]["status"] = "APPROVED"
+        global BASE
+        saved, BASE = BASE, self.base
+        try:
+            return r["id"], page_redirect(f"/market/paypal/return?token={r['id']}&PayerID=X", cookie=cookie)
+        finally:
+            BASE = saved
+
+    def test_buy_a_paid_agent_and_its_instructions_stay_hidden(self):
+        seller = register(f"seller-{time.time_ns()}@example.com")                 # Agency
+        buyer, _ = self.member()                                                     # Starter can buy
+        slug, pk = self.seller_agent(seller, 4.99)
+        item = next(x for x in call("GET", "/api/market", cookie=buyer)[1]["agents"] if x["pk"] == pk)
+        self.assertEqual((item["price"], item["bought"]), (4.99, False))
+        # nobody but its creator (and admins) reads a paid agent's instructions, Pro and Agency members included
+        other_agency = register(f"agency-{time.time_ns()}@example.com")
+        for who in (buyer, other_agency):
+            prof = call("GET", f"/api/market/agents/{pk}", cookie=who)[1]
+            self.assertTrue(prof["paid_locked"])
+            self.assertNotIn("SECRET-RECIPE", json.dumps(prof))
+        self.assertIn("SECRET-RECIPE", call("GET", f"/api/market/agents/{pk}", cookie=seller)[1]["role"])
+        # hiring without paying: 402
+        s, r, _ = call("POST", f"/api/market/agents/{pk}/hire", cookie=buyer)
+        self.assertEqual(s, 402, r)
+        self.assertEqual(self.call("POST", f"/api/market/agents/{pk}/buy", cookie=seller)[0], 400)    # your own
+        order, (status, where) = self.pay(buyer, "agent", pk)
+        self.assertEqual((status, where), (303, f"/hire/agents/{pk}?paid=paid"))
+        # it's copied, locked: runs, but its instructions can't be read, edited, exported or published
+        prof = call("GET", f"/api/market/agents/{pk}", cookie=buyer)[1]
+        self.assertTrue(prof["bought"])
+        copy = prof["hired_as"]
+        self.assertTrue(copy)
+        mine = {a["id"]: a for a in call("GET", "/api/agents?full=true", cookie=buyer)[1]}
+        self.assertTrue(mine[copy]["locked"])
+        self.assertEqual(mine[copy]["role"], "")
+        upgraded = register(f"pro-buyer-{time.time_ns()}@example.com", plan="pro")
+        self.pay(upgraded, "agent", pk)
+        pro_copy = call("GET", f"/api/market/agents/{pk}", cookie=upgraded)[1]["hired_as"]
+        got = call("GET", f"/api/agents/{pro_copy}", cookie=upgraded)[1]
+        self.assertNotIn("SECRET-RECIPE", json.dumps(got))
+        self.assertEqual(call("GET", f"/api/agents/{pro_copy}/export", cookie=upgraded)[0], 403)
+        self.assertEqual(call("PUT", f"/api/agents/{pro_copy}", {"name": "Mine now", "role": "Rewritten instructions here."}, cookie=upgraded)[0], 403)
+        req = urllib.request.Request(BASE + "/api/export", headers={"Cookie": upgraded})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            bundle = zipfile.ZipFile(io.BytesIO(r.read()))
+        self.assertFalse(any(b"SECRET-RECIPE" in bundle.read(n) for n in bundle.namelist()))
+        self.pay(other_agency, "agent", pk)                       # an Agency buyer may publish, but not a bought copy
+        agency_copy = call("GET", f"/api/market/agents/{pk}", cookie=other_agency)[1]["hired_as"]
+        self.assertEqual(call("POST", "/api/market/publish", {"kind": "agent", "id": agency_copy, "category": "writing"}, cookie=other_agency)[0], 400)
+        # paying twice isn't possible: it's owned
+        self.assertTrue(self.call("POST", f"/api/market/agents/{pk}/buy", cookie=buyer)[1]["owned"])
+        # the creator's dashboard: 70% of 4.99 ($3.49) for each of the three sales, 30% ($1.50) for the platform
+        e = call("GET", "/api/earnings", cookie=seller)[1]
+        self.assertEqual((e["totals"]["sales"], e["totals"]["earned"], e["totals"]["platform"], e["totals"]["gross"]), (3, 10.47, 4.5, 14.97))
+        self.assertEqual(e["items"][0]["sales"], 3)
+        self.assertAlmostEqual(sum(d["earned"] for d in e["series"]), 10.47)
+        self.assertEqual(call("GET", "/api/earnings", cookie=buyer)[1]["purchases"][0]["amount"], 4.99)
+        # a refund comes off the creator's balance
+        s, _, _ = self.hook("PAYMENT.CAPTURE.REFUNDED", {"id": "REF-1", "links": [{"rel": "up", "href": f"https://paypal.test/v2/payments/captures/CAP-{order}"}]})
+        self.assertEqual(s, 200)
+        e = call("GET", "/api/earnings", cookie=seller)[1]
+        self.assertEqual((e["totals"]["sales"], e["totals"]["refunds"], e["totals"]["balance"]), (2, 1, 6.98))
+
+    def test_payouts_and_a_buyer_who_never_comes_back(self):
+        seller = register(f"seller-{time.time_ns()}@example.com")
+        _, pk = self.seller_agent(seller, 20)
+        buyer, _ = self.member()
+        s, r, _ = self.call("POST", f"/api/market/agents/{pk}/buy", cookie=buyer)
+        self.assertEqual(s, 200, r)
+        # the buyer closed the tab after paying: PayPal's webhook captures the order and the copy is made
+        self.paypal.orders[r["id"]]["status"] = "APPROVED"
+        self.assertEqual(self.hook("CHECKOUT.ORDER.APPROVED", {"id": r["id"]})[0], 200)
+        self.assertTrue(call("GET", f"/api/market/agents/{pk}", cookie=buyer)[1]["hired_as"])
+        self.assertEqual(call("POST", "/api/earnings/payout", cookie=seller)[0], 400)                 # no PayPal email yet
+        self.assertEqual(call("PUT", "/api/earnings/payout-email", {"email": "not an email"}, cookie=seller)[0], 400)
+        self.assertEqual(call("PUT", "/api/earnings/payout-email", {"email": "Seller@PayPal.test"}, cookie=seller)[1]["payout_email"],
+                         "seller@paypal.test")
+        s, r, _ = call("POST", "/api/earnings/payout", cookie=seller)
+        self.assertEqual((s, r.get("amount")), (200, 14.0), r)
+        self.assertEqual(call("POST", "/api/earnings/payout", cookie=seller)[0], 409)                 # one at a time
+        self.assertEqual(call("GET", "/api/admin/payouts", cookie=seller)[0], 403)
+        queue = call("GET", "/api/admin/payouts")[1]["items"]
+        pid = next(p["id"] for p in queue if p["paypal_email"] == "seller@paypal.test" and p["status"] == "requested")
+        self.assertEqual(call("POST", f"/api/admin/payouts/{pid}", {"decision": "paid"})[0], 400)       # needs the reference
+        self.assertEqual(call("POST", f"/api/admin/payouts/{pid}", {"decision": "paid", "reference": "TX-123"})[0], 200)
+        self.assertEqual(call("POST", f"/api/admin/payouts/{pid}", {"decision": "paid", "reference": "TX-123"})[0], 404)
+        t = call("GET", "/api/earnings", cookie=seller)[1]["totals"]
+        self.assertEqual((t["balance"], t["paid_out"]), (0.0, 14.0))
+        s, rev, _ = call("GET", "/api/admin/revenue")
+        self.assertEqual(s, 200, rev)
+        self.assertGreaterEqual(rev["marketplace"]["platform"], 6.0)
+
+    def test_prices_teams_and_who_can_sell(self):
+        seller = register(f"seller-{time.time_ns()}@example.com")
+        slug, pk = self.seller_agent(seller, 3)
+        for bad in (-1, 0.5, 101, "abc"):
+            self.assertEqual(call("POST", "/api/market/publish", {"kind": "agent", "id": slug, "category": "writing", "price": bad}, cookie=seller)[0], 400, bad)
+        s, team, _ = call("POST", "/api/presets", {"name": f"Paid crew {slug}", "agents": [slug, "html"]}, cookie=seller)
+        self.assertEqual(s, 200, team)
+        s, r, _ = call("POST", "/api/market/publish", {"kind": "team", "id": team["id"], "category": "add"}, cookie=seller)
+        self.assertEqual(s, 400, r)                                       # free team, paid agent inside
+        s, r, _ = call("POST", "/api/market/publish", {"kind": "team", "id": team["id"], "category": "add", "price": 9}, cookie=seller)
+        self.assertEqual(s, 200, r)
+        tpk = r["pk"]
+        call("POST", "/api/market/review", {"kind": "team", "pk": tpk, "decision": "approve"})
+        buyer, _ = self.member()
+        self.assertEqual(call("POST", f"/api/market/teams/{tpk}/hire", cookie=buyer)[0], 402)
+        _, (status, where) = self.pay(buyer, "team", tpk)
+        self.assertEqual(where, f"/hire/teams/{tpk}?paid=paid")
+        hired = call("GET", f"/api/market/teams/{tpk}", cookie=buyer)[1]["hired_as"]
+        members = call("GET", f"/api/presets/{hired}", cookie=buyer)[1]["agents"]
+        mine = {a["id"]: a for a in call("GET", "/api/agents", cookie=buyer)[1]}
+        self.assertTrue(all(mine[m]["locked"] for m in members if m != "html"))
+        # Pro can't publish at all; a seller who leaves Agency can't sell until they come back
+        pro = register(f"pro-{time.time_ns()}@example.com", plan="pro")
+        self.agent_for(pro, "pro-agent")
+        self.assertEqual(call("POST", "/api/market/publish", {"kind": "agent", "id": "pro-agent", "category": "writing", "price": 5}, cookie=pro)[0], 403)
+        uid = call("GET", "/api/auth/me", cookie=seller)[1]["user"]["id"]
+        call("PATCH", f"/api/users/{uid}", {"plan": "pro"})
+        other, _ = self.member()
+        self.assertEqual(self.call("POST", f"/api/market/agents/{pk}/buy", cookie=other)[0], 409)
+
+    def agent_for(self, cookie, slug):
+        s, r, _ = call("POST", "/api/agents", {"id": slug, "name": "Pro agent", "icon": "message", "color": "#334455", "default": False,
+                                               "description": "Something.", "role": "You are a pro agent with instructions."}, cookie=cookie)
+        self.assertEqual(s, 200, r)
+
+
 class T44StarterInstructions(unittest.TestCase):
     """Starter members see what each agent does (name, description, stats, projects, ratings), not its instructions."""
 
@@ -3248,7 +3406,7 @@ class T44StarterInstructions(unittest.TestCase):
             s, r, _ = call("GET", path, cookie=starter)
             self.assertEqual((s, r.get("upgrade") if isinstance(r, dict) else None), (403, "pro"), path)
         market = call("GET", "/api/market", cookie=starter)[1]
-        pk = (market.get("agents") or [{}])[0].get("pk")
+        pk = next((a["pk"] for a in market.get("agents") or [] if not a.get("price")), None)   # a paid one hides them from Pro too
         if pk:
             profile = call("GET", f"/api/market/agents/{pk}", cookie=starter)[1]
             self.assertEqual((profile["role"], profile["instructions_locked"]), ("", True))

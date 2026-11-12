@@ -25,6 +25,26 @@ window.sourceBadge = (item) => item.official
     ? `<span class="badge ${esc(item.listing)}">${{ pending: "Waiting for review", rejected: "Not approved", private: "Private" }[item.listing] || esc(item.listing)}</span>`
     : `<span class="badge community">Community</span>`;
 
+/* "$4.99" on a paid agent or team; nothing on a free one. Paid ones: 70% goes to their creator. */
+window.priceTag = (usd) => `$${(+usd).toFixed(2)}`;
+window.priceBadge = (item) => item && item.price > 0
+  ? `<span class="badge paid" title="${esc(window.t("Pay once, keep it. Its instructions stay its creator's."))}">${icon("lock", { size: 12 })}<span data-no-i18n>${priceTag(item.price)}</span></span>` : "";
+if (!document.querySelector("style[data-paid]")) {
+  const css = document.createElement("style");
+  css.dataset.paid = "";
+  css.textContent = `.badge.paid { background: rgb(var(--sky-rgb) / .1); color: var(--sky, var(--ink)); border-color: rgb(var(--sky-rgb) / .35); font-weight: 600; letter-spacing: 0; }
+    .market-card .m-price { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--stone); }
+    .market-card .m-price input { width: 92px; }`;
+  document.head.append(css);
+}
+
+/* Pay for a paid agent or team: PayPal's page, then back to its profile, where it's hired. */
+window.buy = async (kind, pk) => {
+  const r = await api(`/api/market/${kind === "team" ? "teams" : "agents"}/${pk}/buy`, { method: "POST" });
+  if (r.approve) { location.href = r.approve; return null; }
+  return r;          // {owned: true}: it's yours already, hire it
+};
+
 /* Hire a community agent or team: it's copied into your own. Returns the server's answer. */
 window.hire = async (kind, pk, name) => {
   const r = await api(`/api/market/${kind === "team" ? "teams" : "agents"}/${pk}/hire`, { method: "POST" });
@@ -81,6 +101,7 @@ window.hireButtons = (kind, item, { big = false } = {}) => {
   if (item.mine) return start(item.id);
   if (item.official) return start(item.id);
   if (item.hired_as) return `<span class="badge listed">${icon("check", { size: 12 })}Hired</span>${start(item.hired_as)}`;
+  if (item.price > 0 && !item.bought) return `<button class="btn btn-dark${size}" type="button" data-buy="${kind}" data-pk="${item.pk}" data-name="${esc(item.name)}">${icon("lock", { size: 15 })}<span>Buy</span> <span data-no-i18n>${priceTag(item.price)}</span></button>`;
   return `<button class="btn btn-dark${size}" type="button" data-hire="${kind}" data-pk="${item.pk}" data-name="${esc(item.name)}">${icon("plus", { size: 15 })}Hire</button>`;
 };
 
@@ -147,10 +168,33 @@ window.startJobDialog = (kind, id, name) => JOB_FOR ? sendToProject(kind, id) : 
   d.showModal(); q.focus(); load();
 });
 
-/* Clicks on Hire / Start a job anywhere on a marketplace page */
+/* Back from PayPal on a profile (?paid=…): say how it went, once. */
+(() => {
+  const paid = new URLSearchParams(location.search).get("paid");
+  if (!paid) return;
+  const say = () => toast({ paid: "Paid. It's yours: it's in your agents and teams.", pending: "PayPal is still confirming your payment. It shows here in a minute.",
+                            cancelled: "Payment cancelled. Nothing was charged.", error: "PayPal couldn't be reached. If you paid, it shows here in a minute." }[paid]
+                          || "Payment cancelled. Nothing was charged.", paid === "paid" ? undefined : paid === "pending" ? undefined : "err");
+  document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", say) : setTimeout(say, 0);
+  history.replaceState(null, "", location.pathname + location.hash);
+})();
+
+/* Clicks on Buy / Hire / Start a job anywhere on a marketplace page */
 document.addEventListener("click", async (e) => {
   const s = e.target.closest("[data-start-job]");
   if (s) return startJobDialog(s.dataset.startJob, s.dataset.id, s.dataset.name);
+  const b = e.target.closest("[data-buy]");
+  if (b) {
+    b.disabled = true;
+    try {
+      const r = await buy(b.dataset.buy, b.dataset.pk);
+      if (!r) return;                                  // on the way to PayPal
+      const h = await hire(b.dataset.buy, b.dataset.pk, b.dataset.name);
+      window.dispatchEvent(new CustomEvent("market:hired"));
+      startJobDialog(b.dataset.buy, h.id, b.dataset.name);
+    } catch (err) { toast(err.message, "err"); b.disabled = false; }
+    return;
+  }
   const h = e.target.closest("[data-hire]");
   if (!h) return;
   h.disabled = true;
@@ -166,17 +210,21 @@ window.marketCard = (kind, m) => {
   if (!m) return "";
   const profile = m.pk ? `<a class="btn btn-ghost btn-sm" href="/hire/${kind === "team" ? "teams" : "agents"}/${m.pk}">${icon("eye", { size: 14 })}View profile</a>` : "";
   const cats = kind === "team" ? ["build", "improve", "add"] : ["planning", "writing", "design", "code", "growth", "quality"];
-  const picker = `<select class="input" id="mk-cat" aria-label="Category">${cats.map(c => `<option value="${c}" ${m.category === c ? "selected" : ""}>${esc(CATEGORY[c])}</option>`).join("")}</select>`;
+  const picker = `<select class="input" id="mk-cat" aria-label="Category">${cats.map(c => `<option value="${c}" ${m.category === c ? "selected" : ""}>${esc(CATEGORY[c])}</option>`).join("")}</select>
+    <label class="m-price"><span>Price (USD)</span><input class="input" id="mk-price" type="number" min="0" max="100" step="0.01" value="${m.price ? (+m.price).toFixed(2) : "0"}" aria-describedby="mk-price-note"></label>`;
+  const priceNote = `<p class="empty-note" id="mk-price-note">${icon("lock", { size: 13 })}<span>Leave 0 to share it for free, or set a price from $1 to $100. Buyers pay once and you earn 70% of each sale. A paid ${team ? "team's agents keep" : "agent keeps"} its instructions hidden, buyers included. See your sales on the <a href="/earnings">Earnings</a> page.</span></p>`;
+  const priced = m.price > 0 ? ` <span class="badge paid">${icon("lock", { size: 12 })}<span data-no-i18n>${priceTag(m.price)}</span></span>` : "";
   let body;
   const team = kind === "team";
   if (m.listing === "official") body = `<p class="empty-note">${team ? "Shared with everyone, so it's in the marketplace as an official team." : "Shared with everyone, so it's in the marketplace as an official agent."}</p><div class="m-acts">${profile}</div>`;
-  else if (m.copy) body = `<p class="empty-note">${team ? "You hired this team from the marketplace." : "You hired this agent from the marketplace. Its ratings count for the original."}</p><div class="m-acts">${profile}</div>`;
-  else if (m.listing === "pending") body = `<p class="empty-note"><span class="badge pending">Waiting for review</span> <span>An admin checks it before it shows in the marketplace.</span></p>
+  else if (m.copy) body = `<p class="empty-note">${team ? "You hired this team from the marketplace." : m.locked ? "You bought this agent. It works in your projects; its instructions stay its creator's, so it can't be edited, exported or duplicated." : "You hired this agent from the marketplace. Its ratings count for the original."}</p><div class="m-acts">${profile}</div>`;
+  else if (m.listing === "pending") body = `<p class="empty-note"><span class="badge pending">Waiting for review</span>${priced} <span>An admin checks it before it shows in the marketplace.</span></p>
     <div class="m-acts">${profile}<button class="btn btn-ghost btn-sm" type="button" data-mk="withdraw">Withdraw</button></div>`;
-  else if (m.listing === "listed") body = `<p class="empty-note"><span class="badge listed">Listed</span> <span>Members can see it, hire it and rate its work. If you edit it, an admin reviews it again.</span></p>
+  else if (m.listing === "listed") body = `<p class="empty-note"><span class="badge listed">Listed</span>${priced} <span>${m.price > 0 ? "Members can buy it, hire it and rate its work. If you edit it, an admin reviews it again." : "Members can see it, hire it and rate its work. If you edit it, an admin reviews it again."}</span></p>
     <div class="m-acts">${profile}<button class="btn btn-ghost btn-sm" type="button" data-mk="withdraw">Withdraw from the marketplace</button></div>`;
   else body = `${m.listing === "rejected" ? `<p class="empty-note" style="color:var(--danger)"><span>Not approved.</span> ${m.note ? `<span data-no-i18n>${esc(m.note)}</span> ` : ""}<span>Change it and publish again.</span></p>` : ""}
     <p class="empty-note">${team ? "Publish it so other members can hire it. They'll see its agents, their instructions and its starting prompt, and an admin checks it first." : "Publish it so other members can hire it. They'll see its instructions, and an admin checks it first."}</p>
+    ${priceNote}
     <div class="m-acts">${picker}<button class="btn btn-dark btn-sm" type="button" data-mk="publish">${icon("briefcase", { size: 14 })}Publish to the marketplace</button></div>`;
   return `<section class="card market-card"><h2>${icon("briefcase", { size: 16 })}Marketplace</h2>${body}</section>`;
 };
@@ -185,7 +233,7 @@ window.bindMarketCard = (root, kind, id, reload) => root.addEventListener("click
   b.disabled = true;
   try {
     if (b.dataset.mk === "publish") {
-      const r = await api("/api/market/publish", { method: "POST", body: JSON.stringify({ kind, id, category: root.querySelector("#mk-cat").value }) });
+      const r = await api("/api/market/publish", { method: "POST", body: JSON.stringify({ kind, id, category: root.querySelector("#mk-cat").value, price: +(root.querySelector("#mk-price")?.value || 0) }) });
       toast(r.listing === "listed" ? "Listed in the marketplace" : "Sent for review");
     } else {
       await api("/api/market/withdraw", { method: "POST", body: JSON.stringify({ kind, id }) });

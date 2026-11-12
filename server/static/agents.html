@@ -284,17 +284,18 @@ async function detailView(id) {
           </div></div>
         <div class="acts">
           ${a.instructions_locked ? "" : `<a class="btn btn-ghost btn-sm" href="/api/agents/${encodeURIComponent(a.id)}/export" title="Download this agent as a .md file">${icon("download", { size: 14 })}Export</a>`}
-          <a class="btn btn-ghost btn-sm" href="/agents/new?from=${encodeURIComponent(a.id)}">${icon("copy", { size: 14 })}Duplicate</a>
-          ${a.editable ? `<button class="btn btn-ghost btn-sm" id="del">${icon("trash", { size: 14 })}Delete</button>
-          <a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">${icon("pencil", { size: 14 })}Edit</a>` : ""}
+          ${a.locked ? "" : `<a class="btn btn-ghost btn-sm" href="/agents/new?from=${encodeURIComponent(a.id)}">${icon("copy", { size: 14 })}Duplicate</a>`}
+          ${a.editable ? `<button class="btn btn-ghost btn-sm" id="del">${icon("trash", { size: 14 })}Delete</button>` : ""}
+          ${a.editable && !a.locked ? `<a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">${icon("pencil", { size: 14 })}Edit</a>` : ""}
         </div>
       </div>
       <p class="vdesc">${esc(a.description || "No description yet.")}</p>
-      ${a.editable ? "" : `<p class="note">${icon("lock", { size: 14 })}<span>Only an admin can change a shared agent. Duplicate it to make your own version.</span></p>`}
+      ${a.locked ? `<p class="note">${icon("lock", { size: 14 })}<span>You bought this agent. It works in your projects; its instructions stay its creator's, so it can't be edited, exported or duplicated.</span></p>`
+        : a.editable ? "" : `<p class="note">${icon("lock", { size: 14 })}<span>Only an admin can change a shared agent. Duplicate it to make your own version.</span></p>`}
       ${a.model_ok ? "" : `<div class="err-state" role="alert" style="max-width:none;margin:20px 0 0;padding:16px 18px;text-align:start;display:flex;gap:12px;align-items:center">
         <span class="tile" style="margin:0;width:36px;height:36px">${icon("alert", { size: 18 })}</span>
         <span style="flex:1"><b style="display:inline">“${esc(a.model)}” isn't a known model.</b> This agent will fail until you pick a valid one.</span>
-        ${a.editable ? `<a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">Fix the model</a>` : ""}</div>`}
+        ${a.editable && !a.locked ? `<a class="btn btn-dark btn-sm" href="/agents/${encodeURIComponent(a.id)}/edit">Fix the model</a>` : ""}</div>`}
     </section>
     ${marketCard("agent", a.market)}
     <div class="grid2">
@@ -345,6 +346,7 @@ async function formView(id) {
       id || from ? api(`/api/agents/${encodeURIComponent(id || from)}`) : null, getMe()]);
   } catch (err) { return showError(app, err, () => formView(id), "Couldn't open the form"); }
   if (id && !source.editable) return showError(app, new Error("Only an admin can change a shared agent. Duplicate it to make your own version."), null, "This agent is shared");
+  if (source?.locked) return showError(app, new Error("You bought this agent: its instructions stay its creator's, so it can't be edited or duplicated."), null, "This agent is locked");
   const isNew = !id;
   const askScope = isNew && me?.role === "admin";
   const draft = source

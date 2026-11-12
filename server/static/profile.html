@@ -291,13 +291,14 @@ function paintChips() {
 /* ---------- plan: what it includes, and the spending limit per run ---------- */
 const PLAN_FEATURES = (p) => [
   [p.projects == null ? "Unlimited projects" : p.projects === 1 ? "One project" : `Up to ${p.projects} projects`, true],
-  ["Official agents and ready teams", true],
+  [p.research ? "Every official agent and ready team" : "Official agents and ready teams, except web Research", true],
+  ["Buy paid agents and teams in the marketplace", true],
   ["Read every agent's instructions, export agents and teams", p.instructions],
-  ["Your own agents and teams", p.custom_agents],
+  ["Duplicate agents, make your own agents and teams", p.custom_agents],
   ["Web research agent", p.research],
   [p.browser_checks === "all" ? "Browser checks before Responsive, Accessibility, QA and the Critic" : "Browser check before the Critic", true],
   [p.versions == null ? "Every version kept" : `Last ${p.versions} versions kept`, true],
-  ["Publish to the marketplace", p.publish],
+  ["Sell your agents and teams in the marketplace, keep 70% of each sale", p.publish],
   ["Invite editors and viewers to your projects", p.members],
   ...(planInfo?.keys === "user" ? [[p.run_limit === p.run_limit_max ? `Spending limit fixed at $${p.run_limit} per run` : `Your own spending limit, up to $${p.run_limit_max} per run`, true]] : []),
   [p.credit ? "Downloads carry a small “Made with Agents Atelier” line" : "Downloads without the credit line", !p.credit],
@@ -503,7 +504,7 @@ async function load() {
           <h2>Preferences</h2>
           <p>Saved on your account, so they follow you to your other devices.</p>
           <div class="prefs">
-            ${seg("lang", "Language", "lang-label", getLang(), [["en", "English", "", true], ["fr", "Français", "", true], ["ary", "الدارجة", "", true]])}
+            ${seg("lang", "Language", "lang-label", getLang(), [["en", "English", "", true], ["fr", "Français", "", true]])}
             ${seg("pref-theme", "Appearance", "theme-label", getTheme(), [["system", "System", "monitor"], ["light", "Light", "sun"], ["dark", "Dark", "moon"]])}
           </div>
           <label class="notify-pref"><input type="checkbox" id="notify-runs" ${me.notify_runs !== false ? "checked" : ""}>

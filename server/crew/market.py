@@ -5,6 +5,10 @@
                 the catalogue ('listed'). Editing a listed one sends it back for review.
   Hiring        copies a community agent (or a team with its agents) into your own agents, marked hired_from, so it
                 runs in your projects like any agent of yours. Hires are counted on the original.
+  Paid          a creator on the Agency plan may set a price when publishing (accounts/sales.py takes the payment:
+                70% to the creator, 30% to the platform). Nobody but its creator and the admins reads a paid agent's
+                instructions; a bought copy is `locked`: it runs, but its owner can't read, edit, export or duplicate it.
+                A team that is paid locks the copies of its creator's agents too.
   Profiles      runs, jobs, projects, average time and cost, the Critic's average score and the ratings of an agent
                 and of the copies hired from it. The portfolio shows your own projects it worked on and other
                 people's projects only when their owner chose to show them (project "showcase").
@@ -40,6 +44,41 @@ SCORE_RE = re.compile(r"(\d{1,2}(?:[.,]\d)?)\s*/\s*10\b")
 # when an agent has never run anywhere: seconds and API-equivalent cost, by model family
 DEFAULT_SECONDS = 40
 DEFAULT_COST = {"opus": 0.45, "sonnet": 0.15, "haiku": 0.04, "fable": 0.6}
+PRICE_MIN, PRICE_MAX = 1, 100     # USD, for a paid agent or team (0 = free)
+
+
+class NeedsPurchase(Exception):
+    """Hiring a paid agent or team that the member hasn't bought yet (HTTP 402)."""
+
+    def __init__(self, text: str, kind: str, pk: int, price: float):
+        super().__init__(text)
+        self.kind, self.pk, self.price = kind, pk, price
+
+
+def clean_price(value) -> float:
+    """A price from a form: 0 (free) or between PRICE_MIN and PRICE_MAX dollars, to the cent."""
+    try:
+        price = round(float(value or 0), 2)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError("The price must be a number of dollars, like 4.99.")
+    if price != price or price < 0:
+        raise ValueError("The price must be a number of dollars, like 4.99.")
+    if price and not PRICE_MIN <= price <= PRICE_MAX:
+        raise ValueError(f"A price is between ${PRICE_MIN} and ${PRICE_MAX}, or 0 for free.")
+    return price
+
+
+async def owned(user: dict | None) -> set:
+    """(kind, pk) of every paid agent and team this member has bought."""
+    if not user:
+        return set()
+    rows = await db.pool.fetch("SELECT kind, item_pk FROM market_purchases WHERE buyer_id = $1 AND status = 'completed'", user["id"])
+    return {(r["kind"], r["item_pk"]) for r in rows}
+
+
+def sees_paid_instructions(user: dict | None, r) -> bool:
+    """A paid agent's instructions are its creator's (and the admins') only, buyers included."""
+    return not float(r["price"] or 0) or (bool(user) and r["owner_id"] == user["id"]) or _is_admin(user)
 
 
 def critic_score(text: str) -> float | None:
@@ -63,7 +102,7 @@ def _is_admin(user: dict | None) -> bool:
 
 async def _agent_rows() -> list:
     return await db.pool.fetch("""SELECT a.pk, a.uuid, a.owner_id, a.slug, a.name, a.icon, a.color, a.description, a.model, a.tools,
-                                         a.role, a.is_default, a.listing, a.category, a.listing_note, a.listed_at, a.hired_from,
+                                         a.role, a.is_default, a.listing, a.category, a.listing_note, a.listed_at, a.hired_from, a.price, a.locked,
                                          a.created_at, a.updated_at, u.name AS owner_name
                                   FROM agents a LEFT JOIN users u ON u.id = a.owner_id""")
 
@@ -149,7 +188,7 @@ def _visible_in_market(r, user) -> bool:
     return r["owner_id"] is None or r["listing"] == "listed" or (user and r["owner_id"] == user["id"]) or _is_admin(user)
 
 
-def _agent_item(r, user, stats, rows, ratings) -> dict:
+def _agent_item(r, user, stats, rows, ratings, bought=frozenset()) -> dict:
     fam = _family(rows, r["pk"])
     st = _sum_stats(stats, fam)
     st.pop("_projects")
@@ -162,6 +201,7 @@ def _agent_item(r, user, stats, rows, ratings) -> dict:
             "hires": sum(1 for x in rows if x["hired_from"] == r["pk"]),
             "rating": _rating_summary([x for x in ratings if x["agent_pk"] in fam]),
             "listed_at": (r["listed_at"] or r["created_at"]).timestamp(), **st,
+            "price": float(r["price"] or 0), "bought": ("agent", r["pk"]) in bought,
             **dict(zip(("est_seconds", "est_cost"), agent_estimate(r, stats, rows)[:2]))}
 
 
@@ -170,9 +210,10 @@ async def catalogue(user: dict | None, metas: list[dict]) -> dict:
     rows = await _agent_rows()
     stats = run_stats(metas, rows)
     ratings = await _ratings()
-    agents = [_agent_item(r, user, stats, rows, ratings) for r in rows
+    bought = await owned(user)
+    agents = [_agent_item(r, user, stats, rows, ratings, bought) for r in rows
               if (r["owner_id"] is None or r["listing"] == "listed") and r["hired_from"] is None]
-    teams = [await _team_item(t, user, stats, rows, ratings) for t in await _team_rows()
+    teams = [await _team_item(t, user, stats, rows, ratings, bought) for t in await _team_rows()
              if (t["owner_id"] is None or t["listing"] == "listed") and t["hired_from"] is None]
     my_copies = {r["hired_from"]: r["slug"] for r in rows if user and r["owner_id"] == user["id"] and r["hired_from"]}
     for a in agents:
@@ -182,7 +223,7 @@ async def catalogue(user: dict | None, metas: list[dict]) -> dict:
 
 async def _team_rows() -> list:
     return await db.pool.fetch("""SELECT t.pk, t.owner_id, t.slug, t.name, t.description, t.agents, t.prompt, t.listing,
-                                         t.category, t.listing_note, t.listed_at, t.hired_from, t.created_at, u.name AS owner_name
+                                         t.category, t.listing_note, t.listed_at, t.hired_from, t.price, t.created_at, u.name AS owner_name
                                   FROM teams t LEFT JOIN users u ON u.id = t.owner_id""")
 
 
@@ -198,7 +239,7 @@ def _team_members(t, rows) -> list:
     return out
 
 
-async def _team_item(t, user, stats, rows, ratings) -> dict:
+async def _team_item(t, user, stats, rows, ratings, bought=frozenset()) -> dict:
     members = _team_members(t, rows)
     est = estimate_rows(members, stats, rows)
     fam_pks = set().union(*(_family(rows, m["pk"]) for m in members)) if members else set()
@@ -210,7 +251,9 @@ async def _team_item(t, user, stats, rows, ratings) -> dict:
             "mine": bool(user) and t["owner_id"] == user["id"],
             "agents": [{"pk": m["pk"], "id": m["slug"], "name": m["name"], "icon": m["icon"], "color": m["color"]} for m in members],
             "hires": hires, "rating": _rating_summary([x for x in ratings if x["agent_pk"] in fam_pks]),
-            "seconds": est["seconds"], "cost": est["cost"], "listed_at": (t["listed_at"] or t["created_at"]).timestamp()}
+            "seconds": est["seconds"], "cost": est["cost"], "listed_at": (t["listed_at"] or t["created_at"]).timestamp(),
+            "price": float(t["price"] or 0), "bought": ("team", t["pk"]) in bought,
+            "paid_agents": [m["name"] for m in members if float(m["price"] or 0) and m["owner_id"] is not None]}
 
 
 # ---------------------------------------------------------------- estimates
@@ -248,7 +291,7 @@ async def agent_profile(user: dict, pk: int, metas: list[dict], has_preview) -> 
     stats = run_stats(metas, rows)
     fam = _family(rows, pk)
     ratings = await _ratings(fam)
-    item = _agent_item(r, user, stats, rows, ratings)
+    item = _agent_item(r, user, stats, rows, ratings, await owned(user))
     projects = _sum_stats(stats, fam)["_projects"]
     by_id = {m["id"]: m for m in metas}
     portfolio = []
@@ -268,7 +311,9 @@ async def agent_profile(user: dict, pk: int, metas: list[dict], has_preview) -> 
              and r["slug"] in t["agents"] and (t["owner_id"] is None or t["owner_id"] == r["owner_id"])]
     copy_of = next((x for x in rows if x["pk"] == r["hired_from"]), None) if r["hired_from"] else None
     mine_copy = next((x["slug"] for x in rows if x["hired_from"] == pk and x["owner_id"] == user["id"]), None)
-    return {**item, "role": storage.read_instructions(r["uuid"], r["role"]), "teams": teams, "portfolio": portfolio[:200], "reviews": reviews,
+    hidden = not sees_paid_instructions(user, r)
+    return {**item, "role": "" if hidden else storage.read_instructions(r["uuid"], r["role"]), "paid_locked": hidden,
+            **({"instructions_locked": True} if hidden else {}), "teams": teams, "portfolio": portfolio[:200], "reviews": reviews,
             "hired_as": mine_copy, "copy_of": {"pk": copy_of["pk"], "name": copy_of["name"]} if copy_of else None,
             "note": r["listing_note"] if item["mine"] else ""}
 
@@ -280,10 +325,11 @@ async def team_profile(user: dict, pk: int, metas: list[dict]) -> dict:
         raise KeyError(pk)
     stats = run_stats(metas, rows)
     ratings = await _ratings()
-    item = await _team_item(t, user, stats, rows, ratings)
+    item = await _team_item(t, user, stats, rows, ratings, await owned(user))
     members = _team_members(t, rows)
     est = estimate_rows(members, stats, rows)
     item["agents"] = [{**a, "pk": m["pk"], "description": m["description"], "official": m["owner_id"] is None,
+                       "price": float(m["price"] or 0),
                        "rating": _rating_summary([x for x in ratings if x["agent_pk"] in _family(rows, m["pk"])])}
                       for a, m in zip(est["agents"], members)]
     hired = await db.pool.fetchval("SELECT slug FROM teams WHERE hired_from = $1 AND owner_id = $2", pk, user["id"])
@@ -303,27 +349,36 @@ async def _own_row(user: dict, kind: str, slug: str):
 async def listing_of(user: dict, kind: str, slug: str) -> dict | None:
     """The marketplace state of one of your own agents or teams (None for a shared one)."""
     table = "agents" if kind == "agent" else "teams"
-    r = await db.pool.fetchrow(f"SELECT pk, listing, category, listing_note, hired_from FROM {table} WHERE owner_id = $1 AND slug = $2",
+    r = await db.pool.fetchrow(f"SELECT pk, listing, category, listing_note, hired_from, price FROM {table} WHERE owner_id = $1 AND slug = $2",
                                user["id"], slug)
     if r is None:
         shared = await db.pool.fetchval(f"SELECT pk FROM {table} WHERE owner_id IS NULL AND slug = $1", slug)
         return {"pk": shared, "listing": "official"} if shared else None
     return {"pk": r["pk"], "listing": r["listing"], "category": r["category"], "note": r["listing_note"],
-            "copy": r["hired_from"] is not None}
+            "copy": r["hired_from"] is not None, "price": float(r["price"] or 0),
+            "locked": kind == "agent" and bool(await db.pool.fetchval("SELECT locked FROM agents WHERE pk = $1", r["pk"]))}
 
 
-async def publish(user: dict, kind: str, slug: str, category: str) -> dict:
+async def publish(user: dict, kind: str, slug: str, category: str, price=0) -> dict:
     cats = AGENT_CATEGORIES if kind == "agent" else TEAM_CATEGORIES
     if category not in cats:
         raise ValueError("Pick a category for the marketplace.")
+    price = clean_price(price)
     r = await _own_row(user, kind, slug)
     if r["hired_from"] is not None:
         raise ValueError("You hired this one from the marketplace, so you can't publish it as yours. Make your own agent instead.")
+    if kind == "agent" and r["locked"]:
+        raise ValueError("This is a copy of a paid agent, so you can't publish it.")
+    if kind == "team" and not price:
+        rows = await _agent_rows()
+        paid = [m["name"] for m in _team_members(r, rows) if float(m["price"] or 0) and m["owner_id"] is not None]
+        if paid:
+            raise ValueError(f"This team includes paid agents ({', '.join(paid)}). Set a price for the team, or make those agents free.")
     table = "agents" if kind == "agent" else "teams"
     state = "listed" if _is_admin(user) else "pending"       # an admin's own listing needs no review
-    await db.pool.execute(f"""UPDATE {table} SET listing = $3, category = $4, listing_note = '',
+    await db.pool.execute(f"""UPDATE {table} SET listing = $3, category = $4, listing_note = '', price = $5,
                                  listed_at = CASE WHEN $3 = 'listed' THEN now() ELSE listed_at END
-                              WHERE owner_id = $1 AND slug = $2""", user["id"], slug, state, category)
+                              WHERE owner_id = $1 AND slug = $2""", user["id"], slug, state, category, price)
     return await listing_of(user, kind, slug)
 
 
@@ -344,13 +399,14 @@ async def after_edit(user: dict, kind: str, slug: str):
 
 
 async def pending() -> dict:
-    agents = await db.pool.fetch("""SELECT a.pk, a.uuid, a.slug, a.name, a.icon, a.color, a.description, a.role, a.model, a.tools, a.category,
+    agents = await db.pool.fetch("""SELECT a.pk, a.uuid, a.slug, a.name, a.icon, a.color, a.description, a.role, a.model, a.tools, a.category, a.price,
                                            a.updated_at, u.name AS owner_name, u.email
                                     FROM agents a JOIN users u ON u.id = a.owner_id WHERE a.listing = 'pending' ORDER BY a.updated_at""")
-    teams = await db.pool.fetch("""SELECT t.pk, t.slug, t.name, t.description, t.prompt, t.agents, t.category, t.updated_at,
+    teams = await db.pool.fetch("""SELECT t.pk, t.slug, t.name, t.description, t.prompt, t.agents, t.category, t.price, t.updated_at,
                                           u.name AS owner_name, u.email
                                    FROM teams t JOIN users u ON u.id = t.owner_id WHERE t.listing = 'pending' ORDER BY t.updated_at""")
-    pack = lambda r: {**{k: (v.timestamp() if hasattr(v, "timestamp") else list(v) if isinstance(v, list) else v)
+    pack = lambda r: {**{k: (v.timestamp() if hasattr(v, "timestamp") else list(v) if isinstance(v, list)
+                             else float(v) if k == "price" else v)
                          for k, v in dict(r).items() if k not in ("owner_name", "email")},
                       "by": f"{r['owner_name'] or 'A member'} ({r['email']})"}
     agents = [{**dict(r), "role": storage.read_instructions(r["uuid"], r["role"])} for r in agents]
@@ -382,49 +438,76 @@ async def _free_slug(user: dict, base: str) -> str:
     return slug
 
 
-async def _copy_agent(user: dict, r) -> str:
-    """Copy agent row `r` into the user's own agents (or return the copy they already have)."""
+async def _copy_agent(user: dict, r, locked: bool = False) -> str:
+    """Copy agent row `r` into the user's own agents (or return the copy they already have). A `locked` copy runs, but its
+    owner can't read or change its instructions (a paid agent, or an agent of a paid team)."""
     have = await db.pool.fetchval("SELECT slug FROM agents WHERE owner_id = $1 AND hired_from = $2", user["id"], r["pk"])
     if have:
+        if locked:
+            await db.pool.execute("UPDATE agents SET locked = true WHERE owner_id = $1 AND slug = $2", user["id"], have)
         return have
     slug = await _free_slug(user, r["slug"])
     pos = await db.pool.fetchval("SELECT coalesce(max(position), -1) + 1 FROM agents WHERE owner_id = $1", user["id"])
     await db.pool.execute(
-        """INSERT INTO agents (owner_id, slug, name, icon, color, is_default, description, model, tools, role, position, hired_from)
-           VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, $9, $10, $11)""",
+        """INSERT INTO agents (owner_id, slug, name, icon, color, is_default, description, model, tools, role, position, hired_from, locked)
+           VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, $9, $10, $11, $12)""",
         user["id"], slug, r["name"], r["icon"], r["color"], r["description"], r["model"], r["tools"],
-        storage.read_instructions(r["uuid"], r["role"]), pos, r["pk"])
+        storage.read_instructions(r["uuid"], r["role"]), pos, r["pk"], locked or bool(float(r["price"] or 0)))
     async with db.pool.acquire() as con:
         await storage.export_instructions(con)
     return slug
 
 
-async def hire_agent(user: dict, pk: int) -> dict:
+def _price_text(price: float) -> str:
+    return f"${price:.2f}"
+
+
+async def hire_agent(user: dict, pk: int, paid: bool = False) -> dict:
+    """Copy a listed agent into the member's agents. A paid one needs a completed purchase (or `paid`: sales.py just took
+    the payment); admins hire for free. A copy of a paid agent is locked."""
     r = await db.pool.fetchrow("SELECT * FROM agents WHERE pk = $1", pk)
-    if r is None or not (r["owner_id"] is None or r["listing"] == "listed"):
+    if r is None or not (r["owner_id"] is None or r["listing"] == "listed" or paid):
         raise KeyError(pk)
     if r["owner_id"] is None:
         return {"id": r["slug"], "already": True}           # official agents are everyone's already
     if r["owner_id"] == user["id"]:
         return {"id": r["slug"], "already": True}
+    price = float(r["price"] or 0)
+    if price and not paid and not _is_admin(user) and ("agent", pk) not in await owned(user):
+        raise NeedsPurchase(f"{r['name']} costs {_price_text(price)}. Buy it once to hire it.", "agent", pk, price)
     had = await db.pool.fetchval("SELECT slug FROM agents WHERE owner_id = $1 AND hired_from = $2", user["id"], pk)
     slug = await _copy_agent(user, r)
     return {"id": slug, "already": bool(had)}
 
 
-async def hire_team(user: dict, pk: int) -> dict:
+async def hire_team(user: dict, pk: int, paid: bool = False) -> dict:
+    """Copy a listed team and its creator's agents into the member's own. A paid team needs a purchase; a free team that
+    includes paid agents needs each of them bought. The copies of a paid team's agents are locked."""
     t = await db.pool.fetchrow("SELECT * FROM teams WHERE pk = $1", pk)
-    if t is None or not (t["owner_id"] is None or t["listing"] == "listed"):
+    if t is None or not (t["owner_id"] is None or t["listing"] == "listed" or paid):
         raise KeyError(pk)
     if t["owner_id"] is None or t["owner_id"] == user["id"]:
         return {"id": t["slug"], "already": True}
+    price = float(t["price"] or 0)
+    mine = await owned(user)
+    free = paid or _is_admin(user)
+    if price and not free and ("team", pk) not in mine:
+        raise NeedsPurchase(f"{t['name']} costs {_price_text(price)}. Buy it once to hire it.", "team", pk, price)
+    rows = await _agent_rows()
+    members = _team_members(t, rows)
+    if not price and not free:
+        missing = [m for m in members if m["owner_id"] is not None and float(m["price"] or 0) and ("agent", m["pk"]) not in mine]
+        if missing:
+            m = missing[0]
+            raise NeedsPurchase(f"This team includes {m['name']}, a paid agent ({_price_text(float(m['price']))}). Buy it first.",
+                                "agent", m["pk"], float(m["price"]))
     had = await db.pool.fetchval("SELECT slug FROM teams WHERE owner_id = $1 AND hired_from = $2", user["id"], pk)
     if had:
         return {"id": had, "already": True}
-    rows = await _agent_rows()
     ids = []
-    for m in _team_members(t, rows):
-        ids.append(m["slug"] if m["owner_id"] is None else await _copy_agent(user, await db.pool.fetchrow("SELECT * FROM agents WHERE pk = $1", m["pk"])))
+    for m in members:
+        ids.append(m["slug"] if m["owner_id"] is None else
+                   await _copy_agent(user, await db.pool.fetchrow("SELECT * FROM agents WHERE pk = $1", m["pk"]), locked=bool(price)))
     team = await store.save_preset(user, t["name"], ids, t["description"], scope="mine", prompt=t["prompt"])
     await db.pool.execute("UPDATE teams SET hired_from = $3 WHERE owner_id = $1 AND slug = $2", user["id"], team["id"], pk)
     return {"id": team["id"], "already": False, "agents": ids}

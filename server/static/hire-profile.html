@@ -106,7 +106,7 @@ function agentPage(a) {
   <section class="p-hero" aria-labelledby="p-name">
     <span class="ico">${icon(a.icon || "bot", { size: 30 })}</span>
     <div><h1 id="p-name" ${userText(a)}>${esc(a.name)}</h1>
-      <p class="who">${sourceBadge(a)}<span><span>by</span> <span data-no-i18n>${esc(a.by)}</span></span><span>·</span><span>${esc(CATEGORY[a.category] || "")}</span>
+      <p class="who">${priceBadge(a)}${sourceBadge(a)}<span><span>by</span> <span data-no-i18n>${esc(a.by)}</span></span><span>·</span><span>${esc(CATEGORY[a.category] || "")}</span>
         ${a.model ? `<span class="badge mono" data-no-i18n>${esc(a.model)}</span>` : ""}${a.web ? `<span class="badge">Web research</span>` : ""}
         ${a.copy_of ? `<span><span>Hired from</span> <a href="/hire/agents/${a.copy_of.pk}" data-no-i18n>${esc(a.copy_of.name)}</a></span>` : ""}</p>
       <p class="desc" ${userText(a)}>${esc(a.description)}</p>
@@ -130,7 +130,13 @@ function agentPage(a) {
   ${a.teams.length ? `<section class="p-sec"><h2>Teams it's part of</h2><p class="hint">Hire the whole team for a kind of job.</p>
     <ul class="p-teams">${a.teams.map(t => `<li><a class="fchip" href="/hire/teams/${t.pk}">${icon("layers", { size: 14 })}${esc(t.name)}</a></li>`).join("")}</ul></section>` : ""}
   <section class="p-sec"><h2>How it works</h2><p class="hint">The instructions it follows, after the shared rules every agent receives.</p>
-    ${a.instructions_locked ? instructionsLockedHTML() : `<pre class="p-role" tabindex="0" aria-label="Instructions" data-no-i18n>${esc(a.role)}</pre>`}</section>`;
+    ${a.paid_locked ? paidLockedHTML(a) : a.instructions_locked ? instructionsLockedHTML() : `<pre class="p-role" tabindex="0" aria-label="Instructions" data-no-i18n>${esc(a.role)}</pre>`}</section>`;
+}
+
+function paidLockedHTML(a) {
+  return `<div class="instr-locked"><span class="tile">${icon("lock", { size: 18 })}</span>
+    <div><b>A paid agent keeps its instructions private</b>
+      <p>${a.bought || a.hired_as ? "You bought it: it works in your projects like any of your agents, but its instructions stay its creator's." : "Its creator sells it: buy it once and it works in your projects like any of your agents. Its instructions stay its creator's, buyers included."}</p></div></div>`;
 }
 
 function teamPage(t) {
@@ -140,7 +146,7 @@ function teamPage(t) {
   <section class="p-hero" aria-labelledby="p-name">
     <span class="ico">${icon(CATEGORY_ICON[t.category] || "layers", { size: 30 })}</span>
     <div><h1 id="p-name" ${userText(t)}>${esc(t.name)}</h1>
-      <p class="who">${sourceBadge(t)}<span><span>by</span> <span data-no-i18n>${esc(t.by)}</span></span><span>·</span><span>${esc(CATEGORY[t.category] || "")}</span></p>
+      <p class="who">${priceBadge(t)}${sourceBadge(t)}<span><span>by</span> <span data-no-i18n>${esc(t.by)}</span></span><span>·</span><span>${esc(CATEGORY[t.category] || "")}</span></p>
       <p class="desc" ${userText(t)}>${esc(t.description)}</p>
       ${t.mine && t.listing === "rejected" && t.note ? `<p class="desc p-rejected" role="note">${icon("alert", { size: 16 })}<span><span>Not approved.</span> <span data-no-i18n>${esc(t.note)}</span></span></p>` : ""}</div>
     <div class="acts">${hireButtons("team", t, { big: true })}</div>
@@ -152,10 +158,11 @@ function teamPage(t) {
     ${kpi(t.rating.count ? `${t.rating.percent}%` : "–", "liked its agents' work")}
     ${t.official ? "" : kpi(t.hires, t.hires === 1 ? "hire" : "hires")}
   </ul>
+  ${t.price > 0 || (t.paid_agents || []).length ? `<p class="hint p-paid-note">${icon("lock", { size: 14 })}<span>${t.price > 0 ? "A paid team: buy it once and its agents work in your projects. Their instructions stay its creator's." : "This team includes paid agents. Buy them first, then hire the team."}</span></p>` : ""}
   <section class="p-sec"><h2>The crew</h2><p class="hint">They work in this order. Estimates come from their past jobs.</p>
     <ol class="p-crew">${t.agents.map((a, i) => `<li><a href="/hire/agents/${a.pk}">
       <span class="n" data-no-i18n>${String(i + 1).padStart(2, "0")}</span><span class="ico">${icon(a.icon || "bot", { size: 18 })}</span>
-      <span><b>${esc(a.name)}</b><small>${esc(a.description || "")}</small></span>
+      <span><b>${esc(a.name)}</b><small>${esc(a.description || "")}</small></span>${a.price > 0 ? priceBadge(a) : ""}
       <span class="est">${a.measured ? "" : "~"}${timeText(a.seconds)} · ${costText(a.cost)}</span></a></li>`).join("")}</ol></section>
   ${t.prompt ? `<section class="p-sec"><h2>Starting prompt</h2><p class="hint">Filled in when you start a job with this team. Replace the parts in [brackets].</p>
     <pre class="p-prompt" data-no-i18n>${prompt}</pre></section>` : ""}`;

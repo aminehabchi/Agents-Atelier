@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0f1117">
+<title>Earnings · Agents Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
+<script src="/static/icons.js"></script>
+<script src="/static/ui.js"></script>
+<style>
+  :root { --chart: var(--sky); }
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+  .head .page-title { margin: 0; font-size: clamp(28px, 4vw, 44px); }
+  .head-lead { margin: 6px 0 0; font-size: 15px; color: var(--graphite); max-width: 640px; line-height: 1.5; }
+  .seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: var(--r-pill); background: var(--linen); }
+  .seg button { border: 0; background: none; padding: 6px 12px; border-radius: var(--r-pill); font: inherit; font-size: 13px; color: var(--graphite); cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: var(--ring); }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .tile { background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 18px 20px; min-width: 0; }
+  .tile h2 { margin: 0 0 8px; font-size: 12px; font-weight: 500; letter-spacing: .04em; color: var(--graphite); }
+  .tile b { display: block; font-size: 30px; font-weight: 400; line-height: 1.1; font-feature-settings: "tnum", "zero"; overflow-wrap: anywhere; }
+  .tile small { display: block; margin-top: 6px; font-size: 12px; line-height: 1.4; color: var(--stone); }
+  .tile.hero { border-color: var(--sky); }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .panel { background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 20px; min-width: 0; }
+  .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .panel h2 { margin: 0; font-size: 14px; font-weight: 500; letter-spacing: .02em; }
+  .panel-head .sub { font-size: 12px; color: var(--stone); }
+  .empty-note { color: var(--stone); font-size: 14px; line-height: 1.5; margin: 0; padding: 18px 0; text-align: center; }
+
+  /* profit per day: bars on a shared baseline, value on hover or focus */
+  .plot { position: relative; height: 170px; margin-top: 22px; border-bottom: 1px solid var(--line-strong); }
+  .plot .top-line { position: absolute; left: 0; right: 0; top: 0; border-top: 1px dashed var(--line); }
+  .plot .top-label { position: absolute; right: 0; top: -18px; font-size: 11px; color: var(--stone); font-feature-settings: "tnum"; }
+  .days { position: absolute; inset: 0; display: grid; }
+  .day { position: relative; display: flex; align-items: flex-end; justify-content: center; height: 100%; background: none; border: 0; padding: 0; cursor: default; }
+  .day:hover, .day:focus-visible { background: var(--ice); outline-offset: -2px; }
+  .day i { display: block; width: min(70%, 14px); background: var(--chart); border-radius: 3px 3px 0 0; }
+  .tip { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5; display: none; padding: 6px 10px; background: var(--paper); color: var(--ink);
+    border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: var(--hard-sm); font-size: 12px; line-height: 1.4; white-space: nowrap; pointer-events: none; }
+  .day:nth-child(-n+4) .tip { left: 0; transform: none; }
+  .day:nth-last-child(-n+4) .tip { left: auto; right: 0; transform: none; }
+  .day:hover .tip, .day:focus-visible .tip { display: block; }
+  .tip b { display: block; font-weight: 500; }
+  .x-labels { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--stone); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: start; padding: 10px 8px; border-top: 1px solid var(--line); vertical-align: middle; }
+  th { font-size: 12px; font-weight: 500; color: var(--graphite); border-top: 0; }
+  td.num, th.num { text-align: end; font-feature-settings: "tnum", "zero"; white-space: nowrap; }
+  td a { color: inherit; }
+  .tbl { overflow-x: auto; margin: 0 -8px; }
+  .bar { height: 6px; border-radius: 3px; background: var(--linen); margin-top: 6px; }
+  .bar i { display: block; height: 100%; border-radius: 3px; background: var(--chart); }
+
+  .rows { display: flex; flex-direction: column; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 10px 0; font-size: 14px; min-width: 0; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row .nm { flex: 1; min-width: 0; }
+  .row .nm b, .row .nm small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .nm b { font-weight: 500; }
+  .row .nm small { color: var(--stone); font-size: 12px; margin-top: 1px; }
+  .row .amt { flex: none; font-feature-settings: "tnum"; }
+  .row .amt.minus { color: var(--danger); text-decoration: line-through; }
+
+  .payout form { display: grid; gap: 10px; }
+  .payout .split { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .payout .split:first-of-type { border-top: 0; }
+  .payout .split b { font-weight: 500; font-feature-settings: "tnum"; }
+  .payout .hint { font-size: 13px; color: var(--stone); line-height: 1.5; margin: 0; }
+  .share { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin: 6px 0 4px; }
+  .share i { display: block; height: 100%; }
+  .share .you { background: var(--chart); }
+  .share .us { background: var(--line-strong); }
+  .legend { display: flex; justify-content: space-between; font-size: 12px; color: var(--stone); }
+  .admin-q .row .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  @media (max-width: 960px) {
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .tile { padding: 14px; }
+    .tile b { font-size: 24px; }
+    .panel { padding: 16px; }
+    .hide-sm { display: none; }
+  }
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="mark"><i data-icon="logo" data-size="18"></i></span>Agents Atelier</a>
+    <nav class="links">
+      <a href="/projects"><i data-icon="grid" data-size="16"></i>Projects</a>
+      <a href="/agents"><i data-icon="users" data-size="16"></i>My agents</a>
+      <a href="/teams"><i data-icon="layers" data-size="16"></i>My teams</a>
+    </nav>
+    <a class="btn btn-dark" href="/hire"><i data-icon="briefcase" data-size="16"></i>Marketplace</a>
+  </div>
+</header>
+<main class="wrap page">
+  <div id="app" aria-busy="true"><p>Loading…</p></div>
+</main>
+<script>
+const app = document.getElementById("app");
+let days = 30, me = null;
+const usd = (v) => `$${(+v || 0).toFixed(2)}`;
+const when = (ts) => ts ? new Date(ts * 1000).toLocaleDateString(getLocale(), { day: "numeric", month: "short", year: "numeric" }) : "–";
+const tile = (label, value, note, hero = false) => `<div class="tile ${hero ? "hero" : ""}"><h2>${label}</h2><b data-no-i18n>${value}</b>${note ? `<small>${note}</small>` : ""}</div>`;
+const itemHref = (x) => `/hire/${x.kind === "team" ? "teams" : "agents"}/${x.pk}`;
+
+/* Profit per day over the chosen period, in UTC days like the server counts them. */
+function chart(series) {
+  const by = Object.fromEntries(series.map(d => [d.date, d]));
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    out.push(by[d] || { date: d, sales: 0, earned: 0 });
+  }
+  const top = Math.max(...out.map(d => d.earned), 0);
+  if (!top) return `<p class="empty-note">No sales in this period yet.</p>`;
+  const fmt = (d) => new Date(d + "T12:00:00Z").toLocaleDateString(getLocale(), { day: "numeric", month: "short" });
+  return `<div class="plot" role="img" aria-label="${esc(window.t("Your profit per day"))}"><span class="top-line"></span><span class="top-label" data-no-i18n>${usd(top)}</span>
+    <div class="days" style="grid-template-columns:repeat(${out.length},minmax(0,1fr))">${out.map(d => `<button class="day" type="button" aria-label="${esc(fmt(d.date))}: ${usd(d.earned)}">
+      <i style="height:${top ? (d.earned / top) * 100 : 0}%"></i><span class="tip"><b data-no-i18n>${esc(fmt(d.date))}</b><span data-no-i18n>${usd(d.earned)}</span> · <span>${d.sales} sale${d.sales === 1 ? "" : "s"}</span></span></button>`).join("")}</div></div>
+    <div class="x-labels" data-no-i18n><span>${esc(fmt(out[0].date))}</span><span>${esc(fmt(out[out.length - 1].date))}</span></div>`;
+}
+
+function itemsTable(items) {
+  if (!items.length) return `<p class="empty-note">${me?.can_sell ? "You don't sell anything yet. Open one of your agents or teams, set a price and publish it to the marketplace." : "Selling agents and teams comes with the Agency plan."}</p>`;
+  const top = Math.max(...items.map(x => x.earned), 0.01);
+  return `<div class="tbl"><table><thead><tr><th>Agent or team</th><th class="num">Price</th><th class="num">Sales</th><th class="num hide-sm">Refunds</th><th class="num">Your profit</th></tr></thead><tbody>
+    ${items.map(x => `<tr><td>${x.listing === "deleted" ? `<span data-no-i18n>${esc(x.name)}</span>` : `<a href="${itemHref(x)}" data-no-i18n>${esc(x.name)}</a>`}
+        <small style="display:block;color:var(--stone);font-size:12px">${x.kind === "team" ? "Team" : "Agent"} · ${{ listed: "Listed", pending: "Waiting for review", rejected: "Not approved", private: "Private", deleted: "Deleted" }[x.listing] || esc(x.listing)}</small>
+        <div class="bar" aria-hidden="true"><i style="width:${(x.earned / top) * 100}%"></i></div></td>
+      <td class="num" data-no-i18n>${x.price == null ? "–" : x.price ? usd(x.price) : "Free"}</td><td class="num" data-no-i18n>${x.sales}</td>
+      <td class="num hide-sm" data-no-i18n>${x.refunds}</td><td class="num" data-no-i18n>${usd(x.earned)}</td></tr>`).join("")}
+  </tbody></table></div>`;
+}
+
+function salesList(recent) {
+  if (!recent.length) return `<p class="empty-note">Your sales show here.</p>`;
+  return `<div class="rows">${recent.slice(0, 12).map(s => `<div class="row"><span class="nm"><b data-no-i18n>${esc(s.name)}</b>
+      <small><span>${s.status === "refunded" ? "Refunded" : "Bought by"}</span> <span data-no-i18n>${esc(s.buyer)} · ${esc(when(s.ts))} · ${usd(s.amount)}</span></small></span>
+      <span class="amt ${s.status === "refunded" ? "minus" : ""}" data-no-i18n>+${usd(s.earned)}</span></div>`).join("")}</div>`;
+}
+
+function payoutPanel(d) {
+  const t = d.totals, can = t.balance >= d.payout_min && d.payout_email && !d.payouts.some(p => p.status === "requested");
+  return `<section class="panel payout"><div class="panel-head"><h2>Payout</h2><span class="sub">Sent to your PayPal</span></div>
+    <div class="split"><span>Balance</span><b data-no-i18n>${usd(t.balance)}</b></div>
+    <div class="split"><span>Waiting to be sent</span><b data-no-i18n>${usd(t.requested)}</b></div>
+    <div class="split"><span>Paid to you so far</span><b data-no-i18n>${usd(t.paid_out)}</b></div>
+    <form id="emailForm" novalidate>
+      <label class="field"><span>Your PayPal email</span><input class="input" type="email" name="email" value="${esc(d.payout_email)}" placeholder="you@example.com" autocomplete="email" data-no-i18n></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" type="submit">Save</button>
+        <button class="btn btn-dark btn-sm" type="button" id="askPayout" ${can ? "" : "disabled"}>${icon("arrow-right", { size: 14 })}<span>Ask for a payout</span></button></div>
+      <p class="hint"><span>You can ask for your whole balance from</span> <span data-no-i18n>${usd(d.payout_min)}</span><span>. An admin sends it with PayPal within a few days.</span></p>
+    </form>
+    ${d.payouts.length ? `<div class="rows" style="margin-top:12px">${d.payouts.slice(0, 6).map(p => `<div class="row"><span class="nm"><b>${{ requested: "Asked for", paid: "Paid", rejected: "Not sent" }[p.status]}</b>
+      <small data-no-i18n>${esc(when(p.decided || p.requested))}${p.reference ? ` · ${esc(p.reference)}` : ""}${p.note ? ` · ${esc(p.note)}` : ""}</small></span><span class="amt" data-no-i18n>${usd(p.amount)}</span></div>`).join("")}</div>` : ""}
+  </section>`;
+}
+
+function splitPanel(d) {
+  const you = Math.round(d.share * 100);
+  return `<section class="panel"><div class="panel-head"><h2>How a sale is split</h2></div>
+    <div class="share" aria-hidden="true"><i class="you" style="width:${you}%"></i><i class="us" style="width:${100 - you}%"></i></div>
+    <div class="legend"><span><span>You</span> <span data-no-i18n>${you}%</span></span><span><span>Agents Atelier</span> <span data-no-i18n>${100 - you}%</span></span></div>
+    <p class="hint" style="font-size:13px;color:var(--stone);line-height:1.5;margin:10px 0 0">Buyers pay once with PayPal. Your agent's instructions stay hidden from everyone, buyers included. A refunded sale comes off your balance.</p></section>`;
+}
+
+function purchasesPanel(list) {
+  return `<section class="panel"><div class="panel-head"><h2>What you bought</h2><span class="sub" data-no-i18n>${list.length}</span></div>
+    ${list.length ? `<div class="rows">${list.slice(0, 10).map(b => `<a class="row" href="${itemHref(b)}" style="text-decoration:none;color:inherit"><span class="nm"><b data-no-i18n>${esc(b.name)}</b>
+      <small><span>${b.status === "refunded" ? "Refunded" : b.kind === "team" ? "Team" : "Agent"}</span> <span data-no-i18n>· ${esc(b.by)} · ${esc(when(b.ts))}</span></small></span>
+      <span class="amt ${b.status === "refunded" ? "minus" : ""}" data-no-i18n>${usd(b.amount)}</span></a>`).join("")}</div>`
+      : `<p class="empty-note">Paid agents and teams you buy in the marketplace show here.</p>`}</section>`;
+}
+
+async function adminQueue() {
+  const slot = document.getElementById("adminQ");
+  if (!slot) return;
+  try {
+    const q = await api("/api/admin/payouts");
+    const open = q.items.filter(p => p.status === "requested");
+    slot.innerHTML = `<section class="panel admin-q"><div class="panel-head"><h2>Payouts to send</h2><span class="sub">Admins only</span></div>
+      ${open.length ? `<div class="rows">${open.map(p => `<div class="row"><span class="nm"><b data-no-i18n>${usd(p.amount)} → ${esc(p.paypal_email)}</b>
+        <small data-no-i18n>${esc(p.member)} · ${esc(when(p.requested))}</small></span>
+        <span class="acts"><button class="btn btn-ghost btn-sm" data-decide="rejected" data-id="${p.id}">Reject</button>
+        <button class="btn btn-dark btn-sm" data-decide="paid" data-id="${p.id}">${icon("check", { size: 14 })}Mark paid</button></span></div>`).join("")}</div>`
+        : `<p class="empty-note">No payout is waiting.</p>`}</section>`;
+  } catch (err) { slot.innerHTML = ""; }
+}
+
+async function load() {
+  let d;
+  try { d = me = await api(`/api/earnings?days=${days}`); }
+  catch (err) { app.removeAttribute("aria-busy"); return showError(app, err, load, "Couldn't load your earnings"); }
+  const t = d.totals, user = await getMe();
+  app.removeAttribute("aria-busy");
+  app.innerHTML = `
+    <div class="head"><div><h1 class="page-title">Earnings</h1>
+      <p class="head-lead">${d.can_sell ? "What your paid agents and teams sold, what you earned, and your payouts." : "What you bought in the marketplace. Selling agents and teams comes with the Agency plan."}</p></div>
+      <div class="seg" role="group" aria-label="Period">${[30, 90, 365].map(n => `<button type="button" data-days="${n}" aria-pressed="${n === days}"><span data-no-i18n>${n}</span> <span>days</span></button>`).join("")}</div></div>
+    <div class="tiles">
+      ${tile("Your profit", usd(t.period_earned), `<span data-no-i18n>${t.period_sales}</span> <span>${t.period_sales === 1 ? "sale" : "sales"} in this period</span>`, true)}
+      ${tile("Balance", usd(t.balance), "Ready to be paid out")}
+      ${tile("All-time profit", usd(t.earned), `<span>Buyers paid</span> <span data-no-i18n>${usd(t.gross)}</span>`)}
+      ${tile("Sales", String(t.sales), `<span data-no-i18n>${t.buyers}</span> <span>${t.buyers === 1 ? "buyer" : "buyers"}</span>${t.refunds ? ` · <span data-no-i18n>${t.refunds}</span> <span>refunded</span>` : ""}`)}
+    </div>
+    ${d.can_sell || d.items.length ? "" : `<p class="note" style="margin-top:12px">${icon("sparkles", { size: 14 })}<span>On the Agency plan you can sell your own agents and teams and keep 70% of every sale.</span> <a href="/profile?upgrade=agency#plan">See the plans</a></p>`}
+    <div class="grid">
+      <div class="col">
+        <section class="panel"><div class="panel-head"><h2>Your profit per day</h2><span class="sub">Your share of each sale</span></div>${chart(d.series)}</section>
+        <section class="panel"><div class="panel-head"><h2>By agent and team</h2><span class="sub">All time</span></div>${itemsTable(d.items)}</section>
+        <section class="panel"><div class="panel-head"><h2>Recent sales</h2></div>${salesList(d.recent)}</section>
+      </div>
+      <div class="col">
+        <div id="adminQ"></div>
+        ${payoutPanel(d)}
+        ${splitPanel(d)}
+        ${purchasesPanel(d.purchases)}
+      </div>
+    </div>`;
+  if (user?.role !== "admin") document.getElementById("adminQ").remove();
+  else adminQueue();
+}
+
+app.addEventListener("click", async (e) => {
+  const seg = e.target.closest("[data-days]");
+  if (seg) { days = +seg.dataset.days; return load(); }
+  if (e.target.closest("#askPayout")) {
+    return withBusy(e.target.closest("#askPayout"), async () => {
+      const r = await api("/api/earnings/payout", { method: "POST" });
+      toast(`${window.t("Payout asked for:")} $${r.amount.toFixed(2)}`);
+      await load();
+    });
+  }
+  const dec = e.target.closest("[data-decide]");
+  if (dec) {
+    const paid = dec.dataset.decide === "paid";
+    const value = await promptDialog(paid
+      ? { title: "Mark this payout paid?", label: "The PayPal transaction id you sent it with", ok: "Mark paid", max: 80 }
+      : { title: "Reject this payout?", label: "Tell the member why", ok: "Reject", optional: true });
+    if (value === null) return;
+    return withBusy(dec, async () => {
+      await api(`/api/admin/payouts/${dec.dataset.id}`, { method: "POST", body: JSON.stringify(paid ? { decision: "paid", reference: value } : { decision: "rejected", note: value }) });
+      toast(paid ? "Marked paid" : "Rejected");
+      await load();
+    });
+  }
+});
+app.addEventListener("submit", async (e) => {
+  if (e.target.id !== "emailForm") return;
+  e.preventDefault();
+  const btn = e.target.querySelector("[type=submit]");
+  await withBusy(btn, async () => {
+    await api("/api/earnings/payout-email", { method: "PUT", body: JSON.stringify({ email: e.target.email.value }) });
+    toast("PayPal email saved");
+    await load();
+  });
+});
+load().catch(err => showError(app, err, () => location.reload(), "Something went wrong on this page"));
+</script>
+</body>
+</html>

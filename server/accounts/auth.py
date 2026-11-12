@@ -44,7 +44,7 @@ LOCK_MINUTES = 15
 MAX_RESET_SENDS = 5
 MAX_RESET_FAILS = 15
 RESET_WINDOW = dt.timedelta(hours=24)
-LANGUAGES = ("en", "fr", "ary")      # ary: Moroccan Darija
+LANGUAGES = ("en", "fr")
 THEMES = ("system", "light", "dark")
 MIN_NAME = 2
 MAX_NAME = 80
@@ -245,10 +245,6 @@ EMAILS = {
                "Bonjour,\n\nVotre code de confirmation : {code}\n\n"
                "Saisissez-le dans Agents Atelier pour confirmer votre e-mail. Il est valable {minutes} minutes.\n\n"
                "Si vous n'avez pas créé de compte, ignorez cet e-mail.\n"),
-        "ary": ("{code} هو الكود ديالك ف Agents Atelier",
-                "السلام،\n\nالكود ديال التأكيد ديالك هو: {code}\n\n"
-                "دخلو ف Agents Atelier باش تأكد الإيميل ديالك. خدام لمدة {minutes} دقيقة.\n\n"
-                "إلا ما درتيش حساب، ما تدير والو ف هاد الإيميل.\n"),
     },
     "reset": {
         "en": ("{code} is your password reset code",
@@ -259,10 +255,6 @@ EMAILS = {
                "Bonjour,\n\nVotre code de réinitialisation du mot de passe : {code}\n\n"
                "Saisissez-le dans Agents Atelier pour choisir un nouveau mot de passe. Il est valable {minutes} minutes.\n\n"
                "Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail. Votre mot de passe n'a pas changé.\n"),
-        "ary": ("{code} هو الكود باش تبدل كلمة السر",
-                "السلام،\n\nالكود باش تبدل كلمة السر ديالك هو: {code}\n\n"
-                "دخلو ف Agents Atelier باش تختار كلمة سر جديدة. خدام لمدة {minutes} دقيقة.\n\n"
-                "إلا ما طلبتيش هادشي، ما تدير والو. كلمة السر ديالك ما تبدلاتش.\n"),
     },
     "changed": {
         "en": ("Your Agents Atelier password was changed",
@@ -271,9 +263,6 @@ EMAILS = {
         "fr": ("Votre mot de passe Agents Atelier a été modifié",
                "Bonjour,\n\nLe mot de passe de votre compte Agents Atelier vient d'être modifié.\n\n"
                "Si ce n'est pas vous, utilisez tout de suite « Mot de passe oublié ? » sur la page de connexion.\n"),
-        "ary": ("كلمة السر ديال حسابك ف Agents Atelier تبدلات",
-                "السلام،\n\nكلمة السر ديال حسابك ف Agents Atelier يالاه تبدلات.\n\n"
-                "إلا ماشي نتا اللي بدلتيها، دخل دابا لصفحة الدخول وكليكي على \"نسيتي كلمة السر؟\".\n"),
     },
     "invited": {
         "en": ("You were added to a project on Agents Atelier",
@@ -282,9 +271,6 @@ EMAILS = {
         "fr": ("Vous avez été ajouté à un projet sur Agents Atelier",
                "Bonjour,\n\nQuelqu'un vous a ajouté à l'un de ses projets sur Agents Atelier.\n\n"
                "Connectez-vous et ouvrez Projets : il apparaît dans « Partagés avec moi ».\n"),
-        "ary": ("تزاديتي لواحد المشروع ف Agents Atelier",
-                "السلام،\n\nشي واحد زادك لواحد من المشاريع ديالو ف Agents Atelier.\n\n"
-                "دخل لحسابك وحل المشاريع: غادي تلقاه ف \"مشاركين معايا\".\n"),
     },
     "invited_signup": {
         "en": ("You're invited to a project on Agents Atelier",
@@ -295,10 +281,6 @@ EMAILS = {
                "Bonjour,\n\nQuelqu'un vous invite à travailler avec lui sur un projet sur Agents Atelier.\n\n"
                "Créez un compte avec cette adresse e-mail et confirmez-le : le projet vous attendra dans "
                "« Partagés avec moi », dans Projets.\n\nSi vous ne savez pas qui l'a envoyé, ignorez cet e-mail.\n"),
-        "ary": ("عندك دعوة لواحد المشروع ف Agents Atelier",
-                "السلام،\n\nشي واحد عرض عليك تخدم معاه ف واحد المشروع ف Agents Atelier.\n\n"
-                "دير حساب بهاد الإيميل وأكدو: المشروع غادي يكون كيتسناك ف \"مشاركين معايا\" ف المشاريع.\n\n"
-                "إلا ما عرفتيش شكون صيفط هادشي، ما تدير والو.\n"),
     },
 }
 
