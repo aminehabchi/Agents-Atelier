@@ -1,4 +1,5 @@
-"""Each member's own Claude API key (CLAUDE_KEYS=user).
+"""Each member's own Claude API key (CLAUDE_KEYS=user, USE_CLAUDE_CODE=false), or this machine's Claude Code login
+(CLAUDE_KEYS=server, USE_CLAUDE_CODE=true; see claude_code_env).
 
 The key is checked with one tiny call, then kept encrypted (Fernet, KEY_SECRET) in users.claude_key. Only its last
 four characters ever reach the browser. Runs use the project owner's key: the server starts each `claude -p` with a
@@ -93,6 +94,22 @@ def env_for(user_id: str, key: str) -> dict:
     # HOME too: the server account's own ~/.claude login is never in reach
     env.update(ANTHROPIC_API_KEY=key, CLAUDE_CONFIG_DIR=str(home), HOME=str(home), DISABLE_AUTOUPDATER="1",
                CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1")
+    return env
+
+
+CLAUDE_CODE_LOGIN = ("CLAUDE_CONFIG_DIR", "CLAUDE_CODE_OAUTH_TOKEN")    # where Claude Code finds its login
+API_KEYS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+
+
+def claude_code_env() -> dict:
+    """The environment of a claude process in Claude Code mode: this machine's Claude Code login (its HOME, a
+    CLAUDE_CONFIG_DIR, or a CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`) and nothing else from the server: no
+    DATABASE_URL, KEY_SECRET, SMTP or PayPal settings. With USE_CLAUDE_CODE=true an API key is left out on purpose, so
+    the subscription login is what's used; CLAUDE_KEYS=server alone still passes a server-wide ANTHROPIC_API_KEY."""
+    env = {k: os.environ[k] for k in SAFE_ENV if k in os.environ}
+    names = CLAUDE_CODE_LOGIN + (() if config.CLAUDE_CODE_LOGIN_ONLY else API_KEYS)
+    env.update({k: os.environ[k] for k in names if os.environ.get(k)})
+    env.update(DISABLE_AUTOUPDATER="1", CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1")
     return env
 
 

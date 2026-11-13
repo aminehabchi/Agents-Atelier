@@ -113,10 +113,10 @@ WORDS = {
            "min": "{n} min", "sec": "moins d'une minute"},
 }
 FEATURES = {
-    "pro": {"en": "unlimited projects, your own agents and teams, web research, more checks and versions",
-            "fr": "projets illimités, vos propres agents et équipes, recherche web, plus de vérifications et de versions"},
-    "agency": {"en": "everything in Pro, editors and viewers on your projects, publishing to the marketplace, every version kept",
-               "fr": "tout Pro, des éditeurs et lecteurs sur vos projets, la publication sur la place de marché, toutes les versions gardées"},
+    "pro": {"en": "unlimited projects, web research, your own agents and teams, more checks and versions",
+            "fr": "projets illimités, recherche web, vos propres agents et équipes, plus de vérifications et de versions"},
+    "agency": {"en": "everything in Pro, selling your agents and teams (you keep 70% of each sale), editors and viewers on your projects, every version kept",
+               "fr": "tout Pro, la vente de vos agents et équipes (vous gardez 70 % de chaque vente), des éditeurs et lecteurs sur vos projets, toutes les versions gardées"},
 }
 PLAN_NAMES = {"fr": {"agency": "Agence"}}
 

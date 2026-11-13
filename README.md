@@ -246,7 +246,16 @@ cp .env.example .env                 # then set ADMIN_EMAIL (and SMTP_* to send 
 docker compose up -d --build         # http://localhost:8001
 ```
 
-**Who pays for the agents** is set by `CLAUDE_KEYS` in `.env`:
+**Who pays for the agents** is set in `.env`, with the switch `USE_CLAUDE_CODE` (or the older `CLAUDE_KEYS`):
+- `USE_CLAUDE_CODE=true`: the agents run on **Claude Code**, billed to your Claude subscription (the login below). No
+  API key is needed, the profile's API key section is hidden, and `ANTHROPIC_API_KEY` is never passed to the agents.
+- `USE_CLAUDE_CODE=false`: the **Claude API**, each member's own key (the same as `CLAUDE_KEYS=user`).
+- Not set: `CLAUDE_KEYS` decides, as below.
+
+In both modes the agents get a clean environment: the server's own settings (`DATABASE_URL`, `KEY_SECRET`, SMTP,
+PayPal) never reach them.
+
+With `CLAUDE_KEYS`:
 - `user` (the default): every member, admins included, adds their own Claude API key on **/profile → Claude and
   spending**. Nothing runs without one, and the server's own login is never used.
 - `server` (a private install): everyone runs on the server's Claude Code login. Log it in once, with one of these (the
@@ -323,6 +332,7 @@ command line wins over the file: `AGENT_MODEL=sonnet PORT=9000 ./run.sh`. Restar
 | `RUNS_PER_HOUR` | `60` | Runs that start agents (prompt, Continue, Start again, retry) per member per hour |
 | `INVITES_PER_HOUR` / `SHARE_LINKS_PER_HOUR` / `CHECKOUTS_PER_HOUR` | `30` / `30` / `10` | Per member per hour |
 | `COMMENTS_PER_HOUR` | `30` | Comments through share links, per visitor address per hour |
+| `USE_CLAUDE_CODE` | (unset) | `true`: the agents run on Claude Code (your subscription login, no API key) · `false`: each member's own Claude API key. Wins over `CLAUDE_KEYS` |
 | `CLAUDE_KEYS` | `user` | `user`: each member runs on their own Claude API key · `server`: everyone uses the server's Claude Code login |
 | `KEY_SECRET` | *(generated)* | Fernet key that encrypts members' API keys; empty = one is made and kept in `storage/.secrets/` |
 | `REVIEW_ROUNDS` | `2` | Times the Critic may send work back in one run |

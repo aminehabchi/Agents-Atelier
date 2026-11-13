@@ -106,6 +106,21 @@ REVIEW_ROUNDS = 0 if PLAN == "free" else _int("REVIEW_ROUNDS", 2, low=0)
 CLAUDE_KEYS = (os.environ.get("CLAUDE_KEYS", "").strip() or "user").lower()
 if CLAUDE_KEYS not in ("user", "server"):
     raise SystemExit(f"Setting CLAUDE_KEYS must be user or server, got {CLAUDE_KEYS!r} (check your .env).")
+# USE_CLAUDE_CODE: the same choice as a switch, and it wins over CLAUDE_KEYS when set.
+#   true  = the agents run on this machine's Claude Code login (your Claude subscription), like CLAUDE_KEYS=server
+#   false = each member's own Claude API key, like CLAUDE_KEYS=user
+_use_claude_code = os.environ.get("USE_CLAUDE_CODE", "").strip().lower()
+if _use_claude_code:
+    if _use_claude_code in ("1", "true", "yes", "on"):
+        CLAUDE_KEYS = "server"
+    elif _use_claude_code in ("0", "false", "no", "off"):
+        CLAUDE_KEYS = "user"
+    else:
+        raise SystemExit(f"Setting USE_CLAUDE_CODE must be true or false, got {_use_claude_code!r} (check your .env).")
+USE_CLAUDE_CODE = CLAUDE_KEYS == "server"
+# USE_CLAUDE_CODE=true means the Claude Code login only: a server-wide ANTHROPIC_API_KEY isn't passed to the agents.
+# (CLAUDE_KEYS=server on its own still passes it, as before.)
+CLAUDE_CODE_LOGIN_ONLY = _use_claude_code in ("1", "true", "yes", "on")
 # encrypts the members' API keys in the database (a Fernet key). Empty: one is made and kept in STORAGE_DIR/.secrets/.
 KEY_SECRET = os.environ.get("KEY_SECRET", "").strip()
 

@@ -44,9 +44,9 @@ class NoClaudeKey(RuntimeError):
 
 async def claude_env(meta: dict) -> dict | None:
     """The environment of this project's `claude` processes: the owner's own API key and nothing else from the server
-    (CLAUDE_KEYS=user), or None to inherit the server's login (CLAUDE_KEYS=server)."""
+    (CLAUDE_KEYS=user), or this machine's Claude Code login and nothing else (USE_CLAUDE_CODE=true)."""
     if not keys.USER_MODE:
-        return None
+        return keys.claude_code_env()
     owner = await owner_of(meta)
     if not owner:
         raise NoClaudeKey("This older project has no owner, so there's no Claude API key to run it with. "

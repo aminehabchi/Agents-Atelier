@@ -81,8 +81,9 @@ async def list_models():
 
 @router.post("/api/models/check")
 async def check_model(request: Request, body: dict):
-    """One tiny call with this model, on the member's own Claude account (CLAUDE_KEYS=user)."""
-    env = None
+    """One tiny call with this model, on the member's own Claude account (CLAUDE_KEYS=user) or on this machine's
+    Claude Code login (USE_CLAUDE_CODE=true)."""
+    env = keys.claude_code_env()          # Claude Code mode: this machine's login
     if keys.USER_MODE:
         user = current_user(request)
         key = keys.decrypt(await auth.stored_claude_key(user["id"]))

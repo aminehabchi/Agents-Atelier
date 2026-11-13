@@ -4169,3 +4169,85 @@ class T50PromptInjection(unittest.TestCase):
         argv = next(c["argv"] for c in log_calls() if "Web research rules" in " ".join(c["argv"]))
         self.assertIn("WebFetch(domain:169.254.169.254)", argv)
 
+
+
+class T51ClaudeCodeSwitch(unittest.TestCase):
+    """USE_CLAUDE_CODE=true: the agents run on this machine's Claude Code login (a subscription), never on an API key,
+    and get nothing else from the server's environment. Its own server, with a server-wide API key that must not leak."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.port = free_port()
+        cls.base = f"http://127.0.0.1:{cls.port}"
+        cls.calls = TMP / "fake-claude-code.log"
+        env = {**os.environ, "STORAGE_DIR": str(TMP / "storage-claude-code"), "ATELIER_WORK": str(TMP / "none"),
+               "ATELIER_AGENTS": str(TMP / "agents"), "CLAUDE_BIN": str(ROOT / "tests" / "fake-claude"), "AGENT_TIMEOUT": str(AGENT_TIMEOUT),
+               "FAKE_CLAUDE_LOG": str(cls.calls), "ATELIER_ENV_FILE": str(TMP / "no.env"), "DATABASE_URL": TEST_DB_URL,
+               "ADMIN_EMAIL": ADMIN_EMAIL, "EMAIL_OUTBOX": str(OUTBOX), "SMTP_HOST": "", "TRUST_PROXY": "1",
+               "SIGNUPS_PER_HOUR": "100000", "LOGINS_PER_15_MIN": "100000", "KEY_SECRET": "", "RUN_EMAIL_AFTER": "0",
+               "CLAUDE_KEYS": "user",                                   # the switch wins over it
+               "USE_CLAUDE_CODE": "true",
+               "ANTHROPIC_API_KEY": "sk-ant-SERVERKEY-must-not-reach-agents-0000",
+               "CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-oat01-subscription-token", **NO_RATE_LIMITS}
+        env.pop("AGENT_MODEL", None)
+        cls.log = open(TMP / "server-claude-code.log", "w")
+        cls.proc = subprocess.Popen([str(PYTHON), "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(cls.port)],
+                                    cwd=ROOT / "server", env=env, stdout=cls.log, stderr=subprocess.STDOUT)
+        for _ in range(100):
+            try:
+                urllib.request.urlopen(cls.base + "/api/agents", timeout=1)
+                return
+            except urllib.error.URLError:
+                time.sleep(0.1)
+        raise RuntimeError("The Claude Code test server didn't start:\n" + (TMP / "server-claude-code.log").read_text())
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.proc.terminate()
+        cls.proc.wait(5)
+        cls.log.close()
+
+    def on_this_server(self, fn):
+        global BASE, PORT
+        saved = BASE, PORT
+        BASE, PORT = self.base, self.port
+        try:
+            return fn()
+        finally:
+            BASE, PORT = saved
+
+    def test_runs_use_the_claude_code_login_and_nothing_else(self):
+        member = register(f"cc-{time.time_ns()}@example.com", key=False, plan="starter")     # no API key at all
+        self.assertEqual(self.on_this_server(lambda: call("GET", "/api/plans", cookie=member))[1]["keys"], "server")
+        self.calls.write_text("")
+        pid = self.on_this_server(lambda: new_project(name="Claude Code run", cookie=member))
+
+        async def script(sock, recv):
+            await sock.send(send({"type": "prompt", "text": "A page for a bakery", "agents": ["ux", "html"]}))
+            return await recv(("run_done", "error", "run_stopped"))
+        events = self.on_this_server(lambda: ws(pid, script, cookie=member))
+        self.assertEqual(events[-1]["type"], "run_done", events[-3:])
+        runs = [json.loads(l) for l in self.calls.read_text().splitlines()]
+        self.assertTrue(runs)
+        for r in runs:
+            self.assertEqual(r["key"], "", "an API key reached an agent")                      # ANTHROPIC_API_KEY left out
+            self.assertIn("CLAUDE_CODE_OAUTH_TOKEN", r["env"])                                  # the subscription login is kept
+            for secret in ("DATABASE_URL", "KEY_SECRET", "ANTHROPIC_API_KEY", "SMTP_HOST", "ADMIN_EMAIL"):
+                self.assertNotIn(secret, r["env"])
+        # checking a model runs the same way
+        s, r, _ = self.on_this_server(lambda: call("POST", "/api/models/check", {"model": "sonnet"}, cookie=member))
+        self.assertEqual(s, 200, r)
+        self.assertEqual(json.loads(self.calls.read_text().splitlines()[-1])["key"], "")
+
+    def test_the_switch_takes_true_or_false(self):
+        def mode(**env):
+            out = subprocess.run([str(PYTHON), "-c", "from core import config; print(config.CLAUDE_KEYS, config.CLAUDE_CODE_LOGIN_ONLY)"],
+                                 cwd=ROOT / "server", capture_output=True, text=True,
+                                 env={**{k: v for k, v in os.environ.items() if k not in ("CLAUDE_KEYS", "USE_CLAUDE_CODE")},
+                                      "ATELIER_ENV_FILE": str(TMP / "no.env"), **env})
+            return (out.stdout.strip() or out.stderr.strip().splitlines()[-1])
+        self.assertEqual(mode(USE_CLAUDE_CODE="true"), "server True")
+        self.assertEqual(mode(USE_CLAUDE_CODE="FALSE", CLAUDE_KEYS="server"), "user False")      # the switch wins
+        self.assertEqual(mode(CLAUDE_KEYS="server"), "server False")                            # older setting alone: unchanged
+        self.assertEqual(mode(), "user False")
+        self.assertIn("USE_CLAUDE_CODE must be true or false", mode(USE_CLAUDE_CODE="maybe"))
