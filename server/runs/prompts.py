@@ -83,7 +83,7 @@ NOTE_LIMIT = 600            # characters kept from each agent's hand-over note
 PROMPT_LIMIT = 10000        # longest prompt a user can send
 FIELD_TAGS = re.compile(r"</?\s*(project|site_pages|user_request|earlier_requests|team_notes|reference_images|send_back"
                         r"|review_feedback|run_plan|project_state|team|browser_check|brand_kit|project_assets|project_brief"
-                        r"|first_build|security_note)\b[^>]*>", re.I)
+                        r"|first_build|security_note|brief_result)\b[^>]*>", re.I)
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 

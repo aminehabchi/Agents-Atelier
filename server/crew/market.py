@@ -26,7 +26,7 @@ AGENT_CATEGORIES = ("planning", "writing", "design", "code", "growth", "quality"
 TEAM_CATEGORIES = ("build", "improve", "add")
 SHARED_AGENT_CATEGORY = {
     "brief": "planning", "research": "planning", "auditor": "planning", "ux": "planning",
-    "copy": "writing", "content": "writing", "translator": "writing", "legal": "writing",
+    "copy": "writing", "content": "writing", "human-tone": "writing", "microcopy": "writing", "translator": "writing", "legal": "writing",
     "design": "design", "3d-design": "design", "depth": "design", "3d-scene": "code", "assets": "design", "dark-theme": "design", "anim": "design", "gallery": "design", "typography": "design",
     "html": "code", "css": "code", "js": "code", "responsive": "code", "forms": "code", "tidy": "code",
     "seo": "growth", "conversion": "growth", "local": "growth", "pricing": "growth",
@@ -35,7 +35,7 @@ SHARED_AGENT_CATEGORY = {
 }
 SHARED_TEAM_CATEGORY = {
     "improve-imported": "improve", "redesign": "improve", "boost-conversions": "improve", "seo-speed": "improve",
-    "accessibility-audit": "improve", "code-cleanup": "improve", "readable-text": "improve",
+    "accessibility-audit": "improve", "code-cleanup": "improve", "readable-text": "improve", "polish-wording": "improve",
     "multilingual": "add", "legal-pages": "add", "dark-mode": "add", "forms": "add", "add-3d": "add", "contact-options": "add",
 }
 REQUIRED = "brief"                 # always runs (see the studio)

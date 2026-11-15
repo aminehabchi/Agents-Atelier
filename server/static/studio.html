@@ -1117,7 +1117,7 @@ function handle(ev) {
     case "orchestrating":
       setBusy(true);
       orchCard = addMsg(`<div class="msg orch working" role="status"><div class="head"><span class="tile">${icon("cpu", { size: 18 })}</span>
-        <span><b>Orchestrator:</b> reading your request and the project</span>
+        <span><b>Orchestrator:</b> reading the brief and the project</span>
         <span class="state"><span class="typing"><span></span><span></span><span></span></span></span></div>
         <p class="why"></p></div>`);
       renderTeamHead();
@@ -1178,6 +1178,13 @@ function handle(ev) {
       if (ev.name && project && ev.name !== project.name) { project.name = ev.name; renderHeader(); }
       renderTeam();
       break;
+    case "run_agents":                    // the Brief is done and the Orchestrator chose who works next
+      if (!run) break;
+      run.agents = ev.agents || run.agents;
+      run.agents.forEach(id => { if (!(ev.done || []).includes(id)) status[id] = { state: "waiting" }; });
+      selected.forEach(id => { if (!run.agents.includes(id)) status[id] = { state: "skipped" }; });
+      renderTeam();
+      break;
     case "agent_start":
       if (!a) break;
       if (run) run.index = ev.with?.length ? Math.min(...[a.id, ...ev.with].map(id => run.agents.indexOf(id)).filter(n => n >= 0)) : run.agents.indexOf(a.id);
@@ -1224,6 +1231,10 @@ function handle(ev) {
         setBusy(false); const r = run?.retry; run = null; renderTeam();
         addSystem(`${BY_ID[r]?.name || "Agent"} finished its retry`);
         if (!replaying) toast("Retry finished");
+        break;
+      }
+      if (ev.brief_only) {                // the Brief worked, then the Orchestrator answered, asked or wants a yes
+        setBusy(false); run = null; renderTeam();
         break;
       }
       const took = run ? ` in ${duration((now - run.started) / 1000)}` : "";

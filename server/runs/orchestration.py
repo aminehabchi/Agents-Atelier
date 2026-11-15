@@ -1,5 +1,12 @@
-"""Asking the Orchestrator which agents a prompt needs (run_orchestrator), then starting that plan: a new prompt
-(run_prompt), a decided plan (start_plan) and the parallel steps of a first build (schedule_first_build)."""
+"""Every prompt runs in this order: the Brief agent first (it reads the prompt and updates ## Brief in plan.md), then the
+Orchestrator (it reads what the Brief wrote and decides who works, asks, or answers), then the agents it chose.
+
+  run_prompt         starts a run with the Brief alone; the plan is "deferred" until the Brief is done
+  after_brief        called by run_chain once the Brief finished: asks the Orchestrator and returns the rest of the
+                     plan, or None when nothing else runs (an answer, questions, a plan to confirm, contact details)
+  start_plan         runs a decided plan (after a yes or contact details), without running the Brief a second time
+  run_orchestrator   one read-only `claude -p` call; on a first build it only chooses which agents work side by side
+"""
 
 import asyncio
 import json
@@ -20,13 +27,15 @@ class OrchestratorUnavailable(RuntimeError):
     """Claude Code itself can't run (not installed, not logged in, rate-limited): no point running the team either."""
 
 
-async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict, first_build: bool = False) -> dict | None:
+async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict, first_build: bool = False,
+                           brief_result: str = "") -> dict | None:
     """Ask the Orchestrator (read-only `claude -p`) which agents to run. Returns its parsed JSON, or None.
     With first_build, it only chooses which of the team's agents may work at the same time."""
     folder = site_dir(pid)
     role, model = orch.load_prompt()
     model = model if model and model_catalog.allowed(model) else MODEL
-    prompt = orch.build_prompt(meta, request, team, folder, clean_text, site_pages(meta), brief_block(meta), first_build=first_build)
+    prompt = orch.build_prompt(meta, request, team, folder, clean_text, site_pages(meta), brief_block(meta), first_build=first_build,
+                               brief_result=brief_result)
     note = await injection_note(pid, folder, request)       # it reads the files too: it gets the same warning
     if note:
         prompt += "\n\n" + note
@@ -108,31 +117,63 @@ async def run_orchestrator(pid: str, request: str, team: list[dict], meta: dict,
 
 
 async def run_prompt(pid: str, request: str, pool: list[str], images: list[str]):
-    """A new prompt: decide who works (Orchestrator), then run them. The Brief agent always runs when anyone does."""
+    """A new prompt. The Brief agent works on it first; when it's done, run_chain calls after_brief, where the Orchestrator
+    reads the brief and decides the rest. (A project without the Brief agent goes straight to the Orchestrator.)"""
+    meta = load_meta(pid)
+    order = [a["id"] for a in await project_agents(meta)]
+    first = orch.is_fresh(meta, site_dir(pid))
+    if orch.BRIEF in order:
+        # the last exchange (the Orchestrator's question, if any) stays until it decides again: it reads it to know this
+        # prompt answers it, then settle() replaces it
+        plan = {"deferred": True, "pool": list(pool), "first": first, "agents": [orch.BRIEF], "notes": {}}
+        await run_chain(pid, request, [orch.BRIEF], images=images, plan=plan)
+        return
+    plan = await decide_plan(pid, request, pool, first, "")
+    if plan is not None and await settle(pid, request, plan, images):
+        await start_plan(pid, request, plan, images)
+
+
+async def decide_plan(pid: str, request: str, pool: list[str], first: bool, brief_result: str) -> dict | None:
+    """The Orchestrator's plan for this prompt (None when it couldn't run at all: an error was shown)."""
     meta = load_meta(pid)
     agents = await project_agents(meta)
     order = [a["id"] for a in agents]
-    if orch.is_fresh(meta, site_dir(pid)):
+    if first:                                   # a first build: the whole team; the Orchestrator only pairs agents up
         everyone = [i for i in order if i in set(pool) | {orch.BRIEF}]
         plan = {"intent": "new_build", "agents": everyone, "notes": {}, "reply": None, "fallback": False, "first": True,
                 "reason": "First build: the whole team works on it."}
-    else:
-        await broadcast(pid, {"type": "orchestrating"})
-        try:
-            team = [a for a in agents if a["id"] in set(pool) | {orch.BRIEF} | orch.ON_REQUEST]
-            plan = orch.decide(await run_orchestrator(pid, request, team, meta), pool, order)
-        except asyncio.CancelledError:
-            await broadcast(pid, {"type": "run_stopped", "orchestrator": True})
-            return
-        except OrchestratorUnavailable as e:
-            await broadcast(pid, {"type": "error", "text": str(e), "orchestrator": True})
-            return
-        except Exception as e:   # never block the user: fall back to the whole team
-            log.exception("Orchestrator crashed on project %s", pid)
-            plan = orch.decide(None, pool, order)
-    asks_contact = plan["agents"] and not plan.get("confirm") and contact.missing(plan["agents"], load_meta(pid))
-    if not asks_contact:                      # otherwise start_plan shows the plan together with its questions
-        await broadcast(pid, {"type": "plan", **plan})
+        team = [a for a in agents if a["id"] in everyone]
+        if len(team) >= 3 and orch.could_pair(everyone):
+            try:
+                raw = await run_orchestrator(pid, request, team, meta, first_build=True, brief_result=brief_result)
+                plan["parallel"] = orch.clean_parallel((raw or {}).get("parallel"), everyone)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:              # pairing is a bonus: one agent after another is fine
+                log.warning("Couldn't plan parallel steps for %s: %s", pid, e)
+        return plan
+    await broadcast(pid, {"type": "orchestrating"})
+    try:
+        team = [a for a in agents if a["id"] in set(pool) | {orch.BRIEF} | orch.ON_REQUEST]
+        return orch.decide(await run_orchestrator(pid, request, team, meta, brief_result=brief_result), pool, order)
+    except asyncio.CancelledError:
+        raise
+    except OrchestratorUnavailable as e:
+        await broadcast(pid, {"type": "error", "text": str(e), "orchestrator": True})
+        return None
+    except Exception:   # never block the user: fall back to the whole team
+        log.exception("Orchestrator crashed on project %s", pid)
+        return orch.decide(None, pool, order)
+
+
+async def settle(pid: str, request: str, plan: dict, images: list[str]) -> bool:
+    """Show the plan and keep what must wait for the user (an answer, questions, a yes, contact details).
+    True when its agents can start now."""
+    keys = contact.missing(plan["agents"], load_meta(pid)) if plan["agents"] and not plan.get("confirm") else []
+    if keys:
+        await ask_contact(pid, request, plan, images, keys)
+        return False
+    await broadcast(pid, {"type": "plan", **plan})
     meta = load_meta(pid)
     # The Orchestrator answered, asked (a question or a short form) or wants a yes first: keep that exchange (not in the
     # history the agents read), so the user's next prompt or the form's answers can simply follow it. A run clears it.
@@ -142,21 +183,24 @@ async def run_prompt(pid: str, request: str, pool: list[str], images: list[str])
                              "images": images} if waiting else None
     meta["pending"] = {"request": request, "plan": plan, "images": images} if plan.get("confirm") else None
     save_meta(meta)
-    if plan["agents"] and not plan.get("confirm"):
-        await start_plan(pid, request, plan, images)
+    return bool(plan["agents"]) and not plan.get("confirm")
 
 
-async def start_plan(pid: str, request: str, plan: dict, images: list[str]):
-    """Run a decided plan, unless its agents need contact details the project doesn't have: then ask for them first
-    (the answers start this same plan, see handle_answer)."""
-    meta = load_meta(pid)
-    keys = contact.missing(plan["agents"], meta)
-    if not keys:
-        schedule = None
-        if plan.get("first") and not plan.get("parallel") and orch.could_pair(plan["agents"]):
-            schedule = asyncio.create_task(schedule_first_build(pid, request, plan["agents"]))
-        await run_chain(pid, request, plan["agents"], images=images, plan=plan, schedule=schedule)
-        return
+async def after_brief(pid: str, request: str, plan: dict, images: list[str], brief_result: str) -> dict | None:
+    """The Brief is done: the Orchestrator decides the rest from what it wrote. Returns the plan for the remaining agents
+    (the Brief already ran, so it isn't run again), or None when nothing else runs now."""
+    decided = await decide_plan(pid, request, plan.get("pool") or [], bool(plan.get("first")), brief_result)
+    if decided is None:
+        return None
+    decided["brief_done"] = True             # a plan confirmed later, or started after contact details, skips the Brief
+    if not await settle(pid, request, decided, images):
+        return None
+    return decided
+
+
+async def ask_contact(pid: str, request: str, plan: dict, images: list[str], keys: list[str]):
+    """The plan's agents need contact details the project doesn't have: ask for them first (the answers start this same
+    plan, see handle_answer)."""
     qs = contact.questions(keys)
     reply = ("Before the team starts, a few contact details. Skip any you don't have yet: "
              "its button stays hidden until you add it.")
@@ -165,6 +209,23 @@ async def start_plan(pid: str, request: str, plan: dict, images: list[str]):
     meta["pending"] = {"request": request, "plan": {**plan, "confirm": False}, "images": images}
     meta["last_exchange"] = {"request": request[:PROMPT_LIMIT], "reply": reply, "questions": qs, "images": images, "needs": keys}
     save_meta(meta)
+
+
+async def start_plan(pid: str, request: str, plan: dict, images: list[str]):
+    """Run a decided plan, unless its agents need contact details the project doesn't have: then ask for them first
+    (the answers start this same plan, see handle_answer). A plan decided after the Brief doesn't run the Brief again."""
+    if plan.get("brief_done"):
+        plan = {**plan, "agents": [i for i in plan["agents"] if i != orch.BRIEF]}
+        if not plan["agents"]:
+            return
+    keys = contact.missing(plan["agents"], load_meta(pid))
+    if not keys:
+        schedule = None
+        if plan.get("first") and not plan.get("parallel") and orch.could_pair(plan["agents"]):
+            schedule = asyncio.create_task(schedule_first_build(pid, request, plan["agents"]))
+        await run_chain(pid, request, plan["agents"], images=images, plan=plan, schedule=schedule)
+        return
+    await ask_contact(pid, request, plan, images, keys)
 
 
 async def schedule_first_build(pid: str, request: str, agent_ids: list[str]) -> list[list[str]]:

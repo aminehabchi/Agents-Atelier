@@ -327,6 +327,18 @@
     "prompt": "Improve how this site appears in search and loads.\nThe searches people should find it for: [e.g. \"café in Casablanca\", \"wedding photographer Rabat\"].\nCity or area served: [city]."
   },
   {
+    "id": "polish-wording",
+    "name": "Polish the wording",
+    "description": "Make the text sound like you, not like AI, and make every button, error and message say exactly what happens.",
+    "agents": [
+      "brief",
+      "human-tone",
+      "microcopy",
+      "critic"
+    ],
+    "prompt": "Polish the wording of my site without changing the facts.\nIt should sound: [warm / professional / playful], like we talk to our customers.\nAlso fix: [unclear buttons / form error messages / the contact form's messages]."
+  },
+  {
     "id": "readable-text",
     "name": "Readable text",
     "description": "Fix text that is too small, cramped, cut off or hard to read, without changing the words.",

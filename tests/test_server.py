@@ -802,13 +802,22 @@ class T06bOrchestrator(unittest.TestCase):
     POOL = ["ux", "html", "css", "js", "qa", "critic"]
 
     def prompt(self, pid, text, pool=None, until=("run_done", "error", "run_stopped", "plan")):
+        """Send a prompt; collect events until the run ends. Every prompt runs the Brief first, then the Orchestrator."""
         async def script(sock, recv):
             await sock.send(send({"type": "prompt", "text": text, "agents": pool or self.POOL}))
             events = await recv(until)
-            if events[-1]["type"] == "plan" and events[-1]["agents"] and not events[-1].get("confirm") and not events[-1].get("questions"):
+            if events[-1]["type"] == "plan" and (types(events).count("run_start") or
+                                                 (events[-1]["agents"] and not events[-1].get("confirm") and not events[-1].get("questions"))):
                 events += await recv(("run_done", "error", "run_stopped"))
             return events
         return ws(pid, script)
+
+    def plan_of(self, events):
+        return next(e for e in events if e["type"] == "plan")
+
+    def call_for(self, role):
+        """The fake CLI's log line of the agent (or Orchestrator) whose instructions start with `role`."""
+        return next(c for c in log_calls() if role in json.dumps(c["argv"]))["argv"]
 
     def built(self):
         pid = new_project()
@@ -819,15 +828,22 @@ class T06bOrchestrator(unittest.TestCase):
         pid = self.built()
         LOG.write_text("")
         events = self.prompt(pid, "make the buttons rounder [[orch:css]]")
-        self.assertEqual(types(events)[:3], ["user", "orchestrating", "plan"])
-        plan = events[2]
-        self.assertEqual(plan["agents"], ["brief", "css", "qa", "critic"])     # Brief first, QA + Critic after a change
+        kinds = types(events)
+        self.assertEqual(kinds[:3], ["user", "run_start", "agent_start"])        # the Brief works on the prompt first…
+        self.assertEqual(events[2]["agent"], "brief")
+        self.assertLess(kinds.index("agent_done"), kinds.index("orchestrating"))  # …then the Orchestrator reads its brief
+        self.assertLess(kinds.index("orchestrating"), kinds.index("plan"))
+        plan = self.plan_of(events)
+        self.assertEqual(plan["agents"], ["brief", "css", "qa", "critic"])     # QA + Critic after a change
         self.assertEqual(plan["reason"], "Only styling is needed.")
+        self.assertEqual(next(e for e in events if e["type"] == "run_agents")["agents"], ["brief", "css", "qa", "critic"])
         self.assertEqual([e["agent"] for e in events if e["type"] == "agent_done"], ["brief", "css", "qa", "critic"])
         calls = [c for c in log_calls() if "-p" in c["argv"]]
-        orch_argv = calls[0]["argv"]
+        self.assertIn("You are the Brief agent", json.dumps(calls[0]["argv"]))                # the Brief ran first
+        orch_argv = calls[1]["argv"]
         self.assertEqual(orch_argv[orch_argv.index("--tools") + 1], "Read,Glob,Grep")      # read-only
         self.assertIn("<project_state>", orch_argv[orch_argv.index("-p") + 1])
+        self.assertIn("<brief_result>", orch_argv[orch_argv.index("-p") + 1])             # what the Brief wrote
         css_prompt = calls[2]["argv"][calls[2]["argv"].index("-p") + 1]
         self.assertIn("<run_plan>", css_prompt)
         self.assertIn("note for css", css_prompt)
@@ -838,22 +854,24 @@ class T06bOrchestrator(unittest.TestCase):
 
     def test_dependents_are_added_and_unknown_or_switched_off_agents_dropped(self):
         pid = self.built()
-        plan = self.prompt(pid, "new section [[orch:ux,seo,nope]]")[2]
+        plan = self.plan_of(self.prompt(pid, "new section [[orch:ux,seo,nope]]"))
         self.assertEqual(plan["agents"], ["brief", "ux", "html", "css", "qa", "critic"])   # seo is off, nope doesn't exist
 
     def test_unclear_prompt_asks_and_runs_nobody(self):
         pid = self.built()
         before = call("GET", f"/api/projects/{pid}")[1]
         events = self.prompt(pid, "fix it [[orch-talk]]")
-        self.assertEqual(events[-1]["type"], "plan")
-        self.assertEqual((events[-1]["agents"], events[-1]["reply"]), ([], "Which section should change?"))
-        self.assertNotIn("run_start", types(events))
+        plan = self.plan_of(events)
+        self.assertEqual((plan["agents"], plan["reply"]), ([], "Which section should change?"))
+        self.assertEqual([e["agent"] for e in events if e["type"] == "agent_done"], ["brief"])   # only the Brief worked
+        self.assertEqual((events[-1]["type"], events[-1].get("brief_only")), ("run_done", True))
         after = call("GET", f"/api/projects/{pid}")[1]
         self.assertEqual(after["history"], before["history"])                  # agents never see the off-topic prompt
         self.assertFalse(after["busy"])
         LOG.write_text("")
         self.prompt(pid, "the header [[orch:css]]")
-        orch_prompt = log_calls()[0]["argv"][log_calls()[0]["argv"].index("-p") + 1]
+        orch_argv = self.call_for("You are the Orchestrator")
+        orch_prompt = orch_argv[orch_argv.index("-p") + 1]
         self.assertIn("Which section should change?", orch_prompt)             # the next prompt can answer it
 
     def answer(self, pid, msg, until=("run_done", "error", "run_stopped", "plan")):
@@ -869,10 +887,10 @@ class T06bOrchestrator(unittest.TestCase):
     def test_form_questions_are_answered_then_the_team_runs(self):
         pid = self.built()
         events = self.prompt(pid, "add a section [[orch-form]]")
-        plan = events[-1]
+        plan = self.plan_of(events)
         self.assertEqual((plan["type"], plan["agents"], plan["intent"]), ("plan", [], "unclear"))
         self.assertEqual([(q["id"], q["kind"]) for q in plan["questions"]], [("q1", "single"), ("q2", "multi"), ("q3", "text")])
-        self.assertNotIn("run_start", types(events))
+        self.assertEqual([e["agent"] for e in events if e["type"] == "agent_done"], ["brief"])
         events = self.answer(pid, {"action": "answers", "answers": {"q1": "About", "q2": ["Blue", "Teal"]}})
         user = events[0]
         self.assertEqual(user["type"], "user")
@@ -889,17 +907,16 @@ class T06bOrchestrator(unittest.TestCase):
     def test_big_change_waits_for_a_yes(self):
         pid = self.built()
         events = self.prompt(pid, "redesign everything [[orch-confirm]]")
-        plan = events[-1]
-        self.assertEqual(plan["type"], "plan")
+        plan = self.plan_of(events)
         self.assertTrue(plan["confirm"])
         self.assertEqual(plan["agents"], ["brief", "css", "qa", "critic"])         # design is switched off
         self.assertEqual(plan["reply"], "The team will redesign every page. Go ahead?")
-        self.assertNotIn("run_start", types(events))
+        self.assertEqual([e["agent"] for e in events if e["type"] == "agent_done"], ["brief"])   # only the Brief, before the yes
         self.assertFalse(call("GET", f"/api/projects/{pid}")[1]["busy"])
         LOG.write_text("")
         events = self.answer(pid, {"action": "confirm"}, until=("run_done", "error", "run_stopped"))
         self.assertEqual((events[0]["type"], events[0]["action"]), ("answer", "confirm"))
-        self.assertEqual([e["agent"] for e in events if e["type"] == "agent_done"], ["brief", "css", "qa", "critic"])
+        self.assertEqual([e["agent"] for e in events if e["type"] == "agent_done"], ["css", "qa", "critic"])   # the Brief isn't run twice
         self.assertFalse([c for c in log_calls() if "You are the Orchestrator" in json.dumps(c["argv"])])   # no second Orchestrator call
         self.assertEqual(self.answer(pid, {"action": "confirm"})[-1]["type"], "error")         # nothing waits any more
 
@@ -914,12 +931,12 @@ class T06bOrchestrator(unittest.TestCase):
     def test_contact_agents_can_be_picked_even_if_off(self):
         pid = self.built()
         events = self.prompt(pid, "add whatsapp, email, call and telegram buttons [[orch:whatsapp,email,call,telegram]]")
-        self.assertEqual(types(events), ["user", "orchestrating", "plan"])           # one card: the plan and its questions
-        plan = events[2]
+        self.assertEqual(types(events).count("plan"), 1)                              # one card: the plan and its questions
+        plan = self.plan_of(events)
         self.assertEqual(plan["agents"], ["brief", "whatsapp", "email", "call", "telegram", "qa", "critic"])
         self.assertEqual(plan["needs"], ["whatsapp", "email", "phone", "telegram"])
         events = self.answer(pid, {"action": "answers", "answers": {}})              # skip them all: the team still runs
-        self.assertEqual([e["agent"] for e in events if e["type"] == "agent_done"], ["brief", "whatsapp", "email", "call", "telegram", "qa", "critic"])
+        self.assertEqual([e["agent"] for e in events if e["type"] == "agent_done"], ["whatsapp", "email", "call", "telegram", "qa", "critic"])
         agents = {a["id"]: a for a in call("GET", "/api/agents")[1]}
         for i in ("whatsapp", "email", "call", "telegram"):
             self.assertFalse(agents[i]["default"], i)                                   # helpers: off until needed
@@ -944,10 +961,10 @@ class T06bOrchestrator(unittest.TestCase):
     def test_contact_details_are_asked_before_the_first_build(self):
         pid = new_project()
         events = self.prompt(pid, "first build", pool=["html", "css", "whatsapp", "email"])
-        plan = events[-1]
-        self.assertEqual(plan["needs"], ["whatsapp", "email"])                  # asked even though the Orchestrator didn't run
+        plan = self.plan_of(events)
+        self.assertEqual(plan["needs"], ["whatsapp", "email"])                  # asked after the Brief, before the team
         self.assertIn("whatsapp", plan["agents"])
-        self.assertNotIn("run_start", types(events))
+        self.assertEqual([e["agent"] for e in events if e["type"] == "agent_done"], ["brief"])
         bad = self.answer(pid, {"action": "answers", "answers": {"q1": "call me", "q2": ""}})
         self.assertEqual(bad[-1]["type"], "error")
         self.assertIn("doesn't look like a phone number", bad[-1]["text"])
@@ -2881,7 +2898,7 @@ class T40Parallel(unittest.TestCase):
         LOG.write_text("")
         events = self.prompt(pid, "a bakery [[par:design+copy]] [[slow]]", ["ux", "design", "copy", "html"])
         self.assertEqual(events[-1]["type"], "run_done", events[-1])
-        self.assertEqual(next(e for e in events if e["type"] == "schedule")["groups"], [["design", "copy"]])
+        self.assertEqual(next(e for e in events if e["type"] == "plan")["parallel"], [["design", "copy"]])   # decided after the Brief
         self.assertEqual(next(e for e in events if e["type"] == "parallel")["agents"], ["design", "copy"])
         prompts = [c["argv"][c["argv"].index("-p") + 1] for c in log_calls() if "-p" in c["argv"]]
         self.assertEqual(sum("<first_build>" in p for p in prompts), 1)
@@ -4308,3 +4325,14 @@ h1{font-size:clamp(32px,5vw,48px);line-height:1.15;text-wrap:balance} p{max-widt
         teams = {t["id"]: t for t in market["teams"]}
         for tid in ("new-website", "landing-page", "redesign"):
             self.assertIn("typography", [a["id"] for a in teams[tid]["agents"]], tid)
+
+    def test_the_wording_agents_and_their_team_are_in_the_marketplace(self):
+        market = call("GET", "/api/market")[1]
+        agents = {a["id"]: a for a in market["agents"]}
+        for aid in ("human-tone", "microcopy"):
+            self.assertEqual((agents[aid]["official"], agents[aid]["category"]), (True, "writing"), aid)
+        team = next(t for t in market["teams"] if t["id"] == "polish-wording")
+        self.assertEqual([a["id"] for a in team["agents"]], ["brief", "human-tone", "microcopy", "critic"])
+        role = call("GET", "/api/agents/human-tone")[1]["role"]
+        self.assertIn("You are the Human tone editor", role)
+        self.assertNotIn("VoltAgent", role)                                   # the credit stays in the file's header

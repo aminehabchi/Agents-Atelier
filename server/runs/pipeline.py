@@ -414,7 +414,9 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
     images = list(images) or (list(prev.get("images", [])) if resume else [])
     review_round = prev.get("review_round", 0) if resume else 0
     send_back = dict(prev.get("send_back") or {}) if resume else {}
-    plan = plan if plan is not None else (prev.get("plan") or {}) if resume else {}
+    deferred_before = (prev.get("plan") or {}).get("deferred") and agent_ids == [orch.BRIEF]
+    plan = plan if plan is not None else (prev.get("plan") or {}) if (resume or deferred_before) else {}
+    brief_only = False                      # the Orchestrator decided, after the Brief, that nothing else runs now
     meta["run"] = {"request": request, "images": images, "agents": [a["id"] for a in team], "done": done, "notes": notes,
                    "review_round": review_round, "send_back": send_back, "plan": plan,
                    "current": None, "running": [], "status": "running", "error": "",
@@ -438,6 +440,25 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
                     plan = {**plan, "parallel": groups}
                     update_run(pid, plan=plan)
                     await broadcast(pid, {"type": "schedule", "groups": groups})
+            if plan.get("deferred") and orch.BRIEF in done:
+                # Brief first, then the Orchestrator: it reads what the Brief wrote and decides who works now
+                from runs import orchestration          # here: it imports this module
+                brief = next((a for a in team if a["id"] == orch.BRIEF), None)
+                brief_note = next((n for n in reversed(notes) if brief and n.startswith(f"- {brief['name']} agent")), "")
+                decided = await orchestration.after_brief(pid, request, plan, images, brief_note)
+                if decided is None:
+                    brief_only = True
+                    break
+                plan = {k: v for k, v in decided.items() if k != "deferred"}
+                chosen = set(plan["agents"]) | {orch.BRIEF}
+                team = [a for a in await project_agents(load_meta(pid)) if a["id"] in chosen]
+                no_web = [a for a in team if a.get("tools") == "web" and not tier["research"]]
+                team = [a for a in team if a not in no_web]
+                update_run(pid, agents=[a["id"] for a in team], plan=plan)
+                await broadcast(pid, {"type": "run_agents", "agents": [a["id"] for a in team], "done": done})
+                if no_web:
+                    await broadcast(pid, {"type": "notice", "upgrade": "pro",
+                                          "text": f"{', '.join(a['name'] for a in no_web)} skipped: agents that search the web come with the Pro plan."})
             remaining = [a["id"] for a in team if a["id"] not in done]
             step = [a for i in orch.next_step(remaining, plan.get("parallel") or []) for a in team if a["id"] == i]
             if not step:
@@ -521,11 +542,13 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
                 await email_after_run(pid, False, f"it reached the ${limit:g} spending limit per run.")
                 return
         meta = load_meta(pid)
-        meta["history"].append(request)
+        if not brief_only:          # an answer, questions or a plan to confirm: that exchange is kept instead (last_exchange)
+            meta["history"].append(request)
         meta["run"].update(status="done", current=None, running=[], updated=time.time())
         save_meta(meta)
-        await broadcast(pid, {"type": "run_done"})
-        await email_after_run(pid, True)
+        await broadcast(pid, {"type": "run_done", **({"brief_only": True} if brief_only else {})})
+        if not brief_only:
+            await email_after_run(pid, True)
     except asyncio.CancelledError:
         kill_procs(st)
         run = safely("Saving the stopped run", update_run, pid, status="stopped", running=[])

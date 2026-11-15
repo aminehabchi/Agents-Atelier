@@ -11,8 +11,8 @@ result in a real browser, sending bigger problems back to the agent that owns th
 
 | On a freelance platform                 | On Agents Atelier                                                       |
 |-----------------------------------------|-------------------------------------------------------------------------|
-| Browse profiles and hire people         | Browse **36 specialist agents** with profiles, ratings and portfolios  |
-| Hire an agency for a whole job          | Hire one of **24 ready teams** (restaurant site, portfolio, 3D site, contact options…), each with a starting prompt |
+| Browse profiles and hire people         | Browse **38 specialist agents** with profiles, ratings and portfolios  |
+| Hire an agency for a whole job          | Hire one of **25 ready teams** (restaurant site, portfolio, 3D site, contact options…), each with a starting prompt |
 | Offers, then days of waiting             | **Start a job**: pick one of your projects and the team starts at once  |
 | Each round of changes means new messages | Ask for a change anytime: **only the agents it needs** work on it      |
 | You trust a profile                     | Every agent's **results, ratings, time and cost** are shown, and on Pro its **instructions** too |
@@ -28,9 +28,9 @@ Agents Atelier is a web platform that works like a freelance marketplace, except
 AI agent: rather than posting a job, comparing offers and waiting days for a delivery, you describe the website you
 need and hire a team of agents that starts working the moment you press Enter. Each project begins with a name, a short
 description and optional answers about your audience, goal, tone, colours, languages and must-have content; you can
-give it its own brand kit (logo, colours, fonts), or import an existing site to improve. You then pick one of 24
+give it its own brand kit (logo, colours, fonts), or import an existing site to improve. You then pick one of 25
 ready use-case teams (a restaurant site, a portfolio, a landing page, a redesign, a multilingual version, legal
-pages, a 3D site, contact options…), each with a starting prompt to fill in, or choose agents yourself from 36 specialists: a Brief agent turns your
+pages, a 3D site, contact options…), each with a starting prompt to fill in, or choose agents yourself from 38 specialists: a Brief agent turns your
 request into a clear brief, UX plans the structure, Design System sets the colours and fonts, the Copywriter writes
 every word, HTML, CSS, JS, Responsive and Animation agents build the pages, Accessibility audits them, and QA and the
 Critic check the result in a real browser at desktop and phone width, fix small problems and send bigger ones back to
@@ -94,8 +94,8 @@ accept or re-roll. Agents Atelier works more like a small design studio:
 
 | A single AI builder                         | Agents Atelier                                                                 |
 |---------------------------------------------|--------------------------------------------------------------------------------|
-| One generalist does everything at once      | **36 specialists**, each with one job and its own instructions                 |
-| A blank chat box                            | **24 use-case teams**, each with the right agents and a prompt to fill in      |
+| One generalist does everything at once      | **38 specialists**, each with one job and its own instructions                 |
+| A blank chat box                            | **25 use-case teams**, each with the right agents and a prompt to fill in      |
 | You see the result, not the process         | You see **every agent, every file it touches, how long it took and its cost**  |
 | Unhappy? Regenerate everything              | **Retry just one agent** ("CSS: warmer palette") or **roll back** to any step |
 | Stopping loses the work                     | **Stop, then Continue** from where it stopped, even after a crash              |
@@ -136,22 +136,26 @@ server, a database or logins.
 
 ### What happens when you press Enter
 
-**Who works is decided first:**
+**Every prompt runs in the same order: the Brief first, then the Orchestrator, then the team.**
 
-- **First prompt on a new project:** every agent in the project's team builds the site. If an agent in the team needs a
-  contact detail you haven't given (a WhatsApp number, an email…), a short form asks for it first.
-- **Any later prompt:** the **Orchestrator** reads your request and the project (files, `plan.md`, earlier requests, the
-  last run) and picks only the agents the request needs. "Make the buttons rounder" runs CSS, not the whole team. Its
-  choice and reason appear in the chat, and the run starts right away (press Stop if it picked wrong). It may also pick
-  a helper that isn't in the team when the request clearly needs it ("translate the site into Arabic" brings in the
-  Translator).
-- **The Brief agent always runs** whenever any agent runs, so it's always in the team (with a lock instead of ×). On follow-ups it restates your
-  request as a precise change instead of rewriting the brief.
+1. **The Brief agent works on your prompt first**, every time (it's always in the team, with a lock instead of ×). On a
+   new project it writes the brief; on follow-ups it keeps the brief and restates your request as a precise change
+   ("Latest request": what to change, where, what to keep), or notes that it's a question or unclear.
+2. **Then the Orchestrator reads what the Brief wrote** (plus the project: files, `plan.md`, earlier requests, the last
+   run) and decides:
+   - **First prompt on a new project:** every agent in the project's team builds the site; the Orchestrator only decides
+     which agents can work side by side. If an agent needs a contact detail you haven't given (a WhatsApp number, an
+     email…), a short form asks for it first.
+   - **Any later prompt:** only the agents the request needs. "Make the buttons rounder" runs CSS, not the whole team.
+     Its choice and reason appear in the chat, and the team starts right away (press Stop if it picked wrong). It may
+     also pick a helper that isn't in the team when the request clearly needs it ("translate the site into Arabic"
+     brings in the Translator).
+3. **The chosen agents run.** The Brief isn't run a second time, even after a "Yes, start" or a contact form.
 - The server adds what the Orchestrator might forget: agents that must adapt (HTML changes → CSS) and **QA + Critic
   after any code change**.
-- **Unclear, off-topic or a question** ("fix it", "write me a poem", "which fonts did you use?"): no agent runs. The
-  Orchestrator answers, or asks what it needs as a short **form** in the chat (choices, checkboxes or a text field);
-  answer it and the right agents start.
+- **Unclear, off-topic or a question** ("fix it", "write me a poem", "which fonts did you use?"): after the Brief, no
+  other agent runs. The Orchestrator answers, or asks what it needs as a short **form** in the chat (choices,
+  checkboxes or a text field); answer it and the right agents start.
 - **Big changes wait for your yes.** For a request that would rework most of the site, the Orchestrator shows its plan
   with **Yes, start** and **Cancel** instead of starting at once.
 - **Template blanks.** A use-case prompt still containing `[blanks]` is turned into a form before anyone works.
@@ -376,7 +380,7 @@ command line wins over the file: `AGENT_MODEL=sonnet PORT=9000 ./run.sh`. Restar
    languages, must-have content, sites you like, things to avoid) help the first build land closer. Add your logo and
    photos, fill in the project's **brand kit** (logo, up to six colours, heading and body fonts, or copy another
    project's kit), or start from an **existing site** (a folder or a .zip with an `index.html`).
-2. **Hire a team.** The studio offers the 24 ready teams: pick one and it becomes the project's team, with its starting
+2. **Hire a team.** The studio offers the 25 ready teams: pick one and it becomes the project's team, with its starting
    prompt filled in; replace the parts in [brackets] (or send it as is and answer the form). To change the team later,
    use **Add agents** or **Choose a team** in the studio's team strip: the marketplace opens for this project. Or write your own: *"A one-page site with
    a hero and a booking button, services with prices, opening hours and a map link. Calm, trustworthy."* Attach a
@@ -454,7 +458,7 @@ continue, switch view, device or page).
 
 ## The agent team
 
-The 36 shared agents, in run order. "On" agents are in a new project's team by default; the others are helpers you add
+The 38 shared agents, in run order. "On" agents are in a new project's team by default; the others are helpers you add
 from the marketplace, get with a use-case team, or the Orchestrator brings in when a request needs them.
 
 | Agent          | Default  | Model    | What it does |
@@ -467,6 +471,7 @@ from the marketplace, get with a use-case team, or the Orchestrator brings in wh
 | 3D designer    | off      | opus     | Plans the site's 3D: which elements get depth, the object, interaction and fallbacks |
 | Copywriter     | on       | sonnet   | Writes every word: headlines, body text, buttons, form labels and errors |
 | Content writer | off      | sonnet   | Longer content: about and service pages, articles, FAQs and guides |
+| Human tone     | off      | sonnet   | Edits the site's text so it sounds written by a person: removes stock AI phrases, filler and empty claims, keeps every fact |
 | HTML           | on       | sonnet   | Semantic, accessible markup from the plan and the copy |
 | Translator     | off      | sonnet   | One copy of every page per language, a language switcher, right-to-left layouts |
 | Legal pages    | off      | sonnet   | Privacy policy, legal notice and cookie information, linked from the footer |
@@ -479,6 +484,7 @@ from the marketplace, get with a use-case team, or the Orchestrator brings in wh
 | JS             | on       | sonnet   | Vanilla JavaScript: menu, tabs, forms, scrolling |
 | 3D scene       | off      | opus     | A real interactive 3D object in hand-written WebGL (no libraries), with fallbacks |
 | Forms          | off      | sonnet   | Contact, booking, quote and newsletter forms with validation and clear states |
+| Microcopy      | off      | sonnet   | Fixes the text people act on: buttons, links, form labels, errors, empty states, confirmations, success messages |
 | WhatsApp       | off      | sonnet   | A WhatsApp button and a short form that opens WhatsApp with the message written |
 | Email contact  | off      | sonnet   | A mailto link and a form that opens the visitor's email app, plus a copy button |
 | Click-to-call  | off      | haiku    | Tappable phone numbers, a call button on phones, a copy option on computers |
@@ -516,11 +522,11 @@ team** in the studio (the marketplace opens for that project), or manage them on
 | Polish  | Accessibility, Performance, Critic | Improving a page that already exists    |
 | Full    | all of them                        | The most thorough result                |
 
-And **24 shared use-case teams**, each with a starting prompt that fills the prompt box when you pick it:
+And **25 shared use-case teams**, each with a starting prompt that fills the prompt box when you pick it:
 
 | Build something new | Improve a site you have | Add one thing |
 |---|---|---|
-| New website from scratch · Landing page that converts · Restaurant or café · Local service business · Portfolio · Blog or content site · Product page · Event page · 3D website · Research, then build · Build from a sketch or screenshot | Improve an imported site · Redesign: new look, same content · Boost conversions · SEO and speed checkup · Readable text · Accessibility audit · Code cleanup | Make it multilingual · Legal pages · Add a dark mode · Contact and booking forms · Contact options · Add 3D to my site |
+| New website from scratch · Landing page that converts · Restaurant or café · Local service business · Portfolio · Blog or content site · Product page · Event page · 3D website · Research, then build · Build from a sketch or screenshot | Improve an imported site · Redesign: new look, same content · Boost conversions · SEO and speed checkup · Polish the wording · Readable text · Accessibility audit · Code cleanup | Make it multilingual · Legal pages · Add a dark mode · Contact and booking forms · Contact options · Add 3D to my site |
 
 Users can save their own teams (with their own starting prompt) from the studio or the Teams page.
 
@@ -834,6 +840,14 @@ you've checked your projects. Back up two things: the Postgres database and the 
   metadata); the agents use them in `srcset`, and the Project tab shows how much lighter they are.
 - **Limits:** requests up to 8 MB; reference images up to 5 MB each (PNG, JPG, WebP, GIF), up to 6 per prompt; files
   up to 500 KB in the Code tab; one agent run up to `AGENT_TIMEOUT`.
+
+## Credits
+
+- The **Human tone** and **Microcopy** agents are adapted from `content-quality-editor`, `ai-writing-auditor` and
+  `ux-microcopy-reviewer` in [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents)
+  (MIT License; `ux-microcopy-reviewer` itself credits the MIT `claude-code-para-disenadores` plugin), rewritten for
+  this team's static sites and rules.
+- The browser checks use [axe-core](https://github.com/dequelabs/axe-core) (MPL-2.0).
 
 ## FAQ
 

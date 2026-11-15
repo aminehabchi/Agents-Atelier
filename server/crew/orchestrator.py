@@ -27,7 +27,7 @@ FINISHERS = ("qa", "critic")            # run after any change to the code, when
 READ_ONLY = {"brief", "critic", "qa", "research"}   # agents whose choice alone doesn't count as a code change
 # Helpers that may be chosen when the request clearly asks for what they do, even if switched off (never in a fallback).
 ON_REQUEST = {"research", "auditor", "content", "translator", "legal", "dark-theme", "pricing", "gallery", "forms", "conversion", "local", "tidy",
-              "3d-design", "3d-scene", "depth", "whatsapp", "email", "call", "telegram", "qr"}
+              "3d-design", "3d-scene", "depth", "whatsapp", "email", "call", "telegram", "qr", "typography", "human-tone", "microcopy"}
 INTENTS = {"new_build", "change", "redo_agent", "question", "off_topic", "unclear", "confirm"}
 TALK = {"question", "off_topic", "unclear"}   # intents where no agent runs: the Orchestrator answers in the chat
 # "confirm": the agents are chosen but wait until the user says yes (a big or ambiguous request). "unclear" may carry a
@@ -109,7 +109,9 @@ time: reply with {"intent": "new_build", "agents": [], "parallel": [[…], …],
 
 
 def build_prompt(meta: dict, request: str, team: list[dict], folder: Path, clean, site_pages: str, brief: str = "",
-                 first_build: bool = False) -> str:
+                 first_build: bool = False, brief_result: str = "") -> str:
+    """The Orchestrator's prompt. `brief_result` is what the Brief agent said after reading this request (it always runs
+    first, and has already updated ## Brief in plan.md, which <project_state> shows)."""
     past = "\n".join(f"- {clean(h, 300)}" for h in meta.get("history", [])[-8:]) or "(none)"
     roster = "\n".join(f"- {a['id']}: {a['name']} — {clean(a.get('description') or '', 160)}"
                        + (" (switched off: choose it only when the request clearly asks for what it does)" if a["id"] in ON_REQUEST
@@ -138,7 +140,12 @@ description: {clean(meta.get("description") or "(no description)", 300)}
 <user_request>
 {clean(request, 10000)}
 </user_request>
-{FIRST_BUILD if first_build else ""}
+{f"""
+<brief_result>
+The Brief agent has just read this request and updated ## Brief in plan.md (see <project_state>). Its note:
+{clean(brief_result, 1200)}
+</brief_result>
+""" if brief_result else ""}{FIRST_BUILD if first_build else ""}
 Decide now. Reply with only the JSON object."""
 
 

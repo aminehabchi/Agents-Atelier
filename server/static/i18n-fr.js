@@ -1099,7 +1099,7 @@ Object.assign(window.I18N.fr, {
 
 /* Landing page: questions, contact buttons, checks, photos and QR codes */
 Object.assign(window.I18N.fr, {
-  "This is the default team for a new website. Twenty-six more join when the job needs them, such as Research, Typography, Translator, Forms, WhatsApp, Legal pages and 3D.": "Voici l'équipe par défaut pour un nouveau site. Vingt-six autres rejoignent la mission quand elle en a besoin, comme Recherche, Typographie, Traducteur, Formulaires, WhatsApp, Pages légales et 3D.",
+  "This is the default team for a new website. Twenty-eight more join when the job needs them, such as Research, Typography, Human tone, Translator, Forms, WhatsApp, Legal pages and 3D.": "Voici l'équipe par défaut pour un nouveau site. Vingt-huit autres rejoignent la mission quand elle en a besoin, comme Recherche, Typographie, Ton humain, Traducteur, Formulaires, WhatsApp, Pages légales et 3D.",
   "It asks before it guesses": "Il demande avant de deviner",
   "When a request is vague or a prompt still has blanks like [your business], the Orchestrator asks a few questions with suggested answers. Pick one, type your own, or skip.": "Quand une demande est floue ou qu'une demande de départ a encore des blancs comme [votre activité], l'Orchestrateur pose quelques questions avec des réponses suggérées. Choisissez-en une, écrivez la vôtre ou passez.",
   "Big changes wait for your yes": "Les grands changements attendent votre accord",
@@ -2379,4 +2379,19 @@ Object.assign(window.I18N.fr, {
   "Make the text on my site easier to read, without changing the words.": "Rendez les textes de mon site plus faciles à lire, sans changer les mots.",
   "What bothers me: [small text / long lines / cramped headings / text cut off on phones].": "Ce qui me gêne : [textes trop petits / lignes trop longues / titres serrés / textes coupés sur téléphone].",
   "Keep: [my fonts / my colours / the layout].": "À garder : [mes polices / mes couleurs / la mise en page].",
+});
+Object.assign(window.I18N.fr, { "reading the brief and the project": "lit le brief et le projet" });
+Object.assign(window.I18N.fr, { "<b>Orchestrator:</b> reading the brief and the project": "<b>Orchestrateur :</b> lit le brief et le projet" });
+
+/* ---------- Human tone and Microcopy agents, Polish the wording team ---------- */
+Object.assign(window.I18N.fr, {
+  "Human tone": "Ton humain",
+  "Edits the site's text so it sounds written by a person: removes stock AI phrases, filler and empty claims, and keeps every fact.": "Retravaille les textes du site pour qu'ils sonnent écrits par une personne : supprime les tournures toutes faites d'IA, le remplissage et les promesses vides, en gardant chaque fait.",
+  "Microcopy": "Microtextes",
+  "Fixes the small text people act on: buttons, links, form labels, errors, empty states, confirmations and success messages.": "Corrige les petits textes sur lesquels on agit : boutons, liens, libellés de formulaire, erreurs, états vides, confirmations et messages de réussite.",
+  "Polish the wording": "Peaufiner les textes",
+  "Make the text sound like you, not like AI, and make every button, error and message say exactly what happens.": "Des textes qui vous ressemblent, pas à une IA, et des boutons, erreurs et messages qui disent exactement ce qui se passe.",
+  "Polish the wording of my site without changing the facts.": "Peaufinez les textes de mon site sans changer les faits.",
+  "It should sound: [warm / professional / playful], like we talk to our customers.": "Le ton : [chaleureux / professionnel / ludique], comme nous parlons à nos clients.",
+  "Also fix: [unclear buttons / form error messages / the contact form's messages].": "À corriger aussi : [boutons peu clairs / messages d'erreur des formulaires / messages du formulaire de contact].",
 });
