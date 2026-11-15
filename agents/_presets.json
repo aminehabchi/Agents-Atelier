@@ -10,6 +10,7 @@
       "copy",
       "html",
       "css",
+      "typography",
       "js",
       "responsive",
       "anim",
@@ -29,6 +30,7 @@
       "copy",
       "html",
       "css",
+      "typography",
       "pricing",
       "js",
       "responsive",
@@ -63,6 +65,7 @@
       "auditor",
       "design",
       "css",
+      "typography",
       "responsive",
       "anim",
       "a11y",
@@ -322,6 +325,19 @@
       "qa"
     ],
     "prompt": "Improve how this site appears in search and loads.\nThe searches people should find it for: [e.g. \"café in Casablanca\", \"wedding photographer Rabat\"].\nCity or area served: [city]."
+  },
+  {
+    "id": "readable-text",
+    "name": "Readable text",
+    "description": "Fix text that is too small, cramped, cut off or hard to read, without changing the words.",
+    "agents": [
+      "brief",
+      "typography",
+      "responsive",
+      "a11y",
+      "critic"
+    ],
+    "prompt": "Make the text on my site easier to read, without changing the words.\nWhat bothers me: [small text / long lines / cramped headings / text cut off on phones].\nKeep: [my fonts / my colours / the layout]."
   },
   {
     "id": "accessibility-audit",

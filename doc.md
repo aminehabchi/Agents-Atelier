@@ -205,7 +205,7 @@ Every agent gets these rules before its own role. They define the contract betwe
 ### Presets
 
 The four built-in presets are computed from the current agents (`agents.builtin_presets()`): Default, Quick, Polish
-and Full. The 23 shared use-case teams (with a starting prompt and a category) come from `agents/_presets.json` through
+and Full. The 24 shared use-case teams (with a starting prompt and a category) come from `agents/_presets.json` through
 the migrations; members' teams are rows in the `teams` table. Unknown agent ids are dropped when teams are loaded.
 
 ---

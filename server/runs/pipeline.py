@@ -370,7 +370,7 @@ async def _agent_event(pid: str, agent: dict, ev: dict, folder: Path, pending_ed
 
 
 # The agents that get a real browser's view of the site first (see browser_check.py).
-BROWSER_CHECK_AGENTS = {"responsive", "a11y", "qa", "critic"}   # layout problems for Responsive, axe results for Accessibility
+BROWSER_CHECK_AGENTS = {"typography", "responsive", "a11y", "qa", "critic"}   # text problems for Typography, layout for Responsive, axe results for Accessibility
 
 
 async def safe_browser_check(pid: str) -> dict | None:

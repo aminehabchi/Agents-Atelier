@@ -1099,7 +1099,7 @@ Object.assign(window.I18N.fr, {
 
 /* Landing page: questions, contact buttons, checks, photos and QR codes */
 Object.assign(window.I18N.fr, {
-  "This is the default team for a new website. Twenty-five more join when the job needs them, such as Research, Translator, Forms, WhatsApp, Legal pages and 3D.": "Voici l'équipe par défaut pour un nouveau site. Vingt-cinq autres rejoignent la mission quand elle en a besoin, comme Recherche, Traducteur, Formulaires, WhatsApp, Pages légales et 3D.",
+  "This is the default team for a new website. Twenty-six more join when the job needs them, such as Research, Typography, Translator, Forms, WhatsApp, Legal pages and 3D.": "Voici l'équipe par défaut pour un nouveau site. Vingt-six autres rejoignent la mission quand elle en a besoin, comme Recherche, Typographie, Traducteur, Formulaires, WhatsApp, Pages légales et 3D.",
   "It asks before it guesses": "Il demande avant de deviner",
   "When a request is vague or a prompt still has blanks like [your business], the Orchestrator asks a few questions with suggested answers. Pick one, type your own, or skip.": "Quand une demande est floue ou qu'une demande de départ a encore des blancs comme [votre activité], l'Orchestrateur pose quelques questions avec des réponses suggérées. Choisissez-en une, écrivez la vôtre ou passez.",
   "Big changes wait for your yes": "Les grands changements attendent votre accord",
@@ -2369,3 +2369,14 @@ Object.assign(window.I18N.fr, {
   "Yes, from your profile at any time. A paid plan starts as soon as PayPal confirms the payment. Moving down applies at once: you keep your projects, but can't start new ones beyond the plan's limit.": "Oui, depuis votre profil, à tout moment. Une offre payante démarre dès que PayPal confirme le paiement. Passer à une offre inférieure s'applique aussitôt : vous gardez vos projets, mais ne pouvez pas en créer au-delà de la limite de l'offre.",
 });
 Object.assign(window.I18N.fr, { "Developers and agent creators": "Développeurs et créateurs d'agents" });
+
+/* ---------- Typography agent, Readable text team ---------- */
+Object.assign(window.I18N.fr, {
+  "Typography": "Typographie",
+  "Styles every piece of text so it reads well: hierarchy, line height, line length, wrapping, links and numbers, and fixes text that is clipped, cramped or too small.": "Met en forme chaque texte pour qu'il se lise bien : hiérarchie, interligne, longueur des lignes, retours à la ligne, liens et chiffres, et corrige les textes coupés, serrés ou trop petits.",
+  "Readable text": "Textes lisibles",
+  "Fix text that is too small, cramped, cut off or hard to read, without changing the words.": "Corrigez les textes trop petits, serrés, coupés ou difficiles à lire, sans changer les mots.",
+  "Make the text on my site easier to read, without changing the words.": "Rendez les textes de mon site plus faciles à lire, sans changer les mots.",
+  "What bothers me: [small text / long lines / cramped headings / text cut off on phones].": "Ce qui me gêne : [textes trop petits / lignes trop longues / titres serrés / textes coupés sur téléphone].",
+  "Keep: [my fonts / my colours / the layout].": "À garder : [mes polices / mes couleurs / la mise en page].",
+});

@@ -49,6 +49,8 @@ Rules:
   - translator: "make it bilingual", "add an Arabic version", "translate to French". Usually alone, or with css for right-to-left.
   - legal: "add a privacy policy", "mentions légales", "cookie page".
   - dark-theme: "add a dark mode", "night theme".
+  - typography: "the text is hard to read", "the font is too small", "fix the headings", "the text is cut off", "more line
+    spacing", "nicer text styling". Usually alone (with design when the fonts themselves change).
   - forms: "add a contact form", "booking form", "the form doesn't validate". Usually with html and css if the form is new.
   - conversion: "get more bookings", "make it convert better", "make visitors trust us".
   - tidy: "clean up the code", "refactor the CSS". Alone.

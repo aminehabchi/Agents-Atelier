@@ -67,6 +67,8 @@ PROBE = r"""(() => {
 
 # Layout problems the agents can't see from the code: elements on top of each other, a header that wraps onto two rows,
 # blank bands, sections whose content fills a small part of their width, and a grid whose last row holds one lonely card.
+# Text styling problems too: text cut off or sticking out of its box, text too small, lines too long, cramped line height,
+# a heading that ends on one lonely word, and justified text on a phone.
 LAYOUT = r"""(() => {
   const vw = document.documentElement.clientWidth, sy = scrollY, desktop = vw >= 900, MAX = 8;
   const name = (el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.classList.length ? "." + [...el.classList].slice(0, 2).join(".") : "");
@@ -94,7 +96,7 @@ LAYOUT = r"""(() => {
     }
     return { l, r: rt, t: t + sy, b: b + sy, w: Math.max(0, rt - l), h: Math.max(0, b - t), el };
   };
-  const out = { overlaps: [], header: "", gaps: [], narrow: [], lonely: [] };
+  const out = { overlaps: [], header: "", gaps: [], narrow: [], lonely: [], text: [] };
 
   // 1. Elements drawn on top of each other (leaves only, nothing positioned on purpose)
   let items = [...document.body.querySelectorAll("a, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, li, img, label, figcaption, blockquote, td, th, dt, dd")]
@@ -158,6 +160,41 @@ LAYOUT = r"""(() => {
     for (const k of kids) { const t = Math.round(k.getBoundingClientRect().top / 4); lines[t] = (lines[t] || 0) + 1; }
     const counts = Object.keys(lines).map(Number).sort((a, b) => a - b).map((t) => lines[t]);
     if (counts.length >= 2 && counts[counts.length - 1] === 1 && counts[0] >= 3) out.lonely.push("the last row of " + where(g) + " holds a single item while the first row holds " + counts[0]);
+  }
+
+  // 6. Text styling, on elements that hold text of their own (at most 3 of each kind, so one rule doesn't flood the report)
+  const kinds = {}, note = (kind, text) => { kinds[kind] = (kinds[kind] || 0) + 1; if (kinds[kind] <= 3) out.text.push(text); };
+  const running = /^(P|LI|DD|BLOCKQUOTE|FIGCAPTION)$/;
+  const texty = [...document.body.querySelectorAll("h1, h2, h3, h4, h5, h6, p, li, a, button, label, td, th, dt, dd, blockquote, figcaption, small, span, strong, em, div")]
+    .filter((el) => !hidden(el) && shown(el) && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 1)).slice(0, 800);
+  for (const el of texty) {
+    const s = styled(el), size = parseFloat(s.fontSize), r = el.getBoundingClientRect();
+    const text = (el.textContent || "").trim().replace(/\s+/g, " "), block = s.display !== "inline";
+    // cut off: a box that hides its overflow and is smaller than its text (an intended one-line ellipsis or line clamp is fine)
+    const clips = s.overflowX !== "visible" || s.overflowY !== "visible";
+    const meant = s.textOverflow === "ellipsis" || (s.webkitLineClamp && s.webkitLineClamp !== "none");
+    if (block && clips && !meant && (el.scrollWidth > el.clientWidth + 2 || el.scrollHeight > el.clientHeight + 2))
+      note("clip", said(el) + ": text is cut off (" + Math.round(el.scrollWidth) + "x" + Math.round(el.scrollHeight) + "px of text in a " + Math.round(el.clientWidth) + "x" + Math.round(el.clientHeight) + "px box)");
+    else if (block && !clips && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 2)
+      note("out", said(el) + ": text sticks out of its box by " + Math.round(el.scrollWidth - el.clientWidth) + "px (a long word, URL or e-mail that doesn't wrap)");
+    if (size < 12) note("small", said(el) + ": text is " + Math.round(size * 10) / 10 + "px, too small to read");
+    else if (running.test(el.tagName) && size < 14 && text.length > 40) note("small", said(el) + ": running text is " + Math.round(size) + "px (body text should be at least 16px)");
+    if (running.test(el.tagName) && text.length > 80) {
+      const lh = parseFloat(s.lineHeight);
+      if (lh && lh / size < 1.3 && r.height > lh * 1.8) note("tight", said(el) + ": line height is " + (lh / size).toFixed(2) + " for running text (aim for 1.5 to 1.7)");
+      const perLine = Math.round(r.width / (size * 0.5));
+      if (desktop && perLine > 95 && r.height > lh * 1.8) note("long", said(el) + ": lines are about " + perLine + " characters long (aim for 65 at most)");
+      if (!desktop && s.textAlign === "justify") note("justify", said(el) + ": justified text leaves gaps between words on a phone");
+    }
+    // a heading over several lines whose last line is one short word
+    if (/^H[1-3]$/.test(el.tagName) && text.split(" ").length >= 3) {
+      const range = document.createRange(); range.selectNodeContents(el);
+      const lines = {};
+      for (const q of range.getClientRects()) { if (q.width < 1) continue; const t = Math.round(q.top / 4); lines[t] = (lines[t] || 0) + q.width; }
+      const widths = Object.keys(lines).map(Number).sort((a, b) => a - b).map((t) => lines[t]);
+      if (widths.length >= 2 && widths[widths.length - 1] < 0.25 * Math.max(...widths) && !/\s/.test(text.split(" ").slice(-1)[0]))
+        note("orphan", said(el) + ": the heading's last line is a single word (balance its lines)");
+    }
   }
   return out;
 })()"""
@@ -333,6 +370,7 @@ async def _check_page(chrome: _Chrome, folder: Path, page: str, viewport, shot: 
             "images_without_alt": int(probe.get("alt") or 0),
             "layout": uniq([*layout.get("overlaps", []), *([layout["header"]] if layout.get("header") else []), *layout.get("gaps", []),
                             *layout.get("narrow", []), *layout.get("lonely", [])]),
+            "text": uniq(layout.get("text", [])),
             "a11y": [_clean(x, 300) for x in a11y]}
 
 
@@ -378,7 +416,7 @@ def problems(report: dict) -> int:
     for r in report.get("pages", []):
         n += len(r["errors"]) + len(r["missing_files"]) + len(r["broken_images"]) + len(r["missing_anchors"]) + len(r["dead_links"])
         n += 1 if r["viewport"] == "phone" and r["overflow"] > 1 else 0
-        n += len(r.get("layout", [])) + len(r.get("a11y", []))
+        n += len(r.get("layout", [])) + len(r.get("text", [])) + len(r.get("a11y", []))
     return n
 
 
@@ -411,6 +449,8 @@ def prompt_block(report: dict) -> str:
             found.append(f"{r['images_without_alt']} image(s) without an alt attribute")
         if r.get("layout"):
             found.append("layout: " + "; ".join(r["layout"]))
+        if r.get("text"):
+            found.append("text styling: " + "; ".join(r["text"]))
         if r.get("a11y"):
             found.append("accessibility (axe-core, WCAG 2.2 AA): " + "; ".join(r["a11y"]))
         lines.append(f"- {r['page']} at {r['viewport']} width: " + (" | ".join(found) if found else "no problems"))

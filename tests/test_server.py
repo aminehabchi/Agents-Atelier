@@ -4251,3 +4251,60 @@ class T51ClaudeCodeSwitch(unittest.TestCase):
         self.assertEqual(mode(CLAUDE_KEYS="server"), "server False")                            # older setting alone: unchanged
         self.assertEqual(mode(), "user False")
         self.assertIn("USE_CLAUDE_CODE must be true or false", mode(USE_CLAUDE_CODE="maybe"))
+
+
+class T52TextStyling(unittest.TestCase):
+    """The browser check measures text styling problems (for the Typography agent): cut-off or overflowing text, tiny
+    text, long lines, cramped line height, a heading ending on one word, justified text on a phone. A clean page has none."""
+
+    BAD = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bad</title><style>body{font-family:sans-serif;margin:0} .wide p{font-size:16px;line-height:1.1;text-align:justify}
+.card{width:160px;height:40px;overflow:hidden} .fine{font-size:10px} .mail{width:120px;display:block}
+h2{font-size:40px;line-height:1.2;width:480px}</style></head><body>
+<h2>Bread, pastries and cakes baked fresh every day</h2>
+<div class="wide"><p>We bake bread every morning with flour from the valley, slow fermentation and a wood fired oven that our grandfather
+built with his own hands many years ago, so every loaf tastes the way bread used to taste when the village had three bakeries.</p></div>
+<div class="card">Fresh croissants every single morning, warm from the oven, with real butter from the farm next door.</div>
+<p class="fine">Prices include taxes. Offer valid while stocks last, see conditions in store.</p>
+<a class="mail" href="mailto:x">contact-us-for-wholesale-orders@ourfamilybakery-example.com</a></body></html>"""
+    GOOD = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Good</title><style>body{font-family:sans-serif;margin:0;padding:0 20px;font-size:17px;line-height:1.6}
+h1{font-size:clamp(32px,5vw,48px);line-height:1.15;text-wrap:balance} p{max-width:65ch} a{overflow-wrap:anywhere}</style></head><body>
+<h1>Welcome to our small family bakery</h1><p>We bake bread every morning with flour from the valley and a wood fired oven.</p>
+<p><a href="mailto:x">contact-us-for-wholesale-orders@ourfamilybakery-example.com</a></p></body></html>"""
+
+    def check(self, html):
+        site = Path(tempfile.mkdtemp(dir=TMP))
+        (site / "index.html").write_text(html)
+        code = ("import sys, asyncio, json; sys.path.insert(0, '.'); from site_tools import browser_check as bc; from pathlib import Path\n"
+                f"r = asyncio.run(bc.check_site(Path({str(site)!r}), shots_dir=Path({str(site / 'shots')!r})))\n"
+                "print(json.dumps(None if r is None else {p['viewport']: p['text'] for p in r['pages']}))")
+        out = subprocess.run([str(PYTHON), "-c", code], cwd=ROOT / "server", capture_output=True, text=True, timeout=120,
+                             env={**os.environ, "ATELIER_ENV_FILE": str(TMP / "no.env")})
+        result = json.loads(out.stdout.strip().splitlines()[-1])
+        if result is None:
+            self.skipTest("Chrome isn't installed")
+        return result
+
+    def test_text_problems_are_measured(self):
+        found = self.check(self.BAD)
+        desktop, phone = " | ".join(found["desktop"]), " | ".join(found["phone"])
+        for text in ("text is cut off", "sticks out of its box", "too small to read", "line height is 1.10",
+                     "characters long", "last line is a single word"):
+            self.assertIn(text, desktop)
+        self.assertIn("justified text", phone)
+        self.assertNotIn("justified text", desktop)
+
+    def test_a_well_styled_page_has_no_text_problems(self):
+        self.assertEqual(self.check(self.GOOD), {"desktop": [], "phone": []})
+
+    def test_the_typography_agent_and_its_team_are_in_the_marketplace(self):
+        market = call("GET", "/api/market")[1]
+        agent = next(a for a in market["agents"] if a["id"] == "typography")
+        self.assertEqual((agent["official"], agent["category"], agent["icon"]), (True, "design", "heading"))
+        team = next(t for t in market["teams"] if t["id"] == "readable-text")
+        self.assertEqual(team["category"], "improve")
+        self.assertIn("typography", [a["id"] for a in team["agents"]])
+        teams = {t["id"]: t for t in market["teams"]}
+        for tid in ("new-website", "landing-page", "redesign"):
+            self.assertIn("typography", [a["id"] for a in teams[tid]["agents"]], tid)

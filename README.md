@@ -11,8 +11,8 @@ result in a real browser, sending bigger problems back to the agent that owns th
 
 | On a freelance platform                 | On Agents Atelier                                                       |
 |-----------------------------------------|-------------------------------------------------------------------------|
-| Browse profiles and hire people         | Browse **35 specialist agents** with profiles, ratings and portfolios  |
-| Hire an agency for a whole job          | Hire one of **23 ready teams** (restaurant site, portfolio, 3D site, contact options…), each with a starting prompt |
+| Browse profiles and hire people         | Browse **36 specialist agents** with profiles, ratings and portfolios  |
+| Hire an agency for a whole job          | Hire one of **24 ready teams** (restaurant site, portfolio, 3D site, contact options…), each with a starting prompt |
 | Offers, then days of waiting             | **Start a job**: pick one of your projects and the team starts at once  |
 | Each round of changes means new messages | Ask for a change anytime: **only the agents it needs** work on it      |
 | You trust a profile                     | Every agent's **results, ratings, time and cost** are shown, and on Pro its **instructions** too |
@@ -28,9 +28,9 @@ Agents Atelier is a web platform that works like a freelance marketplace, except
 AI agent: rather than posting a job, comparing offers and waiting days for a delivery, you describe the website you
 need and hire a team of agents that starts working the moment you press Enter. Each project begins with a name, a short
 description and optional answers about your audience, goal, tone, colours, languages and must-have content; you can
-give it its own brand kit (logo, colours, fonts), or import an existing site to improve. You then pick one of 23
+give it its own brand kit (logo, colours, fonts), or import an existing site to improve. You then pick one of 24
 ready use-case teams (a restaurant site, a portfolio, a landing page, a redesign, a multilingual version, legal
-pages, a 3D site, contact options…), each with a starting prompt to fill in, or choose agents yourself from 35 specialists: a Brief agent turns your
+pages, a 3D site, contact options…), each with a starting prompt to fill in, or choose agents yourself from 36 specialists: a Brief agent turns your
 request into a clear brief, UX plans the structure, Design System sets the colours and fonts, the Copywriter writes
 every word, HTML, CSS, JS, Responsive and Animation agents build the pages, Accessibility audits them, and QA and the
 Critic check the result in a real browser at desktop and phone width, fix small problems and send bigger ones back to
@@ -94,12 +94,12 @@ accept or re-roll. Agents Atelier works more like a small design studio:
 
 | A single AI builder                         | Agents Atelier                                                                 |
 |---------------------------------------------|--------------------------------------------------------------------------------|
-| One generalist does everything at once      | **35 specialists**, each with one job and its own instructions                 |
-| A blank chat box                            | **23 use-case teams**, each with the right agents and a prompt to fill in      |
+| One generalist does everything at once      | **36 specialists**, each with one job and its own instructions                 |
+| A blank chat box                            | **24 use-case teams**, each with the right agents and a prompt to fill in      |
 | You see the result, not the process         | You see **every agent, every file it touches, how long it took and its cost**  |
 | Unhappy? Regenerate everything              | **Retry just one agent** ("CSS: warmer palette") or **roll back** to any step |
 | Stopping loses the work                     | **Stop, then Continue** from where it stopped, even after a crash              |
-| Nobody looks at the page                    | **Real browser checks** at desktop and phone width: layout, accessibility, errors |
+| Nobody looks at the page                    | **Real browser checks** at desktop and phone width: layout, text, accessibility, errors |
 | Fixed behaviour                             | Every agent is a **Markdown file you can edit**, with its own model            |
 | Hosted, often framework code                | Outputs plain HTML/CSS/JS with **no build step**, hosted anywhere              |
 
@@ -187,7 +187,7 @@ Each agent receives:
 - any **reference images** you attached
 - the project's **contact details** (WhatsApp, phone, email, Telegram) for the contact agents, and the **smaller WebP
   copies** of your photos to use in `srcset`
-- for Responsive, Accessibility, QA and the Critic: a **browser check** (see below)
+- for Typography, Responsive, Accessibility, QA and the Critic: a **browser check** (see below)
 - the **shared rules** (`agents/_common.md`) followed by **its own role**, then security rules the server adds last
 - an instruction to write its chat messages in **your interface language** (French); the site itself keeps
   following the brief
@@ -197,12 +197,14 @@ other agents. Only agents marked for web research (Research) can search the web.
 
 ### Real browser checks
 
-Agents have no browser of their own, so before **Responsive**, **Accessibility**, **QA** and the **Critic** work
+Agents have no browser of their own, so before **Typography**, **Responsive**, **Accessibility**, **QA** and the **Critic** work
 (only before the Critic on the Starter plan), the server opens every page in headless Chrome at desktop (1280px) and
 phone (390px) width and hands over what it measured:
 - **Errors:** console errors, files that failed to load, broken images, links to missing pages or anchors.
 - **Layout:** sideways scrolling and the element that's too wide, overlapping elements, a header wrapping onto two rows,
   large blank bands, sections that are too narrow, a lonely card on the last row.
+- **Text styling:** text cut off or sticking out of its box, text too small to read, lines too long, cramped line
+  height, a heading that ends on one lonely word, justified text on a phone (the Typography agent's area).
 - **Accessibility:** an axe-core (WCAG 2.2 AA) audit: contrast, labels, alt text, heading order and more.
 
 Each of those agents is told to fix what's in its area first, and the Critic may not leave a reported problem behind: it
@@ -356,7 +358,7 @@ command line wins over the file: `AGENT_MODEL=sonnet PORT=9000 ./run.sh`. Restar
 | `SIGNUPS_PER_HOUR` / `LOGINS_PER_15_MIN` / `RESETS_PER_HOUR` | `5` / `30` / `10` | Limits per IP address (`0` = none) |
 | `BLOCK_DISPOSABLE_EMAILS` / `DISPOSABLE_DOMAINS_FILE` | `true` / *(empty)* | Refuse throwaway inboxes; add your own domain list |
 | **Browser checks** | | |
-| `BROWSER_CHECKS` / `CHROME_BIN` | `true` / *(found automatically)* | Real browser checks before Responsive, Accessibility, QA and the Critic |
+| `BROWSER_CHECKS` / `CHROME_BIN` | `true` / *(found automatically)* | Real browser checks before Typography, Responsive, Accessibility, QA and the Critic |
 | **Legal pages** | | |
 | `LEGAL_NAME` / `LEGAL_EMAIL` / `LEGAL_ADDRESS` | `Agents Atelier` / *(admin email)* / *(empty)* | Who runs the service, shown on /terms and /privacy. Put the registered company name and address before going public |
 | **Email** | | |
@@ -374,7 +376,7 @@ command line wins over the file: `AGENT_MODEL=sonnet PORT=9000 ./run.sh`. Restar
    languages, must-have content, sites you like, things to avoid) help the first build land closer. Add your logo and
    photos, fill in the project's **brand kit** (logo, up to six colours, heading and body fonts, or copy another
    project's kit), or start from an **existing site** (a folder or a .zip with an `index.html`).
-2. **Hire a team.** The studio offers the 23 ready teams: pick one and it becomes the project's team, with its starting
+2. **Hire a team.** The studio offers the 24 ready teams: pick one and it becomes the project's team, with its starting
    prompt filled in; replace the parts in [brackets] (or send it as is and answer the form). To change the team later,
    use **Add agents** or **Choose a team** in the studio's team strip: the marketplace opens for this project. Or write your own: *"A one-page site with
    a hero and a booking button, services with prices, opening hours and a map link. Calm, trustworthy."* Attach a
@@ -452,7 +454,7 @@ continue, switch view, device or page).
 
 ## The agent team
 
-The 35 shared agents, in run order. "On" agents are in a new project's team by default; the others are helpers you add
+The 36 shared agents, in run order. "On" agents are in a new project's team by default; the others are helpers you add
 from the marketplace, get with a use-case team, or the Orchestrator brings in when a request needs them.
 
 | Agent          | Default  | Model    | What it does |
@@ -472,6 +474,7 @@ from the marketplace, get with a use-case team, or the Orchestrator brings in wh
 | Dark mode      | off      | sonnet   | A dark theme that follows the visitor's system, with a remembered toggle |
 | Pricing        | off      | sonnet   | Plans to compare, service price lists or restaurant menus |
 | Gallery        | off      | sonnet   | A fast, accessible photo gallery with a lightbox |
+| Typography     | off      | sonnet   | Text that reads well: hierarchy, line height and length, wrapping, links, numbers; fixes text that is clipped, cramped or too small (it gets the browser check's text problems) |
 | Assets         | off      | sonnet   | Logo, favicon, icons and illustrations as hand-written SVG |
 | JS             | on       | sonnet   | Vanilla JavaScript: menu, tabs, forms, scrolling |
 | 3D scene       | off      | opus     | A real interactive 3D object in hand-written WebGL (no libraries), with fallbacks |
@@ -513,11 +516,11 @@ team** in the studio (the marketplace opens for that project), or manage them on
 | Polish  | Accessibility, Performance, Critic | Improving a page that already exists    |
 | Full    | all of them                        | The most thorough result                |
 
-And **23 shared use-case teams**, each with a starting prompt that fills the prompt box when you pick it:
+And **24 shared use-case teams**, each with a starting prompt that fills the prompt box when you pick it:
 
 | Build something new | Improve a site you have | Add one thing |
 |---|---|---|
-| New website from scratch · Landing page that converts · Restaurant or café · Local service business · Portfolio · Blog or content site · Product page · Event page · 3D website · Research, then build · Build from a sketch or screenshot | Improve an imported site · Redesign: new look, same content · Boost conversions · SEO and speed checkup · Accessibility audit · Code cleanup | Make it multilingual · Legal pages · Add a dark mode · Contact and booking forms · Contact options · Add 3D to my site |
+| New website from scratch · Landing page that converts · Restaurant or café · Local service business · Portfolio · Blog or content site · Product page · Event page · 3D website · Research, then build · Build from a sketch or screenshot | Improve an imported site · Redesign: new look, same content · Boost conversions · SEO and speed checkup · Readable text · Accessibility audit · Code cleanup | Make it multilingual · Legal pages · Add a dark mode · Contact and booking forms · Contact options · Add 3D to my site |
 
 Users can save their own teams (with their own starting prompt) from the studio or the Teams page.
 
