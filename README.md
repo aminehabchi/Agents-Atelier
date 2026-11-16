@@ -61,6 +61,10 @@ dark.
 *The studio: talk to the team on the left, watch the page being built on the right, and see each agent's step in the
 team strip below. (Light theme: [docs/screenshots/studio-light.png](docs/screenshots/studio-light.png).)*
 
+**▶ Watch the two-minute explainer:** the idea, and a real build of 9ahwti, a Casablanca coffee shop site in Moroccan Darija.
+
+[![Agents Atelier explained in two minutes: the Brief, the Orchestrator and the team build the 9ahwti coffee shop site live, right to left in Darija](docs/video/explainer-poster.jpg)](docs/video/agents-atelier-explainer.mp4)
+
 > Technical documentation (architecture, API, data formats, internals) is in **[doc.md](doc.md)**.
 
 ## Contents
