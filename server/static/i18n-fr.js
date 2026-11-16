@@ -2395,3 +2395,35 @@ Object.assign(window.I18N.fr, {
   "It should sound: [warm / professional / playful], like we talk to our customers.": "Le ton : [chaleureux / professionnel / ludique], comme nous parlons à nos clients.",
   "Also fix: [unclear buttons / form error messages / the contact form's messages].": "À corriger aussi : [boutons peu clairs / messages d'erreur des formulaires / messages du formulaire de contact].",
 });
+
+/* ---------- studio: run order card, browser check areas ---------- */
+Object.assign(window.I18N.fr, {
+  "How this run works": "Déroulé de cette exécution",
+  "reads your request": "lit votre demande",
+  "picks the agents": "choisit les agents",
+  "does the work": "fait le travail",
+  "pairs agents up": "regroupe les agents",
+  "reading your request": "lit votre demande",
+  "brief updated": "brief mis à jour",
+  "reading the brief": "lit le brief",
+  "asked you first": "vous a posé une question",
+  "waits for your yes": "attend votre accord",
+  "answered you": "vous a répondu",
+  "the whole team": "toute l'équipe",
+  "waits for your reply": "attend votre réponse",
+  "finished": "terminé",
+  "stopped": "arrêté",
+  "Fixed by": "Corrigé par",
+  "Errors and broken links": "Erreurs et liens cassés",
+  "Text styling": "Typographie",
+  "These screenshots were replaced by a later check.": "Ces captures ont été remplacées par une vérification plus récente.",
+});
+window.I18N_FR_PATTERNS.push(
+  [/^(\d+) agents chosen$/, "$1 agents choisis"],
+  [/^(\d+) agents at work$/, "$1 agents au travail"],
+);
+window.I18N_FR_PATTERNS.push(
+  [/^(.+) fixes it$/, (_, a) => `${(window.I18N.fr || {})[a] || a} corrige`],
+  [/^Step (\d+)$/, "Étape $1"],
+);
+Object.assign(window.I18N.fr, { "Not needed this time": "Pas nécessaire cette fois" });

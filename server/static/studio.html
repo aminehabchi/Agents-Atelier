@@ -72,6 +72,45 @@
   .msg.bcheck .shots { display: flex; gap: 8px; margin-top: 10px; }
   .msg.bcheck .shots a { flex: none; border-radius: 8px; overflow: hidden; box-shadow: var(--ring); }
   .msg.bcheck .shots img { display: block; height: 72px; width: auto; }
+  .msg.bcheck .shots a.gone { display: none; }
+  .msg.bcheck .shots-gone { margin: 8px 0 0; font-size: 12px; color: var(--stone); }
+  /* the problems, by area, with the agent whose job they are */
+  .msg.bcheck .areas { display: grid; gap: 6px; margin-top: 10px; }
+  .msg.bcheck details.area { border-radius: 8px; background: var(--mist, var(--field)); }
+  .msg.bcheck details.area > summary { display: flex; align-items: center; gap: 8px; padding: 8px 10px; cursor: pointer; list-style: none; color: var(--ink); min-width: 0; }
+  .msg.bcheck details.area > summary::-webkit-details-marker { display: none; }
+  .msg.bcheck details.area > summary .chev { flex: none; color: var(--stone); transition: transform .15s; }
+  .msg.bcheck details.area[open] > summary .chev { transform: rotate(180deg); }
+  .msg.bcheck .a-name { font-weight: 500; }
+  .msg.bcheck .a-n { flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pill); display: inline-grid; place-items: center;
+    font-size: 11px; font-weight: 600; background: rgb(var(--sky-rgb) / .14); color: var(--sky); }
+  .msg.bcheck .a-who { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--stone); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .msg.bcheck .a-who .ic, .msg.bcheck .a-who svg { flex: none; }
+  .msg.bcheck details.area ul { margin: 0; padding: 0 12px 10px 30px; display: grid; gap: 4px; font-size: 12.5px; line-height: 1.5; color: var(--graphite); }
+  .msg.bcheck details.area li { overflow-wrap: anywhere; }
+  .msg.bcheck .a-more { list-style: none; color: var(--stone); }
+  /* the run's order: Brief, then the Orchestrator, then the team */
+  .msg.flow { align-self: stretch; }
+  .msg.flow ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .msg.flow li { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; align-items: center; padding: 8px 10px;
+    border-radius: 8px; background: var(--paper); box-shadow: var(--ring); font-size: 12.5px; color: var(--stone); min-width: 0; }
+  .msg.flow li .st { grid-row: span 2; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 600;
+    background: var(--linen); color: var(--graphite); }
+  .msg.flow li b { font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msg.flow li small { font-size: 11.5px; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .msg.flow li.now { box-shadow: inset 0 0 0 1.5px var(--sky); }
+  .msg.flow li.now .st { background: var(--sky); color: var(--on-sky); animation: flowpulse 1.4s ease-in-out infinite; }
+  .msg.flow li.done .st { background: var(--ok); color: #fff; }
+  .msg.flow li.skip { opacity: .7; }
+  .msg.flow li.stopped .st { background: var(--danger); color: #fff; }
+  @keyframes flowpulse { 50% { box-shadow: 0 0 0 4px rgb(var(--sky-rgb) / .25); } }
+  @media (prefers-reduced-motion: reduce) { .msg.flow li.now .st { animation: none; } }
+  @container chat (max-width: 420px) {
+    .msg.flow li { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; row-gap: 4px; padding: 8px 6px; }
+    .msg.flow li .st { grid-row: auto; }
+    .msg.flow li b { font-size: 12px; max-width: 100%; }
+    .msg.flow li small { display: none; }
+  }
   .msg { max-width: 100%; font-size: 14px; line-height: 1.55; animation: pop .25s ease; }
   .replay .msg { animation: none; }
   @keyframes pop { from { opacity: 0; transform: translateY(6px); } }
@@ -140,7 +179,7 @@
   .send:disabled { opacity: .35; cursor: default; filter: none; background: var(--steel); color: var(--stone); }
   .send.stop { background: var(--paper); color: var(--danger); box-shadow: inset 0 0 0 1.5px var(--danger); }
   .composer .hint { font-size: 11.5px; color: var(--stone); min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .composer .team-hint { font-size: 12px; color: var(--stone); white-space: nowrap; }
+  .composer .team-hint { font-size: 12px; color: var(--stone); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
   .composer .attach { width: 34px; height: 34px; color: var(--graphite); }
   body.viewer .composer .row { display: none; }
   body.viewer .composer textarea { padding-bottom: 11px; min-height: 68px; }   /* room for the two-line "you're a viewer" note */
@@ -796,6 +835,12 @@
   }
   @container chat (max-width: 450px) { .title .pid, .title .sub > span[aria-hidden] { display: none; } }
   @container chat (max-width: 420px) { .composer .hint { display: none; } }
+  /* a narrow chat: the agent's name keeps the first line, its status goes under it */
+  @container chat (max-width: 440px) {
+    .msg.agent .who { flex-wrap: wrap; row-gap: 2px; }
+    .msg.agent .who .nm { flex: 1 1 0; }
+    .msg.agent .who .state { order: 3; flex-basis: 100%; margin-inline-start: 48px; }
+  }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 </head>
@@ -1116,13 +1161,18 @@ function handle(ev) {
     case "hello": setBusy(ev.busy); break;
     case "orchestrating":
       setBusy(true);
+      setFlow("orch", "now", "reading the brief");
       orchCard = addMsg(`<div class="msg orch working" role="status"><div class="head"><span class="tile">${icon("cpu", { size: 18 })}</span>
         <span><b>Orchestrator:</b> reading the brief and the project</span>
         <span class="state"><span class="typing"><span></span><span></span><span></span></span></span></div>
         <p class="why"></p></div>`);
       renderTeamHead();
       break;
-    case "plan": showPlan(ev); break;
+    case "plan":
+      showPlan(ev);
+      setFlow("orch", "done", (ev.questions || []).length ? "asked you first" : ev.confirm ? "waits for your yes"
+        : !(ev.agents || []).length ? "answered you" : ev.first ? "the whole team" : `${ev.agents.length} agents chosen`);
+      break;
     case "needs_key":                     // the agents run on the owner's own Claude account, and there's no key yet
       setBusy(false);
       if (lastPrompt && !$("input").value) { $("input").value = lastPrompt; autosize(); }
@@ -1166,11 +1216,13 @@ function handle(ev) {
         renderTeam();
         break;
       }
+      if (ev.flow) startFlow(!!ev.first);
+      else flowCard = null;
       // `pool` = the agents switched on (the Orchestrator may pick fewer); older runs only sent `agents`
       if (ev.pool?.length) selected = new Set(ev.pool.filter(id => BY_ID[id]));
       else if (ev.agents) selected = new Set(ev.agents.filter(id => BY_ID[id]));
       lockRequired();
-      run = { agents: ev.agents || [...selected], index: -1, started: now };
+      run = { agents: ev.agents || [...selected], index: -1, started: now, flow: !!ev.flow };
       paused = null; disableResumeCards();
       Object.keys(status).forEach(k => { if (!(ev.done || []).includes(k)) delete status[k]; });
       run.agents.forEach(id => { if (!(ev.done || []).includes(id)) status[id] = { state: "waiting" }; else status[id] = { ...(status[id] || {}), state: "done" }; });
@@ -1179,6 +1231,7 @@ function handle(ev) {
       renderTeam();
       break;
     case "run_agents":                    // the Brief is done and the Orchestrator chose who works next
+      setFlow("team", "now", `${Math.max(0, (ev.agents || []).filter(id => !(ev.done || []).includes(id)).length)} agents at work`);
       if (!run) break;
       run.agents = ev.agents || run.agents;
       run.agents.forEach(id => { if (!(ev.done || []).includes(id)) status[id] = { state: "waiting" }; });
@@ -1186,10 +1239,11 @@ function handle(ev) {
       renderTeam();
       break;
     case "agent_start":
+      if (a?.id === "brief") setFlow("brief", "now", "reading your request");
       if (!a) break;
       if (run) run.index = ev.with?.length ? Math.min(...[a.id, ...ev.with].map(id => run.agents.indexOf(id)).filter(n => n >= 0)) : run.agents.indexOf(a.id);
       status[a.id] = { state: "working", started: now, last: "" };
-      cards[a.id] = addAgentCard(a, now, run ? run.index + 1 : 0, run ? run.agents.length : 0, !!ev.fix, ev.with || []);
+      cards[a.id] = addAgentCard(a, now, run ? run.index + 1 : 0, run && !(run.flow && run.agents.length === 1) ? run.agents.length : 0, !!ev.fix, ev.with || []);
       renderTeam();
       break;
     case "parallel":                      // agents the Orchestrator lets work at the same time
@@ -1218,6 +1272,7 @@ function handle(ev) {
       if (ev.file === "research.md") refreshResearch();
       break;
     case "agent_done":
+      if (a?.id === "brief") setFlow("brief", "done", "brief updated");
       if (!a) break;
       status[a.id] = { ...(status[a.id] || {}), state: "done", ended: now };
       finishCard(a.id, ev.text, now, ev.stat);
@@ -1234,9 +1289,11 @@ function handle(ev) {
         break;
       }
       if (ev.brief_only) {                // the Brief worked, then the Orchestrator answered, asked or wants a yes
+        setFlow("team", "skip", "waits for your reply"); flowCard = null;
         setBusy(false); run = null; renderTeam();
         break;
       }
+      setFlow("team", "done", "finished"); flowCard = null;
       const took = run ? ` in ${duration((now - run.started) / 1000)}` : "";
       setBusy(false); run = null; renderTeam();
       addMsg(`<div class="msg done-card">
@@ -1248,6 +1305,7 @@ function handle(ev) {
       break;
     }
     case "run_stopped":
+      stopFlow(); flowCard = null;
       setBusy(false); run = null; markStopped();
       if (ev.orchestrator) { addSystem("Stopped before the team started"); renderTeam(); break; }
       if (ev.retry) { addSystem("Retry stopped"); paused = ev.run?.resumable ? ev.run : paused; renderTeam(); break; }
@@ -1280,7 +1338,7 @@ function handle(ev) {
     case "browser_check_start": break;
     case "browser_check": {
       const shots = (ev.screenshots || []).map(f => `<a href="${mediaUrl(f)}" target="_blank" rel="noopener"><img loading="lazy" src="${mediaUrl(f)}?v=${Date.now()}" alt="${esc(f.includes("phone") ? "Phone screenshot" : "Desktop screenshot")}"></a>`).join("");
-      addMsg(`<div class="msg bcheck ${ev.problems ? "warn" : ""}"><div class="head">${icon(ev.problems ? "alert" : "check", { size: 16 })}<span>${esc(ev.text)}</span></div>${shots ? `<div class="shots">${shots}</div>` : ""}</div>`);
+      addMsg(`<div class="msg bcheck ${ev.problems ? "warn" : ""}"><div class="head">${icon(ev.problems ? "alert" : "check", { size: 16 })}<span>${esc(ev.text)}</span></div>${checkAreas(ev.areas)}${shots ? `<div class="shots">${shots}</div>` : ""}</div>`);
       break;
     }
     case "security":
@@ -1387,7 +1445,7 @@ const agentNames = (ids) => {
 function addAgentCard(a, started, step, total, fix = false, alongside = []) {
   const el = addMsg(`<div class="msg agent working ${alongside.length ? "par" : ""}" data-agent="${esc(a.id)}" style="--c:${a.color}">
     <div class="who"><span class="tile">${icon(a.icon, { size: 18 })}</span>
-      <span class="nm" title="${esc(a.description || "")}">${esc(a.name)} agent${fix ? `<small>Fixing the Critic's feedback</small>` : step ? `<small>Step ${step} of ${total}${alongside.length ? ` · alongside ${esc(agentNames(alongside))}` : ""}</small>` : ""}</span>
+      <span class="nm" title="${esc(a.description || "")}">${esc(a.name)} agent${fix ? `<small>Fixing the Critic's feedback</small>` : step ? `<small>${total ? `Step ${step} of ${total}` : `Step ${step}`}${alongside.length ? ` · alongside ${esc(agentNames(alongside))}` : ""}</small>` : ""}</span>
       <span class="state"><span class="timer">0s</span><span class="typing"><span></span><span></span><span></span></span></span>
       <button class="icon-btn plain retry" data-retry="${esc(a.id)}" title="Retry ${esc(a.name)}: run only this agent again">${icon("refresh", { size: 15 })}</button></div>
     <div class="actions"></div><div class="text"></div></div>`);
@@ -1512,6 +1570,48 @@ $("messages").addEventListener("click", (e) => {
 const REQUIRED = ["brief"];
 let orchCard = null;
 function lockRequired() { REQUIRED.forEach(id => BY_ID[id] && selected.add(id)); }
+/* The run's order, as a small card at its start: the Brief reads the request, the Orchestrator decides, the team works. */
+let flowCard = null;
+const FLOW = [["brief", "Brief", "reads your request"], ["orch", "Orchestrator", "picks the agents"], ["team", "Team", "does the work"]];
+function startFlow(first) {
+  flowCard = addMsg(`<div class="msg flow" role="status" aria-label="${esc(window.t("How this run works"))}"><ol>${FLOW.map(([k, name, what], i) =>
+    `<li data-step="${k}"><span class="st">${i + 1}</span><b>${esc(name)}</b><small>${esc(k === "orch" && first ? "pairs agents up" : what)}</small></li>`).join("")}</ol></div>`);
+}
+function setFlow(step, state, note) {
+  const li = flowCard?.isConnected && flowCard.querySelector(`[data-step="${step}"]`);
+  if (!li) return;
+  li.classList.remove("now", "done", "skip", "stopped");
+  li.classList.add(state);
+  li.querySelector(".st").innerHTML = state === "done" ? icon("check", { size: 12 }) : state === "stopped" ? icon("x", { size: 12 }) : String(FLOW.findIndex(f => f[0] === step) + 1);
+  if (note) li.querySelector("small").textContent = window.t(note);
+  if (state === "now") flowCard.querySelectorAll("li").forEach(x => { if (x !== li && x.classList.contains("now")) x.classList.replace("now", "done"); });
+}
+function stopFlow() {
+  const now = flowCard?.isConnected && flowCard.querySelector("li.now");
+  if (now) setFlow(now.dataset.step, "stopped", "stopped");
+}
+
+/* The browser check's problems, by area, each with the agent whose job it is (the Critic when that agent isn't in the team). */
+function checkAreas(areas) {
+  if (!(areas || []).length) return "";
+  return `<div class="areas">${areas.map((x, i) => {
+    const owner = selected.has(x.agent) || x.agent === "qa" ? BY_ID[x.agent] : BY_ID.critic;
+    const who = owner ? `<span class="a-who"><span style="color:${esc(owner.color)}">${icon(owner.icon, { size: 13 })}</span><span>${esc(window.t(`${owner.name} fixes it`))}</span></span>` : "";
+    return `<details class="area" ${i === 0 ? "open" : ""}><summary>${icon("chevron-down", { size: 14, cls: "chev" })}<span class="a-name">${esc(window.t(x.label))}</span>
+      <span class="a-n" data-no-i18n>${x.count}</span>${who}</summary>
+      <ul data-no-i18n>${x.items.map(t => `<li>${esc(t)}</li>`).join("")}${x.count > x.items.length ? `<li class="a-more">+${x.count - x.items.length}</li>` : ""}</ul></details>`;
+  }).join("")}</div>`;
+}
+/* Only the latest check's screenshots are kept: an older card says so instead of showing broken images. */
+document.addEventListener("error", (e) => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.closest(".msg.bcheck .shots")) return;
+  const shots = img.closest(".shots"), link = img.closest("a");
+  link?.classList.add("gone");
+  if (!shots.querySelector("a:not(.gone)") && !shots.nextElementSibling?.classList.contains("shots-gone"))
+    shots.insertAdjacentHTML("afterend", `<p class="shots-gone">${esc(window.t("These screenshots were replaced by a later check."))}</p>`);
+}, true);
+
 function showPlan(ev) {
   if (!orchCard || !orchCard.isConnected || !orchCard.classList.contains("working")) {
     orchCard = addMsg(`<div class="msg orch"><div class="head"><span class="tile">${icon("cpu", { size: 18 })}</span>

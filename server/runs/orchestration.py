@@ -144,6 +144,7 @@ async def decide_plan(pid: str, request: str, pool: list[str], first: bool, brie
                 "reason": "First build: the whole team works on it."}
         team = [a for a in agents if a["id"] in everyone]
         if len(team) >= 3 and orch.could_pair(everyone):
+            await broadcast(pid, {"type": "orchestrating", "first": True})
             try:
                 raw = await run_orchestrator(pid, request, team, meta, first_build=True, brief_result=brief_result)
                 plan["parallel"] = orch.clean_parallel((raw or {}).get("parallel"), everyone)

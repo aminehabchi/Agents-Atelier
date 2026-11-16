@@ -411,6 +411,31 @@ async def check_site(folder: Path, pages: list[str] | None = None, shots_dir: Pa
     return {"pages": results, "screenshots": shots}
 
 
+AREAS = (("errors", "Errors and broken links", "qa"), ("layout", "Layout", "responsive"),
+         ("text", "Text styling", "typography"), ("a11y", "Accessibility", "a11y"))
+MAX_SHOWN = 8           # per area, in the studio's card
+
+
+def areas(report: dict) -> list[dict]:
+    """The report for the studio's card: the problems grouped by area, each with the agent whose job it is
+    ({area, label, agent, count, items}). Same counting as problems()."""
+    found = {k: [] for k, _, _ in AREAS}
+    for r in report.get("pages", []):
+        where = f"{r['page']} · {r['viewport']}: "
+        found["errors"] += [where + "script error: " + e for e in r["errors"]]
+        found["errors"] += [where + "file that failed to load: " + f for f in r["missing_files"]]
+        found["errors"] += [where + "broken image: " + f for f in r["broken_images"]]
+        found["errors"] += [where + "link to a missing id: " + f for f in r["missing_anchors"]]
+        found["errors"] += [where + "link to a missing page: " + f for f in r["dead_links"]]
+        if r["viewport"] == "phone" and r["overflow"] > 1:
+            found["layout"].append(where + f"the page scrolls sideways by {r['overflow']}px" + (" (" + "; ".join(r["too_wide"][:2]) + ")" if r["too_wide"] else ""))
+        found["layout"] += [where + x for x in r.get("layout", [])]
+        found["text"] += [where + x for x in r.get("text", [])]
+        found["a11y"] += [where + x for x in r.get("a11y", [])]
+    return [{"area": k, "label": label, "agent": agent, "count": len(found[k]), "items": found[k][:MAX_SHOWN]}
+            for k, label, agent in AREAS if found[k]]
+
+
 def problems(report: dict) -> int:
     n = 0
     for r in report.get("pages", []):

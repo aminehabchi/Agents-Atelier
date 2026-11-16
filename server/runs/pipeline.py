@@ -424,7 +424,8 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
     save_meta(meta)
 
     await broadcast(pid, {"type": "run_start", "request": request, "name": meta["name"],
-                          "agents": meta["run"]["agents"], "pool": meta.get("agents") or [], "done": done, "resumed": resume})
+                          "agents": meta["run"]["agents"], "pool": meta.get("agents") or [], "done": done, "resumed": resume,
+                          **({"flow": True, "first": bool(plan.get("first"))} if plan.get("deferred") else {})})
     if no_web:
         await broadcast(pid, {"type": "notice", "upgrade": "pro",
                               "text": f"{', '.join(a['name'] for a in no_web)} skipped: agents that search the web come with the Pro plan."})
@@ -481,7 +482,8 @@ async def run_chain(pid: str, request: str, agent_ids: list[str], resume: bool =
                         extras[a["id"]] += browser_check.prompt_block(report)
                         agent_images[a["id"]] = [*images, *report["screenshots"]]
                     await broadcast(pid, {"type": "browser_check", "agent": looked[0]["id"], "text": browser_check.summary(report),
-                                          "problems": browser_check.problems(report), "screenshots": report["screenshots"]})
+                                          "problems": browser_check.problems(report), "screenshots": report["screenshots"],
+                                          "areas": browser_check.areas(report)})
             if len(step) > 1:
                 await broadcast(pid, {"type": "parallel", "agents": [a["id"] for a in step]})
             for agent in step:

@@ -4295,7 +4295,7 @@ h1{font-size:clamp(32px,5vw,48px);line-height:1.15;text-wrap:balance} p{max-widt
         (site / "index.html").write_text(html)
         code = ("import sys, asyncio, json; sys.path.insert(0, '.'); from site_tools import browser_check as bc; from pathlib import Path\n"
                 f"r = asyncio.run(bc.check_site(Path({str(site)!r}), shots_dir=Path({str(site / 'shots')!r})))\n"
-                "print(json.dumps(None if r is None else {p['viewport']: p['text'] for p in r['pages']}))")
+                "print(json.dumps(None if r is None else {**{p['viewport']: p['text'] for p in r['pages']}, 'areas': bc.areas(r)}))")
         out = subprocess.run([str(PYTHON), "-c", code], cwd=ROOT / "server", capture_output=True, text=True, timeout=120,
                              env={**os.environ, "ATELIER_ENV_FILE": str(TMP / "no.env")})
         result = json.loads(out.stdout.strip().splitlines()[-1])
@@ -4313,7 +4313,16 @@ h1{font-size:clamp(32px,5vw,48px);line-height:1.15;text-wrap:balance} p{max-widt
         self.assertNotIn("justified text", desktop)
 
     def test_a_well_styled_page_has_no_text_problems(self):
-        self.assertEqual(self.check(self.GOOD), {"desktop": [], "phone": []})
+        found = self.check(self.GOOD)
+        self.assertEqual((found["desktop"], found["phone"]), ([], []))
+        self.assertNotIn("text", [a["area"] for a in found["areas"]])
+
+    def test_the_studio_card_groups_problems_by_the_agent_that_fixes_them(self):
+        areas = {a["area"]: a for a in self.check(self.BAD)["areas"]}
+        text = areas["text"]
+        self.assertEqual((text["label"], text["agent"]), ("Text styling", "typography"))
+        self.assertEqual(text["count"], len(self.check(self.BAD)["desktop"]) + len(self.check(self.BAD)["phone"]))
+        self.assertTrue(all(i.startswith(("index.html · desktop: ", "index.html · phone: ")) for i in text["items"]))
 
     def test_the_typography_agent_and_its_team_are_in_the_marketplace(self):
         market = call("GET", "/api/market")[1]
