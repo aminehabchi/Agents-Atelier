@@ -841,6 +841,15 @@ you've checked your projects. Back up two things: the Postgres database and the 
 - **Limits:** requests up to 8 MB; reference images up to 5 MB each (PNG, JPG, WebP, GIF), up to 6 per prompt; files
   up to 500 KB in the Code tab; one agent run up to `AGENT_TIMEOUT`.
 
+## License
+
+Agents Atelier is free software under the **GNU Affero General Public License v3.0** ([LICENSE](LICENSE)). You may use,
+change and share it; if you run a modified version as a service people use over a network, you must offer them its
+source code. The sites the agents build are yours: the license covers this app, not what you make with it.
+
+Third-party parts keep their own licenses: axe-core (MPL-2.0, `server/vendor/axe.min.js`) and the agents adapted from
+VoltAgent's collection (MIT), listed under Credits below.
+
 ## Credits
 
 - The **Human tone** and **Microcopy** agents are adapted from `content-quality-editor`, `ai-writing-auditor` and
